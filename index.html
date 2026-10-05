@@ -7,119 +7,284 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<header class="topbar">
+  <div>
+    <h1>ACONS Planning</h1>
+    <p>Шахматка, графики, аналитика и контроль выполнения</p>
+  </div>
+  <div class="top-actions">
+    <button id="exportBtn" class="ghost-btn">Экспорт JSON</button>
+    <label class="ghost-btn file-btn">Импорт JSON<input id="importInput" type="file" accept=".json,application/json"></label>
+    <button id="resetBtn" class="danger-lite">Сбросить демо-данные</button>
+  </div>
+</header>
 
-  <header class="topbar">
-    <div>
-      <h1>ACONS Planning</h1>
-      <p>Шахматка производства работ</p>
-    </div>
-  </header>
+<main class="container">
+  <nav class="tabs">
+    <button class="tab active" data-tab="main">Основные здания</button>
+    <button class="tab" data-tab="demo">Демонтаж</button>
+    <button class="tab" data-tab="history">Журнал факта</button>
+    <button class="tab" data-tab="analytics">Аналитика</button>
+    <button class="tab" data-tab="settings">Настройки</button>
+    <button class="tab" data-tab="access">Доступ</button>
+  </nav>
 
-  <main class="container">
-
-    <section class="controls">
-      <select id="blockFilter">
-        <option value="all">Все блоки</option>
-        <option value="Блок 1">Блок 1</option>
-        <option value="Блок 2">Блок 2</option>
-        <option value="Блок 3">Блок 3</option>
-      </select>
-
-      <select id="sideFilter">
-        <option value="all">Все стороны</option>
-        <option value="А">Ось А / море</option>
-        <option value="Г">Ось Г / штаб</option>
-      </select>
+  <section id="tab-main" class="tab-panel">
+    <section class="toolbar card">
+      <div class="field"><label>Здание</label><select id="buildingFilter"></select></div>
+      <div class="field"><label>Блок</label><select id="blockFilter"></select></div>
+      <div class="field"><label>Этаж</label><select id="floorFilter"></select></div>
+      <div class="field"><label>Ось / сторона</label><select id="sideFilter"></select></div>
+      <div class="field"><label>Статус</label>
+        <select id="statusFilter">
+          <option value="all">Все статусы</option>
+          <option>Не начато</option><option>Фронт готов</option><option>В работе</option>
+          <option>Завершено</option><option>Приостановлено</option><option>Ограничение</option>
+        </select>
+      </div>
     </section>
 
     <section class="stats">
-      <div class="stat-card">
-        <span>Завершено</span>
-        <strong id="doneCount">0</strong>
-      </div>
+      <div class="stat-card"><span>Всего фронтов</span><strong id="mainTotal">0</strong></div>
+      <div class="stat-card"><span>В работе</span><strong id="mainWork">0</strong></div>
+      <div class="stat-card"><span>Завершено</span><strong id="mainDone">0</strong></div>
+      <div class="stat-card"><span>Сдано</span><strong id="mainAccepted">0</strong></div>
+      <div class="stat-card"><span>Ограничения</span><strong id="mainRisk">0</strong></div>
+    </section>
 
-      <div class="stat-card">
-        <span>В работе</span>
-        <strong id="workCount">0</strong>
+    <section class="card">
+      <div class="section-head">
+        <div>
+          <h2>Шахматка фронтов</h2>
+          <p>Здание → блок → этаж → ось / сторона → вид работ. Подземные этажи в этой шахматке не показываются.</p>
+        </div>
+        <div class="legend">
+          <span class="lg lg-not">Не начато</span><span class="lg lg-ready">Фронт готов</span>
+          <span class="lg lg-work">В работе</span><span class="lg lg-done">Завершено</span>
+          <span class="lg lg-pause">Приостановлено</span><span class="lg lg-risk">Ограничение</span>
+        </div>
       </div>
-
-      <div class="stat-card">
-        <span>Ограничения</span>
-        <strong id="riskCount">0</strong>
-      </div>
-
-      <div class="stat-card">
-        <span>Не начато</span>
-        <strong id="notCount">0</strong>
+      <div class="table-wrap">
+        <table class="matrix"><thead id="matrixHead"></thead><tbody id="matrixBody"></tbody></table>
       </div>
     </section>
 
-    <section class="matrix-card">
-      <h2>Шахматка фронтов</h2>
+    <section id="frontEditor" class="editor card hidden">
+      <div class="editor-head">
+        <div><h2 id="frontTitle">Карточка фронта</h2><p id="frontMeta"></p></div>
+        <button id="closeFrontEditor" class="ghost-btn">Закрыть</button>
+      </div>
+      <div class="form-grid">
+        <div class="field"><label>Статус</label><select id="frontStatus">
+          <option>Не начато</option><option>Фронт готов</option><option>В работе</option>
+          <option>Завершено</option><option>Приостановлено</option><option>Ограничение</option>
+        </select></div>
+        <div class="field"><label>Факт</label><input id="frontFact" type="text"></div>
+        <div class="field"><label>Людей, чел. <small>опционально</small></label><input id="frontPeople" type="number" min="0"></div>
+        <div class="field"><label>Договорное начало</label><input id="frontContractStart" type="date"></div>
+        <div class="field"><label>Договорное окончание</label><input id="frontContractEnd" type="date"></div>
+        <div class="field"><label>Рабочее начало</label><input id="frontPlanStart" type="date"></div>
+        <div class="field"><label>Рабочее окончание</label><input id="frontPlanEnd" type="date"></div>
+        <div class="field"><label>Фактическое начало</label><input id="frontFactStart" type="date"></div>
+        <div class="field"><label>Фактическое окончание</label><input id="frontFactEnd" type="date"></div>
+        <div class="field"><label>Ед. изм.</label><input id="frontUnit" type="text" placeholder="м² / м.п. / шт."></div>
+        <div class="field"><label>Общий объем</label><input id="frontTotalQty" type="number" min="0" step="0.01"></div>
+        <div class="field"><label>Выполнено накопительно</label><input id="frontDoneQty" type="number" min="0" step="0.01"></div>
+        <div class="field inline-checks">
+          <label><input id="frontPresented" type="checkbox"> Предъявлено</label>
+          <label><input id="frontAccepted" type="checkbox"> Сдано / принято</label>
+        </div>
+        <div class="field wide"><label>Ограничение / комментарий</label><textarea id="frontConstraint" rows="3"></textarea></div>
+      </div>
+      <div class="editor-actions">
+        <button id="saveFrontBtn" class="primary-btn">Сохранить</button>
+        <button id="addFactFromFrontBtn" class="ghost-btn">Добавить запись факта</button>
+      </div>
+    </section>
+  </section>
 
+  <section id="tab-demo" class="tab-panel hidden">
+    <section class="stats">
+      <div class="stat-card"><span>Объектов</span><strong id="demoTotal">0</strong></div>
+      <div class="stat-card"><span>В работе</span><strong id="demoWork">0</strong></div>
+      <div class="stat-card"><span>Завершено</span><strong id="demoDone">0</strong></div>
+      <div class="stat-card"><span>Сдано</span><strong id="demoAccepted">0</strong></div>
+      <div class="stat-card"><span>Просрочено</span><strong id="demoLate">0</strong></div>
+    </section>
+    <section class="card">
+      <div class="section-head">
+        <div><h2>Демонтажные работы</h2><p>Договорные и рабочие даты, факт, связи, сдача и отклонение.</p></div>
+      </div>
       <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Блок / этаж / сторона</th>
-              <th>Кладка</th>
-              <th>Вертикальное армирование</th>
-              <th>Штукатурка</th>
-              <th>Гидроизоляция балконов</th>
-              <th>Передача фронта</th>
-            </tr>
-          </thead>
-          <tbody id="matrixBody"></tbody>
+        <table class="demo-table">
+          <thead><tr><th>Объект</th><th>Статус</th><th>Договор</th><th>Рабочий план</th><th>Факт</th><th>Связь</th><th>Сдача</th><th>Отклонение</th></tr></thead>
+          <tbody id="demoBody"></tbody>
+        </table>
+      </div>
+    </section>
+    <section id="demoEditor" class="editor card hidden">
+      <div class="editor-head">
+        <div><h2 id="demoTitle">Карточка демонтажа</h2><p id="demoMeta"></p></div>
+        <button id="closeDemoEditor" class="ghost-btn">Закрыть</button>
+      </div>
+      <div class="form-grid">
+        <div class="field"><label>Статус</label><select id="demoStatus">
+          <option>Не начато</option><option>Готово к старту</option><option>В работе</option>
+          <option>Приостановлено</option><option>Завершено</option><option>Ограничение</option>
+        </select></div>
+        <div class="field"><label>Договорное начало</label><input id="demoContractStart" type="date"></div>
+        <div class="field"><label>Договорное окончание</label><input id="demoContractEnd" type="date"></div>
+        <div class="field"><label>Рабочее начало</label><input id="demoPlanStart" type="date"></div>
+        <div class="field"><label>Рабочее окончание</label><input id="demoPlanEnd" type="date"></div>
+        <div class="field"><label>Фактическое начало</label><input id="demoFactStart" type="date"></div>
+        <div class="field"><label>Фактическое окончание</label><input id="demoFactEnd" type="date"></div>
+        <div class="field"><label>Предшественник</label><select id="demoPred"></select></div>
+        <div class="field"><label>Тип связи</label><select id="demoLinkType"><option>ОН (FS)</option><option>НН (SS)</option><option>ОО (FF)</option><option>НО (SF)</option></select></div>
+        <div class="field"><label>Лаг, дней</label><input id="demoLag" type="number" value="0"></div>
+        <div class="field inline-checks"><label><input id="demoPresented" type="checkbox"> Предъявлено</label><label><input id="demoAccepted" type="checkbox"> Сдано / принято</label></div>
+        <div class="field wide"><label>Комментарий / ограничение</label><textarea id="demoComment" rows="3"></textarea></div>
+      </div>
+      <div class="editor-actions"><button id="saveDemoBtn" class="primary-btn">Сохранить</button></div>
+    </section>
+  </section>
+
+  <section id="tab-history" class="tab-panel hidden">
+    <section class="card">
+      <div class="section-head">
+        <div><h2>Журнал факта</h2><p>Каждая запись хранится по дате. Это основа план/факт аналитики за любой интервал.</p></div>
+        <button id="newFactBtn" class="primary-btn">Новая запись факта</button>
+      </div>
+      <div class="toolbar">
+        <div class="field"><label>С</label><input id="hFrom" type="date"></div>
+        <div class="field"><label>По</label><input id="hTo" type="date"></div>
+        <div class="field"><label>Здание</label><select id="hBuilding"></select></div>
+        <div class="field"><label>Вид работ</label><select id="hWork"></select></div>
+        <button id="applyHistoryFilter" class="ghost-btn">Фильтр</button>
+      </div>
+      <div class="table-wrap">
+        <table class="history-table">
+          <thead><tr><th>Дата</th><th>Фронт</th><th>Факт за период</th><th>Накопительно</th><th>Людей</th><th>Статус</th><th>Комментарий</th></tr></thead>
+          <tbody id="historyBody"></tbody>
         </table>
       </div>
     </section>
 
-    <section id="editor" class="editor hidden">
+    <section id="factEditor" class="editor card hidden">
       <div class="editor-head">
-        <div>
-          <h2 id="editorTitle">Карточка фронта</h2>
-          <p id="editorMeta"></p>
-        </div>
-        <button id="closeEditor">Закрыть</button>
+        <div><h2>Новая запись факта</h2><p id="factEditorMeta"></p></div>
+        <button id="closeFactEditor" class="ghost-btn">Закрыть</button>
       </div>
-
       <div class="form-grid">
-
-        <label>
-          Статус
-          <select id="status">
-            <option>Не начато</option>
-            <option>Фронт готов</option>
-            <option>В работе</option>
-            <option>Завершено</option>
-            <option>Приостановлено</option>
-            <option>Ограничение</option>
-          </select>
-        </label>
-
-        <label>
-          Факт
-          <input id="fact" type="text" placeholder="Например: выполнен 5 этаж">
-        </label>
-
-        <label>
-          Людей
-          <input id="people" type="number" min="0" placeholder="Опционально">
-        </label>
-
-        <label class="wide">
-          Ограничение / комментарий
-          <textarea id="constraint" rows="3"></textarea>
-        </label>
-
+        <div class="field"><label>Фронт</label><select id="factFrontSelect"></select></div>
+        <div class="field"><label>Дата</label><input id="factDate" type="date"></div>
+        <div class="field"><label>Факт за период</label><input id="factQty" type="number" min="0" step="0.01"></div>
+        <div class="field"><label>Накопительно</label><input id="factCumQty" type="number" min="0" step="0.01"></div>
+        <div class="field"><label>Людей</label><input id="factPeople" type="number" min="0"></div>
+        <div class="field"><label>Статус</label><select id="factStatus">
+          <option>Не начато</option><option>Фронт готов</option><option>В работе</option>
+          <option>Завершено</option><option>Приостановлено</option><option>Ограничение</option>
+        </select></div>
+        <div class="field wide"><label>Комментарий</label><textarea id="factComment" rows="3"></textarea></div>
       </div>
+      <div class="editor-actions"><button id="saveFactBtn" class="primary-btn">Сохранить запись</button></div>
+    </section>
+  </section>
 
-      <button id="saveBtn" class="save-btn">Сохранить</button>
-
+  <section id="tab-analytics" class="tab-panel hidden">
+    <section class="card">
+      <div class="section-head">
+        <div><h2>Сравнение периодов</h2><p>Можно сравнить любые два интервала по людям, объемам, стартам, окончаниям и сдаче.</p></div>
+      </div>
+      <div class="period-grid">
+        <div class="period-box"><h3>Период A</h3><div class="toolbar"><div class="field"><label>С</label><input id="a1From" type="date"></div><div class="field"><label>По</label><input id="a1To" type="date"></div></div></div>
+        <div class="period-box"><h3>Период B</h3><div class="toolbar"><div class="field"><label>С</label><input id="a2From" type="date"></div><div class="field"><label>По</label><input id="a2To" type="date"></div></div></div>
+      </div>
+      <div class="toolbar">
+        <div class="field"><label>Здание</label><select id="aBuilding"></select></div>
+        <div class="field"><label>Вид работ</label><select id="aWork"></select></div>
+        <div class="field"><label>Блок</label><select id="aBlock"></select></div>
+        <div class="field"><label>Этаж</label><select id="aFloor"></select></div>
+        <button id="applyAnalytics" class="primary-btn">Сравнить</button>
+      </div>
     </section>
 
-  </main>
+    <section class="compare-grid">
+      <div class="compare-card"><span>Факт объема A</span><strong id="cQtyA">0</strong><small id="cQtyDelta">Δ 0</small></div>
+      <div class="compare-card"><span>Факт объема B</span><strong id="cQtyB">0</strong><small></small></div>
+      <div class="compare-card"><span>Человеко-дни A</span><strong id="cPeopleA">0</strong><small id="cPeopleDelta">Δ 0</small></div>
+      <div class="compare-card"><span>Человеко-дни B</span><strong id="cPeopleB">0</strong><small></small></div>
+      <div class="compare-card"><span>Сдано A</span><strong id="cAcceptedA">0</strong><small id="cAcceptedDelta">Δ 0</small></div>
+      <div class="compare-card"><span>Сдано B</span><strong id="cAcceptedB">0</strong><small></small></div>
+    </section>
 
-  <script src="app.js"></script>
+    <section class="grid-2">
+      <div class="card"><h2>План / факт периода A</h2><div id="analyticsA" class="analytics-list"></div></div>
+      <div class="card"><h2>План / факт периода B</h2><div id="analyticsB" class="analytics-list"></div></div>
+    </section>
+  </section>
+
+  <section id="tab-settings" class="tab-panel hidden">
+    <section class="grid-2">
+      <div class="card">
+        <h2>Здания</h2>
+        <div id="settingsBuildings" class="settings-list"></div>
+        <div class="add-row"><input id="newBuilding" placeholder="Новое здание"><button id="addBuildingBtn" class="primary-btn">Добавить</button></div>
+      </div>
+      <div class="card">
+        <h2>Виды работ</h2>
+        <div id="settingsWorks" class="settings-list"></div>
+        <div class="add-row"><input id="newWork" placeholder="Новый вид работ"><button id="addWorkBtn" class="primary-btn">Добавить</button></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Структура здания / новая разбивка</h2>
+      <div class="form-grid">
+        <div class="field"><label>Здание</label><select id="sBuilding"></select></div>
+        <div class="field"><label>Блок / зона</label><input id="sBlock" placeholder="Например: Блок 4"></div>
+        <div class="field"><label>Этаж</label><input id="sFloor" type="number" placeholder="Например: 8 или -1"></div>
+        <div class="field"><label>Ось / сторона / зона</label><input id="sSide" placeholder="Например: А / море"></div>
+        <div class="field"><label>Создать работы</label><select id="sWorkMode"><option value="all">Все виды работ</option><option value="one">Один вид работ</option></select></div>
+        <div class="field"><label>Вид работ</label><select id="sWork"></select></div>
+      </div>
+      <div class="editor-actions"><button id="addStructureBtn" class="primary-btn">Добавить разбивку</button></div>
+      <p class="muted">Новая разбивка сохраняется. Если указать отрицательный этаж, он будет в базе, но не будет виден в фасадной шахматке.</p>
+    </section>
+
+    <section class="card">
+      <h2>Сохраненные разбивки</h2>
+      <div id="structureList" class="settings-list"></div>
+    </section>
+  </section>
+
+  <section id="tab-access" class="tab-panel hidden">
+    <section class="grid-2">
+      <div class="card">
+        <h2>Роли доступа</h2>
+        <div class="analytics-list">
+          <div class="analytics-item"><span>Администратор</span><strong>Полный доступ</strong></div>
+          <div class="analytics-item"><span>Планировщик</span><strong>Изменение графиков, факта, аналитики</strong></div>
+          <div class="analytics-item"><span>Ответственный</span><strong>Факт, люди, комментарии по своим фронтам</strong></div>
+          <div class="analytics-item"><span>Заказчик</span><strong>Только просмотр выбранных разделов</strong></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Публичный доступ сейчас</h2>
+        <p class="muted">Текущая GitHub Pages версия — публичная ссылка без авторизации. Не размещай здесь конфиденциальные данные.</p>
+        <p>Для реальной эксплуатации нужен вход по учетной записи и база данных. Я подготовил структуру под Supabase: после подключения можно ограничить доступ по ролям и по проектам.</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Как выдавать доступ после подключения базы</h2>
+      <div class="access-flow">
+        <div><b>Внутренние сотрудники</b><br>Вход по email → роль Планировщик / Ответственный / Администратор.</div>
+        <div><b>Заказчик</b><br>Отдельная учетная запись → только чтение → только разрешенные объекты и отчеты.</div>
+        <div><b>Подрядчик</b><br>Доступ только к своим работам → ввод факта и комментариев без прав менять договорные даты.</div>
+      </div>
+    </section>
+  </section>
+</main>
+<script src="app.js"></script>
 </body>
 </html>
