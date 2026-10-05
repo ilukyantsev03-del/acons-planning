@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ACONS Planning</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div>
+      <h1>ACONS Planning</h1>
+      <p>Шахматка производства работ</p>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <section class="controls">
+      <select id="blockFilter">
+        <option value="all">Все блоки</option>
+        <option value="Блок 1">Блок 1</option>
+        <option value="Блок 2">Блок 2</option>
+        <option value="Блок 3">Блок 3</option>
+      </select>
+
+      <select id="sideFilter">
+        <option value="all">Все стороны</option>
+        <option value="А">Ось А / море</option>
+        <option value="Г">Ось Г / штаб</option>
+      </select>
+    </section>
+
+    <section class="stats">
+      <div class="stat-card">
+        <span>Завершено</span>
+        <strong id="doneCount">0</strong>
+      </div>
+
+      <div class="stat-card">
+        <span>В работе</span>
+        <strong id="workCount">0</strong>
+      </div>
+
+      <div class="stat-card">
+        <span>Ограничения</span>
+        <strong id="riskCount">0</strong>
+      </div>
+
+      <div class="stat-card">
+        <span>Не начато</span>
+        <strong id="notCount">0</strong>
+      </div>
+    </section>
+
+    <section class="matrix-card">
+      <h2>Шахматка фронтов</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Блок / этаж / сторона</th>
+              <th>Кладка</th>
+              <th>Вертикальное армирование</th>
+              <th>Штукатурка</th>
+              <th>Гидроизоляция балконов</th>
+              <th>Передача фронта</th>
+            </tr>
+          </thead>
+          <tbody id="matrixBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="editor" class="editor hidden">
+      <div class="editor-head">
+        <div>
+          <h2 id="editorTitle">Карточка фронта</h2>
+          <p id="editorMeta"></p>
+        </div>
+        <button id="closeEditor">Закрыть</button>
+      </div>
+
+      <div class="form-grid">
+
+        <label>
+          Статус
+          <select id="status">
+            <option>Не начато</option>
+            <option>Фронт готов</option>
+            <option>В работе</option>
+            <option>Завершено</option>
+            <option>Приостановлено</option>
+            <option>Ограничение</option>
+          </select>
+        </label>
+
+        <label>
+          Факт
+          <input id="fact" type="text" placeholder="Например: выполнен 5 этаж">
+        </label>
+
+        <label>
+          Людей
+          <input id="people" type="number" min="0" placeholder="Опционально">
+        </label>
+
+        <label class="wide">
+          Ограничение / комментарий
+          <textarea id="constraint" rows="3"></textarea>
+        </label>
+
+      </div>
+
+      <button id="saveBtn" class="save-btn">Сохранить</button>
+
+    </section>
+
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
