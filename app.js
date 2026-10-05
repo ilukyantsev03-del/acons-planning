@@ -824,7 +824,11 @@ function importData(file){
 
   r.readAsText(file)
 }
-
+// Явно связываем HTML-элементы по id с JavaScript.
+// Не полагаемся на автоматические глобальные переменные браузера.
+document.querySelectorAll("[id]").forEach(el => {
+  window[el.id] = el;
+});
 setupTabs();
 initAllSelects();
 renderMatrix();
