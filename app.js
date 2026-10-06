@@ -1,22 +1,33 @@
 'use strict';
 
+
+/* =========================================================
+   ОБЩЕЕ
+   ========================================================= */
+
 const $ = id =>
   document.getElementById(id);
+
 
 const DB_NAME =
   'acons_planning_local';
 
+
 const DB_VERSION =
-  1;
+  2;
+
 
 const STORE =
   'project';
 
+
 const PROJECT_KEY =
   'main';
 
+
 const SCHEMA_VERSION =
-  '1.0.0';
+  '2.0.0';
+
 
 const STATUS_LIST = [
   'Не начато',
@@ -26,6 +37,67 @@ const STATUS_LIST = [
   'Приостановлено',
   'Ограничение'
 ];
+
+
+const DIMENSIONS = {
+
+  building: {
+    label: 'Здание'
+  },
+
+  block: {
+    label: 'Блок'
+  },
+
+  floor: {
+    label: 'Этаж'
+  },
+
+  capture: {
+    label: 'Захватка'
+  },
+
+  axis: {
+    label: 'Ось'
+  },
+
+  side: {
+    label: 'Сторона'
+  },
+
+  zone: {
+    label: 'Зона'
+  },
+
+  roomNo: {
+    label: '№ помещения'
+  },
+
+  roomName: {
+    label: 'Помещение'
+  },
+
+  organization: {
+    label: 'Организация'
+  }
+
+};
+
+
+const CELL_TYPES = {
+
+  status: 'Статус',
+
+  percent: '% выполнения',
+
+  qty: 'Факт / объём',
+
+  endDate: 'Дата окончания',
+
+  variance: 'Отклонение'
+
+};
+
 
 const BUILDINGS = [
   'Главный корпус',
@@ -43,87 +115,158 @@ const BUILDINGS = [
   'Аэрарий'
 ];
 
+
 const WORKS = [
+
   [
     'Кладка наружных стен',
     'АР',
     'м²'
   ],
+
   [
     'Вертикальное армирование',
     'КР',
     'т'
   ],
+
   [
     'Штукатурка',
     'АР',
     'м²'
   ],
+
   [
     'Гидроизоляция балконов',
     'АР',
     'м²'
   ],
+
   [
     'Передача фронта',
     'Организация работ',
     'шт.'
   ]
+
 ];
+
 
 const DEMOLITION = [
+
   "Склад (ангар) литера Д'",
+
   "Нежилое здание, Корпус №10 литера Д",
+
   "Нежилое здание, Корпус №9 литера Г",
+
   "Нежилое здание №11 литера Е",
+
   "Демонтаж «фонтана с оленем»",
+
   "Аэрарий",
+
   "Нежилое здание Корпус №12 литера З",
+
   "Нежилое здание Корпус №1 литера Б",
+
   "Котельная литера Ф'",
+
   "Склад литера Б', 90:25:020102:170",
+
   "Коттедж 1 литера Ш'",
+
   "Парники",
+
   "Коммунальная столовая литера Ц",
+
   "Управление (бытовые помещения) литера Р",
+
   "Теплица в ООПТ",
+
   "Сауна литера Л'",
+
   "Склад",
+
   "Кладовая / Аккумуляторная литера Т'",
+
   "Гараж литера Ж'",
+
   "Гараж литера С'",
+
   "Нежилое здание КТП / Диспетчерская литера П'",
+
   "Нежилое здание, Корпус №4 литера В",
+
   "Библиотека литера Ю",
+
   "Нежилое здание Корпус №32 литера И",
+
   "Спортивная площадка",
+
   "Нежилое здание (Коттедж 3) литера Ц'",
+
   "Приемная, спортзал литера Т (ЛФК)",
+
   "Прачечная литера А (ОКН)",
+
   "Нежилое здание литера У' (Склад ген.подрядчика)",
+
   "Офис, нежилое здание литера Ф (штаб тех.заказчика)",
+
   "Нежилое здание Корпус №35 литера Л (штаб ген.подрядчика)",
+
   "Нежилое здание, Корпус №34 литера К (ООПТ)"
+
 ];
 
-let db = null;
-let project = null;
-let importRows = [];
-let compareIncoming = null;
+
+let db =
+  null;
+
+
+let project =
+  null;
+
+
+let importRows =
+  [];
+
+
+let compareIncoming =
+  null;
+
+
+let currentViewId =
+  null;
+
+
+let temporaryView =
+  null;
+
+
+/* =========================================================
+   УТИЛИТЫ
+   ========================================================= */
 
 const uid = prefix =>
   prefix +
   '-' +
   crypto.randomUUID();
 
+
 const today = () =>
   new Date()
     .toISOString()
-    .slice(0, 10);
+    .slice(
+      0,
+      10
+    );
+
 
 const nowIso = () =>
   new Date()
     .toISOString();
+
 
 const num = value =>
   Number(
@@ -140,10 +283,12 @@ const num = value =>
       )
   ) || 0;
 
+
 const fmt = value =>
   Math.round(
     num(value) * 100
   ) / 100;
+
 
 const esc = value =>
   String(
@@ -151,15 +296,16 @@ const esc = value =>
   )
     .replace(
       /[&<>"']/g,
-      char =>
+      character =>
         ({
-          '&':'&amp;',
-          '<':'&lt;',
-          '>':'&gt;',
-          '"':'&quot;',
-          "'":'&#039;'
-        })[char]
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#039;'
+        })[character]
     );
+
 
 const uniq = array =>
   [
@@ -172,6 +318,7 @@ const uniq = array =>
       )
     )
   ];
+
 
 const byId = (
   list,
@@ -187,6 +334,7 @@ const byId = (
       )
   );
 
+
 const nameById = (
   list,
   id
@@ -197,29 +345,173 @@ const nameById = (
   )?.name ||
   '';
 
+
+const clone = value =>
+  structuredClone(
+    value
+  );
+
+
 const diffDays = (
   first,
   second
-) =>
-  first &&
-  second
-    ? Math.round(
-        (
-          Date.parse(second) -
-          Date.parse(first)
-        ) /
-        86400000
+) => {
+
+  if (
+    !first ||
+    !second
+  ) {
+    return null;
+  }
+
+  return Math.round(
+    (
+      Date.parse(
+        second
+      ) -
+      Date.parse(
+        first
       )
-    : null;
+    ) /
+    86400000
+  );
+};
+
+
+/* =========================================================
+   ПРОЕКТ ПО УМОЛЧАНИЮ
+   ========================================================= */
+
+function createDefaultView(
+  works
+) {
+
+  return {
+
+    id:
+      'VIEW-DEFAULT',
+
+    name:
+      'Основная шахматка',
+
+    type:
+      'matrix',
+
+    rows: [
+      'block',
+      'floor',
+      'side'
+    ],
+
+    workIds:
+      works
+        .map(
+          work =>
+            work.id
+        ),
+
+    cellValue:
+      'status',
+
+    filters: {
+      buildingIds: [],
+      blocks: [],
+      floors: [],
+      captures: [],
+      axes: [],
+      sides: [],
+      zones: [],
+      organizationIds: [],
+      statuses: []
+    },
+
+    showCompleted:
+      true,
+
+    hideBasement:
+      false,
+
+    isDefault:
+      true,
+
+    createdAt:
+      nowIso(),
+
+    updatedAt:
+      nowIso()
+
+  };
+
+}
+
 
 function emptyProject() {
+
+  const buildings =
+    BUILDINGS.map(
+      (
+        name,
+        index
+      ) => ({
+
+        id:
+          `BLD-${String(index + 1).padStart(3, '0')}`,
+
+        name,
+
+        active:
+          true,
+
+        sort:
+          index + 1
+
+      })
+    );
+
+
+  const works =
+    WORKS.map(
+      (
+        item,
+        index
+      ) => ({
+
+        id:
+          `WRK-${String(index + 1).padStart(3, '0')}`,
+
+        name:
+          item[0],
+
+        section:
+          item[1],
+
+        unit:
+          item[2],
+
+        active:
+          true,
+
+        sort:
+          index + 1
+
+      })
+    );
+
+
+  const defaultView =
+    createDefaultView(
+      works
+    );
+
 
   return {
 
     schemaVersion:
       SCHEMA_VERSION,
 
+
     meta: {
+
       projectName:
         'ACONS Planning',
 
@@ -230,56 +522,20 @@ function emptyProject() {
         nowIso(),
 
       lastBackupAt:
-        null
+        null,
+
+      defaultViewId:
+        defaultView.id
+
     },
 
-    buildings:
-      BUILDINGS.map(
-        (
-          name,
-          index
-        ) => ({
-          id:
-            `BLD-${String(index + 1).padStart(3,'0')}`,
 
-          name,
-
-          active:
-            true,
-
-          sort:
-            index + 1
-        })
-      ),
+    buildings,
 
     organizations:
       [],
 
-    works:
-      WORKS.map(
-        (
-          item,
-          index
-        ) => ({
-          id:
-            `WRK-${String(index + 1).padStart(3,'0')}`,
-
-          name:
-            item[0],
-
-          section:
-            item[1],
-
-          unit:
-            item[2],
-
-          active:
-            true,
-
-          sort:
-            index + 1
-        })
-      ),
+    works,
 
     structures:
       [],
@@ -302,11 +558,13 @@ function emptyProject() {
     customFields:
       [],
 
-    views:
-      [],
+    views: [
+      defaultView
+    ],
 
     history:
       [],
+
 
     demolition:
       DEMOLITION.map(
@@ -314,8 +572,9 @@ function emptyProject() {
           name,
           index
         ) => ({
+
           id:
-            `DEM-${String(index + 1).padStart(3,'0')}`,
+            `DEM-${String(index + 1).padStart(3, '0')}`,
 
           name,
 
@@ -342,10 +601,18 @@ function emptyProject() {
 
           active:
             true
+
         })
       )
+
   };
+
 }
+
+
+/* =========================================================
+   INDEXED DB
+   ========================================================= */
 
 async function openDb() {
 
@@ -361,11 +628,13 @@ async function openDb() {
           DB_VERSION
         );
 
+
       request.onupgradeneeded =
         event => {
 
           const database =
             event.target.result;
+
 
           if (
             !database
@@ -379,8 +648,11 @@ async function openDb() {
               .createObjectStore(
                 STORE
               );
+
           }
+
         };
+
 
       request.onsuccess =
         event =>
@@ -388,14 +660,18 @@ async function openDb() {
             event.target.result
           );
 
+
       request.onerror =
         () =>
           reject(
             request.error
           );
+
     }
   );
+
 }
+
 
 async function dbGet() {
 
@@ -411,6 +687,7 @@ async function dbGet() {
           'readonly'
         );
 
+
       const request =
         transaction
           .objectStore(
@@ -420,6 +697,7 @@ async function dbGet() {
             PROJECT_KEY
           );
 
+
       request.onsuccess =
         () =>
           resolve(
@@ -427,14 +705,18 @@ async function dbGet() {
             null
           );
 
+
       request.onerror =
         () =>
           reject(
             request.error
           );
+
     }
   );
+
 }
+
 
 async function dbPut(
   value
@@ -452,6 +734,7 @@ async function dbPut(
           'readwrite'
         );
 
+
       transaction
         .objectStore(
           STORE
@@ -461,30 +744,43 @@ async function dbPut(
           PROJECT_KEY
         );
 
+
       transaction.oncomplete =
         () =>
           resolve();
+
 
       transaction.onerror =
         () =>
           reject(
             transaction.error
           );
+
     }
   );
+
 }
+
 
 async function saveProject() {
 
   project.meta.updatedAt =
     nowIso();
 
+
   await dbPut(
     project
   );
 
+
   renderBackupNotice();
+
 }
+
+
+/* =========================================================
+   ИСТОРИЯ
+   ========================================================= */
 
 function log(
   action,
@@ -493,8 +789,11 @@ function log(
 ) {
 
   project.history.unshift({
+
     id:
-      uid('H'),
+      uid(
+        'H'
+      ),
 
     at:
       nowIso(),
@@ -504,7 +803,9 @@ function log(
     entity,
 
     description
+
   });
+
 
   project.history =
     project.history
@@ -512,7 +813,13 @@ function log(
         0,
         5000
       );
+
 }
+
+
+/* =========================================================
+   ЗАГРУЗКА ФАЙЛА
+   ========================================================= */
 
 function download(
   name,
@@ -528,10 +835,12 @@ function download(
       }
     );
 
+
   const url =
     URL.createObjectURL(
       blob
     );
+
 
   const link =
     document
@@ -539,20 +848,26 @@ function download(
         'a'
       );
 
+
   link.href =
     url;
 
+
   link.download =
     name;
+
 
   document.body
     .appendChild(
       link
     );
 
+
   link.click();
 
+
   link.remove();
+
 
   setTimeout(
     () =>
@@ -561,7 +876,13 @@ function download(
       ),
     1000
   );
+
 }
+
+
+/* =========================================================
+   ФРОНТ
+   ========================================================= */
 
 function hydrateFront(
   front
@@ -573,10 +894,13 @@ function hydrateFront(
       front.structureId
     ) || {};
 
+
   return {
+
     ...front,
 
     structure,
+
 
     building:
       nameById(
@@ -584,11 +908,13 @@ function hydrateFront(
         structure.buildingId
       ),
 
+
     work:
       nameById(
         project.works,
         front.workId
       ),
+
 
     organization:
       nameById(
@@ -596,43 +922,70 @@ function hydrateFront(
         front.organizationId
       ),
 
+
     block:
-      structure.block || '',
+      structure.block ||
+      '',
+
 
     floor:
-      structure.floor ?? '',
+      structure.floor ??
+      '',
+
 
     capture:
-      structure.capture || '',
+      structure.capture ||
+      '',
+
 
     axis:
-      structure.axis || '',
+      structure.axis ||
+      '',
+
 
     side:
-      structure.side || '',
+      structure.side ||
+      '',
+
 
     zone:
-      structure.zone || '',
+      structure.zone ||
+      '',
+
 
     roomNo:
-      structure.roomNo || '',
+      structure.roomNo ||
+      '',
+
 
     roomName:
-      structure.roomName || ''
+      structure.roomName ||
+      ''
+
   };
+
 }
+
 
 function frontLabel(
   front
 ) {
+
+  if (!front) {
+    return '';
+  }
+
 
   const item =
     hydrateFront(
       front
     );
 
+
   return [
+
     item.building,
+
     item.block,
 
     item.floor !== ''
@@ -648,6 +1001,7 @@ function frontLabel(
       : '',
 
     item.side,
+
     item.zone,
 
     item.roomNo
@@ -655,10 +1009,21 @@ function frontLabel(
       : '',
 
     item.work
+
   ]
-    .filter(Boolean)
-    .join(' / ');
+    .filter(
+      Boolean
+    )
+    .join(
+      ' / '
+    );
+
 }
+
+
+/* =========================================================
+   SELECT
+   ========================================================= */
 
 function fill(
   element,
@@ -670,11 +1035,14 @@ function fill(
     return;
   }
 
+
   const current =
     element.value;
 
+
   element.innerHTML =
     '';
+
 
   if (
     allLabel !==
@@ -687,17 +1055,22 @@ function fill(
           'option'
         );
 
+
     option.value =
       'all';
 
+
     option.textContent =
       allLabel;
+
 
     element
       .appendChild(
         option
       );
+
   }
+
 
   items.forEach(
     item => {
@@ -708,11 +1081,13 @@ function fill(
             'option'
           );
 
+
       option.value =
         String(
           item.id ??
           item
         );
+
 
       option.textContent =
         String(
@@ -720,15 +1095,20 @@ function fill(
           item
         );
 
+
       element
         .appendChild(
           option
         );
+
     }
   );
 
+
   if (
-    [...element.options]
+    [
+      ...element.options
+    ]
       .some(
         option =>
           option.value ===
@@ -738,8 +1118,15 @@ function fill(
 
     element.value =
       current;
+
   }
+
 }
+
+
+/* =========================================================
+   ИНИЦИАЛИЗАЦИЯ SELECT
+   ========================================================= */
 
 function initSelects() {
 
@@ -751,6 +1138,7 @@ function initSelects() {
           false
       );
 
+
   const works =
     project.works
       .filter(
@@ -759,6 +1147,7 @@ function initSelects() {
           false
       );
 
+
   const organizations =
     project.organizations
       .filter(
@@ -766,6 +1155,7 @@ function initSelects() {
           item.active !==
           false
       );
+
 
   [
     'mfBuilding',
@@ -782,8 +1172,8 @@ function initSelects() {
         )
     );
 
+
   [
-    'mfWork',
     'gWork',
     'pfWork'
   ]
@@ -795,6 +1185,7 @@ function initSelects() {
           'Все работы'
         )
     );
+
 
   [
     'mfOrg',
@@ -809,14 +1200,535 @@ function initSelects() {
         )
     );
 
+
   updateMatrixDependent();
+
 }
+
+
+/* =========================================================
+   ШАХМАТКА — ПРЕДСТАВЛЕНИЯ
+   ========================================================= */
+
+function ensureViews() {
+
+  if (
+    !Array.isArray(
+      project.views
+    )
+  ) {
+
+    project.views =
+      [];
+
+  }
+
+
+  if (
+    project.views.length ===
+    0
+  ) {
+
+    const view =
+      createDefaultView(
+        project.works
+      );
+
+
+    project.views
+      .push(
+        view
+      );
+
+
+    project.meta.defaultViewId =
+      view.id;
+
+  }
+
+
+  if (
+    !project.meta.defaultViewId ||
+    !byId(
+      project.views,
+      project.meta.defaultViewId
+    )
+  ) {
+
+    project.meta.defaultViewId =
+      project.views[0].id;
+
+  }
+
+
+  if (
+    !currentViewId ||
+    !byId(
+      project.views,
+      currentViewId
+    )
+  ) {
+
+    currentViewId =
+      project.meta.defaultViewId;
+
+  }
+
+}
+
+
+function normalizeView(
+  view
+) {
+
+  return {
+
+    id:
+      view.id ||
+      uid(
+        'VIEW'
+      ),
+
+    name:
+      view.name ||
+      'Новая шахматка',
+
+    type:
+      view.type ||
+      'matrix',
+
+    rows:
+      Array.isArray(
+        view.rows
+      ) &&
+      view.rows.length
+        ? view.rows
+        : [
+            'block',
+            'floor',
+            'side'
+          ],
+
+    workIds:
+      Array.isArray(
+        view.workIds
+      )
+        ? view.workIds
+        : [],
+
+    cellValue:
+      view.cellValue ||
+      'status',
+
+    filters: {
+
+      buildingIds:
+        view.filters
+          ?.buildingIds ||
+        [],
+
+      blocks:
+        view.filters
+          ?.blocks ||
+        [],
+
+      floors:
+        view.filters
+          ?.floors ||
+        [],
+
+      captures:
+        view.filters
+          ?.captures ||
+        [],
+
+      axes:
+        view.filters
+          ?.axes ||
+        [],
+
+      sides:
+        view.filters
+          ?.sides ||
+        [],
+
+      zones:
+        view.filters
+          ?.zones ||
+        [],
+
+      organizationIds:
+        view.filters
+          ?.organizationIds ||
+        [],
+
+      statuses:
+        view.filters
+          ?.statuses ||
+        []
+
+    },
+
+    showCompleted:
+      view.showCompleted !==
+      false,
+
+    hideBasement:
+      Boolean(
+        view.hideBasement
+      ),
+
+    isDefault:
+      Boolean(
+        view.isDefault
+      ),
+
+    createdAt:
+      view.createdAt ||
+      nowIso(),
+
+    updatedAt:
+      view.updatedAt ||
+      nowIso()
+
+  };
+
+}
+
+
+function currentView() {
+
+  ensureViews();
+
+
+  return normalizeView(
+    byId(
+      project.views,
+      currentViewId
+    )
+  );
+
+}
+
+
+function workingView() {
+
+  return temporaryView
+    ? normalizeView(
+        temporaryView
+      )
+    : currentView();
+
+}
+
+
+function renderViewSelector() {
+
+  ensureViews();
+
+
+  const select =
+    $('viewSelect');
+
+
+  const oldValue =
+    currentViewId;
+
+
+  select.innerHTML =
+    project.views
+      .map(
+        view => {
+
+          const isDefault =
+            project.meta.defaultViewId ===
+            view.id;
+
+
+          return `
+            <option
+              value="${view.id}"
+              ${
+                view.id ===
+                oldValue
+                  ? 'selected'
+                  : ''
+              }
+            >
+              ${esc(view.name)}
+              ${isDefault ? ' ★' : ''}
+            </option>
+          `;
+
+        }
+      )
+      .join(
+        ''
+      );
+
+
+  select.value =
+    currentViewId;
+
+
+  renderViewDescription();
+
+}
+
+
+function renderViewDescription() {
+
+  const view =
+    workingView();
+
+
+  $('viewModeBadge')
+    .textContent =
+      view.type ===
+        'matrix'
+        ? 'Шахматка'
+        : 'Таблица';
+
+
+  const rowNames =
+    view.rows
+      .map(
+        key =>
+          DIMENSIONS[key]
+            ?.label ||
+          key
+      )
+      .join(
+        ' → '
+      );
+
+
+  const selectedWorks =
+    view.workIds.length
+      ? view.workIds.length
+      : project.works.length;
+
+
+  $('viewDescription')
+    .textContent =
+      view.type ===
+        'matrix'
+        ? `Строки: ${rowNames}. Колонок работ: ${selectedWorks}. Ячейка: ${CELL_TYPES[view.cellValue] || view.cellValue}.`
+        : `Табличное представление. Строковая структура: ${rowNames}.`;
+
+}
+
+
+function viewFiltersToQuickFilters(
+  view
+) {
+
+  const first = array =>
+    Array.isArray(
+      array
+    ) &&
+    array.length ===
+      1
+      ? String(
+          array[0]
+        )
+      : 'all';
+
+
+  $('mfBuilding').value =
+    first(
+      view.filters
+        .buildingIds
+    );
+
+
+  updateMatrixDependent();
+
+
+  $('mfBlock').value =
+    first(
+      view.filters
+        .blocks
+    );
+
+
+  $('mfFloor').value =
+    first(
+      view.filters
+        .floors
+    );
+
+
+  $('mfCapture').value =
+    first(
+      view.filters
+        .captures
+    );
+
+
+  $('mfAxis').value =
+    first(
+      view.filters
+        .axes
+    );
+
+
+  $('mfSide').value =
+    first(
+      view.filters
+        .sides
+    );
+
+
+  $('mfZone').value =
+    first(
+      view.filters
+        .zones
+    );
+
+
+  $('mfOrg').value =
+    first(
+      view.filters
+        .organizationIds
+    );
+
+
+  $('mfStatus').value =
+    first(
+      view.filters
+        .statuses
+    );
+
+}
+
+
+function quickFiltersToView(
+  sourceView
+) {
+
+  const view =
+    clone(
+      sourceView
+    );
+
+
+  const single = value =>
+    value &&
+    value !==
+      'all'
+      ? [
+          value
+        ]
+      : [];
+
+
+  view.filters =
+    {
+
+      buildingIds:
+        single(
+          $('mfBuilding').value
+        ),
+
+      blocks:
+        single(
+          $('mfBlock').value
+        ),
+
+      floors:
+        single(
+          $('mfFloor').value
+        ),
+
+      captures:
+        single(
+          $('mfCapture').value
+        ),
+
+      axes:
+        single(
+          $('mfAxis').value
+        ),
+
+      sides:
+        single(
+          $('mfSide').value
+        ),
+
+      zones:
+        single(
+          $('mfZone').value
+        ),
+
+      organizationIds:
+        single(
+          $('mfOrg').value
+        ),
+
+      statuses:
+        single(
+          $('mfStatus').value
+        )
+
+    };
+
+
+  return view;
+
+}
+
+
+function setCurrentView(
+  id
+) {
+
+  const view =
+    byId(
+      project.views,
+      id
+    );
+
+
+  if (!view) {
+    return;
+  }
+
+
+  currentViewId =
+    id;
+
+
+  temporaryView =
+    null;
+
+
+  renderViewSelector();
+
+
+  viewFiltersToQuickFilters(
+    normalizeView(
+      view
+    )
+  );
+
+
+  renderMatrix();
+
+}
+
+
+/* =========================================================
+   ЗАВИСИМЫЕ ФИЛЬТРЫ ШАХМАТКИ
+   ========================================================= */
 
 function updateMatrixDependent() {
 
   const buildingId =
     $('mfBuilding')
-      .value;
+      ?.value ||
+    'all';
+
 
   const structures =
     project.structures
@@ -828,83 +1740,3095 @@ function updateMatrixDependent() {
             buildingId
       );
 
+
+  const makeItems = (
+    values,
+    numeric = false
+  ) => {
+
+    let list =
+      uniq(
+        values
+      );
+
+
+    if (
+      numeric
+    ) {
+
+      list =
+        list.sort(
+          (
+            first,
+            second
+          ) =>
+            num(
+              first
+            ) -
+            num(
+              second
+            )
+        );
+
+    } else {
+
+      list =
+        list.sort(
+          (
+            first,
+            second
+          ) =>
+            String(
+              first
+            )
+              .localeCompare(
+                String(
+                  second
+                ),
+                'ru'
+              )
+        );
+
+    }
+
+
+    return list
+      .map(
+        value => ({
+          id:
+            value,
+
+          name:
+            value
+        })
+      );
+
+  };
+
+
   fill(
     $('mfBlock'),
 
-    uniq(
+    makeItems(
       structures
         .map(
           item =>
             item.block
         )
-    )
-      .map(
-        value => ({
-          id:
-            value,
-
-          name:
-            value
-        })
-      ),
+    ),
 
     'Все блоки'
   );
 
+
   fill(
     $('mfFloor'),
 
-    uniq(
+    makeItems(
       structures
         .map(
           item =>
             item.floor
+        ),
+      true
+    ),
+
+    'Все этажи'
+  );
+
+
+  fill(
+    $('mfCapture'),
+
+    makeItems(
+      structures
+        .map(
+          item =>
+            item.capture
+        )
+    ),
+
+    'Все захватки'
+  );
+
+
+  fill(
+    $('mfAxis'),
+
+    makeItems(
+      structures
+        .map(
+          item =>
+            item.axis
+        )
+    ),
+
+    'Все оси'
+  );
+
+
+  fill(
+    $('mfSide'),
+
+    makeItems(
+      structures
+        .map(
+          item =>
+            item.side
+        )
+    ),
+
+    'Все стороны'
+  );
+
+
+  fill(
+    $('mfZone'),
+
+    makeItems(
+      structures
+        .map(
+          item =>
+            item.zone
+        )
+    ),
+
+    'Все зоны'
+  );
+
+}
+
+
+/* =========================================================
+   НОВАЯ ШАХМАТКА
+   ========================================================= */
+
+function openNewViewEditor() {
+
+  const view = {
+
+    id:
+      uid(
+        'VIEW'
+      ),
+
+    name:
+      `Новая шахматка ${project.views.length + 1}`,
+
+    type:
+      'matrix',
+
+    rows: [
+      'block',
+      'floor',
+      'side'
+    ],
+
+    workIds:
+      project.works
+        .map(
+          work =>
+            work.id
+        ),
+
+    cellValue:
+      'status',
+
+    filters: {
+      buildingIds: [],
+      blocks: [],
+      floors: [],
+      captures: [],
+      axes: [],
+      sides: [],
+      zones: [],
+      organizationIds: [],
+      statuses: []
+    },
+
+    showCompleted:
+      true,
+
+    hideBasement:
+      false,
+
+    isDefault:
+      false,
+
+    createdAt:
+      nowIso(),
+
+    updatedAt:
+      nowIso()
+
+  };
+
+
+  openViewConfiguration(
+    view,
+    true
+  );
+
+}
+
+
+/* =========================================================
+   НАСТРОЙКА ШАХМАТКИ
+   ========================================================= */
+
+function openViewConfiguration(
+  viewInput,
+  isNew = false
+) {
+
+  const view =
+    normalizeView(
+      clone(
+        viewInput
+      )
+    );
+
+
+  const dimensionChecks =
+    Object.entries(
+      DIMENSIONS
+    )
+      .map(
+        (
+          [
+            key,
+            info
+          ]
+        ) => {
+
+          const checked =
+            view.rows.includes(
+              key
+            );
+
+
+          return `
+            <label class="check-row">
+
+              <input
+                type="checkbox"
+                data-row-dimension="${key}"
+                ${checked ? 'checked' : ''}
+              >
+
+              <span>
+                ${esc(info.label)}
+              </span>
+
+            </label>
+          `;
+
+        }
+      )
+      .join(
+        ''
+      );
+
+
+  const workChecks =
+    project.works
+      .filter(
+        work =>
+          work.active !==
+          false
+      )
+      .map(
+        work => {
+
+          const checked =
+            view.workIds.length ===
+              0 ||
+            view.workIds.includes(
+              work.id
+            );
+
+
+          return `
+            <label class="check-row">
+
+              <input
+                type="checkbox"
+                data-view-work="${work.id}"
+                ${checked ? 'checked' : ''}
+              >
+
+              <span>
+                ${esc(work.name)}
+              </span>
+
+            </label>
+          `;
+
+        }
+      )
+      .join(
+        ''
+      );
+
+
+  const cellOptions =
+    Object.entries(
+      CELL_TYPES
+    )
+      .map(
+        (
+          [
+            key,
+            label
+          ]
+        ) =>
+          `
+            <option
+              value="${key}"
+              ${
+                view.cellValue ===
+                key
+                  ? 'selected'
+                  : ''
+              }
+            >
+              ${esc(label)}
+            </option>
+          `
+      )
+      .join(
+        ''
+      );
+
+
+  openModal(
+    isNew
+      ? 'Новая шахматка'
+      : 'Настройка шахматки',
+
+    `
+
+      <div class="form-grid">
+
+        <div class="field">
+
+          <label>
+            Название
+          </label>
+
+          <input
+            id="vcName"
+            value="${esc(view.name)}"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Режим
+          </label>
+
+          <select id="vcType">
+
+            <option
+              value="matrix"
+              ${
+                view.type ===
+                'matrix'
+                  ? 'selected'
+                  : ''
+              }
+            >
+              Шахматка
+            </option>
+
+            <option
+              value="table"
+              ${
+                view.type ===
+                'table'
+                  ? 'selected'
+                  : ''
+              }
+            >
+              Таблица
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Содержимое ячейки
+          </label>
+
+          <select id="vcCellValue">
+            ${cellOptions}
+          </select>
+
+        </div>
+
+      </div>
+
+
+      <div class="view-config">
+
+        <div class="config-box">
+
+          <h3>
+            Поля строк
+          </h3>
+
+          <p class="muted">
+            Отмеченные поля формируют строки шахматки.
+            Порядок можно поменять ниже.
+          </p>
+
+          <div class="check-list">
+            ${dimensionChecks}
+          </div>
+
+        </div>
+
+
+        <div class="config-box">
+
+          <h3>
+            Виды работ
+          </h3>
+
+          <p class="muted">
+            В режиме «Шахматка» выбранные виды работ
+            становятся колонками.
+          </p>
+
+          <div class="check-list">
+            ${workChecks}
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <div class="config-box">
+
+        <h3>
+          Дополнительные параметры
+        </h3>
+
+
+        <label class="check-row">
+
+          <input
+            id="vcShowCompleted"
+            type="checkbox"
+            ${
+              view.showCompleted
+                ? 'checked'
+                : ''
+            }
+          >
+
+          <span>
+            Показывать завершённые работы
+          </span>
+
+        </label>
+
+
+        <label class="check-row">
+
+          <input
+            id="vcHideBasement"
+            type="checkbox"
+            ${
+              view.hideBasement
+                ? 'checked'
+                : ''
+            }
+          >
+
+          <span>
+            Скрывать отрицательные этажи
+          </span>
+
+        </label>
+
+      </div>
+
+
+      <div class="editor-actions">
+
+        <button
+          id="vcCancel"
+          class="btn"
+        >
+          Отмена
+        </button>
+
+
+        <button
+          id="vcSave"
+          class="btn primary"
+        >
+          ${
+            isNew
+              ? 'Создать шахматку'
+              : 'Применить настройки'
+          }
+        </button>
+
+      </div>
+
+    `
+  );
+
+
+  $('vcCancel').onclick =
+    closeModal;
+
+
+  $('vcSave').onclick =
+    async () => {
+
+      const selectedRows =
+        [
+          ...document.querySelectorAll(
+            '[data-row-dimension]:checked'
+          )
+        ]
+          .map(
+            checkbox =>
+              checkbox.dataset.rowDimension
+          );
+
+
+      if (
+        selectedRows.length ===
+        0
+      ) {
+
+        alert(
+          'Выбери хотя бы одно поле строк.'
+        );
+
+        return;
+
+      }
+
+
+      const selectedWorks =
+        [
+          ...document.querySelectorAll(
+            '[data-view-work]:checked'
+          )
+        ]
+          .map(
+            checkbox =>
+              checkbox.dataset.viewWork
+          );
+
+
+      const result = {
+
+        ...view,
+
+        name:
+          $('vcName')
+            .value
+            .trim() ||
+          'Без названия',
+
+        type:
+          $('vcType')
+            .value,
+
+        rows:
+          selectedRows,
+
+        workIds:
+          selectedWorks,
+
+        cellValue:
+          $('vcCellValue')
+            .value,
+
+        showCompleted:
+          $('vcShowCompleted')
+            .checked,
+
+        hideBasement:
+          $('vcHideBasement')
+            .checked,
+
+        updatedAt:
+          nowIso()
+
+      };
+
+
+      if (
+        isNew
+      ) {
+
+        project.views
+          .push(
+            result
+          );
+
+
+        currentViewId =
+          result.id;
+
+
+        log(
+          'Создано',
+          'Шахматка',
+          result.name
+        );
+
+      } else {
+
+        const index =
+          project.views
+            .findIndex(
+              item =>
+                item.id ===
+                result.id
+            );
+
+
+        if (
+          index >=
+          0
+        ) {
+
+          project.views[index] =
+            result;
+
+        }
+
+
+        currentViewId =
+          result.id;
+
+
+        log(
+          'Изменено',
+          'Шахматка',
+          result.name
+        );
+
+      }
+
+
+      temporaryView =
+        null;
+
+
+      await saveProject();
+
+
+      closeModal();
+
+
+      renderAll();
+
+
+      setCurrentView(
+        result.id
+      );
+
+    };
+
+}
+
+
+/* =========================================================
+   ДУБЛИРОВАНИЕ
+   ========================================================= */
+
+async function duplicateCurrentView() {
+
+  const source =
+    currentView();
+
+
+  const copy =
+    clone(
+      source
+    );
+
+
+  copy.id =
+    uid(
+      'VIEW'
+    );
+
+
+  copy.name =
+    source.name +
+    ' — копия';
+
+
+  copy.isDefault =
+    false;
+
+
+  copy.createdAt =
+    nowIso();
+
+
+  copy.updatedAt =
+    nowIso();
+
+
+  project.views
+    .push(
+      copy
+    );
+
+
+  currentViewId =
+    copy.id;
+
+
+  temporaryView =
+    null;
+
+
+  log(
+    'Создано',
+    'Шахматка',
+    copy.name
+  );
+
+
+  await saveProject();
+
+
+  renderAll();
+
+
+  setCurrentView(
+    copy.id
+  );
+
+}
+
+
+/* =========================================================
+   УДАЛЕНИЕ ПРЕДСТАВЛЕНИЯ
+   ========================================================= */
+
+async function deleteCurrentView() {
+
+  ensureViews();
+
+
+  if (
+    project.views.length <=
+    1
+  ) {
+
+    alert(
+      'Нельзя удалить единственную шахматку.'
+    );
+
+    return;
+
+  }
+
+
+  const view =
+    currentView();
+
+
+  if (
+    !confirm(
+      `Удалить шахматку «${view.name}»?`
+    )
+  ) {
+    return;
+  }
+
+
+  project.views =
+    project.views
+      .filter(
+        item =>
+          item.id !==
+          view.id
+      );
+
+
+  if (
+    project.meta.defaultViewId ===
+    view.id
+  ) {
+
+    project.meta.defaultViewId =
+      project.views[0].id;
+
+  }
+
+
+  currentViewId =
+    project.meta.defaultViewId;
+
+
+  temporaryView =
+    null;
+
+
+  log(
+    'Удалено',
+    'Шахматка',
+    view.name
+  );
+
+
+  await saveProject();
+
+
+  renderAll();
+
+
+  setCurrentView(
+    currentViewId
+  );
+
+}
+
+
+/* =========================================================
+   ПО УМОЛЧАНИЮ
+   ========================================================= */
+
+async function makeCurrentViewDefault() {
+
+  const view =
+    currentView();
+
+
+  project.meta.defaultViewId =
+    view.id;
+
+
+  project.views =
+    project.views
+      .map(
+        item => ({
+          ...item,
+
+          isDefault:
+            item.id ===
+            view.id
+        })
+      );
+
+
+  log(
+    'Изменено',
+    'Шахматка',
+    `По умолчанию: ${view.name}`
+  );
+
+
+  await saveProject();
+
+
+  renderViewSelector();
+
+
+  renderSettings();
+
+}
+
+
+/* =========================================================
+   СОХРАНИТЬ БЫСТРЫЕ ФИЛЬТРЫ В ВИД
+   ========================================================= */
+
+async function saveCurrentViewState() {
+
+  const view =
+    currentView();
+
+
+  const updated =
+    quickFiltersToView(
+      view
+    );
+
+
+  updated.updatedAt =
+    nowIso();
+
+
+  const index =
+    project.views
+      .findIndex(
+        item =>
+          item.id ===
+          updated.id
+      );
+
+
+  project.views[index] =
+    updated;
+
+
+  temporaryView =
+    null;
+
+
+  log(
+    'Изменено',
+    'Шахматка',
+    `Сохранены фильтры: ${updated.name}`
+  );
+
+
+  await saveProject();
+
+
+  renderAll();
+
+
+  setCurrentView(
+    updated.id
+  );
+
+}
+
+
+/* =========================================================
+   БЫСТРЫЕ ФИЛЬТРЫ
+   ========================================================= */
+
+function quickFilterChanged() {
+
+  temporaryView =
+    quickFiltersToView(
+      currentView()
+    );
+
+
+  renderMatrix();
+
+}
+
+
+function resetQuickFilters() {
+
+  temporaryView =
+    null;
+
+
+  viewFiltersToQuickFilters(
+    currentView()
+  );
+
+
+  renderMatrix();
+
+}
+
+
+/* =========================================================
+   ФИЛЬТРАЦИЯ ФРОНТОВ
+   ========================================================= */
+
+function arrayAllows(
+  array,
+  value
+) {
+
+  return (
+    !Array.isArray(
+      array
+    ) ||
+    array.length ===
+      0 ||
+    array
+      .map(
+        String
+      )
+      .includes(
+        String(
+          value
+        )
+      )
+  );
+
+}
+
+
+function filteredFrontsForView(
+  view
+) {
+
+  return project.fronts
+    .map(
+      hydrateFront
+    )
+    .filter(
+      front => {
+
+        const structure =
+          front.structure ||
+          {};
+
+
+        if (
+          !arrayAllows(
+            view.filters
+              .buildingIds,
+            structure.buildingId
+          )
+        ) {
+          return false;
+        }
+
+
+        if (
+          !arrayAllows(
+            view.filters
+              .blocks,
+            front.block
+          )
+        ) {
+          return false;
+        }
+
+
+        if (
+          !arrayAllows(
+            view.filters
+              .floors,
+            front.floor
+          )
+        ) {
+          return false;
+        }
+
+
+        if (
+          !arrayAllows(
+            view.filters
+              .captures,
+            front.capture
+          )
+        ) {
+          return false;
+        }
+
+
+        if (
+          !arrayAllows(
+            view.filters
+              .axes,
+            front.axis
+          )
+        ) {
+          return false;
+        }
+
+
+        if (
+          !arrayAllows(
+            view.filters
+              .sides,
+            front.side
+          )
+        ) {
+          return false;
+        }
+
+
+        if (
+          !arrayAllows(
+            view.filters
+              .zones,
+            front.zone
+          )
+        ) {
+          return false;
+        }
+
+
+        if (
+          !arrayAllows(
+            view.filters
+              .organizationIds,
+            front.organizationId
+          )
+        ) {
+          return false;
+        }
+
+
+        if (
+          !arrayAllows(
+            view.filters
+              .statuses,
+            front.status
+          )
+        ) {
+          return false;
+        }
+
+
+        if (
+          !view.showCompleted &&
+          (
+            front.status ===
+              'Завершено' ||
+            front.completed
+          )
+        ) {
+          return false;
+        }
+
+
+        if (
+          view.hideBasement &&
+          num(
+            front.floor
+          ) <
+          0
+        ) {
+          return false;
+        }
+
+
+        if (
+          view.workIds.length &&
+          !view.workIds
+            .includes(
+              front.workId
+            )
+        ) {
+          return false;
+        }
+
+
+        return true;
+
+      }
+    );
+
+}
+
+
+/* =========================================================
+   ЗНАЧЕНИЕ ИЗМЕРЕНИЯ
+   ========================================================= */
+
+function dimensionValue(
+  front,
+  key
+) {
+
+  switch (
+    key
+  ) {
+
+    case 'building':
+      return front.building;
+
+    case 'block':
+      return front.block;
+
+    case 'floor':
+      return front.floor;
+
+    case 'capture':
+      return front.capture;
+
+    case 'axis':
+      return front.axis;
+
+    case 'side':
+      return front.side;
+
+    case 'zone':
+      return front.zone;
+
+    case 'roomNo':
+      return front.roomNo;
+
+    case 'roomName':
+      return front.roomName;
+
+    case 'organization':
+      return front.organization;
+
+    default:
+      return '';
+
+  }
+
+}
+
+
+/* =========================================================
+   СТАТУС — ЦВЕТ
+   ========================================================= */
+
+function statusClass(
+  status
+) {
+
+  switch (
+    status
+  ) {
+
+    case 'Фронт готов':
+      return 'cell-ready';
+
+    case 'В работе':
+      return 'cell-work';
+
+    case 'Завершено':
+      return 'cell-done';
+
+    case 'Ограничение':
+      return 'cell-risk';
+
+    case 'Приостановлено':
+      return 'cell-pause';
+
+    default:
+      return 'cell-not-started';
+
+  }
+
+}
+
+
+/* =========================================================
+   СОДЕРЖИМОЕ ЯЧЕЙКИ
+   ========================================================= */
+
+function frontCellValue(
+  front,
+  type
+) {
+
+  if (!front) {
+
+    return {
+      main: '—',
+      sub: '',
+      className: 'cell-empty'
+    };
+
+  }
+
+
+  if (
+    type ===
+    'percent'
+  ) {
+
+    const percent =
+      front.totalQty
+        ? Math.min(
+            100,
+            Math.round(
+              num(
+                front.doneQty
+              ) /
+              num(
+                front.totalQty
+              ) *
+              100
+            )
+          )
+        : front.status ===
+            'Завершено'
+            ? 100
+            : 0;
+
+
+    return {
+
+      main:
+        `${percent}%`,
+
+      sub:
+        `${fmt(front.doneQty)} / ${fmt(front.totalQty)} ${front.unit || ''}`,
+
+      className:
+        statusClass(
+          front.status
+        )
+
+    };
+
+  }
+
+
+  if (
+    type ===
+    'qty'
+  ) {
+
+    return {
+
+      main:
+        `${fmt(front.doneQty)} / ${fmt(front.totalQty)}`,
+
+      sub:
+        front.unit ||
+        '',
+
+      className:
+        statusClass(
+          front.status
+        )
+
+    };
+
+  }
+
+
+  if (
+    type ===
+    'endDate'
+  ) {
+
+    return {
+
+      main:
+        front.factEnd ||
+        front.forecastEnd ||
+        front.planEnd ||
+        front.contractEnd ||
+        '—',
+
+      sub:
+        front.status ||
+        '',
+
+      className:
+        statusClass(
+          front.status
+        )
+
+    };
+
+  }
+
+
+  if (
+    type ===
+    'variance'
+  ) {
+
+    let difference =
+      null;
+
+
+    if (
+      front.forecastEnd &&
+      front.contractEnd
+    ) {
+
+      difference =
+        diffDays(
+          front.contractEnd,
+          front.forecastEnd
+        );
+
+    } else if (
+      front.factEnd &&
+      front.contractEnd
+    ) {
+
+      difference =
+        diffDays(
+          front.contractEnd,
+          front.factEnd
+        );
+
+    }
+
+
+    return {
+
+      main:
+        difference ===
+          null
+          ? '—'
+          : (
+              difference > 0
+                ? `+${difference} дн.`
+                : `${difference} дн.`
+            ),
+
+      sub:
+        front.status ||
+        '',
+
+      className:
+        difference !==
+          null &&
+        difference >
+          0
+          ? 'cell-risk'
+          : statusClass(
+              front.status
+            )
+
+    };
+
+  }
+
+
+  return {
+
+    main:
+      front.status ||
+      'Не начато',
+
+    sub:
+      front.doneQty ||
+      front.totalQty
+        ? `${fmt(front.doneQty)} / ${fmt(front.totalQty)} ${front.unit || ''}`
+        : '',
+
+    className:
+      statusClass(
+        front.status
+      )
+
+  };
+
+}
+
+
+/* =========================================================
+   ГРУППИРОВКА ШАХМАТКИ
+   ========================================================= */
+
+function rowKey(
+  front,
+  rows
+) {
+
+  return rows
+    .map(
+      key =>
+        String(
+          dimensionValue(
+            front,
+            key
+          ) ??
+          ''
         )
     )
+    .join(
+      '|||'
+    );
+
+}
+
+
+function compareRowValues(
+  first,
+  second,
+  rows
+) {
+
+  for (
+    const key
+    of rows
+  ) {
+
+    const a =
+      dimensionValue(
+        first,
+        key
+      );
+
+
+    const b =
+      dimensionValue(
+        second,
+        key
+      );
+
+
+    if (
+      key ===
+      'floor'
+    ) {
+
+      const difference =
+        num(
+          a
+        ) -
+        num(
+          b
+        );
+
+
+      if (
+        difference !==
+        0
+      ) {
+
+        return difference;
+
+      }
+
+    } else {
+
+      const difference =
+        String(
+          a
+        )
+          .localeCompare(
+            String(
+              b
+            ),
+            'ru',
+            {
+              numeric:
+                true
+            }
+          );
+
+
+      if (
+        difference !==
+        0
+      ) {
+
+        return difference;
+
+      }
+
+    }
+
+  }
+
+
+  return 0;
+
+}
+
+
+/* =========================================================
+   РЕНДЕР ШАХМАТКИ
+   ========================================================= */
+
+function renderMatrix() {
+
+  ensureViews();
+
+
+  renderViewSelector();
+
+
+  const view =
+    workingView();
+
+
+  renderViewDescription();
+
+
+  const fronts =
+    filteredFrontsForView(
+      view
+    );
+
+
+  $('matrixInfo')
+    .textContent =
+      `Представление: ${view.name} · найдено фронтов: ${fronts.length}`;
+
+
+  if (
+    view.type ===
+    'table'
+  ) {
+
+    renderFlexibleTable(
+      fronts,
+      view
+    );
+
+  } else {
+
+    renderTrueMatrix(
+      fronts,
+      view
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   ТАБЛИЧНОЕ ПРЕДСТАВЛЕНИЕ
+   ========================================================= */
+
+function renderFlexibleTable(
+  fronts,
+  view
+) {
+
+  if (
+    fronts.length ===
+    0
+  ) {
+
+    $('matrixContainer')
+      .innerHTML =
+        `
+          <div class="empty-state">
+            По выбранным условиям данных нет.
+          </div>
+        `;
+
+    return;
+
+  }
+
+
+  const rows =
+    [
+      ...view.rows
+    ];
+
+
+  const headDimensions =
+    rows
+      .map(
+        key =>
+          `<th>${esc(DIMENSIONS[key]?.label || key)}</th>`
+      )
+      .join(
+        ''
+      );
+
+
+  const body =
+    fronts
       .sort(
         (
           first,
           second
         ) =>
-          num(first) -
-          num(second)
+          compareRowValues(
+            first,
+            second,
+            rows
+          )
       )
       .map(
-        value => ({
-          id:
-            value,
+        front => {
 
-          name:
-            value
-        })
-      ),
+          const cells =
+            rows
+              .map(
+                key =>
+                  `
+                    <td>
+                      ${esc(dimensionValue(front,key))}
+                    </td>
+                  `
+              )
+              .join(
+                ''
+              );
 
-    'Все этажи'
+
+          const percent =
+            front.totalQty
+              ? Math.round(
+                  num(front.doneQty) /
+                  num(front.totalQty) *
+                  100
+                )
+              : 0;
+
+
+          return `
+            <tr>
+
+              ${cells}
+
+              <td>${esc(front.work)}</td>
+
+              <td>${esc(front.organization)}</td>
+
+              <td>
+                <span class="badge">
+                  ${esc(front.status)}
+                </span>
+              </td>
+
+              <td>
+                ${fmt(front.totalQty)}
+                ${esc(front.unit || '')}
+              </td>
+
+              <td>
+                ${fmt(front.doneQty)}
+                ${esc(front.unit || '')}
+              </td>
+
+              <td>
+                ${percent}%
+              </td>
+
+              <td>
+                ${front.planEnd || '—'}
+              </td>
+
+              <td>
+                ${front.forecastEnd || '—'}
+              </td>
+
+              <td>
+                <button
+                  class="row-btn"
+                  data-edit-front="${front.id}"
+                >
+                  Открыть
+                </button>
+              </td>
+
+            </tr>
+          `;
+
+        }
+      )
+      .join(
+        ''
+      );
+
+
+  $('matrixContainer')
+    .innerHTML =
+      `
+        <table class="matrix-table">
+
+          <thead>
+
+            <tr>
+
+              ${headDimensions}
+
+              <th>Работа</th>
+
+              <th>Организация</th>
+
+              <th>Статус</th>
+
+              <th>Объём</th>
+
+              <th>Выполнено</th>
+
+              <th>%</th>
+
+              <th>План окончание</th>
+
+              <th>Прогноз</th>
+
+              <th></th>
+
+            </tr>
+
+          </thead>
+
+          <tbody>
+            ${body}
+          </tbody>
+
+        </table>
+      `;
+
+
+  bindFrontButtons();
+
+}
+
+
+/* =========================================================
+   НАСТОЯЩАЯ ШАХМАТКА
+   ========================================================= */
+
+function renderTrueMatrix(
+  fronts,
+  view
+) {
+
+  const works =
+    (
+      view.workIds.length
+        ? view.workIds
+            .map(
+              id =>
+                byId(
+                  project.works,
+                  id
+                )
+            )
+            .filter(
+              Boolean
+            )
+        : project.works
+    )
+      .filter(
+        work =>
+          work.active !==
+          false
+      );
+
+
+  if (
+    fronts.length ===
+    0
+  ) {
+
+    $('matrixContainer')
+      .innerHTML =
+        `
+          <div class="empty-state">
+            По выбранным условиям данных нет.
+          </div>
+        `;
+
+    return;
+
+  }
+
+
+  const groups =
+    new Map();
+
+
+  fronts.forEach(
+    front => {
+
+      const key =
+        rowKey(
+          front,
+          view.rows
+        );
+
+
+      if (
+        !groups.has(
+          key
+        )
+      ) {
+
+        groups.set(
+          key,
+          {
+            sample:
+              front,
+
+            fronts:
+              []
+          }
+        );
+
+      }
+
+
+      groups
+        .get(
+          key
+        )
+        .fronts
+        .push(
+          front
+        );
+
+    }
   );
+
+
+  const rows =
+    [
+      ...groups.values()
+    ]
+      .sort(
+        (
+          first,
+          second
+        ) =>
+          compareRowValues(
+            first.sample,
+            second.sample,
+            view.rows
+          )
+      );
+
+
+  const rowHead =
+    view.rows
+      .map(
+        (
+          key,
+          index
+        ) =>
+          `
+            <th
+              class="${
+                index ===
+                  0
+                  ? 'sticky-col-1'
+                  : ''
+              }"
+            >
+              ${esc(DIMENSIONS[key]?.label || key)}
+            </th>
+          `
+      )
+      .join(
+        ''
+      );
+
+
+  const workHead =
+    works
+      .map(
+        work =>
+          `
+            <th>
+              ${esc(work.name)}
+            </th>
+          `
+      )
+      .join(
+        ''
+      );
+
+
+  const body =
+    rows
+      .map(
+        row => {
+
+          const rowCells =
+            view.rows
+              .map(
+                (
+                  key,
+                  index
+                ) =>
+                  `
+                    <td
+                      class="
+                        matrix-row-label
+                        ${
+                          index ===
+                            0
+                            ? 'sticky-col-1'
+                            : ''
+                        }
+                      "
+                    >
+                      ${esc(dimensionValue(row.sample,key))}
+                    </td>
+                  `
+              )
+              .join(
+                ''
+              );
+
+
+          const workCells =
+            works
+              .map(
+                work => {
+
+                  const front =
+                    row.fronts
+                      .find(
+                        item =>
+                          item.workId ===
+                          work.id
+                      );
+
+
+                  const value =
+                    frontCellValue(
+                      front,
+                      view.cellValue
+                    );
+
+
+                  return `
+                    <td
+                      class="
+                        status-cell
+                        ${value.className}
+                      "
+                      ${
+                        front
+                          ? `data-edit-front="${front.id}"`
+                          : ''
+                      }
+                    >
+
+                      <span class="matrix-cell-main">
+                        ${esc(value.main)}
+                      </span>
+
+                      ${
+                        value.sub
+                          ? `
+                            <span class="matrix-cell-sub">
+                              ${esc(value.sub)}
+                            </span>
+                          `
+                          : ''
+                      }
+
+                    </td>
+                  `;
+
+                }
+              )
+              .join(
+                ''
+              );
+
+
+          return `
+            <tr>
+              ${rowCells}
+              ${workCells}
+            </tr>
+          `;
+
+        }
+      )
+      .join(
+        ''
+      );
+
+
+  $('matrixContainer')
+    .innerHTML =
+      `
+        <table class="matrix-table">
+
+          <thead>
+
+            <tr>
+
+              ${rowHead}
+
+              ${workHead}
+
+            </tr>
+
+          </thead>
+
+          <tbody>
+            ${body}
+          </tbody>
+
+        </table>
+      `;
+
+
+  bindFrontButtons();
+
 }
 
-function renderAll() {
 
-  initSelects();
+/* =========================================================
+   КНОПКИ ФРОНТА
+   ========================================================= */
 
-  renderDashboard();
+function bindFrontButtons() {
 
-  renderMatrix();
+  document
+    .querySelectorAll(
+      '[data-edit-front]'
+    )
+    .forEach(
+      element => {
 
-  renderGantt();
+        element.onclick =
+          () =>
+            openFrontEditor(
+              element.dataset.editFront
+            );
 
-  renderPlanFact();
+      }
+    );
 
-  renderResources();
-
-  renderMilestones();
-
-  renderDemolition();
-
-  renderHistory();
-
-  renderSettings();
 }
+
+
+/* =========================================================
+   МОДАЛЬНОЕ ОКНО
+   ========================================================= */
+
+function openModal(
+  title,
+  html
+) {
+
+  $('modalTitle')
+    .textContent =
+      title;
+
+
+  $('modalBody')
+    .innerHTML =
+      html;
+
+
+  $('modal')
+    .classList
+    .remove(
+      'hidden'
+    );
+
+}
+
+
+function closeModal() {
+
+  $('modal')
+    .classList
+    .add(
+      'hidden'
+    );
+
+
+  $('modalBody')
+    .innerHTML =
+      '';
+
+}
+
+
+/* =========================================================
+   КАРТОЧКА ФРОНТА
+   ========================================================= */
+
+function frontForm(
+  front = {}
+) {
+
+  const structure =
+    front.id
+      ? byId(
+          project.structures,
+          front.structureId
+        ) ||
+        {}
+      : {};
+
+
+  const options = (
+    list,
+    value
+  ) =>
+    list
+      .map(
+        item =>
+          `
+            <option
+              value="${item.id}"
+              ${
+                String(
+                  item.id
+                ) ===
+                String(
+                  value
+                )
+                  ? 'selected'
+                  : ''
+              }
+            >
+              ${esc(item.name)}
+            </option>
+          `
+      )
+      .join(
+        ''
+      );
+
+
+  return `
+
+    <div class="form-grid">
+
+      <div class="field">
+
+        <label>
+          Здание
+        </label>
+
+        <select id="eBuilding">
+          ${options(project.buildings, structure.buildingId)}
+        </select>
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Блок
+        </label>
+
+        <input
+          id="eBlock"
+          value="${esc(structure.block || '')}"
+        >
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Этаж
+        </label>
+
+        <input
+          id="eFloor"
+          type="number"
+          value="${esc(structure.floor ?? '')}"
+        >
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Захватка
+        </label>
+
+        <input
+          id="eCapture"
+          value="${esc(structure.capture || '')}"
+        >
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Ось
+        </label>
+
+        <input
+          id="eAxis"
+          value="${esc(structure.axis || '')}"
+        >
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Сторона
+        </label>
+
+        <input
+          id="eSide"
+          value="${esc(structure.side || '')}"
+        >
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Зона
+        </label>
+
+        <input
+          id="eZone"
+          value="${esc(structure.zone || '')}"
+        >
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          № помещения
+        </label>
+
+        <input
+          id="eRoomNo"
+          value="${esc(structure.roomNo || '')}"
+        >
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Помещение
+        </label>
+
+        <input
+          id="eRoomName"
+          value="${esc(structure.roomName || '')}"
+        >
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Вид работы
+        </label>
+
+        <select id="eWork">
+          ${options(project.works, front.workId)}
+        </select>
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Организация
+        </label>
+
+        <select id="eOrg">
+
+          <option value="">
+            —
+          </option>
+
+          ${options(project.organizations, front.organizationId)}
+
+        </select>
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Ответственный
+        </label>
+
+        <input
+          id="eResponsible"
+          value="${esc(front.responsible || '')}"
+        >
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Статус
+        </label>
+
+        <select id="eStatus">
+
+          ${
+            STATUS_LIST
+              .map(
+                status =>
+                  `
+                    <option
+                      ${
+                        status ===
+                        (
+                          front.status ||
+                          'Не начато'
+                        )
+                          ? 'selected'
+                          : ''
+                      }
+                    >
+                      ${status}
+                    </option>
+                  `
+              )
+              .join(
+                ''
+              )
+          }
+
+        </select>
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Ед. изм.
+        </label>
+
+        <input
+          id="eUnit"
+          value="${esc(front.unit || '')}"
+        >
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Общий объём
+        </label>
+
+        <input
+          id="eTotal"
+          type="number"
+          step="any"
+          value="${front.totalQty ?? ''}"
+        >
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Накопительно выполнено
+        </label>
+
+        <input
+          id="eDone"
+          type="number"
+          step="any"
+          value="${front.doneQty ?? ''}"
+        >
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Договор начало
+        </label>
+
+        <input
+          id="eContractStart"
+          type="date"
+          value="${front.contractStart || ''}"
+        >
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Договор окончание
+        </label>
+
+        <input
+          id="eContractEnd"
+          type="date"
+          value="${front.contractEnd || ''}"
+        >
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          База начало
+        </label>
+
+        <input
+          id="eBaselineStart"
+          type="date"
+          value="${front.baselineStart || ''}"
+        >
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          База окончание
+        </label>
+
+        <input
+          id="eBaselineEnd"
+          type="date"
+          value="${front.baselineEnd || ''}"
+        >
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Рабочий план начало
+        </label>
+
+        <input
+          id="ePlanStart"
+          type="date"
+          value="${front.planStart || ''}"
+        >
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Рабочий план окончание
+        </label>
+
+        <input
+          id="ePlanEnd"
+          type="date"
+          value="${front.planEnd || ''}"
+        >
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Факт начало
+        </label>
+
+        <input
+          id="eFactStart"
+          type="date"
+          value="${front.factStart || ''}"
+        >
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Факт окончание
+        </label>
+
+        <input
+          id="eFactEnd"
+          type="date"
+          value="${front.factEnd || ''}"
+        >
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Прогноз окончание
+        </label>
+
+        <input
+          id="eForecastEnd"
+          type="date"
+          value="${front.forecastEnd || ''}"
+        >
+
+      </div>
+
+    </div>
+
+
+    <div class="field">
+
+      <label>
+        Ограничение
+      </label>
+
+      <textarea id="eConstraint">${esc(front.constraint || '')}</textarea>
+
+    </div>
+
+
+    <div class="field">
+
+      <label>
+        Комментарий / факт
+      </label>
+
+      <textarea id="eComment">${esc(front.comment || '')}</textarea>
+
+    </div>
+
+
+    <div class="editor-actions">
+
+      <button
+        id="deleteFront"
+        class="btn danger"
+        ${
+          front.id
+            ? ''
+            : 'style="display:none"'
+        }
+      >
+        Удалить
+      </button>
+
+
+      <button
+        id="saveFront"
+        class="btn primary"
+      >
+        Сохранить
+      </button>
+
+    </div>
+
+  `;
+
+}
+
+
+function openFrontEditor(
+  id = null
+) {
+
+  const front =
+    id
+      ? byId(
+          project.fronts,
+          id
+        )
+      : {};
+
+
+  openModal(
+    id
+      ? 'Карточка фронта'
+      : 'Новый фронт',
+
+    frontForm(
+      front
+    )
+  );
+
+
+  $('saveFront').onclick =
+    () =>
+      saveFrontFromModal(
+        id
+      );
+
+
+  if (
+    id
+  ) {
+
+    $('deleteFront').onclick =
+      () =>
+        deleteFront(
+          id
+        );
+
+  }
+
+}
+
+
+async function saveFrontFromModal(
+  id
+) {
+
+  const buildingId =
+    $('eBuilding')
+      .value;
+
+
+  let structure =
+    id
+      ? byId(
+          project.structures,
+
+          byId(
+            project.fronts,
+            id
+          )
+            .structureId
+        )
+      : null;
+
+
+  if (
+    !structure
+  ) {
+
+    structure = {
+
+      id:
+        uid(
+          'STR'
+        ),
+
+      buildingId
+
+    };
+
+
+    project.structures
+      .push(
+        structure
+      );
+
+  }
+
+
+  Object.assign(
+    structure,
+    {
+
+      buildingId,
+
+
+      block:
+        $('eBlock')
+          .value
+          .trim(),
+
+
+      floor:
+        $('eFloor')
+          .value ===
+          ''
+          ? ''
+          : num(
+              $('eFloor')
+                .value
+            ),
+
+
+      capture:
+        $('eCapture')
+          .value
+          .trim(),
+
+
+      axis:
+        $('eAxis')
+          .value
+          .trim(),
+
+
+      side:
+        $('eSide')
+          .value
+          .trim(),
+
+
+      zone:
+        $('eZone')
+          .value
+          .trim(),
+
+
+      roomNo:
+        $('eRoomNo')
+          .value
+          .trim(),
+
+
+      roomName:
+        $('eRoomName')
+          .value
+          .trim()
+
+    }
+  );
+
+
+  let front =
+    id
+      ? byId(
+          project.fronts,
+          id
+        )
+      : {
+
+          id:
+            uid(
+              'F'
+            ),
+
+          structureId:
+            structure.id,
+
+          createdAt:
+            nowIso()
+
+        };
+
+
+  Object.assign(
+    front,
+    {
+
+      structureId:
+        structure.id,
+
+
+      workId:
+        $('eWork')
+          .value,
+
+
+      organizationId:
+        $('eOrg')
+          .value,
+
+
+      responsible:
+        $('eResponsible')
+          .value
+          .trim(),
+
+
+      status:
+        $('eStatus')
+          .value,
+
+
+      unit:
+        $('eUnit')
+          .value
+          .trim(),
+
+
+      totalQty:
+        num(
+          $('eTotal')
+            .value
+        ),
+
+
+      doneQty:
+        num(
+          $('eDone')
+            .value
+        ),
+
+
+      contractStart:
+        $('eContractStart')
+          .value,
+
+
+      contractEnd:
+        $('eContractEnd')
+          .value,
+
+
+      baselineStart:
+        $('eBaselineStart')
+          .value,
+
+
+      baselineEnd:
+        $('eBaselineEnd')
+          .value,
+
+
+      planStart:
+        $('ePlanStart')
+          .value,
+
+
+      planEnd:
+        $('ePlanEnd')
+          .value,
+
+
+      factStart:
+        $('eFactStart')
+          .value,
+
+
+      factEnd:
+        $('eFactEnd')
+          .value,
+
+
+      forecastEnd:
+        $('eForecastEnd')
+          .value,
+
+
+      constraint:
+        $('eConstraint')
+          .value
+          .trim(),
+
+
+      comment:
+        $('eComment')
+          .value
+          .trim(),
+
+
+      completed:
+        $('eStatus')
+          .value ===
+          'Завершено',
+
+
+      accepted:
+        front.accepted ||
+        false,
+
+
+      updatedAt:
+        nowIso()
+
+    }
+  );
+
+
+  if (
+    !id
+  ) {
+
+    project.fronts
+      .push(
+        front
+      );
+
+  }
+
+
+  log(
+    id
+      ? 'Изменено'
+      : 'Создано',
+
+    'Фронт',
+
+    frontLabel(
+      front
+    )
+  );
+
+
+  await saveProject();
+
+
+  closeModal();
+
+
+  renderAll();
+
+}
+
+
+async function deleteFront(
+  id
+) {
+
+  if (
+    !confirm(
+      'Удалить фронт?'
+    )
+  ) {
+    return;
+  }
+
+
+  const front =
+    byId(
+      project.fronts,
+      id
+    );
+
+
+  project.fronts =
+    project.fronts
+      .filter(
+        item =>
+          item.id !==
+          id
+      );
+
+
+  project.planLog =
+    project.planLog
+      .filter(
+        item =>
+          item.frontId !==
+          id
+      );
+
+
+  project.factLog =
+    project.factLog
+      .filter(
+        item =>
+          item.frontId !==
+          id
+      );
+
+
+  log(
+    'Удалено',
+    'Фронт',
+    frontLabel(
+      front
+    )
+  );
+
+
+  await saveProject();
+
+
+  closeModal();
+
+
+  renderAll();
+
+}
+
+
+/* =========================================================
+   СВОДКА
+   ========================================================= */
 
 function renderDashboard() {
 
@@ -914,9 +4838,11 @@ function renderDashboard() {
         hydrateFront
       );
 
+
   $('dTotal')
     .textContent =
       fronts.length;
+
 
   $('dWork')
     .textContent =
@@ -927,6 +4853,7 @@ function renderDashboard() {
             'В работе'
         )
         .length;
+
 
   $('dDone')
     .textContent =
@@ -939,6 +4866,7 @@ function renderDashboard() {
         )
         .length;
 
+
   $('dAccepted')
     .textContent =
       fronts
@@ -947,6 +4875,7 @@ function renderDashboard() {
             front.accepted
         )
         .length;
+
 
   $('dLate')
     .textContent =
@@ -959,6 +4888,7 @@ function renderDashboard() {
               today()
         )
         .length;
+
 
   $('dRisk')
     .textContent =
@@ -974,6 +4904,7 @@ function renderDashboard() {
               )
         )
         .length;
+
 
   const critical =
     fronts
@@ -998,6 +4929,7 @@ function renderDashboard() {
         20
       );
 
+
   $('dCritical')
     .innerHTML =
       critical
@@ -1005,6 +4937,7 @@ function renderDashboard() {
           front =>
             `
               <div class="item">
+
                 <span>
                   ${esc(frontLabel(front))}
                 </span>
@@ -1012,14 +4945,24 @@ function renderDashboard() {
                 <strong>
                   ${esc(front.status)}
                 </strong>
+
               </div>
             `
         )
-        .join('') ||
-      '<div class="muted">Нет критичных фронтов</div>';
+        .join(
+          ''
+        ) ||
+      `
+        <div class="muted">
+          Нет критичных фронтов
+        </div>
+      `;
+
 
   const lastDate =
-    [...project.resources]
+    [
+      ...project.resources
+    ]
       .sort(
         (
           first,
@@ -1034,8 +4977,11 @@ function renderDashboard() {
               )
             )
       )
-      .slice(-1)[0]
+      .slice(
+        -1
+      )[0]
       ?.date;
+
 
   const resourceRows =
     project.resources
@@ -1045,6 +4991,7 @@ function renderDashboard() {
           lastDate
       );
 
+
   const people =
     resourceRows
       .reduce(
@@ -1053,11 +5000,18 @@ function renderDashboard() {
           row
         ) =>
           sum +
-          num(row.itr) +
-          num(row.workers) +
-          num(row.mechanizers),
+          num(
+            row.itr
+          ) +
+          num(
+            row.workers
+          ) +
+          num(
+            row.mechanizers
+          ),
         0
       );
+
 
   const equipment =
     resourceRows
@@ -1072,6 +5026,7 @@ function renderDashboard() {
           ),
         0
       );
+
 
   $('dResources')
     .innerHTML =
@@ -1092,824 +5047,18 @@ function renderDashboard() {
             <strong>${equipment}</strong>
           </div>
         `
-        : '<div class="muted">Нет данных</div>';
+        : `
+          <div class="muted">
+            Нет данных
+          </div>
+        `;
+
 }
 
-function matrixFiltered() {
 
-  return project.fronts
-    .map(
-      hydrateFront
-    )
-    .filter(
-      front =>
-        (
-          $('mfBuilding').value ===
-            'all' ||
-          front.structure
-            .buildingId ===
-            $('mfBuilding').value
-        ) &&
-
-        (
-          $('mfBlock').value ===
-            'all' ||
-          front.block ===
-            $('mfBlock').value
-        ) &&
-
-        (
-          $('mfFloor').value ===
-            'all' ||
-          String(
-            front.floor
-          ) ===
-            $('mfFloor').value
-        ) &&
-
-        (
-          $('mfWork').value ===
-            'all' ||
-          front.workId ===
-            $('mfWork').value
-        ) &&
-
-        (
-          $('mfOrg').value ===
-            'all' ||
-          front.organizationId ===
-            $('mfOrg').value
-        ) &&
-
-        (
-          $('mfStatus').value ===
-            'all' ||
-          front.status ===
-            $('mfStatus').value
-        )
-    );
-}
-
-function renderMatrix() {
-
-  updateMatrixDependent();
-
-  $('matrixHead')
-    .innerHTML =
-      `
-        <tr>
-          <th>Здание</th>
-          <th>Блок</th>
-          <th>Этаж</th>
-          <th>Захватка</th>
-          <th>Ось</th>
-          <th>Сторона</th>
-          <th>Зона</th>
-          <th>Работа</th>
-          <th>Организация</th>
-          <th>Статус</th>
-          <th>Объем</th>
-          <th>Выполнено</th>
-          <th></th>
-        </tr>
-      `;
-
-  $('matrixBody')
-    .innerHTML =
-      matrixFiltered()
-        .map(
-          front =>
-            `
-              <tr class="${
-                front.status ===
-                  'Завершено'
-                  ? 's-done'
-                  :
-                front.status ===
-                  'В работе'
-                  ? 's-work'
-                  :
-                front.status ===
-                  'Ограничение'
-                  ? 's-risk'
-                  : ''
-              }">
-
-                <td>${esc(front.building)}</td>
-                <td>${esc(front.block)}</td>
-                <td>${esc(front.floor)}</td>
-                <td>${esc(front.capture)}</td>
-                <td>${esc(front.axis)}</td>
-                <td>${esc(front.side)}</td>
-                <td>${esc(front.zone)}</td>
-                <td>${esc(front.work)}</td>
-                <td>${esc(front.organization)}</td>
-
-                <td>
-                  <span class="badge">
-                    ${esc(front.status)}
-                  </span>
-                </td>
-
-                <td>
-                  ${fmt(front.totalQty)}
-                  ${esc(front.unit || '')}
-                </td>
-
-                <td>
-                  ${fmt(front.doneQty)}
-                  ${esc(front.unit || '')}
-                </td>
-
-                <td>
-                  <button
-                    class="row-btn"
-                    data-edit-front="${front.id}"
-                  >
-                    Открыть
-                  </button>
-                </td>
-
-              </tr>
-            `
-        )
-        .join('');
-
-  document
-    .querySelectorAll(
-      '[data-edit-front]'
-    )
-    .forEach(
-      button =>
-        button.onclick =
-          () =>
-            openFrontEditor(
-              button.dataset.editFront
-            )
-    );
-}
-
-function openModal(
-  title,
-  html
-) {
-
-  $('modalTitle')
-    .textContent =
-      title;
-
-  $('modalBody')
-    .innerHTML =
-      html;
-
-  $('modal')
-    .classList
-    .remove(
-      'hidden'
-    );
-}
-
-function closeModal() {
-
-  $('modal')
-    .classList
-    .add(
-      'hidden'
-    );
-
-  $('modalBody')
-    .innerHTML =
-      '';
-}
-
-function frontForm(
-  front = {}
-) {
-
-  const structure =
-    front.id
-      ? byId(
-          project.structures,
-          front.structureId
-        ) || {}
-      : {};
-
-  const options = (
-    list,
-    value
-  ) =>
-    list
-      .map(
-        item =>
-          `
-            <option
-              value="${item.id}"
-              ${
-                String(item.id) ===
-                String(value)
-                  ? 'selected'
-                  : ''
-              }
-            >
-              ${esc(item.name)}
-            </option>
-          `
-      )
-      .join('');
-
-  return `
-    <div class="form-grid">
-
-      <div class="field">
-        <label>Здание</label>
-        <select id="eBuilding">
-          ${options(project.buildings,structure.buildingId)}
-        </select>
-      </div>
-
-      <div class="field">
-        <label>Блок</label>
-        <input
-          id="eBlock"
-          value="${esc(structure.block || '')}"
-        >
-      </div>
-
-      <div class="field">
-        <label>Этаж</label>
-        <input
-          id="eFloor"
-          type="number"
-          value="${esc(structure.floor ?? '')}"
-        >
-      </div>
-
-      <div class="field">
-        <label>Захватка</label>
-        <input
-          id="eCapture"
-          value="${esc(structure.capture || '')}"
-        >
-      </div>
-
-      <div class="field">
-        <label>Ось</label>
-        <input
-          id="eAxis"
-          value="${esc(structure.axis || '')}"
-        >
-      </div>
-
-      <div class="field">
-        <label>Сторона</label>
-        <input
-          id="eSide"
-          value="${esc(structure.side || '')}"
-        >
-      </div>
-
-      <div class="field">
-        <label>Зона</label>
-        <input
-          id="eZone"
-          value="${esc(structure.zone || '')}"
-        >
-      </div>
-
-      <div class="field">
-        <label>№ помещения</label>
-        <input
-          id="eRoomNo"
-          value="${esc(structure.roomNo || '')}"
-        >
-      </div>
-
-      <div class="field">
-        <label>Помещение</label>
-        <input
-          id="eRoomName"
-          value="${esc(structure.roomName || '')}"
-        >
-      </div>
-
-      <div class="field">
-        <label>Вид работы</label>
-        <select id="eWork">
-          ${options(project.works,front.workId)}
-        </select>
-      </div>
-
-      <div class="field">
-        <label>Организация</label>
-        <select id="eOrg">
-          <option value="">—</option>
-          ${options(project.organizations,front.organizationId)}
-        </select>
-      </div>
-
-      <div class="field">
-        <label>Ответственный</label>
-        <input
-          id="eResponsible"
-          value="${esc(front.responsible || '')}"
-        >
-      </div>
-
-      <div class="field">
-        <label>Статус</label>
-        <select id="eStatus">
-          ${
-            STATUS_LIST
-              .map(
-                status =>
-                  `
-                    <option
-                      ${
-                        status ===
-                        (
-                          front.status ||
-                          'Не начато'
-                        )
-                          ? 'selected'
-                          : ''
-                      }
-                    >
-                      ${status}
-                    </option>
-                  `
-              )
-              .join('')
-          }
-        </select>
-      </div>
-
-      <div class="field">
-        <label>Ед. изм.</label>
-        <input
-          id="eUnit"
-          value="${esc(front.unit || '')}"
-        >
-      </div>
-
-      <div class="field">
-        <label>Общий объем</label>
-        <input
-          id="eTotal"
-          type="number"
-          step="any"
-          value="${front.totalQty ?? ''}"
-        >
-      </div>
-
-      <div class="field">
-        <label>Накопительно выполнено</label>
-        <input
-          id="eDone"
-          type="number"
-          step="any"
-          value="${front.doneQty ?? ''}"
-        >
-      </div>
-
-      <div class="field">
-        <label>Договор начало</label>
-        <input
-          id="eContractStart"
-          type="date"
-          value="${front.contractStart || ''}"
-        >
-      </div>
-
-      <div class="field">
-        <label>Договор окончание</label>
-        <input
-          id="eContractEnd"
-          type="date"
-          value="${front.contractEnd || ''}"
-        >
-      </div>
-
-      <div class="field">
-        <label>База начало</label>
-        <input
-          id="eBaselineStart"
-          type="date"
-          value="${front.baselineStart || ''}"
-        >
-      </div>
-
-      <div class="field">
-        <label>База окончание</label>
-        <input
-          id="eBaselineEnd"
-          type="date"
-          value="${front.baselineEnd || ''}"
-        >
-      </div>
-
-      <div class="field">
-        <label>Рабочий план начало</label>
-        <input
-          id="ePlanStart"
-          type="date"
-          value="${front.planStart || ''}"
-        >
-      </div>
-
-      <div class="field">
-        <label>Рабочий план окончание</label>
-        <input
-          id="ePlanEnd"
-          type="date"
-          value="${front.planEnd || ''}"
-        >
-      </div>
-
-      <div class="field">
-        <label>Факт начало</label>
-        <input
-          id="eFactStart"
-          type="date"
-          value="${front.factStart || ''}"
-        >
-      </div>
-
-      <div class="field">
-        <label>Факт окончание</label>
-        <input
-          id="eFactEnd"
-          type="date"
-          value="${front.factEnd || ''}"
-        >
-      </div>
-
-      <div class="field">
-        <label>Прогноз окончание</label>
-        <input
-          id="eForecastEnd"
-          type="date"
-          value="${front.forecastEnd || ''}"
-        >
-      </div>
-
-    </div>
-
-    <div class="field">
-      <label>Ограничение</label>
-      <textarea id="eConstraint">${esc(front.constraint || '')}</textarea>
-    </div>
-
-    <div class="field">
-      <label>Комментарий / факт</label>
-      <textarea id="eComment">${esc(front.comment || '')}</textarea>
-    </div>
-
-    <div class="editor-actions">
-
-      <button
-        id="deleteFront"
-        class="btn danger"
-        ${
-          front.id
-            ? ''
-            : 'style="display:none"'
-        }
-      >
-        Удалить
-      </button>
-
-      <button
-        id="saveFront"
-        class="btn primary"
-      >
-        Сохранить
-      </button>
-
-    </div>
-  `;
-}
-
-function openFrontEditor(
-  id = null
-) {
-
-  const front =
-    id
-      ? byId(
-          project.fronts,
-          id
-        )
-      : {};
-
-  openModal(
-    id
-      ? 'Карточка фронта'
-      : 'Новый фронт',
-
-    frontForm(
-      front
-    )
-  );
-
-  $('saveFront').onclick =
-    () =>
-      saveFrontFromModal(
-        id
-      );
-
-  if (id) {
-    $('deleteFront').onclick =
-      () =>
-        deleteFront(
-          id
-        );
-  }
-}
-
-async function saveFrontFromModal(
-  id
-) {
-
-  const buildingId =
-    $('eBuilding')
-      .value;
-
-  let structure =
-    id
-      ? byId(
-          project.structures,
-          byId(
-            project.fronts,
-            id
-          ).structureId
-        )
-      : null;
-
-  if (!structure) {
-
-    structure = {
-      id:
-        uid('STR'),
-
-      buildingId
-    };
-
-    project.structures
-      .push(
-        structure
-      );
-  }
-
-  Object.assign(
-    structure,
-    {
-      buildingId,
-
-      block:
-        $('eBlock')
-          .value
-          .trim(),
-
-      floor:
-        $('eFloor').value ===
-          ''
-          ? ''
-          : num(
-              $('eFloor')
-                .value
-            ),
-
-      capture:
-        $('eCapture')
-          .value
-          .trim(),
-
-      axis:
-        $('eAxis')
-          .value
-          .trim(),
-
-      side:
-        $('eSide')
-          .value
-          .trim(),
-
-      zone:
-        $('eZone')
-          .value
-          .trim(),
-
-      roomNo:
-        $('eRoomNo')
-          .value
-          .trim(),
-
-      roomName:
-        $('eRoomName')
-          .value
-          .trim()
-    }
-  );
-
-  let front =
-    id
-      ? byId(
-          project.fronts,
-          id
-        )
-      : {
-          id:
-            uid('F'),
-
-          structureId:
-            structure.id,
-
-          createdAt:
-            nowIso()
-        };
-
-  Object.assign(
-    front,
-    {
-      structureId:
-        structure.id,
-
-      workId:
-        $('eWork')
-          .value,
-
-      organizationId:
-        $('eOrg')
-          .value,
-
-      responsible:
-        $('eResponsible')
-          .value
-          .trim(),
-
-      status:
-        $('eStatus')
-          .value,
-
-      unit:
-        $('eUnit')
-          .value
-          .trim(),
-
-      totalQty:
-        num(
-          $('eTotal')
-            .value
-        ),
-
-      doneQty:
-        num(
-          $('eDone')
-            .value
-        ),
-
-      contractStart:
-        $('eContractStart')
-          .value,
-
-      contractEnd:
-        $('eContractEnd')
-          .value,
-
-      baselineStart:
-        $('eBaselineStart')
-          .value,
-
-      baselineEnd:
-        $('eBaselineEnd')
-          .value,
-
-      planStart:
-        $('ePlanStart')
-          .value,
-
-      planEnd:
-        $('ePlanEnd')
-          .value,
-
-      factStart:
-        $('eFactStart')
-          .value,
-
-      factEnd:
-        $('eFactEnd')
-          .value,
-
-      forecastEnd:
-        $('eForecastEnd')
-          .value,
-
-      constraint:
-        $('eConstraint')
-          .value
-          .trim(),
-
-      comment:
-        $('eComment')
-          .value
-          .trim(),
-
-      completed:
-        $('eStatus')
-          .value ===
-          'Завершено',
-
-      accepted:
-        front.accepted ||
-        false,
-
-      updatedAt:
-        nowIso()
-    }
-  );
-
-  if (!id) {
-    project.fronts
-      .push(
-        front
-      );
-  }
-
-  log(
-    id
-      ? 'Изменено'
-      : 'Создано',
-
-    'Фронт',
-
-    frontLabel(
-      front
-    )
-  );
-
-  await saveProject();
-
-  closeModal();
-
-  renderAll();
-}
-
-async function deleteFront(
-  id
-) {
-
-  if (
-    !confirm(
-      'Удалить фронт?'
-    )
-  ) {
-    return;
-  }
-
-  const front =
-    byId(
-      project.fronts,
-      id
-    );
-
-  project.fronts =
-    project.fronts
-      .filter(
-        item =>
-          item.id !==
-          id
-      );
-
-  project.planLog =
-    project.planLog
-      .filter(
-        item =>
-          item.frontId !==
-          id
-      );
-
-  project.factLog =
-    project.factLog
-      .filter(
-        item =>
-          item.frontId !==
-          id
-      );
-
-  log(
-    'Удалено',
-    'Фронт',
-    frontLabel(
-      front
-    )
-  );
-
-  await saveProject();
-
-  closeModal();
-
-  renderAll();
-}
+/* =========================================================
+   ГАНТ
+   ========================================================= */
 
 function modeDates(
   front,
@@ -1920,37 +5069,47 @@ function modeDates(
     mode ===
     'contract'
   ) {
+
     return [
       front.contractStart,
       front.contractEnd
     ];
+
   }
+
 
   if (
     mode ===
     'baseline'
   ) {
+
     return [
       front.baselineStart,
       front.baselineEnd
     ];
+
   }
+
 
   if (
     mode ===
     'fact'
   ) {
+
     return [
       front.factStart,
       front.factEnd ||
       front.factStart
     ];
+
   }
+
 
   if (
     mode ===
     'forecast'
   ) {
+
     return [
       front.planStart ||
       front.factStart,
@@ -1958,13 +5117,17 @@ function modeDates(
       front.forecastEnd ||
       front.planEnd
     ];
+
   }
+
 
   return [
     front.planStart,
     front.planEnd
   ];
+
 }
+
 
 function renderGantt() {
 
@@ -1972,13 +5135,16 @@ function renderGantt() {
     $('gBuilding')
       .value;
 
+
   const workId =
     $('gWork')
       .value;
 
+
   const mode =
     $('gMode')
       .value;
+
 
   const items =
     project.fronts
@@ -1994,7 +5160,6 @@ function renderGantt() {
               .buildingId ===
               buildingId
           ) &&
-
           (
             workId ===
               'all' ||
@@ -2004,12 +5169,15 @@ function renderGantt() {
       )
       .map(
         front => ({
+
           front,
+
           dates:
             modeDates(
               front,
               mode
             )
+
         })
       )
       .filter(
@@ -2018,16 +5186,23 @@ function renderGantt() {
           item.dates[1]
       );
 
+
   if (
     !items.length
   ) {
 
     $('gantt')
       .innerHTML =
-        '<div class="muted">Нет заполненных дат для выбранного слоя.</div>';
+        `
+          <div class="muted">
+            Нет заполненных дат для выбранного слоя.
+          </div>
+        `;
 
     return;
+
   }
+
 
   const min =
     items
@@ -2037,6 +5212,7 @@ function renderGantt() {
       )
       .sort()[0];
 
+
   const max =
     items
       .map(
@@ -2044,16 +5220,22 @@ function renderGantt() {
           item.dates[1]
       )
       .sort()
-      .slice(-1)[0];
+      .slice(
+        -1
+      )[0];
+
 
   const total =
     Math.max(
       1,
+
       diffDays(
         min,
         max
-      ) + 1
+      ) +
+      1
     );
+
 
   $('gantt')
     .innerHTML =
@@ -2069,18 +5251,22 @@ function renderGantt() {
               total *
               100;
 
+
             const width =
               Math.max(
                 1,
+
                 (
                   diffDays(
                     item.dates[0],
                     item.dates[1]
-                  ) + 1
+                  ) +
+                  1
                 ) /
                 total *
                 100
               );
+
 
             return `
               <div class="gantt-row">
@@ -2099,13 +5285,14 @@ function renderGantt() {
 
                 </div>
 
+
                 <div class="gantt-line">
 
                   <div
                     class="gantt-bar"
                     style="
                       left:${left}%;
-                      width:${width}%
+                      width:${width}%;
                     "
                   >
                     ${item.dates[0]}
@@ -2117,10 +5304,19 @@ function renderGantt() {
 
               </div>
             `;
+
           }
         )
-        .join('');
+        .join(
+          ''
+        );
+
 }
+
+
+/* =========================================================
+   ПЛАН / ФАКТ
+   ========================================================= */
 
 function pfFrontIds() {
 
@@ -2128,9 +5324,11 @@ function pfFrontIds() {
     $('pfBuilding')
       .value;
 
+
   const workId =
     $('pfWork')
       .value;
+
 
   return new Set(
     project.fronts
@@ -2143,6 +5341,7 @@ function pfFrontIds() {
               front.structureId
             );
 
+
           return (
             (
               buildingId ===
@@ -2151,7 +5350,6 @@ function pfFrontIds() {
                 ?.buildingId ===
                 buildingId
             ) &&
-
             (
               workId ===
                 'all' ||
@@ -2159,6 +5357,7 @@ function pfFrontIds() {
                 workId
             )
           );
+
         }
       )
       .map(
@@ -2166,20 +5365,25 @@ function pfFrontIds() {
           front.id
       )
   );
+
 }
+
 
 function renderPlanFact() {
 
   const ids =
     pfFrontIds();
 
+
   const from =
     $('pfFrom')
       .value;
 
+
   const to =
     $('pfTo')
       .value;
+
 
   const planRows =
     project.planLog
@@ -2188,19 +5392,18 @@ function renderPlanFact() {
           ids.has(
             row.frontId
           ) &&
-
           (
             !from ||
             row.date >=
               from
           ) &&
-
           (
             !to ||
             row.date <=
               to
           )
       );
+
 
   const factRows =
     project.factLog
@@ -2209,19 +5412,18 @@ function renderPlanFact() {
           ids.has(
             row.frontId
           ) &&
-
           (
             !from ||
             row.date >=
               from
           ) &&
-
           (
             !to ||
             row.date <=
               to
           )
       );
+
 
   const planPeriod =
     planRows
@@ -2237,6 +5439,7 @@ function renderPlanFact() {
         0
       );
 
+
   const factPeriod =
     factRows
       .reduce(
@@ -2250,6 +5453,7 @@ function renderPlanFact() {
           ),
         0
       );
+
 
   const planCum =
     project.planLog
@@ -2276,6 +5480,7 @@ function renderPlanFact() {
         0
       );
 
+
   const factCum =
     project.factLog
       .filter(
@@ -2301,6 +5506,7 @@ function renderPlanFact() {
         0
       );
 
+
   const total =
     project.fronts
       .filter(
@@ -2321,17 +5527,20 @@ function renderPlanFact() {
         0
       );
 
+
   $('pfPlanPeriod')
     .textContent =
       fmt(
         planPeriod
       );
 
+
   $('pfFactPeriod')
     .textContent =
       fmt(
         factPeriod
       );
+
 
   $('pfVarPeriod')
     .textContent =
@@ -2340,17 +5549,20 @@ function renderPlanFact() {
         planPeriod
       );
 
+
   $('pfPlanCum')
     .textContent =
       fmt(
         planCum
       );
 
+
   $('pfFactCum')
     .textContent =
       fmt(
         factCum
       );
+
 
   $('pfPp')
     .textContent =
@@ -2361,9 +5573,11 @@ function renderPlanFact() {
               total -
               planCum /
               total
-            ) * 100
+            ) *
+            100
           : 0
       );
+
 
   $('planRows')
     .innerHTML =
@@ -2389,7 +5603,10 @@ function renderPlanFact() {
               </tr>
             `
         )
-        .join('');
+        .join(
+          ''
+        );
+
 
   $('factRows')
     .innerHTML =
@@ -2416,8 +5633,16 @@ function renderPlanFact() {
               </tr>
             `
         )
-        .join('');
+        .join(
+          ''
+        );
+
 }
+
+
+/* =========================================================
+   ПЛАН / ФАКТ — ДОБАВЛЕНИЕ
+   ========================================================= */
 
 function openLogEditor(
   mode
@@ -2433,7 +5658,10 @@ function openLogEditor(
             </option>
           `
       )
-      .join('');
+      .join(
+        ''
+      );
+
 
   openModal(
     mode ===
@@ -2445,46 +5673,70 @@ function openLogEditor(
       <div class="form-grid">
 
         <div class="field">
-          <label>Фронт</label>
+
+          <label>
+            Фронт
+          </label>
+
           <select id="lFront">
             ${options}
           </select>
+
         </div>
 
+
         <div class="field">
-          <label>Дата</label>
+
+          <label>
+            Дата
+          </label>
+
           <input
             id="lDate"
             type="date"
             value="${today()}"
           >
+
         </div>
 
+
         <div class="field">
-          <label>Объем</label>
+
+          <label>
+            Объём
+          </label>
+
           <input
             id="lQty"
             type="number"
             step="any"
           >
+
         </div>
 
+
         <div class="field">
-          <label>Люди</label>
+
+          <label>
+            Люди
+          </label>
+
           <input
             id="lPeople"
             type="number"
           >
+
         </div>
+
 
         ${
           mode ===
           'fact'
             ? `
               <div class="field">
+
                 <label>
                   Накопительный итог
-                  (если пусто — посчитается)
                 </label>
 
                 <input
@@ -2492,6 +5744,7 @@ function openLogEditor(
                   type="number"
                   step="any"
                 >
+
               </div>
             `
             : ''
@@ -2499,28 +5752,40 @@ function openLogEditor(
 
       </div>
 
+
       <div class="field">
-        <label>Комментарий</label>
+
+        <label>
+          Комментарий
+        </label>
+
         <textarea id="lComment"></textarea>
+
       </div>
 
+
       <div class="editor-actions">
+
         <button
           id="lSave"
           class="btn primary"
         >
           Сохранить
         </button>
+
       </div>
     `
   );
+
 
   $('lSave').onclick =
     () =>
       saveLog(
         mode
       );
+
 }
+
 
 async function saveLog(
   mode
@@ -2530,9 +5795,11 @@ async function saveLog(
     $('lFront')
       .value;
 
+
   const date =
     $('lDate')
       .value;
+
 
   const qty =
     num(
@@ -2540,16 +5807,19 @@ async function saveLog(
         .value
     );
 
+
   const people =
     num(
       $('lPeople')
         .value
     );
 
+
   const comment =
     $('lComment')
       .value
       .trim();
+
 
   if (
     mode ===
@@ -2558,8 +5828,11 @@ async function saveLog(
 
     project.planLog
       .push({
+
         id:
-          uid('P'),
+          uid(
+            'P'
+          ),
 
         frontId,
 
@@ -2573,7 +5846,9 @@ async function saveLog(
 
         createdAt:
           nowIso()
+
       });
+
 
     log(
       'Добавлено',
@@ -2583,8 +5858,9 @@ async function saveLog(
 
   } else {
 
-    let cumulative =
-      $('lCum').value ===
+    const cumulative =
+      $('lCum')
+        .value ===
         ''
         ? project.factLog
             .filter(
@@ -2609,10 +5885,14 @@ async function saveLog(
               .value
           );
 
+
     project.factLog
       .push({
+
         id:
-          uid('FCT'),
+          uid(
+            'FCT'
+          ),
 
         frontId,
 
@@ -2628,7 +5908,9 @@ async function saveLog(
 
         createdAt:
           nowIso()
+
       });
+
 
     const front =
       byId(
@@ -2636,46 +5918,70 @@ async function saveLog(
         frontId
       );
 
+
     front.doneQty =
       cumulative;
+
 
     if (
       !front.factStart
     ) {
+
       front.factStart =
         date;
+
     }
+
 
     front.updatedAt =
       nowIso();
+
 
     log(
       'Добавлено',
       'Факт',
       `${date} · ${frontLabel(front)} · ${qty}`
     );
+
   }
+
 
   await saveProject();
 
+
   closeModal();
 
+
   renderAll();
+
 }
+
+
+/* =========================================================
+   РЕСУРСЫ
+   ========================================================= */
 
 function resourceFiltered() {
 
   const from =
-    $('rFrom').value;
+    $('rFrom')
+      .value;
+
 
   const to =
-    $('rTo').value;
+    $('rTo')
+      .value;
+
 
   const organizationId =
-    $('rOrg').value;
+    $('rOrg')
+      .value;
+
 
   const buildingId =
-    $('rBuilding').value;
+    $('rBuilding')
+      .value;
+
 
   return project.resources
     .filter(
@@ -2685,20 +5991,17 @@ function resourceFiltered() {
           row.date >=
             from
         ) &&
-
         (
           !to ||
           row.date <=
             to
         ) &&
-
         (
           organizationId ===
             'all' ||
           row.organizationId ===
             organizationId
         ) &&
-
         (
           buildingId ===
             'all' ||
@@ -2706,12 +6009,15 @@ function resourceFiltered() {
             buildingId
         )
     );
+
 }
+
 
 function renderResources() {
 
   const rows =
     resourceFiltered();
+
 
   const sum =
     field =>
@@ -2728,8 +6034,10 @@ function renderResources() {
           0
         );
 
+
   const daily =
     {};
+
 
   rows.forEach(
     row => {
@@ -2739,11 +6047,19 @@ function renderResources() {
           daily[row.date] ||
           0
         ) +
-        num(row.itr) +
-        num(row.workers) +
-        num(row.mechanizers);
+        num(
+          row.itr
+        ) +
+        num(
+          row.workers
+        ) +
+        num(
+          row.mechanizers
+        );
+
     }
   );
+
 
   $('rItr')
     .textContent =
@@ -2751,11 +6067,13 @@ function renderResources() {
         'itr'
       );
 
+
   $('rWorkers')
     .textContent =
       sum(
         'workers'
       );
+
 
   $('rMech')
     .textContent =
@@ -2763,11 +6081,19 @@ function renderResources() {
         'mechanizers'
       );
 
+
   $('rTotalPeople')
     .textContent =
-      sum('itr') +
-      sum('workers') +
-      sum('mechanizers');
+      sum(
+        'itr'
+      ) +
+      sum(
+        'workers'
+      ) +
+      sum(
+        'mechanizers'
+      );
+
 
   $('rPeak')
     .textContent =
@@ -2778,11 +6104,13 @@ function renderResources() {
         )
       );
 
+
   $('rEquipDays')
     .textContent =
       sum(
         'equipmentQty'
       );
+
 
   $('resourceRows')
     .innerHTML =
@@ -2802,7 +6130,9 @@ function renderResources() {
             `
               <tr>
 
-                <td>${row.date}</td>
+                <td>
+                  ${row.date}
+                </td>
 
                 <td>
                   ${esc(nameById(project.organizations,row.organizationId))}
@@ -2812,18 +6142,39 @@ function renderResources() {
                   ${esc(nameById(project.buildings,row.buildingId))}
                 </td>
 
-                <td>${row.itr}</td>
-                <td>${row.workers}</td>
-                <td>${row.mechanizers}</td>
-                <td>${esc(row.equipmentType || '')}</td>
-                <td>${row.equipmentQty}</td>
-                <td>${esc(row.comment || '')}</td>
+                <td>
+                  ${row.itr}
+                </td>
+
+                <td>
+                  ${row.workers}
+                </td>
+
+                <td>
+                  ${row.mechanizers}
+                </td>
+
+                <td>
+                  ${esc(row.equipmentType || '')}
+                </td>
+
+                <td>
+                  ${row.equipmentQty}
+                </td>
+
+                <td>
+                  ${esc(row.comment || '')}
+                </td>
 
               </tr>
             `
         )
-        .join('');
+        .join(
+          ''
+        );
+
 }
+
 
 function openResourceEditor() {
 
@@ -2838,7 +6189,10 @@ function openResourceEditor() {
               </option>
             `
         )
-        .join('');
+        .join(
+          ''
+        );
+
 
   openModal(
     'Добавить ресурсы',
@@ -2847,104 +6201,182 @@ function openResourceEditor() {
       <div class="form-grid">
 
         <div class="field">
-          <label>Дата</label>
+
+          <label>
+            Дата
+          </label>
+
           <input
             id="rrDate"
             type="date"
             value="${today()}"
           >
+
         </div>
 
+
         <div class="field">
-          <label>Организация</label>
+
+          <label>
+            Организация
+          </label>
+
           <select id="rrOrg">
-            <option value="">—</option>
+
+            <option value="">
+              —
+            </option>
+
             ${options(project.organizations)}
+
           </select>
+
         </div>
 
+
         <div class="field">
-          <label>Здание</label>
+
+          <label>
+            Здание
+          </label>
+
           <select id="rrBuilding">
-            <option value="">—</option>
+
+            <option value="">
+              —
+            </option>
+
             ${options(project.buildings)}
+
           </select>
+
         </div>
 
+
         <div class="field">
-          <label>ИТР</label>
+
+          <label>
+            ИТР
+          </label>
+
           <input
             id="rrItr"
             type="number"
           >
+
         </div>
 
+
         <div class="field">
-          <label>Рабочие</label>
+
+          <label>
+            Рабочие
+          </label>
+
           <input
             id="rrWorkers"
             type="number"
           >
+
         </div>
 
+
         <div class="field">
-          <label>Механизаторы</label>
+
+          <label>
+            Механизаторы
+          </label>
+
           <input
             id="rrMech"
             type="number"
           >
+
         </div>
 
+
         <div class="field">
-          <label>Тип техники</label>
+
+          <label>
+            Тип техники
+          </label>
+
           <input id="rrEqType">
+
         </div>
 
+
         <div class="field">
-          <label>Количество техники</label>
+
+          <label>
+            Количество техники
+          </label>
+
           <input
             id="rrEqQty"
             type="number"
           >
+
         </div>
 
       </div>
 
+
       <div class="field">
-        <label>Комментарий</label>
+
+        <label>
+          Комментарий
+        </label>
+
         <textarea id="rrComment"></textarea>
+
       </div>
 
+
       <div class="editor-actions">
+
         <button
           id="rrSave"
           class="btn primary"
         >
           Сохранить
         </button>
+
       </div>
     `
   );
 
+
   $('rrSave').onclick =
     saveResource;
+
 }
+
 
 async function saveResource() {
 
   const resource = {
 
     id:
-      uid('R'),
+      uid(
+        'R'
+      ),
+
 
     date:
-      $('rrDate').value,
+      $('rrDate')
+        .value,
+
 
     organizationId:
-      $('rrOrg').value,
+      $('rrOrg')
+        .value,
+
 
     buildingId:
-      $('rrBuilding').value,
+      $('rrBuilding')
+        .value,
+
 
     itr:
       num(
@@ -2952,11 +6384,13 @@ async function saveResource() {
           .value
       ),
 
+
     workers:
       num(
         $('rrWorkers')
           .value
       ),
+
 
     mechanizers:
       num(
@@ -2964,10 +6398,12 @@ async function saveResource() {
           .value
       ),
 
+
     equipmentType:
       $('rrEqType')
         .value
         .trim(),
+
 
     equipmentQty:
       num(
@@ -2975,19 +6411,24 @@ async function saveResource() {
           .value
       ),
 
+
     comment:
       $('rrComment')
         .value
         .trim(),
 
+
     createdAt:
       nowIso()
+
   };
+
 
   project.resources
     .push(
       resource
     );
+
 
   log(
     'Добавлено',
@@ -2995,12 +6436,21 @@ async function saveResource() {
     `${resource.date} · ${nameById(project.organizations,resource.organizationId)}`
   );
 
+
   await saveProject();
+
 
   closeModal();
 
+
   renderAll();
+
 }
+
+
+/* =========================================================
+   КЛЮЧЕВЫЕ ДАТЫ
+   ========================================================= */
 
 function renderMilestones() {
 
@@ -3037,18 +6487,23 @@ function renderMilestones() {
                 </td>
 
                 <td>
+
                   <button
                     class="row-btn"
                     data-ms="${milestone.id}"
                   >
                     ${esc(milestone.status || '')}
                   </button>
+
                 </td>
 
               </tr>
             `
         )
-        .join('');
+        .join(
+          ''
+        );
+
 
   document
     .querySelectorAll(
@@ -3062,7 +6517,9 @@ function renderMilestones() {
               button.dataset.ms
             )
     );
+
 }
+
 
 function openMilestoneEditor(
   id = null
@@ -3075,6 +6532,7 @@ function openMilestoneEditor(
           id
         )
       : {};
+
 
   const buildingOptions =
     project.buildings
@@ -3094,7 +6552,10 @@ function openMilestoneEditor(
             </option>
           `
       )
-      .join('');
+      .join(
+        ''
+      );
+
 
   openModal(
     id
@@ -3105,88 +6566,141 @@ function openMilestoneEditor(
       <div class="form-grid">
 
         <div class="field">
-          <label>Здание</label>
+
+          <label>
+            Здание
+          </label>
+
           <select id="mBuilding">
             ${buildingOptions}
           </select>
+
         </div>
 
+
         <div class="field">
-          <label>Наименование</label>
+
+          <label>
+            Наименование
+          </label>
+
           <input
             id="mTitle"
             value="${esc(milestone.title || '')}"
           >
+
         </div>
 
+
         <div class="field">
-          <label>Статус</label>
+
+          <label>
+            Статус
+          </label>
+
           <input
             id="mStatus"
             value="${esc(milestone.status || 'Не наступила')}"
           >
+
         </div>
 
+
         <div class="field">
-          <label>Договорная дата</label>
+
+          <label>
+            Договорная дата
+          </label>
+
           <input
             id="mContract"
             type="date"
             value="${milestone.contractDate || ''}"
           >
+
         </div>
 
+
         <div class="field">
-          <label>Рабочая дата</label>
+
+          <label>
+            Рабочая дата
+          </label>
+
           <input
             id="mWork"
             type="date"
             value="${milestone.workDate || ''}"
           >
+
         </div>
 
+
         <div class="field">
-          <label>Прогноз</label>
+
+          <label>
+            Прогноз
+          </label>
+
           <input
             id="mForecast"
             type="date"
             value="${milestone.forecastDate || ''}"
           >
+
         </div>
 
+
         <div class="field">
-          <label>Факт</label>
+
+          <label>
+            Факт
+          </label>
+
           <input
             id="mFact"
             type="date"
             value="${milestone.factDate || ''}"
           >
+
         </div>
 
       </div>
 
+
       <div class="field">
-        <label>Комментарий</label>
+
+        <label>
+          Комментарий
+        </label>
+
         <textarea id="mComment">${esc(milestone.comment || '')}</textarea>
+
       </div>
 
+
       <div class="editor-actions">
+
         <button
           id="mSave"
           class="btn primary"
         >
           Сохранить
         </button>
+
       </div>
     `
   );
+
 
   $('mSave').onclick =
     () =>
       saveMilestone(
         id
       );
+
 }
+
 
 async function saveMilestone(
   id
@@ -3199,60 +6713,80 @@ async function saveMilestone(
           id
         )
       : {
+
           id:
-            uid('M')
+            uid(
+              'M'
+            )
+
         };
+
 
   Object.assign(
     milestone,
     {
+
       buildingId:
         $('mBuilding')
           .value,
+
 
       title:
         $('mTitle')
           .value
           .trim(),
 
+
       status:
         $('mStatus')
           .value
           .trim(),
 
+
       contractDate:
         $('mContract')
           .value,
+
 
       workDate:
         $('mWork')
           .value,
 
+
       forecastDate:
         $('mForecast')
           .value,
 
+
       factDate:
         $('mFact')
           .value,
+
 
       comment:
         $('mComment')
           .value
           .trim(),
 
+
       updatedAt:
         nowIso()
+
     }
   );
 
-  if (!id) {
+
+  if (
+    !id
+  ) {
 
     project.milestones
       .push(
         milestone
       );
+
   }
+
 
   log(
     id
@@ -3264,12 +6798,21 @@ async function saveMilestone(
     milestone.title
   );
 
+
   await saveProject();
+
 
   closeModal();
 
+
   renderAll();
+
 }
+
+
+/* =========================================================
+   ДЕМОНТАЖ
+   ========================================================= */
 
 function renderDemolition() {
 
@@ -3290,11 +6833,14 @@ function renderDemolition() {
                   ${esc(item.name)}
                 </td>
 
+
                 <td>
+
                   <select
                     class="dem-status"
                     data-dem-status="${item.id}"
                   >
+
                     ${
                       STATUS_LIST
                         .map(
@@ -3312,46 +6858,65 @@ function renderDemolition() {
                               </option>
                             `
                         )
-                        .join('')
+                        .join(
+                          ''
+                        )
                     }
+
                   </select>
+
                 </td>
 
+
                 <td>
+
                   <input
                     type="date"
                     data-dem-plan="${item.id}"
                     value="${item.planEnd || ''}"
                   >
+
                 </td>
 
+
                 <td>
+
                   <input
                     type="date"
                     data-dem-forecast="${item.id}"
                     value="${item.forecastEnd || ''}"
                   >
+
                 </td>
 
+
                 <td>
+
                   <input
                     type="date"
                     data-dem-fact="${item.id}"
                     value="${item.factEnd || ''}"
                   >
+
                 </td>
 
+
                 <td>
+
                   <input
                     data-dem-comment="${item.id}"
                     value="${esc(item.comment || '')}"
                   >
+
                 </td>
 
               </tr>
             `
         )
-        .join('');
+        .join(
+          ''
+        );
+
 
   document
     .querySelectorAll(
@@ -3369,7 +6934,9 @@ function renderDemolition() {
               element
             )
     );
+
 }
+
 
 async function saveDemInline(
   element
@@ -3382,49 +6949,67 @@ async function saveDemInline(
     element.dataset.demFact ||
     element.dataset.demComment;
 
+
   const item =
     byId(
       project.demolition,
       id
     );
 
+
   if (
     element.dataset.demStatus
   ) {
+
     item.status =
       element.value;
+
   }
+
 
   if (
     element.dataset.demPlan
   ) {
+
     item.planEnd =
       element.value;
+
   }
+
 
   if (
     element.dataset.demForecast
   ) {
+
     item.forecastEnd =
       element.value;
+
   }
+
 
   if (
     element.dataset.demFact
   ) {
+
     item.factEnd =
       element.value;
+
   }
+
 
   if (
     element.dataset.demComment
   ) {
+
     item.comment =
       element.value;
+
   }
+
 
   item.updatedAt =
     nowIso();
+
 
   log(
     'Изменено',
@@ -3432,8 +7017,15 @@ async function saveDemInline(
     item.name
   );
 
+
   await saveProject();
+
 }
+
+
+/* =========================================================
+   ИСТОРИЯ
+   ========================================================= */
 
 function renderHistory() {
 
@@ -3471,8 +7063,16 @@ function renderHistory() {
               </tr>
             `
         )
-        .join('');
+        .join(
+          ''
+        );
+
 }
+
+
+/* =========================================================
+   НАСТРОЙКИ
+   ========================================================= */
 
 function renderSettings() {
 
@@ -3487,7 +7087,10 @@ function renderSettings() {
               </div>
             `
         )
-        .join('');
+        .join(
+          ''
+        );
+
 
   $('workList')
     .innerHTML =
@@ -3496,18 +7099,26 @@ function renderSettings() {
           item =>
             `
               <div class="item">
+
                 <span>
+
                   ${esc(item.name)}
+
                   ${
                     item.unit
                       ? ` · ${esc(item.unit)}`
                       : ''
                   }
+
                 </span>
+
               </div>
             `
         )
-        .join('');
+        .join(
+          ''
+        );
+
 
   $('orgList')
     .innerHTML =
@@ -3520,18 +7131,111 @@ function renderSettings() {
               </div>
             `
         )
-        .join('');
+        .join(
+          ''
+        );
+
+
+  $('viewsList')
+    .innerHTML =
+      project.views
+        .map(
+          view => {
+
+            const isDefault =
+              project.meta.defaultViewId ===
+              view.id;
+
+
+            return `
+              <div class="item">
+
+                <span>
+
+                  ${esc(view.name)}
+
+                  <span class="view-tag">
+                    ${
+                      view.type ===
+                        'matrix'
+                        ? 'Шахматка'
+                        : 'Таблица'
+                    }
+                  </span>
+
+                  ${
+                    isDefault
+                      ? `
+                        <span class="view-tag">
+                          По умолчанию
+                        </span>
+                      `
+                      : ''
+                  }
+
+                </span>
+
+                <button
+                  class="row-btn"
+                  data-open-view="${view.id}"
+                >
+                  Открыть
+                </button>
+
+              </div>
+            `;
+
+          }
+        )
+        .join(
+          ''
+        );
+
+
+  document
+    .querySelectorAll(
+      '[data-open-view]'
+    )
+    .forEach(
+      button =>
+        button.onclick =
+          () => {
+
+            switchTab(
+              'matrix'
+            );
+
+
+            setCurrentView(
+              button.dataset.openView
+            );
+
+          }
+    );
+
 
   $('projectMeta')
     .innerHTML =
       `
         <div class="item">
-          <span>Версия структуры</span>
-          <strong>${project.schemaVersion}</strong>
+
+          <span>
+            Версия структуры
+          </span>
+
+          <strong>
+            ${project.schemaVersion}
+          </strong>
+
         </div>
 
+
         <div class="item">
-          <span>Последнее изменение</span>
+
+          <span>
+            Последнее изменение
+          </span>
+
           <strong>
             ${
               new Date(
@@ -3542,11 +7246,18 @@ function renderSettings() {
                 )
             }
           </strong>
+
         </div>
 
+
         <div class="item">
-          <span>Последняя резервная копия</span>
+
+          <span>
+            Последняя резервная копия
+          </span>
+
           <strong>
+
             ${
               project.meta.lastBackupAt
                 ? new Date(
@@ -3557,26 +7268,64 @@ function renderSettings() {
                     )
                 : 'не создавалась'
             }
+
           </strong>
+
         </div>
 
-        <div class="item">
-          <span>Фронтов</span>
-          <strong>${project.fronts.length}</strong>
-        </div>
 
         <div class="item">
-          <span>Записей факта</span>
-          <strong>${project.factLog.length}</strong>
+
+          <span>
+            Шахматок
+          </span>
+
+          <strong>
+            ${project.views.length}
+          </strong>
+
+        </div>
+
+
+        <div class="item">
+
+          <span>
+            Фронтов
+          </span>
+
+          <strong>
+            ${project.fronts.length}
+          </strong>
+
+        </div>
+
+
+        <div class="item">
+
+          <span>
+            Записей факта
+          </span>
+
+          <strong>
+            ${project.factLog.length}
+          </strong>
+
         </div>
       `;
+
 }
+
+
+/* =========================================================
+   СПРАВОЧНИКИ
+   ========================================================= */
 
 async function addSimple(
   kind
 ) {
 
   const map = {
+
     building: [
       'newBuilding',
       'buildings',
@@ -3597,7 +7346,9 @@ async function addSimple(
       'ORG',
       'Организация'
     ]
+
   };
+
 
   const [
     input,
@@ -3607,28 +7358,59 @@ async function addSimple(
   ] =
     map[kind];
 
+
   const name =
     $(input)
       .value
       .trim();
 
-  if (!name) {
+
+  if (
+    !name
+  ) {
     return;
   }
 
+
+  const item = {
+
+    id:
+      uid(
+        prefix
+      ),
+
+    name,
+
+    active:
+      true
+
+  };
+
+
+  if (
+    kind ===
+    'work'
+  ) {
+
+    item.unit =
+      '';
+
+    item.section =
+      '';
+
+  }
+
+
   project[list]
-    .push({
-      id:
-        uid(prefix),
+    .push(
+      item
+    );
 
-      name,
 
-      active:
-        true
-    });
+  $(input)
+    .value =
+      '';
 
-  $(input).value =
-    '';
 
   log(
     'Создано',
@@ -3636,20 +7418,31 @@ async function addSimple(
     name
   );
 
+
   await saveProject();
 
+
   renderAll();
+
 }
+
+
+/* =========================================================
+   РЕЗЕРВНАЯ КОПИЯ
+   ========================================================= */
 
 async function exportBackup() {
 
   project.meta.lastBackupAt =
     nowIso();
 
+
   await saveProject();
 
+
   const payload = {
-    ...structuredClone(
+
+    ...clone(
       project
     ),
 
@@ -3658,7 +7451,9 @@ async function exportBackup() {
 
     source:
       'ACONS Planning local'
+
   };
+
 
   download(
     `ACONS_Planning_${
@@ -3685,8 +7480,15 @@ async function exportBackup() {
     )
   );
 
+
   renderAll();
+
 }
+
+
+/* =========================================================
+   ЧТЕНИЕ РЕЗЕРВНОЙ КОПИИ
+   ========================================================= */
 
 async function readJsonFile(
   file
@@ -3695,10 +7497,12 @@ async function readJsonFile(
   const text =
     await file.text();
 
+
   const data =
     JSON.parse(
       text
     );
+
 
   if (
     !data ||
@@ -3713,10 +7517,141 @@ async function readJsonFile(
     throw new Error(
       'Это не резервная копия ACONS Planning.'
     );
+
   }
 
+
   return data;
+
 }
+
+
+/* =========================================================
+   НОРМАЛИЗАЦИЯ СТАРЫХ ПРОЕКТОВ
+   ========================================================= */
+
+function normalizeProject(
+  data
+) {
+
+  const base =
+    emptyProject();
+
+
+  const result = {
+
+    ...base,
+
+    ...data,
+
+
+    schemaVersion:
+      SCHEMA_VERSION,
+
+
+    meta: {
+
+      ...base.meta,
+
+      ...(
+        data.meta ||
+        {}
+      )
+
+    },
+
+
+    buildings:
+      data.buildings ||
+      base.buildings,
+
+
+    works:
+      data.works ||
+      base.works,
+
+
+    organizations:
+      data.organizations ||
+      [],
+
+
+    structures:
+      data.structures ||
+      [],
+
+
+    fronts:
+      data.fronts ||
+      [],
+
+
+    planLog:
+      data.planLog ||
+      [],
+
+
+    factLog:
+      data.factLog ||
+      [],
+
+
+    resources:
+      data.resources ||
+      [],
+
+
+    milestones:
+      data.milestones ||
+      [],
+
+
+    demolition:
+      data.demolition ||
+      base.demolition,
+
+
+    history:
+      data.history ||
+      [],
+
+
+    views:
+      Array.isArray(
+        data.views
+      ) &&
+      data.views.length
+        ? data.views
+            .map(
+              normalizeView
+            )
+        : base.views
+
+  };
+
+
+  if (
+    !result.meta.defaultViewId ||
+    !byId(
+      result.views,
+      result.meta.defaultViewId
+    )
+  ) {
+
+    result.meta.defaultViewId =
+      result.views[0].id;
+
+  }
+
+
+  return result;
+
+}
+
+
+/* =========================================================
+   ЗАГРУЗИТЬ ПРОЕКТ
+   ========================================================= */
 
 async function restoreProject(
   file
@@ -3729,9 +7664,10 @@ async function restoreProject(
         file
       );
 
+
     if (
       !confirm(
-        `Заменить текущий проект файлом?\n` +
+        `Заменить текущий проект файлом?\n\n` +
         `Фронтов в файле: ${data.fronts.length}\n` +
         `Текущих фронтов: ${project.fronts.length}`
       )
@@ -3739,10 +7675,20 @@ async function restoreProject(
       return;
     }
 
+
     project =
       normalizeProject(
         data
       );
+
+
+    currentViewId =
+      project.meta.defaultViewId;
+
+
+    temporaryView =
+      null;
+
 
     log(
       'Восстановлено',
@@ -3750,15 +7696,25 @@ async function restoreProject(
       `Загружена резервная копия ${file.name}`
     );
 
+
     await saveProject();
 
+
     renderAll();
+
+
+    setCurrentView(
+      currentViewId
+    );
+
 
     alert(
       'Проект загружен.'
     );
 
-  } catch (error) {
+  } catch (
+    error
+  ) {
 
     alert(
       'Ошибка загрузки: ' +
@@ -3770,73 +7726,15 @@ async function restoreProject(
     $('restoreInput')
       .value =
         '';
+
   }
+
 }
 
-function normalizeProject(
-  data
-) {
 
-  const base =
-    emptyProject();
-
-  return {
-    ...base,
-    ...data,
-
-    meta: {
-      ...base.meta,
-      ...(
-        data.meta ||
-        {}
-      )
-    },
-
-    buildings:
-      data.buildings ||
-      base.buildings,
-
-    works:
-      data.works ||
-      base.works,
-
-    organizations:
-      data.organizations ||
-      [],
-
-    structures:
-      data.structures ||
-      [],
-
-    fronts:
-      data.fronts ||
-      [],
-
-    planLog:
-      data.planLog ||
-      [],
-
-    factLog:
-      data.factLog ||
-      [],
-
-    resources:
-      data.resources ||
-      [],
-
-    milestones:
-      data.milestones ||
-      [],
-
-    demolition:
-      data.demolition ||
-      base.demolition,
-
-    history:
-      data.history ||
-      []
-  };
-}
+/* =========================================================
+   СРАВНЕНИЕ
+   ========================================================= */
 
 function compareCollections(
   current,
@@ -3860,6 +7758,7 @@ function compareCollections(
         )
     );
 
+
   const incomingMap =
     new Map(
       (
@@ -3876,14 +7775,18 @@ function compareCollections(
         )
     );
 
+
   const added =
     [];
+
 
   const changed =
     [];
 
+
   const missing =
     [];
+
 
   for (
     const [
@@ -3915,6 +7818,7 @@ function compareCollections(
     ) {
 
       changed.push({
+
         before:
           currentMap.get(
             id
@@ -3922,9 +7826,13 @@ function compareCollections(
 
         after:
           row
+
       });
+
     }
+
   }
+
 
   for (
     const [
@@ -3943,62 +7851,88 @@ function compareCollections(
       missing.push(
         row
       );
+
     }
+
   }
 
+
   return {
+
     added,
+
     changed,
+
     missing
+
   };
+
 }
+
 
 function buildComparison(
   incoming
 ) {
 
   const sets = [
+
     [
       'fronts',
       'Фронты'
     ],
+
     [
       'structures',
       'Структуры'
     ],
+
     [
       'planLog',
       'План'
     ],
+
     [
       'factLog',
       'Факт'
     ],
+
     [
       'resources',
       'Ресурсы'
     ],
+
     [
       'milestones',
       'Ключевые даты'
     ],
+
     [
       'demolition',
       'Демонтаж'
     ],
+
     [
       'buildings',
       'Здания'
     ],
+
     [
       'works',
       'Виды работ'
     ],
+
     [
       'organizations',
       'Организации'
+    ],
+
+    [
+      'views',
+      'Шахматки'
     ]
+
   ];
+
 
   return sets
     .map(
@@ -4008,7 +7942,9 @@ function buildComparison(
           label
         ]
       ) => ({
+
         key,
+
         label,
 
         ...compareCollections(
@@ -4016,9 +7952,12 @@ function buildComparison(
           incoming[key],
           'id'
         )
+
       })
     );
+
 }
+
 
 async function compareProjectFile(
   file
@@ -4033,10 +7972,12 @@ async function compareProjectFile(
         )
       );
 
+
     const comparison =
       buildComparison(
         compareIncoming
       );
+
 
     const totals =
       comparison
@@ -4045,6 +7986,7 @@ async function compareProjectFile(
             accumulator,
             item
           ) => ({
+
             added:
               accumulator.added +
               item.added.length,
@@ -4056,9 +7998,11 @@ async function compareProjectFile(
             missing:
               accumulator.missing +
               item.missing.length
+
           }),
 
           {
+
             added:
               0,
 
@@ -4067,36 +8011,64 @@ async function compareProjectFile(
 
             missing:
               0
+
           }
         );
+
 
     openModal(
       'Сравнение проекта',
 
       `
+
         <p>
           <b>Файл:</b>
           ${esc(file.name)}
         </p>
 
+
         <div class="compare-summary">
 
           <div class="compare-box">
-            <span>Новых</span>
-            <h2>${totals.added}</h2>
+
+            <span>
+              Новых
+            </span>
+
+            <h2>
+              ${totals.added}
+            </h2>
+
           </div>
 
-          <div class="compare-box">
-            <span>Изменено</span>
-            <h2>${totals.changed}</h2>
-          </div>
 
           <div class="compare-box">
-            <span>Есть только у меня</span>
-            <h2>${totals.missing}</h2>
+
+            <span>
+              Изменено
+            </span>
+
+            <h2>
+              ${totals.changed}
+            </h2>
+
+          </div>
+
+
+          <div class="compare-box">
+
+            <span>
+              Есть только у меня
+            </span>
+
+            <h2>
+              ${totals.missing}
+            </h2>
+
           </div>
 
         </div>
+
 
         <div class="compare-details">
 
@@ -4122,18 +8094,23 @@ async function compareProjectFile(
                     </div>
                   `
               )
-              .join('')
+              .join(
+                ''
+              )
           }
 
         </div>
 
+
         <p class="muted">
+
           «Объединить» добавит новые записи
-          и заменит совпадающие ID версией из файла,
-          но не удалит локальные записи.
-          «Заменить полностью» сделает файл
-          новой рабочей базой.
+          и обновит совпадающие записи по их ID,
+          но не удалит данные,
+          которые имеются только в текущем проекте.
+
         </p>
+
 
         <div class="editor-actions">
 
@@ -4144,6 +8121,7 @@ async function compareProjectFile(
             Объединить
           </button>
 
+
           <button
             id="replaceCompare"
             class="btn primary"
@@ -4152,16 +8130,21 @@ async function compareProjectFile(
           </button>
 
         </div>
+
       `
     );
+
 
     $('mergeCompare').onclick =
       mergeCompared;
 
+
     $('replaceCompare').onclick =
       replaceCompared;
 
-  } catch (error) {
+  } catch (
+    error
+  ) {
 
     alert(
       'Ошибка сравнения: ' +
@@ -4173,8 +8156,15 @@ async function compareProjectFile(
     $('compareInput')
       .value =
         '';
+
   }
+
 }
+
+
+/* =========================================================
+   ОБЪЕДИНЕНИЕ
+   ========================================================= */
 
 async function mergeCompared() {
 
@@ -4184,18 +8174,33 @@ async function mergeCompared() {
     return;
   }
 
+
   const keys = [
+
     'buildings',
+
     'organizations',
+
     'works',
+
     'structures',
+
     'fronts',
+
     'planLog',
+
     'factLog',
+
     'resources',
+
     'milestones',
-    'demolition'
+
+    'demolition',
+
+    'views'
+
   ];
+
 
   for (
     const key
@@ -4215,6 +8220,7 @@ async function mergeCompared() {
           )
       );
 
+
     for (
       const row
       of (
@@ -4229,13 +8235,17 @@ async function mergeCompared() {
         ),
         row
       );
+
     }
+
 
     project[key] =
       [
         ...map.values()
       ];
+
   }
+
 
   log(
     'Объединено',
@@ -4243,19 +8253,30 @@ async function mergeCompared() {
     'Применены изменения из сравниваемого файла'
   );
 
+
   await saveProject();
+
 
   compareIncoming =
     null;
 
+
   closeModal();
 
+
   renderAll();
+
 
   alert(
     'Изменения объединены.'
   );
+
 }
+
+
+/* =========================================================
+   ПОЛНАЯ ЗАМЕНА
+   ========================================================= */
 
 async function replaceCompared() {
 
@@ -4265,6 +8286,7 @@ async function replaceCompared() {
     return;
   }
 
+
   if (
     !confirm(
       'Полностью заменить текущий проект версией из файла?'
@@ -4273,8 +8295,18 @@ async function replaceCompared() {
     return;
   }
 
+
   project =
     compareIncoming;
+
+
+  currentViewId =
+    project.meta.defaultViewId;
+
+
+  temporaryView =
+    null;
+
 
   log(
     'Заменено',
@@ -4282,15 +8314,30 @@ async function replaceCompared() {
     'Применена сравниваемая версия целиком'
   );
 
+
   await saveProject();
+
 
   compareIncoming =
     null;
 
+
   closeModal();
 
+
   renderAll();
+
+
+  setCurrentView(
+    currentViewId
+  );
+
 }
+
+
+/* =========================================================
+   РЕЗЕРВНАЯ КОПИЯ — СТАТУС
+   ========================================================= */
 
 function renderBackupNotice() {
 
@@ -4299,14 +8346,19 @@ function renderBackupNotice() {
       ?.meta
       ?.lastBackupAt;
 
-  if (!last) {
+
+  if (
+    !last
+  ) {
 
     $('backupNotice')
       .textContent =
-        'Резервная копия проекта еще не создавалась.';
+        'Резервная копия проекта ещё не создавалась.';
 
     return;
+
   }
+
 
   const days =
     Math.floor(
@@ -4319,6 +8371,7 @@ function renderBackupNotice() {
       86400000
     );
 
+
   $('backupNotice')
     .textContent =
       `Последняя резервная копия: ${
@@ -4329,11 +8382,18 @@ function renderBackupNotice() {
             'ru-RU'
           )
       }${
-        days >= 7
+        days >=
+        7
           ? ' · рекомендуется создать новую копию'
           : ''
       }`;
+
 }
+
+
+/* =========================================================
+   ИМПОРТ EXCEL
+   ========================================================= */
 
 async function readImportFile(
   event
@@ -4343,9 +8403,13 @@ async function readImportFile(
     event.target
       .files[0];
 
-  if (!file) {
+
+  if (
+    !file
+  ) {
     return;
   }
+
 
   try {
 
@@ -4353,32 +8417,40 @@ async function readImportFile(
       await file
         .arrayBuffer();
 
+
     const workbook =
       XLSX.read(
         data,
         {
+
           type:
             'array',
 
           cellDates:
             true
+
         }
       );
+
 
     const sheet =
       workbook.Sheets[
         workbook.SheetNames[0]
       ];
 
+
     importRows =
       XLSX.utils
         .sheet_to_json(
           sheet,
           {
+
             defval:
               ''
+
           }
         );
+
 
     $('importInfo')
       .classList
@@ -4386,9 +8458,11 @@ async function readImportFile(
         'hidden'
       );
 
+
     $('importInfo')
       .textContent =
         `Прочитано строк: ${importRows.length}. Показываю первые 50.`;
+
 
     const headers =
       importRows[0]
@@ -4397,18 +8471,20 @@ async function readImportFile(
           )
         : [];
 
+
     $('importHead')
       .innerHTML =
         '<tr>' +
-
         headers
           .map(
             header =>
               `<th>${esc(header)}</th>`
           )
-          .join('') +
-
+          .join(
+            ''
+          ) +
         '</tr>';
+
 
     $('importBody')
       .innerHTML =
@@ -4420,41 +8496,57 @@ async function readImportFile(
           .map(
             row =>
               '<tr>' +
-
               headers
                 .map(
                   header =>
                     `<td>${esc(row[header])}</td>`
                 )
-                .join('') +
-
+                .join(
+                  ''
+                ) +
               '</tr>'
           )
-          .join('');
+          .join(
+            ''
+          );
+
 
     $('commitImportBtn')
       .disabled =
         !importRows.length;
 
-  } catch (error) {
+  } catch (
+    error
+  ) {
 
     alert(
       'Ошибка чтения файла: ' +
       error.message
     );
+
   }
+
 }
+
+
+/* =========================================================
+   ДАТА ИМПОРТА
+   ========================================================= */
 
 function normDate(
   value
 ) {
 
-  if (!value) {
+  if (
+    !value
+  ) {
     return '';
   }
 
+
   if (
-    value instanceof Date
+    value instanceof
+    Date
   ) {
 
     return value
@@ -4463,7 +8555,9 @@ function normDate(
         0,
         10
       );
+
   }
+
 
   const string =
     String(
@@ -4471,22 +8565,30 @@ function normDate(
     )
       .trim();
 
+
   const match =
     string.match(
       /^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})$/
     );
 
-  if (match) {
+
+  if (
+    match
+  ) {
 
     const year =
-      match[3].length ===
+      match[3]
+        .length ===
         2
         ? '20' +
           match[3]
         : match[3];
 
+
     return `${year}-${match[2].padStart(2,'0')}-${match[1].padStart(2,'0')}`;
+
   }
+
 
   return /^\d{4}-\d{2}-\d{2}$/
     .test(
@@ -4494,7 +8596,13 @@ function normDate(
     )
       ? string
       : '';
+
 }
+
+
+/* =========================================================
+   ДОБАВЛЕНИЕ СПРАВОЧНИКА ИЗ ИМПОРТА
+   ========================================================= */
 
 function ensureNamed(
   list,
@@ -4510,11 +8618,17 @@ function ensureNamed(
         name
     );
 
-  if (!item) {
+
+  if (
+    !item
+  ) {
 
     item = {
+
       id:
-        uid(prefix),
+        uid(
+          prefix
+        ),
 
       name,
 
@@ -4522,15 +8636,25 @@ function ensureNamed(
         true,
 
       ...extra
+
     };
+
 
     list.push(
       item
     );
+
   }
 
+
   return item;
+
 }
+
+
+/* =========================================================
+   ИМПОРТ В ПРОЕКТ
+   ========================================================= */
 
 async function commitImport() {
 
@@ -4540,22 +8664,27 @@ async function commitImport() {
     return;
   }
 
+
   if (
     !confirm(
-      `Импортировать ${importRows.length} строк? Перед импортом рекомендуется сохранить проект.`
+      `Импортировать ${importRows.length} строк?\n\nПеред импортом рекомендуется сохранить проект.`
     )
   ) {
     return;
   }
 
+
   let created =
     0;
+
 
   let updated =
     0;
 
+
   let skipped =
     0;
+
 
   for (
     const row
@@ -4569,6 +8698,7 @@ async function commitImport() {
       )
         .trim();
 
+
     const workName =
       String(
         row['Работа'] ||
@@ -4577,14 +8707,18 @@ async function commitImport() {
       )
         .trim();
 
+
     if (
       !buildingName ||
       !workName
     ) {
 
       skipped++;
+
       continue;
+
     }
+
 
     const building =
       ensureNamed(
@@ -4593,20 +8727,24 @@ async function commitImport() {
         buildingName
       );
 
+
     const work =
       ensureNamed(
         project.works,
         'WRK',
         workName,
         {
+
           unit:
             String(
               row['Ед. изм.'] ||
               ''
             )
               .trim()
+
         }
       );
+
 
     const organizationName =
       String(
@@ -4614,6 +8752,7 @@ async function commitImport() {
         ''
       )
         .trim();
+
 
     const organization =
       organizationName
@@ -4624,23 +8763,42 @@ async function commitImport() {
           )
         : null;
 
+
     const signature =
       [
+
         building.id,
-        row['Блок'] || '',
-        row['Этаж'] || '',
-        row['Захватка'] || '',
-        row['Ось'] || '',
-        row['Сторона'] || '',
-        row['Зона'] || '',
+
+        row['Блок'] ||
+        '',
+
+        row['Этаж'] ||
+        '',
+
+        row['Захватка'] ||
+        '',
+
+        row['Ось'] ||
+        '',
+
+        row['Сторона'] ||
+        '',
+
+        row['Зона'] ||
+        '',
+
         row['№ помещения'] ||
         row['Номер помещения'] ||
         ''
+
       ]
         .map(
           String
         )
-        .join('|');
+        .join(
+          '|'
+        );
+
 
     let structure =
       project.structures
@@ -4650,16 +8808,23 @@ async function commitImport() {
             signature
         );
 
-    if (!structure) {
+
+    if (
+      !structure
+    ) {
 
       structure = {
+
         id:
-          uid('STR'),
+          uid(
+            'STR'
+          ),
 
         signature,
 
         buildingId:
           building.id,
+
 
         block:
           String(
@@ -4667,6 +8832,7 @@ async function commitImport() {
             ''
           )
             .trim(),
+
 
         floor:
           row['Этаж'] ===
@@ -4676,12 +8842,14 @@ async function commitImport() {
                 row['Этаж']
               ),
 
+
         capture:
           String(
             row['Захватка'] ||
             ''
           )
             .trim(),
+
 
         axis:
           String(
@@ -4690,6 +8858,7 @@ async function commitImport() {
           )
             .trim(),
 
+
         side:
           String(
             row['Сторона'] ||
@@ -4697,12 +8866,14 @@ async function commitImport() {
           )
             .trim(),
 
+
         zone:
           String(
             row['Зона'] ||
             ''
           )
             .trim(),
+
 
         roomNo:
           String(
@@ -4712,6 +8883,7 @@ async function commitImport() {
           )
             .trim(),
 
+
         roomName:
           String(
             row['Помещение'] ||
@@ -4719,13 +8891,17 @@ async function commitImport() {
             ''
           )
             .trim()
+
       };
+
 
       project.structures
         .push(
           structure
         );
+
     }
+
 
     let front =
       project.fronts
@@ -4737,11 +8913,17 @@ async function commitImport() {
               work.id
         );
 
-    if (!front) {
+
+    if (
+      !front
+    ) {
 
       front = {
+
         id:
-          uid('F'),
+          uid(
+            'F'
+          ),
 
         structureId:
           structure.id,
@@ -4754,28 +8936,35 @@ async function commitImport() {
 
         createdAt:
           nowIso()
+
       };
+
 
       project.fronts
         .push(
           front
         );
 
+
       created++;
 
     } else {
 
       updated++;
+
     }
+
 
     Object.assign(
       front,
       {
+
         organizationId:
           organization
             ?.id ||
           front.organizationId ||
           '',
+
 
         unit:
           String(
@@ -4785,15 +8974,20 @@ async function commitImport() {
           )
             .trim(),
 
+
         totalQty:
           row['Общий объем'] ===
+            '' &&
+          row['Общий объём'] ===
             ''
             ? num(
                 front.totalQty
               )
             : num(
-                row['Общий объем']
+                row['Общий объем'] ||
+                row['Общий объём']
               ),
+
 
         doneQty:
           row['Накопительный итог'] ===
@@ -4805,12 +8999,14 @@ async function commitImport() {
                 row['Накопительный итог']
               ),
 
+
         status:
           String(
             row['Статус'] ||
             front.status ||
             'Не начато'
           ),
+
 
         contractStart:
           normDate(
@@ -4819,12 +9015,14 @@ async function commitImport() {
           front.contractStart ||
           '',
 
+
         contractEnd:
           normDate(
             row['Договорное окончание']
           ) ||
           front.contractEnd ||
           '',
+
 
         baselineStart:
           normDate(
@@ -4833,12 +9031,14 @@ async function commitImport() {
           front.baselineStart ||
           '',
 
+
         baselineEnd:
           normDate(
             row['Базовое окончание']
           ) ||
           front.baselineEnd ||
           '',
+
 
         planStart:
           normDate(
@@ -4847,12 +9047,14 @@ async function commitImport() {
           front.planStart ||
           '',
 
+
         planEnd:
           normDate(
             row['Рабочее окончание']
           ) ||
           front.planEnd ||
           '',
+
 
         forecastEnd:
           normDate(
@@ -4861,11 +9063,15 @@ async function commitImport() {
           front.forecastEnd ||
           '',
 
+
         updatedAt:
           nowIso()
+
       }
     );
+
   }
+
 
   log(
     'Импорт',
@@ -4873,21 +9079,32 @@ async function commitImport() {
     `Создано ${created}, обновлено ${updated}, пропущено ${skipped}`
   );
 
+
   await saveProject();
+
 
   $('importInfo')
     .textContent =
-      `Импорт завершен. Создано: ${created}, обновлено: ${updated}, пропущено: ${skipped}.`;
+      `Импорт завершён. Создано: ${created}, обновлено: ${updated}, пропущено: ${skipped}.`;
+
 
   importRows =
     [];
+
 
   $('commitImportBtn')
     .disabled =
       true;
 
+
   renderAll();
+
 }
+
+
+/* =========================================================
+   PDF
+   ========================================================= */
 
 function printCurrent() {
 
@@ -4896,6 +9113,7 @@ function printCurrent() {
       .querySelector(
         '.panel:not(.hidden)'
       );
+
 
   document
     .querySelectorAll(
@@ -4910,16 +9128,22 @@ function printCurrent() {
           )
     );
 
-  if (active) {
+
+  if (
+    active
+  ) {
 
     active
       .classList
       .add(
         'print-active'
       );
+
   }
 
+
   window.print();
+
 
   setTimeout(
     () =>
@@ -4930,7 +9154,13 @@ function printCurrent() {
         ),
     500
   );
+
 }
+
+
+/* =========================================================
+   ВКЛАДКИ
+   ========================================================= */
 
 function switchTab(
   name
@@ -4951,6 +9181,7 @@ function switchTab(
           )
     );
 
+
   document
     .querySelectorAll(
       '.panel'
@@ -4964,6 +9195,7 @@ function switchTab(
           )
     );
 
+
   $(
     `tab-${name}`
   )
@@ -4972,12 +9204,22 @@ function switchTab(
       'hidden'
     );
 
+
+  if (
+    name ===
+    'dashboard'
+  ) {
+    renderDashboard();
+  }
+
+
   if (
     name ===
     'matrix'
   ) {
     renderMatrix();
   }
+
 
   if (
     name ===
@@ -4986,12 +9228,14 @@ function switchTab(
     renderGantt();
   }
 
+
   if (
     name ===
     'planfact'
   ) {
     renderPlanFact();
   }
+
 
   if (
     name ===
@@ -5000,12 +9244,14 @@ function switchTab(
     renderResources();
   }
 
+
   if (
     name ===
     'milestones'
   ) {
     renderMilestones();
   }
+
 
   if (
     name ===
@@ -5014,6 +9260,7 @@ function switchTab(
     renderDemolition();
   }
 
+
   if (
     name ===
     'history'
@@ -5021,13 +9268,64 @@ function switchTab(
     renderHistory();
   }
 
+
   if (
     name ===
     'settings'
   ) {
     renderSettings();
   }
+
 }
+
+
+/* =========================================================
+   ПОЛНЫЙ РЕНДЕР
+   ========================================================= */
+
+function renderAll() {
+
+  ensureViews();
+
+
+  initSelects();
+
+
+  renderDashboard();
+
+
+  renderViewSelector();
+
+
+  renderMatrix();
+
+
+  renderGantt();
+
+
+  renderPlanFact();
+
+
+  renderResources();
+
+
+  renderMilestones();
+
+
+  renderDemolition();
+
+
+  renderHistory();
+
+
+  renderSettings();
+
+}
+
+
+/* =========================================================
+   СОБЫТИЯ
+   ========================================================= */
 
 function bindUi() {
 
@@ -5044,8 +9342,10 @@ function bindUi() {
             )
     );
 
+
   $('modalClose').onclick =
     closeModal;
+
 
   $('modal').onclick =
     event => {
@@ -5054,23 +9354,88 @@ function bindUi() {
         event.target ===
         $('modal')
       ) {
+
         closeModal();
+
       }
+
     };
+
+
+  $('viewSelect').onchange =
+    () =>
+      setCurrentView(
+        $('viewSelect')
+          .value
+      );
+
+
+  $('newViewBtn').onclick =
+    openNewViewEditor;
+
+
+  $('duplicateViewBtn').onclick =
+    duplicateCurrentView;
+
+
+  $('configureViewBtn').onclick =
+    () =>
+      openViewConfiguration(
+        currentView(),
+        false
+      );
+
+
+  $('saveViewBtn').onclick =
+    saveCurrentViewState;
+
+
+  $('defaultViewBtn').onclick =
+    makeCurrentViewDefault;
+
+
+  $('deleteViewBtn').onclick =
+    deleteCurrentView;
+
+
+  $('resetQuickFiltersBtn').onclick =
+    resetQuickFilters;
+
 
   [
     'mfBuilding',
     'mfBlock',
     'mfFloor',
-    'mfWork',
+    'mfCapture',
+    'mfAxis',
+    'mfSide',
+    'mfZone',
     'mfOrg',
     'mfStatus'
   ]
     .forEach(
-      id =>
+      id => {
+
         $(id).onchange =
-          renderMatrix
+          () => {
+
+            if (
+              id ===
+              'mfBuilding'
+            ) {
+
+              updateMatrixDependent();
+
+            }
+
+
+            quickFilterChanged();
+
+          };
+
+      }
     );
+
 
   [
     'gBuilding',
@@ -5082,6 +9447,7 @@ function bindUi() {
         $(id).onchange =
           renderGantt
     );
+
 
   [
     'pfFrom',
@@ -5095,6 +9461,7 @@ function bindUi() {
           renderPlanFact
     );
 
+
   [
     'rFrom',
     'rTo',
@@ -5107,9 +9474,11 @@ function bindUi() {
           renderResources
     );
 
+
   $('newFrontBtn').onclick =
     () =>
       openFrontEditor();
+
 
   $('newPlanRow').onclick =
     () =>
@@ -5117,18 +9486,22 @@ function bindUi() {
         'plan'
       );
 
+
   $('newFactRow').onclick =
     () =>
       openLogEditor(
         'fact'
       );
 
+
   $('newResourceBtn').onclick =
     openResourceEditor;
+
 
   $('newMilestoneBtn').onclick =
     () =>
       openMilestoneEditor();
+
 
   $('addBuildingBtn').onclick =
     () =>
@@ -5136,11 +9509,13 @@ function bindUi() {
         'building'
       );
 
+
   $('addWorkBtn').onclick =
     () =>
       addSimple(
         'work'
       );
+
 
   $('addOrgBtn').onclick =
     () =>
@@ -5148,8 +9523,10 @@ function bindUi() {
         'org'
       );
 
+
   $('backupBtn').onclick =
     exportBackup;
+
 
   $('restoreInput').onchange =
     event =>
@@ -5158,6 +9535,7 @@ function bindUi() {
         event.target.files[0]
       );
 
+
   $('compareInput').onchange =
     event =>
       event.target.files[0] &&
@@ -5165,34 +9543,66 @@ function bindUi() {
         event.target.files[0]
       );
 
+
   $('pdfBtn').onclick =
     printCurrent;
+
 
   $('importFile').onchange =
     readImportFile;
 
+
   $('commitImportBtn').onclick =
     commitImport;
+
 
   $('clearProjectBtn').onclick =
     async () => {
 
       if (
         !confirm(
-          'Очистить рабочие данные? Справочники зданий и видов работ останутся.'
+          'Очистить рабочие данные?\n\nСправочники зданий, видов работ и сохранённые шахматки останутся.'
         )
       ) {
         return;
       }
 
+
       const fresh =
         emptyProject();
+
+
+      fresh.buildings =
+        project.buildings;
+
+
+      fresh.works =
+        project.works;
+
 
       fresh.organizations =
         project.organizations;
 
+
+      fresh.views =
+        project.views;
+
+
+      fresh.meta.defaultViewId =
+        project.meta.defaultViewId;
+
+
       project =
         fresh;
+
+
+      currentViewId =
+        project.meta.defaultViewId;
+
+
+      temporaryView =
+        null;
+
 
       log(
         'Очищено',
@@ -5200,24 +9610,38 @@ function bindUi() {
         'Рабочие данные очищены'
       );
 
+
       await saveProject();
 
+
       renderAll();
+
     };
+
 }
+
+
+/* =========================================================
+   ЗАПУСК
+   ========================================================= */
 
 async function init() {
 
   db =
     await openDb();
 
+
   project =
     await dbGet();
 
-  if (!project) {
+
+  if (
+    !project
+  ) {
 
     project =
       emptyProject();
+
 
     await saveProject();
 
@@ -5227,20 +9651,47 @@ async function init() {
       normalizeProject(
         project
       );
+
+
+    await saveProject();
+
   }
+
+
+  ensureViews();
+
+
+  currentViewId =
+    project.meta.defaultViewId;
+
+
+  temporaryView =
+    null;
+
 
   bindUi();
 
+
   renderBackupNotice();
 
+
   renderAll();
+
+
+  setCurrentView(
+    currentViewId
+  );
+
 
   $('pfTo').value =
     today();
 
+
   $('rTo').value =
     today();
+
 }
+
 
 document
   .addEventListener(
@@ -5254,11 +9705,12 @@ document
               error
             );
 
+
             alert(
               'Ошибка запуска: ' +
               error.message
             );
+
           }
         )
   );
-
