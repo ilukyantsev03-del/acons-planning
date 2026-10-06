@@ -3,83 +3,161 @@
 const $ = id =>
   document.getElementById(id);
 
-const cfg =
-  window.ACONS_CONFIG || {};
+const DB_NAME =
+  'acons_planning_local';
 
-const badConfig =
-  !cfg.API_URL ||
-  String(cfg.API_URL).includes('PASTE_');
+const DB_VERSION =
+  1;
 
-let currentUser = null;
-let profile = null;
-let selectedFrontId = null;
-let logMode = 'plan';
+const STORE =
+  'project';
+
+const PROJECT_KEY =
+  'main';
+
+const SCHEMA_VERSION =
+  '1.0.0';
+
+const STATUS_LIST = [
+  'Не начато',
+  'Фронт готов',
+  'В работе',
+  'Завершено',
+  'Приостановлено',
+  'Ограничение'
+];
+
+const BUILDINGS = [
+  'Главный корпус',
+  'Грязелечебница',
+  'Ресторан с банкетным залом',
+  'КПП',
+  'ДЭС',
+  'ТП-2',
+  'ТП-3',
+  'ТП-4',
+  'РТП. Хладоцентр',
+  'Котельная',
+  'РЧВ',
+  'Подпорные стены благоустройства',
+  'Аэрарий'
+];
+
+const WORKS = [
+  [
+    'Кладка наружных стен',
+    'АР',
+    'м²'
+  ],
+  [
+    'Вертикальное армирование',
+    'КР',
+    'т'
+  ],
+  [
+    'Штукатурка',
+    'АР',
+    'м²'
+  ],
+  [
+    'Гидроизоляция балконов',
+    'АР',
+    'м²'
+  ],
+  [
+    'Передача фронта',
+    'Организация работ',
+    'шт.'
+  ]
+];
+
+const DEMOLITION = [
+  "Склад (ангар) литера Д'",
+  "Нежилое здание, Корпус №10 литера Д",
+  "Нежилое здание, Корпус №9 литера Г",
+  "Нежилое здание №11 литера Е",
+  "Демонтаж «фонтана с оленем»",
+  "Аэрарий",
+  "Нежилое здание Корпус №12 литера З",
+  "Нежилое здание Корпус №1 литера Б",
+  "Котельная литера Ф'",
+  "Склад литера Б', 90:25:020102:170",
+  "Коттедж 1 литера Ш'",
+  "Парники",
+  "Коммунальная столовая литера Ц",
+  "Управление (бытовые помещения) литера Р",
+  "Теплица в ООПТ",
+  "Сауна литера Л'",
+  "Склад",
+  "Кладовая / Аккумуляторная литера Т'",
+  "Гараж литера Ж'",
+  "Гараж литера С'",
+  "Нежилое здание КТП / Диспетчерская литера П'",
+  "Нежилое здание, Корпус №4 литера В",
+  "Библиотека литера Ю",
+  "Нежилое здание Корпус №32 литера И",
+  "Спортивная площадка",
+  "Нежилое здание (Коттедж 3) литера Ц'",
+  "Приемная, спортзал литера Т (ЛФК)",
+  "Прачечная литера А (ОКН)",
+  "Нежилое здание литера У' (Склад ген.подрядчика)",
+  "Офис, нежилое здание литера Ф (штаб тех.заказчика)",
+  "Нежилое здание Корпус №35 литера Л (штаб ген.подрядчика)",
+  "Нежилое здание, Корпус №34 литера К (ООПТ)"
+];
+
+let db = null;
+let project = null;
 let importRows = [];
-let realtimeChannel = null;
-let editingMilestoneId = null;
+let compareIncoming = null;
 
-const state = {
-  buildings: [],
-  works: [],
-  organizations: [],
-  equipmentTypes: [],
-  structures: [],
-  fronts: [],
-  planLog: [],
-  factLog: [],
-  resourceLog: [],
-  milestones: [],
-  customFields: [],
-  customValues: [],
-  views: [],
-  demolition: [],
-  demolitionDependencies: [],
-  history: [],
-  users: [],
-  settings: {},
-  calendars: [],
-  calendarExceptions: []
-};
+const uid = prefix =>
+  prefix +
+  '-' +
+  crypto.randomUUID();
 
-const BASE_COLUMNS = [
-  ['building', 'Здание'],
-  ['block', 'Блок'],
-  ['floor', 'Этаж'],
-  ['capture', 'Захватка'],
-  ['axis', 'Ось'],
-  ['side', 'Сторона'],
-  ['zone', 'Зона'],
-  ['room_no', '№ помещения'],
-  ['room_name', 'Помещение'],
-  ['equipment', 'Оборудование'],
-  ['fsm_priority', 'Приоритет ФСМ'],
-  ['fsm_status', 'Статус ФСМ'],
-  ['organization', 'Организация'],
-  ['responsible', 'Ответственный'],
-  ['status', 'Статус']
-];
+const today = () =>
+  new Date()
+    .toISOString()
+    .slice(0, 10);
 
-let visibleColumns = [
-  'building',
-  'block',
-  'floor',
-  'axis',
-  'side',
-  'organization',
-  'status'
-];
+const nowIso = () =>
+  new Date()
+    .toISOString();
+
+const num = value =>
+  Number(
+    String(
+      value ?? 0
+    )
+      .replace(
+        /\s/g,
+        ''
+      )
+      .replace(
+        ',',
+        '.'
+      )
+  ) || 0;
+
+const fmt = value =>
+  Math.round(
+    num(value) * 100
+  ) / 100;
 
 const esc = value =>
-  String(value ?? '')
+  String(
+    value ?? ''
+  )
     .replace(
       /[&<>"']/g,
       char =>
         ({
-          '&': '&amp;',
-          '<': '&lt;',
-          '>': '&gt;',
-          '"': '&quot;',
-          "'": '&#039;'
+          '&':'&amp;',
+          '<':'&lt;',
+          '>':'&gt;',
+          '"':'&quot;',
+          "'":'&#039;'
         })[char]
     );
 
@@ -88,70 +166,498 @@ const uniq = array =>
     ...new Set(
       array.filter(
         value =>
-          value !== undefined &&
+          value !== '' &&
           value !== null &&
-          String(value) !== ''
+          value !== undefined
       )
     )
   ];
 
-const today = () =>
-  new Date()
-    .toISOString()
-    .slice(0, 10);
+const byId = (
+  list,
+  id
+) =>
+  list.find(
+    item =>
+      String(
+        item.id
+      ) ===
+      String(
+        id
+      )
+  );
 
-const num = value =>
-  Number(value || 0);
-
-const fmt = value =>
-  Math.round(
-    num(value) * 100
-  ) / 100;
+const nameById = (
+  list,
+  id
+) =>
+  byId(
+    list,
+    id
+  )?.name ||
+  '';
 
 const diffDays = (
-  date1,
-  date2
+  first,
+  second
 ) =>
-  date1 && date2
+  first &&
+  second
     ? Math.round(
         (
-          Date.parse(date2) -
-          Date.parse(date1)
-        ) / 86400000
+          Date.parse(second) -
+          Date.parse(first)
+        ) /
+        86400000
       )
     : null;
 
-function showBootError(text) {
-  $('bootError')
-    .classList
-    .remove('hidden');
+function emptyProject() {
 
-  $('bootError')
-    .innerHTML = `
-      <div class="notice error">
-        <b>Ошибка запуска:</b>
-        ${esc(text)}
-      </div>
-    `;
+  return {
+
+    schemaVersion:
+      SCHEMA_VERSION,
+
+    meta: {
+      projectName:
+        'ACONS Planning',
+
+      createdAt:
+        nowIso(),
+
+      updatedAt:
+        nowIso(),
+
+      lastBackupAt:
+        null
+    },
+
+    buildings:
+      BUILDINGS.map(
+        (
+          name,
+          index
+        ) => ({
+          id:
+            `BLD-${String(index + 1).padStart(3,'0')}`,
+
+          name,
+
+          active:
+            true,
+
+          sort:
+            index + 1
+        })
+      ),
+
+    organizations:
+      [],
+
+    works:
+      WORKS.map(
+        (
+          item,
+          index
+        ) => ({
+          id:
+            `WRK-${String(index + 1).padStart(3,'0')}`,
+
+          name:
+            item[0],
+
+          section:
+            item[1],
+
+          unit:
+            item[2],
+
+          active:
+            true,
+
+          sort:
+            index + 1
+        })
+      ),
+
+    structures:
+      [],
+
+    fronts:
+      [],
+
+    planLog:
+      [],
+
+    factLog:
+      [],
+
+    resources:
+      [],
+
+    milestones:
+      [],
+
+    customFields:
+      [],
+
+    views:
+      [],
+
+    history:
+      [],
+
+    demolition:
+      DEMOLITION.map(
+        (
+          name,
+          index
+        ) => ({
+          id:
+            `DEM-${String(index + 1).padStart(3,'0')}`,
+
+          name,
+
+          status:
+            'Не начато',
+
+          planStart:
+            '',
+
+          planEnd:
+            '',
+
+          factStart:
+            '',
+
+          factEnd:
+            '',
+
+          forecastEnd:
+            '',
+
+          comment:
+            '',
+
+          active:
+            true
+        })
+      )
+  };
 }
 
-function notice(
-  text,
-  ok = false
+async function openDb() {
+
+  return new Promise(
+    (
+      resolve,
+      reject
+    ) => {
+
+      const request =
+        indexedDB.open(
+          DB_NAME,
+          DB_VERSION
+        );
+
+      request.onupgradeneeded =
+        event => {
+
+          const database =
+            event.target.result;
+
+          if (
+            !database
+              .objectStoreNames
+              .contains(
+                STORE
+              )
+          ) {
+
+            database
+              .createObjectStore(
+                STORE
+              );
+          }
+        };
+
+      request.onsuccess =
+        event =>
+          resolve(
+            event.target.result
+          );
+
+      request.onerror =
+        () =>
+          reject(
+            request.error
+          );
+    }
+  );
+}
+
+async function dbGet() {
+
+  return new Promise(
+    (
+      resolve,
+      reject
+    ) => {
+
+      const transaction =
+        db.transaction(
+          STORE,
+          'readonly'
+        );
+
+      const request =
+        transaction
+          .objectStore(
+            STORE
+          )
+          .get(
+            PROJECT_KEY
+          );
+
+      request.onsuccess =
+        () =>
+          resolve(
+            request.result ||
+            null
+          );
+
+      request.onerror =
+        () =>
+          reject(
+            request.error
+          );
+    }
+  );
+}
+
+async function dbPut(
+  value
 ) {
-  if (!$('syncStatus')) {
-    return;
-  }
 
-  $('syncStatus')
-    .textContent =
-      text;
+  return new Promise(
+    (
+      resolve,
+      reject
+    ) => {
 
-  $('syncStatus')
-    .style.color =
-      ok
-        ? '#86efac'
-        : '#fde68a';
+      const transaction =
+        db.transaction(
+          STORE,
+          'readwrite'
+        );
+
+      transaction
+        .objectStore(
+          STORE
+        )
+        .put(
+          value,
+          PROJECT_KEY
+        );
+
+      transaction.oncomplete =
+        () =>
+          resolve();
+
+      transaction.onerror =
+        () =>
+          reject(
+            transaction.error
+          );
+    }
+  );
+}
+
+async function saveProject() {
+
+  project.meta.updatedAt =
+    nowIso();
+
+  await dbPut(
+    project
+  );
+
+  renderBackupNotice();
+}
+
+function log(
+  action,
+  entity,
+  description
+) {
+
+  project.history.unshift({
+    id:
+      uid('H'),
+
+    at:
+      nowIso(),
+
+    action,
+
+    entity,
+
+    description
+  });
+
+  project.history =
+    project.history
+      .slice(
+        0,
+        5000
+      );
+}
+
+function download(
+  name,
+  text,
+  type = 'application/json'
+) {
+
+  const blob =
+    new Blob(
+      [text],
+      {
+        type
+      }
+    );
+
+  const url =
+    URL.createObjectURL(
+      blob
+    );
+
+  const link =
+    document
+      .createElement(
+        'a'
+      );
+
+  link.href =
+    url;
+
+  link.download =
+    name;
+
+  document.body
+    .appendChild(
+      link
+    );
+
+  link.click();
+
+  link.remove();
+
+  setTimeout(
+    () =>
+      URL.revokeObjectURL(
+        url
+      ),
+    1000
+  );
+}
+
+function hydrateFront(
+  front
+) {
+
+  const structure =
+    byId(
+      project.structures,
+      front.structureId
+    ) || {};
+
+  return {
+    ...front,
+
+    structure,
+
+    building:
+      nameById(
+        project.buildings,
+        structure.buildingId
+      ),
+
+    work:
+      nameById(
+        project.works,
+        front.workId
+      ),
+
+    organization:
+      nameById(
+        project.organizations,
+        front.organizationId
+      ),
+
+    block:
+      structure.block || '',
+
+    floor:
+      structure.floor ?? '',
+
+    capture:
+      structure.capture || '',
+
+    axis:
+      structure.axis || '',
+
+    side:
+      structure.side || '',
+
+    zone:
+      structure.zone || '',
+
+    roomNo:
+      structure.roomNo || '',
+
+    roomName:
+      structure.roomName || ''
+  };
+}
+
+function frontLabel(
+  front
+) {
+
+  const item =
+    hydrateFront(
+      front
+    );
+
+  return [
+    item.building,
+    item.block,
+
+    item.floor !== ''
+      ? `${item.floor} эт.`
+      : '',
+
+    item.capture
+      ? `захв. ${item.capture}`
+      : '',
+
+    item.axis
+      ? `ось ${item.axis}`
+      : '',
+
+    item.side,
+    item.zone,
+
+    item.roomNo
+      ? `пом. ${item.roomNo}`
+      : '',
+
+    item.work
+  ]
+    .filter(Boolean)
+    .join(' / ');
 }
 
 function fill(
@@ -159,6 +665,7 @@ function fill(
   items,
   allLabel
 ) {
+
   if (!element) {
     return;
   }
@@ -173,6 +680,7 @@ function fill(
     allLabel !==
     undefined
   ) {
+
     const option =
       document
         .createElement(
@@ -193,6 +701,7 @@ function fill(
 
   items.forEach(
     item => {
+
       const option =
         document
           .createElement(
@@ -226,769 +735,4220 @@ function fill(
           current
       )
   ) {
+
     element.value =
       current;
   }
 }
 
-function nameById(
-  list,
-  id
-) {
-  return (
-    list.find(
-      item =>
-        String(item.id) ===
-        String(id)
-    )?.name ||
-    ''
-  );
-}
+function initSelects() {
 
-async function apiRequest(
-  action,
-  data = {}
-) {
-  if (badConfig) {
-    throw new Error(
-      'В config.js не указан адрес ACONS API.'
-    );
-  }
-
-  const token =
-    localStorage
-      .getItem(
-        'acons_token'
-      ) ||
-    '';
-
-  const response =
-    await fetch(
-      cfg.API_URL,
-      {
-        method: 'POST',
-
-        headers: {
-          'Content-Type':
-            'text/plain;charset=utf-8'
-        },
-
-        redirect: 'follow',
-
-        body:
-          JSON.stringify({
-            action,
-            token,
-            ...data
-          })
-      }
-    );
-
-  if (!response.ok) {
-    throw new Error(
-      'Сервер вернул HTTP ' +
-      response.status
-    );
-  }
-
-  const text =
-    await response.text();
-
-  let result;
-
-  try {
-    result =
-      JSON.parse(text);
-  } catch (error) {
-    throw new Error(
-      'Сервер вернул некорректный ответ.'
-    );
-  }
-
-  if (!result.ok) {
-    throw new Error(
-      result.error ||
-      'Ошибка сервера.'
-    );
-  }
-
-  return result;
-}
-
-function bindAuth() {
-  $('signInBtn').onclick =
-    async () => {
-      const email =
-        $('authEmail')
-          .value
-          .trim();
-
-      const password =
-        $('authPassword')
-          .value;
-
-      $('authNotice')
-        .innerHTML =
-          '';
-
-      if (
-        !email ||
-        !password
-      ) {
-        $('authNotice')
-          .innerHTML =
-            '<div class="notice error">Введите email и пароль.</div>';
-
-        return;
-      }
-
-      $('signInBtn')
-        .disabled =
-          true;
-
-      try {
-        const login =
-          await apiRequest(
-            'login',
-            {
-              email,
-              password
-            }
-          );
-
-        localStorage
-          .setItem(
-            'acons_token',
-            login.token
-          );
-
-        const data =
-          await apiRequest(
-            'bootstrap'
-          );
-
-        await enterApp(
-          data.user,
-          data
-        );
-
-      } catch (error) {
-        localStorage
-          .removeItem(
-            'acons_token'
-          );
-
-        $('authNotice')
-          .innerHTML =
-            `<div class="notice error">${esc(error.message)}</div>`;
-
-      } finally {
-        $('signInBtn')
-          .disabled =
-            false;
-      }
-    };
-
-  $('authPassword')
-    .addEventListener(
-      'keydown',
-      event => {
-        if (
-          event.key ===
-          'Enter'
-        ) {
-          $('signInBtn')
-            .click();
-        }
-      }
-    );
-
-  $('signUpBtn').onclick =
-    () => {
-      $('authNotice')
-        .innerHTML =
-          '<div class="notice">Учетные записи создаёт администратор ACONS Planning.</div>';
-    };
-
-  $('signOutBtn').onclick =
-    async () => {
-      try {
-        await apiRequest(
-          'logout'
-        );
-      } catch (error) {
-        console.warn(
-          error
-        );
-      }
-
-      localStorage
-        .removeItem(
-          'acons_token'
-        );
-
-      if (
-        realtimeChannel
-      ) {
-        clearInterval(
-          realtimeChannel
-        );
-
-        realtimeChannel =
-          null;
-      }
-
-      currentUser =
-        null;
-
-      profile =
-        null;
-
-      $('app')
-        .classList
-        .add('hidden');
-
-      $('authScreen')
-        .classList
-        .remove('hidden');
-    };
-}
-
-async function init() {
-  if (badConfig) {
-    showBootError(
-      'В config.js не указан адрес ACONS API.'
-    );
-
-    return;
-  }
-
-  bindAuth();
-
-  const token =
-    localStorage
-      .getItem(
-        'acons_token'
+  const buildings =
+    project.buildings
+      .filter(
+        item =>
+          item.active !==
+          false
       );
 
-  if (!token) {
-    return;
-  }
-
-  try {
-    const data =
-      await apiRequest(
-        'bootstrap'
+  const works =
+    project.works
+      .filter(
+        item =>
+          item.active !==
+          false
       );
 
-    await enterApp(
-      data.user,
-      data
-    );
-
-  } catch (error) {
-    localStorage
-      .removeItem(
-        'acons_token'
+  const organizations =
+    project.organizations
+      .filter(
+        item =>
+          item.active !==
+          false
       );
-
-    currentUser =
-      null;
-
-    profile =
-      null;
-
-    $('app')
-      .classList
-      .add('hidden');
-
-    $('authScreen')
-      .classList
-      .remove('hidden');
-  }
-}
-
-async function enterApp(
-  user,
-  bootstrapData = null
-) {
-  currentUser =
-    user;
-
-  profile =
-    user;
-
-  $('userLabel')
-    .textContent =
-      `${user.email} · ${user.role || 'без роли'}`;
-
-  $('authScreen')
-    .classList
-    .add('hidden');
-
-  $('app')
-    .classList
-    .remove('hidden');
-
-  bindUi();
-
-  if (bootstrapData) {
-    applyBootstrap(
-      bootstrapData
-    );
-  } else {
-    await reloadAll();
-  }
-
-  subscribeRealtime();
-}
-
-function parseCustomValue(
-  value
-) {
-  if (
-    value ===
-    'true'
-  ) {
-    return true;
-  }
-
-  if (
-    value ===
-    'false'
-  ) {
-    return false;
-  }
-
-  if (
-    value === null ||
-    value === undefined
-  ) {
-    return '';
-  }
-
-  return value;
-}
-
-function applyBootstrap(
-  data
-) {
-  state.buildings =
-    data.buildings || [];
-
-  state.works =
-    data.works || [];
-
-  state.organizations =
-    data.organizations || [];
-
-  state.equipmentTypes =
-    data.equipmentTypes || [];
-
-  state.structures =
-    data.structures || [];
-
-  state.fronts =
-    data.fronts || [];
-
-  state.planLog =
-    data.planLog || [];
-
-  state.factLog =
-    data.factLog || [];
-
-  state.resourceLog =
-    (
-      data.resourceLog ||
-      []
-    )
-      .map(
-        row => ({
-          ...row,
-
-          mechanizers:
-            row.mechanizers ??
-            row.operators ??
-            0
-        })
-      );
-
-  state.milestones =
-    data.milestones || [];
-
-  state.customFields =
-    data.customFields || [];
-
-  state.customValues =
-    data.customValues || [];
-
-  state.views =
-    data.views || [];
-
-  state.demolition =
-    data.demolition || [];
-
-  state.demolitionDependencies =
-    data.demolitionDependencies ||
-    [];
-
-  state.history =
-    data.history || [];
-
-  state.users =
-    data.users || [];
-
-  state.settings =
-    data.settings || {};
-
-  state.calendars =
-    data.calendars || [];
-
-  state.calendarExceptions =
-    data.calendarExceptions ||
-    [];
-
-  state.structures
-    .forEach(
-      item => {
-        item.custom_data =
-          {};
-      }
-    );
-
-  state.fronts
-    .forEach(
-      item => {
-        item.custom_data =
-          {};
-      }
-    );
-
-  state.customValues
-    .forEach(
-      value => {
-        if (
-          value.entity ===
-          'structure'
-        ) {
-          const structure =
-            state.structures
-              .find(
-                item =>
-                  String(
-                    item.id
-                  ) ===
-                  String(
-                    value.entity_id
-                  )
-              );
-
-          if (structure) {
-            structure
-              .custom_data[
-                value.field_id
-              ] =
-                parseCustomValue(
-                  value.value
-                );
-          }
-        }
-
-        if (
-          value.entity ===
-          'front'
-        ) {
-          const front =
-            state.fronts
-              .find(
-                item =>
-                  String(
-                    item.id
-                  ) ===
-                  String(
-                    value.entity_id
-                  )
-              );
-
-          if (front) {
-            front
-              .custom_data[
-                value.field_id
-              ] =
-                parseCustomValue(
-                  value.value
-                );
-          }
-        }
-      }
-    );
-
-  renderAll();
-
-  notice(
-    'Синхронизировано',
-    true
-  );
-}
-
-async function reloadAll() {
-  notice(
-    'Загрузка общей базы...'
-  );
-
-  const data =
-    await apiRequest(
-      'reloadAll'
-    );
-
-  currentUser =
-    data.user;
-
-  profile =
-    data.user;
-
-  applyBootstrap(
-    data
-  );
-}
-
-function subscribeRealtime() {
-  if (
-    realtimeChannel
-  ) {
-    clearInterval(
-      realtimeChannel
-    );
-  }
-
-  realtimeChannel =
-    setInterval(
-      async () => {
-        if (
-          document.hidden
-        ) {
-          return;
-        }
-
-        try {
-          await reloadAll();
-        } catch (error) {
-          console.warn(
-            'Ошибка фонового обновления',
-            error
-          );
-        }
-      },
-      60000
-    );
-
-  notice(
-    'Онлайн · автообновление каждую минуту',
-    true
-  );
-}
-
-function bindUi() {
-  if (
-    window.__aconsBound
-  ) {
-    return;
-  }
-
-  window.__aconsBound =
-    true;
-
-  document
-    .querySelectorAll(
-      '.tab'
-    )
-    .forEach(
-      button => {
-        button.onclick =
-          () =>
-            showTab(
-              button.dataset.tab
-            );
-      }
-    );
-
-  $('closeFront').onclick =
-    () =>
-      $('frontEditor')
-        .classList
-        .add('hidden');
-
-  $('saveFrontBtn').onclick =
-    saveFront;
-
-  $('openViewSettings').onclick =
-    () =>
-      $('viewSettings')
-        .classList
-        .remove('hidden');
-
-  $('closeViewSettings').onclick =
-    () =>
-      $('viewSettings')
-        .classList
-        .add('hidden');
-
-  $('saveViewBtn').onclick =
-    saveView;
-
-  $('loadViewBtn').onclick =
-    loadView;
 
   [
     'mfBuilding',
-    'mfBlock',
-    'mfFloor',
-    'mfWork',
-    'mfOrg',
-    'mfStatus'
+    'gBuilding',
+    'pfBuilding',
+    'rBuilding'
   ]
     .forEach(
-      id => {
-        $(id).onchange =
-          renderMatrix;
-      }
+      id =>
+        fill(
+          $(id),
+          buildings,
+          'Все здания'
+        )
     );
 
   [
-    'gBuilding',
+    'mfWork',
     'gWork',
-    'gOrg',
-    'gMode'
+    'pfWork'
   ]
     .forEach(
-      id => {
-        $(id).onchange =
-          renderGantt;
-      }
+      id =>
+        fill(
+          $(id),
+          works,
+          'Все работы'
+        )
     );
 
-  $('calcPlanFact').onclick =
-    renderPlanFact;
+  [
+    'mfOrg',
+    'rOrg'
+  ]
+    .forEach(
+      id =>
+        fill(
+          $(id),
+          organizations,
+          'Все организации'
+        )
+    );
 
-  $('newPlanRow').onclick =
-    () =>
-      openLogEditor(
-        'plan'
-      );
-
-  $('newFactRow').onclick =
-    () =>
-      openLogEditor(
-        'fact'
-      );
-
-  $('closeLogBtn').onclick =
-    () =>
-      $('logEditor')
-        .classList
-        .add('hidden');
-
-  $('saveLogBtn').onclick =
-    saveLog;
-
-  $('newResourceBtn').onclick =
-    () => {
-      $('resourceEditor')
-        .classList
-        .remove('hidden');
-
-      $('reDate').value =
-        today();
-    };
-
-  $('closeResourceBtn').onclick =
-    () =>
-      $('resourceEditor')
-        .classList
-        .add('hidden');
-
-  $('saveResourceBtn').onclick =
-    saveResource;
-
-  $('filterResourcesBtn').onclick =
-    renderResources;
-
-  $('newMilestoneBtn').onclick =
-    () =>
-      openMilestone();
-
-  $('saveMilestoneBtn').onclick =
-    saveMilestone;
-
-  $('closeMilestoneBtn').onclick =
-    () =>
-      $('milestoneEditor')
-        .classList
-        .add('hidden');
-
-  $('buildReportBtn').onclick =
-    buildReport;
-
-  $('downloadPdfBtn').onclick =
-    downloadPdf;
-
-  $('importFile').onchange =
-    readImportFile;
-
-  $('commitImportBtn').onclick =
-    commitImport;
-
-  $('addBuildingBtn').onclick =
-    () =>
-      addSimple(
-        'buildings',
-        $('newBuilding')
-          .value
-          .trim()
-      );
-
-  $('addWorkBtn').onclick =
-    () =>
-      addSimple(
-        'works',
-        $('newWork')
-          .value
-          .trim()
-      );
-
-  $('addOrgBtn').onclick =
-    () =>
-      addSimple(
-        'organizations',
-        $('newOrg')
-          .value
-          .trim()
-      );
-
-  $('addCfBtn').onclick =
-    addCustomField;
-
-  $('addStructureBtn').onclick =
-    addStructure;
+  updateMatrixDependent();
 }
 
-function showTab(
+function updateMatrixDependent() {
+
+  const buildingId =
+    $('mfBuilding')
+      .value;
+
+  const structures =
+    project.structures
+      .filter(
+        structure =>
+          buildingId ===
+            'all' ||
+          structure.buildingId ===
+            buildingId
+      );
+
+  fill(
+    $('mfBlock'),
+
+    uniq(
+      structures
+        .map(
+          item =>
+            item.block
+        )
+    )
+      .map(
+        value => ({
+          id:
+            value,
+
+          name:
+            value
+        })
+      ),
+
+    'Все блоки'
+  );
+
+  fill(
+    $('mfFloor'),
+
+    uniq(
+      structures
+        .map(
+          item =>
+            item.floor
+        )
+    )
+      .sort(
+        (
+          first,
+          second
+        ) =>
+          num(first) -
+          num(second)
+      )
+      .map(
+        value => ({
+          id:
+            value,
+
+          name:
+            value
+        })
+      ),
+
+    'Все этажи'
+  );
+}
+
+function renderAll() {
+
+  initSelects();
+
+  renderDashboard();
+
+  renderMatrix();
+
+  renderGantt();
+
+  renderPlanFact();
+
+  renderResources();
+
+  renderMilestones();
+
+  renderDemolition();
+
+  renderHistory();
+
+  renderSettings();
+}
+
+function renderDashboard() {
+
+  const fronts =
+    project.fronts
+      .map(
+        hydrateFront
+      );
+
+  $('dTotal')
+    .textContent =
+      fronts.length;
+
+  $('dWork')
+    .textContent =
+      fronts
+        .filter(
+          front =>
+            front.status ===
+            'В работе'
+        )
+        .length;
+
+  $('dDone')
+    .textContent =
+      fronts
+        .filter(
+          front =>
+            front.status ===
+              'Завершено' ||
+            front.completed
+        )
+        .length;
+
+  $('dAccepted')
+    .textContent =
+      fronts
+        .filter(
+          front =>
+            front.accepted
+        )
+        .length;
+
+  $('dLate')
+    .textContent =
+      fronts
+        .filter(
+          front =>
+            front.contractEnd &&
+            !front.accepted &&
+            front.contractEnd <
+              today()
+        )
+        .length;
+
+  $('dRisk')
+    .textContent =
+      fronts
+        .filter(
+          front =>
+            [
+              'Ограничение',
+              'Приостановлено'
+            ]
+              .includes(
+                front.status
+              )
+        )
+        .length;
+
+  const critical =
+    fronts
+      .filter(
+        front =>
+          (
+            front.contractEnd &&
+            !front.accepted &&
+            front.contractEnd <
+              today()
+          ) ||
+          [
+            'Ограничение',
+            'Приостановлено'
+          ]
+            .includes(
+              front.status
+            )
+      )
+      .slice(
+        0,
+        20
+      );
+
+  $('dCritical')
+    .innerHTML =
+      critical
+        .map(
+          front =>
+            `
+              <div class="item">
+                <span>
+                  ${esc(frontLabel(front))}
+                </span>
+
+                <strong>
+                  ${esc(front.status)}
+                </strong>
+              </div>
+            `
+        )
+        .join('') ||
+      '<div class="muted">Нет критичных фронтов</div>';
+
+  const lastDate =
+    [...project.resources]
+      .sort(
+        (
+          first,
+          second
+        ) =>
+          String(
+            first.date
+          )
+            .localeCompare(
+              String(
+                second.date
+              )
+            )
+      )
+      .slice(-1)[0]
+      ?.date;
+
+  const resourceRows =
+    project.resources
+      .filter(
+        row =>
+          row.date ===
+          lastDate
+      );
+
+  const people =
+    resourceRows
+      .reduce(
+        (
+          sum,
+          row
+        ) =>
+          sum +
+          num(row.itr) +
+          num(row.workers) +
+          num(row.mechanizers),
+        0
+      );
+
+  const equipment =
+    resourceRows
+      .reduce(
+        (
+          sum,
+          row
+        ) =>
+          sum +
+          num(
+            row.equipmentQty
+          ),
+        0
+      );
+
+  $('dResources')
+    .innerHTML =
+      lastDate
+        ? `
+          <div class="item">
+            <span>Дата</span>
+            <strong>${lastDate}</strong>
+          </div>
+
+          <div class="item">
+            <span>Людей</span>
+            <strong>${people}</strong>
+          </div>
+
+          <div class="item">
+            <span>Техники</span>
+            <strong>${equipment}</strong>
+          </div>
+        `
+        : '<div class="muted">Нет данных</div>';
+}
+
+function matrixFiltered() {
+
+  return project.fronts
+    .map(
+      hydrateFront
+    )
+    .filter(
+      front =>
+        (
+          $('mfBuilding').value ===
+            'all' ||
+          front.structure
+            .buildingId ===
+            $('mfBuilding').value
+        ) &&
+
+        (
+          $('mfBlock').value ===
+            'all' ||
+          front.block ===
+            $('mfBlock').value
+        ) &&
+
+        (
+          $('mfFloor').value ===
+            'all' ||
+          String(
+            front.floor
+          ) ===
+            $('mfFloor').value
+        ) &&
+
+        (
+          $('mfWork').value ===
+            'all' ||
+          front.workId ===
+            $('mfWork').value
+        ) &&
+
+        (
+          $('mfOrg').value ===
+            'all' ||
+          front.organizationId ===
+            $('mfOrg').value
+        ) &&
+
+        (
+          $('mfStatus').value ===
+            'all' ||
+          front.status ===
+            $('mfStatus').value
+        )
+    );
+}
+
+function renderMatrix() {
+
+  updateMatrixDependent();
+
+  $('matrixHead')
+    .innerHTML =
+      `
+        <tr>
+          <th>Здание</th>
+          <th>Блок</th>
+          <th>Этаж</th>
+          <th>Захватка</th>
+          <th>Ось</th>
+          <th>Сторона</th>
+          <th>Зона</th>
+          <th>Работа</th>
+          <th>Организация</th>
+          <th>Статус</th>
+          <th>Объем</th>
+          <th>Выполнено</th>
+          <th></th>
+        </tr>
+      `;
+
+  $('matrixBody')
+    .innerHTML =
+      matrixFiltered()
+        .map(
+          front =>
+            `
+              <tr class="${
+                front.status ===
+                  'Завершено'
+                  ? 's-done'
+                  :
+                front.status ===
+                  'В работе'
+                  ? 's-work'
+                  :
+                front.status ===
+                  'Ограничение'
+                  ? 's-risk'
+                  : ''
+              }">
+
+                <td>${esc(front.building)}</td>
+                <td>${esc(front.block)}</td>
+                <td>${esc(front.floor)}</td>
+                <td>${esc(front.capture)}</td>
+                <td>${esc(front.axis)}</td>
+                <td>${esc(front.side)}</td>
+                <td>${esc(front.zone)}</td>
+                <td>${esc(front.work)}</td>
+                <td>${esc(front.organization)}</td>
+
+                <td>
+                  <span class="badge">
+                    ${esc(front.status)}
+                  </span>
+                </td>
+
+                <td>
+                  ${fmt(front.totalQty)}
+                  ${esc(front.unit || '')}
+                </td>
+
+                <td>
+                  ${fmt(front.doneQty)}
+                  ${esc(front.unit || '')}
+                </td>
+
+                <td>
+                  <button
+                    class="row-btn"
+                    data-edit-front="${front.id}"
+                  >
+                    Открыть
+                  </button>
+                </td>
+
+              </tr>
+            `
+        )
+        .join('');
+
+  document
+    .querySelectorAll(
+      '[data-edit-front]'
+    )
+    .forEach(
+      button =>
+        button.onclick =
+          () =>
+            openFrontEditor(
+              button.dataset.editFront
+            )
+    );
+}
+
+function openModal(
+  title,
+  html
+) {
+
+  $('modalTitle')
+    .textContent =
+      title;
+
+  $('modalBody')
+    .innerHTML =
+      html;
+
+  $('modal')
+    .classList
+    .remove(
+      'hidden'
+    );
+}
+
+function closeModal() {
+
+  $('modal')
+    .classList
+    .add(
+      'hidden'
+    );
+
+  $('modalBody')
+    .innerHTML =
+      '';
+}
+
+function frontForm(
+  front = {}
+) {
+
+  const structure =
+    front.id
+      ? byId(
+          project.structures,
+          front.structureId
+        ) || {}
+      : {};
+
+  const options = (
+    list,
+    value
+  ) =>
+    list
+      .map(
+        item =>
+          `
+            <option
+              value="${item.id}"
+              ${
+                String(item.id) ===
+                String(value)
+                  ? 'selected'
+                  : ''
+              }
+            >
+              ${esc(item.name)}
+            </option>
+          `
+      )
+      .join('');
+
+  return `
+    <div class="form-grid">
+
+      <div class="field">
+        <label>Здание</label>
+        <select id="eBuilding">
+          ${options(project.buildings,structure.buildingId)}
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Блок</label>
+        <input
+          id="eBlock"
+          value="${esc(structure.block || '')}"
+        >
+      </div>
+
+      <div class="field">
+        <label>Этаж</label>
+        <input
+          id="eFloor"
+          type="number"
+          value="${esc(structure.floor ?? '')}"
+        >
+      </div>
+
+      <div class="field">
+        <label>Захватка</label>
+        <input
+          id="eCapture"
+          value="${esc(structure.capture || '')}"
+        >
+      </div>
+
+      <div class="field">
+        <label>Ось</label>
+        <input
+          id="eAxis"
+          value="${esc(structure.axis || '')}"
+        >
+      </div>
+
+      <div class="field">
+        <label>Сторона</label>
+        <input
+          id="eSide"
+          value="${esc(structure.side || '')}"
+        >
+      </div>
+
+      <div class="field">
+        <label>Зона</label>
+        <input
+          id="eZone"
+          value="${esc(structure.zone || '')}"
+        >
+      </div>
+
+      <div class="field">
+        <label>№ помещения</label>
+        <input
+          id="eRoomNo"
+          value="${esc(structure.roomNo || '')}"
+        >
+      </div>
+
+      <div class="field">
+        <label>Помещение</label>
+        <input
+          id="eRoomName"
+          value="${esc(structure.roomName || '')}"
+        >
+      </div>
+
+      <div class="field">
+        <label>Вид работы</label>
+        <select id="eWork">
+          ${options(project.works,front.workId)}
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Организация</label>
+        <select id="eOrg">
+          <option value="">—</option>
+          ${options(project.organizations,front.organizationId)}
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Ответственный</label>
+        <input
+          id="eResponsible"
+          value="${esc(front.responsible || '')}"
+        >
+      </div>
+
+      <div class="field">
+        <label>Статус</label>
+        <select id="eStatus">
+          ${
+            STATUS_LIST
+              .map(
+                status =>
+                  `
+                    <option
+                      ${
+                        status ===
+                        (
+                          front.status ||
+                          'Не начато'
+                        )
+                          ? 'selected'
+                          : ''
+                      }
+                    >
+                      ${status}
+                    </option>
+                  `
+              )
+              .join('')
+          }
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Ед. изм.</label>
+        <input
+          id="eUnit"
+          value="${esc(front.unit || '')}"
+        >
+      </div>
+
+      <div class="field">
+        <label>Общий объем</label>
+        <input
+          id="eTotal"
+          type="number"
+          step="any"
+          value="${front.totalQty ?? ''}"
+        >
+      </div>
+
+      <div class="field">
+        <label>Накопительно выполнено</label>
+        <input
+          id="eDone"
+          type="number"
+          step="any"
+          value="${front.doneQty ?? ''}"
+        >
+      </div>
+
+      <div class="field">
+        <label>Договор начало</label>
+        <input
+          id="eContractStart"
+          type="date"
+          value="${front.contractStart || ''}"
+        >
+      </div>
+
+      <div class="field">
+        <label>Договор окончание</label>
+        <input
+          id="eContractEnd"
+          type="date"
+          value="${front.contractEnd || ''}"
+        >
+      </div>
+
+      <div class="field">
+        <label>База начало</label>
+        <input
+          id="eBaselineStart"
+          type="date"
+          value="${front.baselineStart || ''}"
+        >
+      </div>
+
+      <div class="field">
+        <label>База окончание</label>
+        <input
+          id="eBaselineEnd"
+          type="date"
+          value="${front.baselineEnd || ''}"
+        >
+      </div>
+
+      <div class="field">
+        <label>Рабочий план начало</label>
+        <input
+          id="ePlanStart"
+          type="date"
+          value="${front.planStart || ''}"
+        >
+      </div>
+
+      <div class="field">
+        <label>Рабочий план окончание</label>
+        <input
+          id="ePlanEnd"
+          type="date"
+          value="${front.planEnd || ''}"
+        >
+      </div>
+
+      <div class="field">
+        <label>Факт начало</label>
+        <input
+          id="eFactStart"
+          type="date"
+          value="${front.factStart || ''}"
+        >
+      </div>
+
+      <div class="field">
+        <label>Факт окончание</label>
+        <input
+          id="eFactEnd"
+          type="date"
+          value="${front.factEnd || ''}"
+        >
+      </div>
+
+      <div class="field">
+        <label>Прогноз окончание</label>
+        <input
+          id="eForecastEnd"
+          type="date"
+          value="${front.forecastEnd || ''}"
+        >
+      </div>
+
+    </div>
+
+    <div class="field">
+      <label>Ограничение</label>
+      <textarea id="eConstraint">${esc(front.constraint || '')}</textarea>
+    </div>
+
+    <div class="field">
+      <label>Комментарий / факт</label>
+      <textarea id="eComment">${esc(front.comment || '')}</textarea>
+    </div>
+
+    <div class="editor-actions">
+
+      <button
+        id="deleteFront"
+        class="btn danger"
+        ${
+          front.id
+            ? ''
+            : 'style="display:none"'
+        }
+      >
+        Удалить
+      </button>
+
+      <button
+        id="saveFront"
+        class="btn primary"
+      >
+        Сохранить
+      </button>
+
+    </div>
+  `;
+}
+
+function openFrontEditor(
+  id = null
+) {
+
+  const front =
+    id
+      ? byId(
+          project.fronts,
+          id
+        )
+      : {};
+
+  openModal(
+    id
+      ? 'Карточка фронта'
+      : 'Новый фронт',
+
+    frontForm(
+      front
+    )
+  );
+
+  $('saveFront').onclick =
+    () =>
+      saveFrontFromModal(
+        id
+      );
+
+  if (id) {
+    $('deleteFront').onclick =
+      () =>
+        deleteFront(
+          id
+        );
+  }
+}
+
+async function saveFrontFromModal(
+  id
+) {
+
+  const buildingId =
+    $('eBuilding')
+      .value;
+
+  let structure =
+    id
+      ? byId(
+          project.structures,
+          byId(
+            project.fronts,
+            id
+          ).structureId
+        )
+      : null;
+
+  if (!structure) {
+
+    structure = {
+      id:
+        uid('STR'),
+
+      buildingId
+    };
+
+    project.structures
+      .push(
+        structure
+      );
+  }
+
+  Object.assign(
+    structure,
+    {
+      buildingId,
+
+      block:
+        $('eBlock')
+          .value
+          .trim(),
+
+      floor:
+        $('eFloor').value ===
+          ''
+          ? ''
+          : num(
+              $('eFloor')
+                .value
+            ),
+
+      capture:
+        $('eCapture')
+          .value
+          .trim(),
+
+      axis:
+        $('eAxis')
+          .value
+          .trim(),
+
+      side:
+        $('eSide')
+          .value
+          .trim(),
+
+      zone:
+        $('eZone')
+          .value
+          .trim(),
+
+      roomNo:
+        $('eRoomNo')
+          .value
+          .trim(),
+
+      roomName:
+        $('eRoomName')
+          .value
+          .trim()
+    }
+  );
+
+  let front =
+    id
+      ? byId(
+          project.fronts,
+          id
+        )
+      : {
+          id:
+            uid('F'),
+
+          structureId:
+            structure.id,
+
+          createdAt:
+            nowIso()
+        };
+
+  Object.assign(
+    front,
+    {
+      structureId:
+        structure.id,
+
+      workId:
+        $('eWork')
+          .value,
+
+      organizationId:
+        $('eOrg')
+          .value,
+
+      responsible:
+        $('eResponsible')
+          .value
+          .trim(),
+
+      status:
+        $('eStatus')
+          .value,
+
+      unit:
+        $('eUnit')
+          .value
+          .trim(),
+
+      totalQty:
+        num(
+          $('eTotal')
+            .value
+        ),
+
+      doneQty:
+        num(
+          $('eDone')
+            .value
+        ),
+
+      contractStart:
+        $('eContractStart')
+          .value,
+
+      contractEnd:
+        $('eContractEnd')
+          .value,
+
+      baselineStart:
+        $('eBaselineStart')
+          .value,
+
+      baselineEnd:
+        $('eBaselineEnd')
+          .value,
+
+      planStart:
+        $('ePlanStart')
+          .value,
+
+      planEnd:
+        $('ePlanEnd')
+          .value,
+
+      factStart:
+        $('eFactStart')
+          .value,
+
+      factEnd:
+        $('eFactEnd')
+          .value,
+
+      forecastEnd:
+        $('eForecastEnd')
+          .value,
+
+      constraint:
+        $('eConstraint')
+          .value
+          .trim(),
+
+      comment:
+        $('eComment')
+          .value
+          .trim(),
+
+      completed:
+        $('eStatus')
+          .value ===
+          'Завершено',
+
+      accepted:
+        front.accepted ||
+        false,
+
+      updatedAt:
+        nowIso()
+    }
+  );
+
+  if (!id) {
+    project.fronts
+      .push(
+        front
+      );
+  }
+
+  log(
+    id
+      ? 'Изменено'
+      : 'Создано',
+
+    'Фронт',
+
+    frontLabel(
+      front
+    )
+  );
+
+  await saveProject();
+
+  closeModal();
+
+  renderAll();
+}
+
+async function deleteFront(
+  id
+) {
+
+  if (
+    !confirm(
+      'Удалить фронт?'
+    )
+  ) {
+    return;
+  }
+
+  const front =
+    byId(
+      project.fronts,
+      id
+    );
+
+  project.fronts =
+    project.fronts
+      .filter(
+        item =>
+          item.id !==
+          id
+      );
+
+  project.planLog =
+    project.planLog
+      .filter(
+        item =>
+          item.frontId !==
+          id
+      );
+
+  project.factLog =
+    project.factLog
+      .filter(
+        item =>
+          item.frontId !==
+          id
+      );
+
+  log(
+    'Удалено',
+    'Фронт',
+    frontLabel(
+      front
+    )
+  );
+
+  await saveProject();
+
+  closeModal();
+
+  renderAll();
+}
+
+function modeDates(
+  front,
+  mode
+) {
+
+  if (
+    mode ===
+    'contract'
+  ) {
+    return [
+      front.contractStart,
+      front.contractEnd
+    ];
+  }
+
+  if (
+    mode ===
+    'baseline'
+  ) {
+    return [
+      front.baselineStart,
+      front.baselineEnd
+    ];
+  }
+
+  if (
+    mode ===
+    'fact'
+  ) {
+    return [
+      front.factStart,
+      front.factEnd ||
+      front.factStart
+    ];
+  }
+
+  if (
+    mode ===
+    'forecast'
+  ) {
+    return [
+      front.planStart ||
+      front.factStart,
+
+      front.forecastEnd ||
+      front.planEnd
+    ];
+  }
+
+  return [
+    front.planStart,
+    front.planEnd
+  ];
+}
+
+function renderGantt() {
+
+  const buildingId =
+    $('gBuilding')
+      .value;
+
+  const workId =
+    $('gWork')
+      .value;
+
+  const mode =
+    $('gMode')
+      .value;
+
+  const items =
+    project.fronts
+      .map(
+        hydrateFront
+      )
+      .filter(
+        front =>
+          (
+            buildingId ===
+              'all' ||
+            front.structure
+              .buildingId ===
+              buildingId
+          ) &&
+
+          (
+            workId ===
+              'all' ||
+            front.workId ===
+              workId
+          )
+      )
+      .map(
+        front => ({
+          front,
+          dates:
+            modeDates(
+              front,
+              mode
+            )
+        })
+      )
+      .filter(
+        item =>
+          item.dates[0] &&
+          item.dates[1]
+      );
+
+  if (
+    !items.length
+  ) {
+
+    $('gantt')
+      .innerHTML =
+        '<div class="muted">Нет заполненных дат для выбранного слоя.</div>';
+
+    return;
+  }
+
+  const min =
+    items
+      .map(
+        item =>
+          item.dates[0]
+      )
+      .sort()[0];
+
+  const max =
+    items
+      .map(
+        item =>
+          item.dates[1]
+      )
+      .sort()
+      .slice(-1)[0];
+
+  const total =
+    Math.max(
+      1,
+      diffDays(
+        min,
+        max
+      ) + 1
+    );
+
+  $('gantt')
+    .innerHTML =
+      items
+        .map(
+          item => {
+
+            const left =
+              diffDays(
+                min,
+                item.dates[0]
+              ) /
+              total *
+              100;
+
+            const width =
+              Math.max(
+                1,
+                (
+                  diffDays(
+                    item.dates[0],
+                    item.dates[1]
+                  ) + 1
+                ) /
+                total *
+                100
+              );
+
+            return `
+              <div class="gantt-row">
+
+                <div class="gantt-name">
+
+                  <b>
+                    ${esc(item.front.work)}
+                  </b>
+
+                  <br>
+
+                  <small>
+                    ${esc(frontLabel(item.front))}
+                  </small>
+
+                </div>
+
+                <div class="gantt-line">
+
+                  <div
+                    class="gantt-bar"
+                    style="
+                      left:${left}%;
+                      width:${width}%
+                    "
+                  >
+                    ${item.dates[0]}
+                    →
+                    ${item.dates[1]}
+                  </div>
+
+                </div>
+
+              </div>
+            `;
+          }
+        )
+        .join('');
+}
+
+function pfFrontIds() {
+
+  const buildingId =
+    $('pfBuilding')
+      .value;
+
+  const workId =
+    $('pfWork')
+      .value;
+
+  return new Set(
+    project.fronts
+      .filter(
+        front => {
+
+          const structure =
+            byId(
+              project.structures,
+              front.structureId
+            );
+
+          return (
+            (
+              buildingId ===
+                'all' ||
+              structure
+                ?.buildingId ===
+                buildingId
+            ) &&
+
+            (
+              workId ===
+                'all' ||
+              front.workId ===
+                workId
+            )
+          );
+        }
+      )
+      .map(
+        front =>
+          front.id
+      )
+  );
+}
+
+function renderPlanFact() {
+
+  const ids =
+    pfFrontIds();
+
+  const from =
+    $('pfFrom')
+      .value;
+
+  const to =
+    $('pfTo')
+      .value;
+
+  const planRows =
+    project.planLog
+      .filter(
+        row =>
+          ids.has(
+            row.frontId
+          ) &&
+
+          (
+            !from ||
+            row.date >=
+              from
+          ) &&
+
+          (
+            !to ||
+            row.date <=
+              to
+          )
+      );
+
+  const factRows =
+    project.factLog
+      .filter(
+        row =>
+          ids.has(
+            row.frontId
+          ) &&
+
+          (
+            !from ||
+            row.date >=
+              from
+          ) &&
+
+          (
+            !to ||
+            row.date <=
+              to
+          )
+      );
+
+  const planPeriod =
+    planRows
+      .reduce(
+        (
+          sum,
+          row
+        ) =>
+          sum +
+          num(
+            row.qty
+          ),
+        0
+      );
+
+  const factPeriod =
+    factRows
+      .reduce(
+        (
+          sum,
+          row
+        ) =>
+          sum +
+          num(
+            row.qty
+          ),
+        0
+      );
+
+  const planCum =
+    project.planLog
+      .filter(
+        row =>
+          ids.has(
+            row.frontId
+          ) &&
+          (
+            !to ||
+            row.date <=
+              to
+          )
+      )
+      .reduce(
+        (
+          sum,
+          row
+        ) =>
+          sum +
+          num(
+            row.qty
+          ),
+        0
+      );
+
+  const factCum =
+    project.factLog
+      .filter(
+        row =>
+          ids.has(
+            row.frontId
+          ) &&
+          (
+            !to ||
+            row.date <=
+              to
+          )
+      )
+      .reduce(
+        (
+          sum,
+          row
+        ) =>
+          sum +
+          num(
+            row.qty
+          ),
+        0
+      );
+
+  const total =
+    project.fronts
+      .filter(
+        front =>
+          ids.has(
+            front.id
+          )
+      )
+      .reduce(
+        (
+          sum,
+          front
+        ) =>
+          sum +
+          num(
+            front.totalQty
+          ),
+        0
+      );
+
+  $('pfPlanPeriod')
+    .textContent =
+      fmt(
+        planPeriod
+      );
+
+  $('pfFactPeriod')
+    .textContent =
+      fmt(
+        factPeriod
+      );
+
+  $('pfVarPeriod')
+    .textContent =
+      fmt(
+        factPeriod -
+        planPeriod
+      );
+
+  $('pfPlanCum')
+    .textContent =
+      fmt(
+        planCum
+      );
+
+  $('pfFactCum')
+    .textContent =
+      fmt(
+        factCum
+      );
+
+  $('pfPp')
+    .textContent =
+      fmt(
+        total
+          ? (
+              factCum /
+              total -
+              planCum /
+              total
+            ) * 100
+          : 0
+      );
+
+  $('planRows')
+    .innerHTML =
+      planRows
+        .sort(
+          (
+            first,
+            second
+          ) =>
+            second.date
+              .localeCompare(
+                first.date
+              )
+        )
+        .map(
+          row =>
+            `
+              <tr>
+                <td>${row.date}</td>
+                <td>${esc(frontLabel(byId(project.fronts,row.frontId)))}</td>
+                <td>${fmt(row.qty)}</td>
+                <td>${fmt(row.people)}</td>
+              </tr>
+            `
+        )
+        .join('');
+
+  $('factRows')
+    .innerHTML =
+      factRows
+        .sort(
+          (
+            first,
+            second
+          ) =>
+            second.date
+              .localeCompare(
+                first.date
+              )
+        )
+        .map(
+          row =>
+            `
+              <tr>
+                <td>${row.date}</td>
+                <td>${esc(frontLabel(byId(project.fronts,row.frontId)))}</td>
+                <td>${fmt(row.qty)}</td>
+                <td>${fmt(row.cumulative)}</td>
+                <td>${fmt(row.people)}</td>
+              </tr>
+            `
+        )
+        .join('');
+}
+
+function openLogEditor(
+  mode
+) {
+
+  const options =
+    project.fronts
+      .map(
+        front =>
+          `
+            <option value="${front.id}">
+              ${esc(frontLabel(front))}
+            </option>
+          `
+      )
+      .join('');
+
+  openModal(
+    mode ===
+      'plan'
+      ? 'Добавить план'
+      : 'Добавить факт',
+
+    `
+      <div class="form-grid">
+
+        <div class="field">
+          <label>Фронт</label>
+          <select id="lFront">
+            ${options}
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Дата</label>
+          <input
+            id="lDate"
+            type="date"
+            value="${today()}"
+          >
+        </div>
+
+        <div class="field">
+          <label>Объем</label>
+          <input
+            id="lQty"
+            type="number"
+            step="any"
+          >
+        </div>
+
+        <div class="field">
+          <label>Люди</label>
+          <input
+            id="lPeople"
+            type="number"
+          >
+        </div>
+
+        ${
+          mode ===
+          'fact'
+            ? `
+              <div class="field">
+                <label>
+                  Накопительный итог
+                  (если пусто — посчитается)
+                </label>
+
+                <input
+                  id="lCum"
+                  type="number"
+                  step="any"
+                >
+              </div>
+            `
+            : ''
+        }
+
+      </div>
+
+      <div class="field">
+        <label>Комментарий</label>
+        <textarea id="lComment"></textarea>
+      </div>
+
+      <div class="editor-actions">
+        <button
+          id="lSave"
+          class="btn primary"
+        >
+          Сохранить
+        </button>
+      </div>
+    `
+  );
+
+  $('lSave').onclick =
+    () =>
+      saveLog(
+        mode
+      );
+}
+
+async function saveLog(
+  mode
+) {
+
+  const frontId =
+    $('lFront')
+      .value;
+
+  const date =
+    $('lDate')
+      .value;
+
+  const qty =
+    num(
+      $('lQty')
+        .value
+    );
+
+  const people =
+    num(
+      $('lPeople')
+        .value
+    );
+
+  const comment =
+    $('lComment')
+      .value
+      .trim();
+
+  if (
+    mode ===
+    'plan'
+  ) {
+
+    project.planLog
+      .push({
+        id:
+          uid('P'),
+
+        frontId,
+
+        date,
+
+        qty,
+
+        people,
+
+        comment,
+
+        createdAt:
+          nowIso()
+      });
+
+    log(
+      'Добавлено',
+      'План',
+      `${date} · ${frontLabel(byId(project.fronts,frontId))} · ${qty}`
+    );
+
+  } else {
+
+    let cumulative =
+      $('lCum').value ===
+        ''
+        ? project.factLog
+            .filter(
+              row =>
+                row.frontId ===
+                frontId
+            )
+            .reduce(
+              (
+                sum,
+                row
+              ) =>
+                sum +
+                num(
+                  row.qty
+                ),
+              0
+            ) +
+            qty
+        : num(
+            $('lCum')
+              .value
+          );
+
+    project.factLog
+      .push({
+        id:
+          uid('FCT'),
+
+        frontId,
+
+        date,
+
+        qty,
+
+        cumulative,
+
+        people,
+
+        comment,
+
+        createdAt:
+          nowIso()
+      });
+
+    const front =
+      byId(
+        project.fronts,
+        frontId
+      );
+
+    front.doneQty =
+      cumulative;
+
+    if (
+      !front.factStart
+    ) {
+      front.factStart =
+        date;
+    }
+
+    front.updatedAt =
+      nowIso();
+
+    log(
+      'Добавлено',
+      'Факт',
+      `${date} · ${frontLabel(front)} · ${qty}`
+    );
+  }
+
+  await saveProject();
+
+  closeModal();
+
+  renderAll();
+}
+
+function resourceFiltered() {
+
+  const from =
+    $('rFrom').value;
+
+  const to =
+    $('rTo').value;
+
+  const organizationId =
+    $('rOrg').value;
+
+  const buildingId =
+    $('rBuilding').value;
+
+  return project.resources
+    .filter(
+      row =>
+        (
+          !from ||
+          row.date >=
+            from
+        ) &&
+
+        (
+          !to ||
+          row.date <=
+            to
+        ) &&
+
+        (
+          organizationId ===
+            'all' ||
+          row.organizationId ===
+            organizationId
+        ) &&
+
+        (
+          buildingId ===
+            'all' ||
+          row.buildingId ===
+            buildingId
+        )
+    );
+}
+
+function renderResources() {
+
+  const rows =
+    resourceFiltered();
+
+  const sum =
+    field =>
+      rows
+        .reduce(
+          (
+            total,
+            row
+          ) =>
+            total +
+            num(
+              row[field]
+            ),
+          0
+        );
+
+  const daily =
+    {};
+
+  rows.forEach(
+    row => {
+
+      daily[row.date] =
+        (
+          daily[row.date] ||
+          0
+        ) +
+        num(row.itr) +
+        num(row.workers) +
+        num(row.mechanizers);
+    }
+  );
+
+  $('rItr')
+    .textContent =
+      sum(
+        'itr'
+      );
+
+  $('rWorkers')
+    .textContent =
+      sum(
+        'workers'
+      );
+
+  $('rMech')
+    .textContent =
+      sum(
+        'mechanizers'
+      );
+
+  $('rTotalPeople')
+    .textContent =
+      sum('itr') +
+      sum('workers') +
+      sum('mechanizers');
+
+  $('rPeak')
+    .textContent =
+      Math.max(
+        0,
+        ...Object.values(
+          daily
+        )
+      );
+
+  $('rEquipDays')
+    .textContent =
+      sum(
+        'equipmentQty'
+      );
+
+  $('resourceRows')
+    .innerHTML =
+      rows
+        .sort(
+          (
+            first,
+            second
+          ) =>
+            second.date
+              .localeCompare(
+                first.date
+              )
+        )
+        .map(
+          row =>
+            `
+              <tr>
+
+                <td>${row.date}</td>
+
+                <td>
+                  ${esc(nameById(project.organizations,row.organizationId))}
+                </td>
+
+                <td>
+                  ${esc(nameById(project.buildings,row.buildingId))}
+                </td>
+
+                <td>${row.itr}</td>
+                <td>${row.workers}</td>
+                <td>${row.mechanizers}</td>
+                <td>${esc(row.equipmentType || '')}</td>
+                <td>${row.equipmentQty}</td>
+                <td>${esc(row.comment || '')}</td>
+
+              </tr>
+            `
+        )
+        .join('');
+}
+
+function openResourceEditor() {
+
+  const options =
+    list =>
+      list
+        .map(
+          item =>
+            `
+              <option value="${item.id}">
+                ${esc(item.name)}
+              </option>
+            `
+        )
+        .join('');
+
+  openModal(
+    'Добавить ресурсы',
+
+    `
+      <div class="form-grid">
+
+        <div class="field">
+          <label>Дата</label>
+          <input
+            id="rrDate"
+            type="date"
+            value="${today()}"
+          >
+        </div>
+
+        <div class="field">
+          <label>Организация</label>
+          <select id="rrOrg">
+            <option value="">—</option>
+            ${options(project.organizations)}
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Здание</label>
+          <select id="rrBuilding">
+            <option value="">—</option>
+            ${options(project.buildings)}
+          </select>
+        </div>
+
+        <div class="field">
+          <label>ИТР</label>
+          <input
+            id="rrItr"
+            type="number"
+          >
+        </div>
+
+        <div class="field">
+          <label>Рабочие</label>
+          <input
+            id="rrWorkers"
+            type="number"
+          >
+        </div>
+
+        <div class="field">
+          <label>Механизаторы</label>
+          <input
+            id="rrMech"
+            type="number"
+          >
+        </div>
+
+        <div class="field">
+          <label>Тип техники</label>
+          <input id="rrEqType">
+        </div>
+
+        <div class="field">
+          <label>Количество техники</label>
+          <input
+            id="rrEqQty"
+            type="number"
+          >
+        </div>
+
+      </div>
+
+      <div class="field">
+        <label>Комментарий</label>
+        <textarea id="rrComment"></textarea>
+      </div>
+
+      <div class="editor-actions">
+        <button
+          id="rrSave"
+          class="btn primary"
+        >
+          Сохранить
+        </button>
+      </div>
+    `
+  );
+
+  $('rrSave').onclick =
+    saveResource;
+}
+
+async function saveResource() {
+
+  const resource = {
+
+    id:
+      uid('R'),
+
+    date:
+      $('rrDate').value,
+
+    organizationId:
+      $('rrOrg').value,
+
+    buildingId:
+      $('rrBuilding').value,
+
+    itr:
+      num(
+        $('rrItr')
+          .value
+      ),
+
+    workers:
+      num(
+        $('rrWorkers')
+          .value
+      ),
+
+    mechanizers:
+      num(
+        $('rrMech')
+          .value
+      ),
+
+    equipmentType:
+      $('rrEqType')
+        .value
+        .trim(),
+
+    equipmentQty:
+      num(
+        $('rrEqQty')
+          .value
+      ),
+
+    comment:
+      $('rrComment')
+        .value
+        .trim(),
+
+    createdAt:
+      nowIso()
+  };
+
+  project.resources
+    .push(
+      resource
+    );
+
+  log(
+    'Добавлено',
+    'Ресурсы',
+    `${resource.date} · ${nameById(project.organizations,resource.organizationId)}`
+  );
+
+  await saveProject();
+
+  closeModal();
+
+  renderAll();
+}
+
+function renderMilestones() {
+
+  $('milestoneRows')
+    .innerHTML =
+      project.milestones
+        .map(
+          milestone =>
+            `
+              <tr>
+
+                <td>
+                  ${esc(nameById(project.buildings,milestone.buildingId))}
+                </td>
+
+                <td>
+                  ${esc(milestone.title)}
+                </td>
+
+                <td>
+                  ${milestone.contractDate || '—'}
+                </td>
+
+                <td>
+                  ${milestone.workDate || '—'}
+                </td>
+
+                <td>
+                  ${milestone.forecastDate || '—'}
+                </td>
+
+                <td>
+                  ${milestone.factDate || '—'}
+                </td>
+
+                <td>
+                  <button
+                    class="row-btn"
+                    data-ms="${milestone.id}"
+                  >
+                    ${esc(milestone.status || '')}
+                  </button>
+                </td>
+
+              </tr>
+            `
+        )
+        .join('');
+
+  document
+    .querySelectorAll(
+      '[data-ms]'
+    )
+    .forEach(
+      button =>
+        button.onclick =
+          () =>
+            openMilestoneEditor(
+              button.dataset.ms
+            )
+    );
+}
+
+function openMilestoneEditor(
+  id = null
+) {
+
+  const milestone =
+    id
+      ? byId(
+          project.milestones,
+          id
+        )
+      : {};
+
+  const buildingOptions =
+    project.buildings
+      .map(
+        item =>
+          `
+            <option
+              value="${item.id}"
+              ${
+                item.id ===
+                milestone.buildingId
+                  ? 'selected'
+                  : ''
+              }
+            >
+              ${esc(item.name)}
+            </option>
+          `
+      )
+      .join('');
+
+  openModal(
+    id
+      ? 'Ключевая дата'
+      : 'Новая ключевая дата',
+
+    `
+      <div class="form-grid">
+
+        <div class="field">
+          <label>Здание</label>
+          <select id="mBuilding">
+            ${buildingOptions}
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Наименование</label>
+          <input
+            id="mTitle"
+            value="${esc(milestone.title || '')}"
+          >
+        </div>
+
+        <div class="field">
+          <label>Статус</label>
+          <input
+            id="mStatus"
+            value="${esc(milestone.status || 'Не наступила')}"
+          >
+        </div>
+
+        <div class="field">
+          <label>Договорная дата</label>
+          <input
+            id="mContract"
+            type="date"
+            value="${milestone.contractDate || ''}"
+          >
+        </div>
+
+        <div class="field">
+          <label>Рабочая дата</label>
+          <input
+            id="mWork"
+            type="date"
+            value="${milestone.workDate || ''}"
+          >
+        </div>
+
+        <div class="field">
+          <label>Прогноз</label>
+          <input
+            id="mForecast"
+            type="date"
+            value="${milestone.forecastDate || ''}"
+          >
+        </div>
+
+        <div class="field">
+          <label>Факт</label>
+          <input
+            id="mFact"
+            type="date"
+            value="${milestone.factDate || ''}"
+          >
+        </div>
+
+      </div>
+
+      <div class="field">
+        <label>Комментарий</label>
+        <textarea id="mComment">${esc(milestone.comment || '')}</textarea>
+      </div>
+
+      <div class="editor-actions">
+        <button
+          id="mSave"
+          class="btn primary"
+        >
+          Сохранить
+        </button>
+      </div>
+    `
+  );
+
+  $('mSave').onclick =
+    () =>
+      saveMilestone(
+        id
+      );
+}
+
+async function saveMilestone(
+  id
+) {
+
+  let milestone =
+    id
+      ? byId(
+          project.milestones,
+          id
+        )
+      : {
+          id:
+            uid('M')
+        };
+
+  Object.assign(
+    milestone,
+    {
+      buildingId:
+        $('mBuilding')
+          .value,
+
+      title:
+        $('mTitle')
+          .value
+          .trim(),
+
+      status:
+        $('mStatus')
+          .value
+          .trim(),
+
+      contractDate:
+        $('mContract')
+          .value,
+
+      workDate:
+        $('mWork')
+          .value,
+
+      forecastDate:
+        $('mForecast')
+          .value,
+
+      factDate:
+        $('mFact')
+          .value,
+
+      comment:
+        $('mComment')
+          .value
+          .trim(),
+
+      updatedAt:
+        nowIso()
+    }
+  );
+
+  if (!id) {
+
+    project.milestones
+      .push(
+        milestone
+      );
+  }
+
+  log(
+    id
+      ? 'Изменено'
+      : 'Создано',
+
+    'Ключевая дата',
+
+    milestone.title
+  );
+
+  await saveProject();
+
+  closeModal();
+
+  renderAll();
+}
+
+function renderDemolition() {
+
+  $('demolitionRows')
+    .innerHTML =
+      project.demolition
+        .filter(
+          item =>
+            item.active !==
+            false
+        )
+        .map(
+          item =>
+            `
+              <tr>
+
+                <td>
+                  ${esc(item.name)}
+                </td>
+
+                <td>
+                  <select
+                    class="dem-status"
+                    data-dem-status="${item.id}"
+                  >
+                    ${
+                      STATUS_LIST
+                        .map(
+                          status =>
+                            `
+                              <option
+                                ${
+                                  status ===
+                                  item.status
+                                    ? 'selected'
+                                    : ''
+                                }
+                              >
+                                ${status}
+                              </option>
+                            `
+                        )
+                        .join('')
+                    }
+                  </select>
+                </td>
+
+                <td>
+                  <input
+                    type="date"
+                    data-dem-plan="${item.id}"
+                    value="${item.planEnd || ''}"
+                  >
+                </td>
+
+                <td>
+                  <input
+                    type="date"
+                    data-dem-forecast="${item.id}"
+                    value="${item.forecastEnd || ''}"
+                  >
+                </td>
+
+                <td>
+                  <input
+                    type="date"
+                    data-dem-fact="${item.id}"
+                    value="${item.factEnd || ''}"
+                  >
+                </td>
+
+                <td>
+                  <input
+                    data-dem-comment="${item.id}"
+                    value="${esc(item.comment || '')}"
+                  >
+                </td>
+
+              </tr>
+            `
+        )
+        .join('');
+
+  document
+    .querySelectorAll(
+      '[data-dem-status],' +
+      '[data-dem-plan],' +
+      '[data-dem-forecast],' +
+      '[data-dem-fact],' +
+      '[data-dem-comment]'
+    )
+    .forEach(
+      element =>
+        element.onchange =
+          () =>
+            saveDemInline(
+              element
+            )
+    );
+}
+
+async function saveDemInline(
+  element
+) {
+
+  const id =
+    element.dataset.demStatus ||
+    element.dataset.demPlan ||
+    element.dataset.demForecast ||
+    element.dataset.demFact ||
+    element.dataset.demComment;
+
+  const item =
+    byId(
+      project.demolition,
+      id
+    );
+
+  if (
+    element.dataset.demStatus
+  ) {
+    item.status =
+      element.value;
+  }
+
+  if (
+    element.dataset.demPlan
+  ) {
+    item.planEnd =
+      element.value;
+  }
+
+  if (
+    element.dataset.demForecast
+  ) {
+    item.forecastEnd =
+      element.value;
+  }
+
+  if (
+    element.dataset.demFact
+  ) {
+    item.factEnd =
+      element.value;
+  }
+
+  if (
+    element.dataset.demComment
+  ) {
+    item.comment =
+      element.value;
+  }
+
+  item.updatedAt =
+    nowIso();
+
+  log(
+    'Изменено',
+    'Демонтаж',
+    item.name
+  );
+
+  await saveProject();
+}
+
+function renderHistory() {
+
+  $('historyRows')
+    .innerHTML =
+      project.history
+        .map(
+          item =>
+            `
+              <tr>
+
+                <td>
+                  ${
+                    new Date(
+                      item.at
+                    )
+                      .toLocaleString(
+                        'ru-RU'
+                      )
+                  }
+                </td>
+
+                <td>
+                  ${esc(item.action)}
+                </td>
+
+                <td>
+                  ${esc(item.entity)}
+                </td>
+
+                <td>
+                  ${esc(item.description)}
+                </td>
+
+              </tr>
+            `
+        )
+        .join('');
+}
+
+function renderSettings() {
+
+  $('buildingList')
+    .innerHTML =
+      project.buildings
+        .map(
+          item =>
+            `
+              <div class="item">
+                <span>${esc(item.name)}</span>
+              </div>
+            `
+        )
+        .join('');
+
+  $('workList')
+    .innerHTML =
+      project.works
+        .map(
+          item =>
+            `
+              <div class="item">
+                <span>
+                  ${esc(item.name)}
+                  ${
+                    item.unit
+                      ? ` · ${esc(item.unit)}`
+                      : ''
+                  }
+                </span>
+              </div>
+            `
+        )
+        .join('');
+
+  $('orgList')
+    .innerHTML =
+      project.organizations
+        .map(
+          item =>
+            `
+              <div class="item">
+                <span>${esc(item.name)}</span>
+              </div>
+            `
+        )
+        .join('');
+
+  $('projectMeta')
+    .innerHTML =
+      `
+        <div class="item">
+          <span>Версия структуры</span>
+          <strong>${project.schemaVersion}</strong>
+        </div>
+
+        <div class="item">
+          <span>Последнее изменение</span>
+          <strong>
+            ${
+              new Date(
+                project.meta.updatedAt
+              )
+                .toLocaleString(
+                  'ru-RU'
+                )
+            }
+          </strong>
+        </div>
+
+        <div class="item">
+          <span>Последняя резервная копия</span>
+          <strong>
+            ${
+              project.meta.lastBackupAt
+                ? new Date(
+                    project.meta.lastBackupAt
+                  )
+                    .toLocaleString(
+                      'ru-RU'
+                    )
+                : 'не создавалась'
+            }
+          </strong>
+        </div>
+
+        <div class="item">
+          <span>Фронтов</span>
+          <strong>${project.fronts.length}</strong>
+        </div>
+
+        <div class="item">
+          <span>Записей факта</span>
+          <strong>${project.factLog.length}</strong>
+        </div>
+      `;
+}
+
+async function addSimple(
+  kind
+) {
+
+  const map = {
+    building: [
+      'newBuilding',
+      'buildings',
+      'BLD',
+      'Здание'
+    ],
+
+    work: [
+      'newWork',
+      'works',
+      'WRK',
+      'Вид работы'
+    ],
+
+    org: [
+      'newOrg',
+      'organizations',
+      'ORG',
+      'Организация'
+    ]
+  };
+
+  const [
+    input,
+    list,
+    prefix,
+    label
+  ] =
+    map[kind];
+
+  const name =
+    $(input)
+      .value
+      .trim();
+
+  if (!name) {
+    return;
+  }
+
+  project[list]
+    .push({
+      id:
+        uid(prefix),
+
+      name,
+
+      active:
+        true
+    });
+
+  $(input).value =
+    '';
+
+  log(
+    'Создано',
+    label,
+    name
+  );
+
+  await saveProject();
+
+  renderAll();
+}
+
+async function exportBackup() {
+
+  project.meta.lastBackupAt =
+    nowIso();
+
+  await saveProject();
+
+  const payload = {
+    ...structuredClone(
+      project
+    ),
+
+    exportedAt:
+      nowIso(),
+
+    source:
+      'ACONS Planning local'
+  };
+
+  download(
+    `ACONS_Planning_${
+      new Date()
+        .toISOString()
+        .slice(
+          0,
+          16
+        )
+        .replace(
+          'T',
+          '_'
+        )
+        .replace(
+          ':',
+          '-'
+        )
+    }.json`,
+
+    JSON.stringify(
+      payload,
+      null,
+      2
+    )
+  );
+
+  renderAll();
+}
+
+async function readJsonFile(
+  file
+) {
+
+  const text =
+    await file.text();
+
+  const data =
+    JSON.parse(
+      text
+    );
+
+  if (
+    !data ||
+    !Array.isArray(
+      data.buildings
+    ) ||
+    !Array.isArray(
+      data.fronts
+    )
+  ) {
+
+    throw new Error(
+      'Это не резервная копия ACONS Planning.'
+    );
+  }
+
+  return data;
+}
+
+async function restoreProject(
+  file
+) {
+
+  try {
+
+    const data =
+      await readJsonFile(
+        file
+      );
+
+    if (
+      !confirm(
+        `Заменить текущий проект файлом?\n` +
+        `Фронтов в файле: ${data.fronts.length}\n` +
+        `Текущих фронтов: ${project.fronts.length}`
+      )
+    ) {
+      return;
+    }
+
+    project =
+      normalizeProject(
+        data
+      );
+
+    log(
+      'Восстановлено',
+      'Проект',
+      `Загружена резервная копия ${file.name}`
+    );
+
+    await saveProject();
+
+    renderAll();
+
+    alert(
+      'Проект загружен.'
+    );
+
+  } catch (error) {
+
+    alert(
+      'Ошибка загрузки: ' +
+      error.message
+    );
+
+  } finally {
+
+    $('restoreInput')
+      .value =
+        '';
+  }
+}
+
+function normalizeProject(
+  data
+) {
+
+  const base =
+    emptyProject();
+
+  return {
+    ...base,
+    ...data,
+
+    meta: {
+      ...base.meta,
+      ...(
+        data.meta ||
+        {}
+      )
+    },
+
+    buildings:
+      data.buildings ||
+      base.buildings,
+
+    works:
+      data.works ||
+      base.works,
+
+    organizations:
+      data.organizations ||
+      [],
+
+    structures:
+      data.structures ||
+      [],
+
+    fronts:
+      data.fronts ||
+      [],
+
+    planLog:
+      data.planLog ||
+      [],
+
+    factLog:
+      data.factLog ||
+      [],
+
+    resources:
+      data.resources ||
+      [],
+
+    milestones:
+      data.milestones ||
+      [],
+
+    demolition:
+      data.demolition ||
+      base.demolition,
+
+    history:
+      data.history ||
+      []
+  };
+}
+
+function compareCollections(
+  current,
+  incoming,
+  key
+) {
+
+  const currentMap =
+    new Map(
+      (
+        current ||
+        []
+      )
+        .map(
+          item => [
+            String(
+              item[key]
+            ),
+            item
+          ]
+        )
+    );
+
+  const incomingMap =
+    new Map(
+      (
+        incoming ||
+        []
+      )
+        .map(
+          item => [
+            String(
+              item[key]
+            ),
+            item
+          ]
+        )
+    );
+
+  const added =
+    [];
+
+  const changed =
+    [];
+
+  const missing =
+    [];
+
+  for (
+    const [
+      id,
+      row
+    ]
+    of incomingMap
+  ) {
+
+    if (
+      !currentMap.has(
+        id
+      )
+    ) {
+
+      added.push(
+        row
+      );
+
+    } else if (
+      JSON.stringify(
+        currentMap.get(
+          id
+        )
+      ) !==
+      JSON.stringify(
+        row
+      )
+    ) {
+
+      changed.push({
+        before:
+          currentMap.get(
+            id
+          ),
+
+        after:
+          row
+      });
+    }
+  }
+
+  for (
+    const [
+      id,
+      row
+    ]
+    of currentMap
+  ) {
+
+    if (
+      !incomingMap.has(
+        id
+      )
+    ) {
+
+      missing.push(
+        row
+      );
+    }
+  }
+
+  return {
+    added,
+    changed,
+    missing
+  };
+}
+
+function buildComparison(
+  incoming
+) {
+
+  const sets = [
+    [
+      'fronts',
+      'Фронты'
+    ],
+    [
+      'structures',
+      'Структуры'
+    ],
+    [
+      'planLog',
+      'План'
+    ],
+    [
+      'factLog',
+      'Факт'
+    ],
+    [
+      'resources',
+      'Ресурсы'
+    ],
+    [
+      'milestones',
+      'Ключевые даты'
+    ],
+    [
+      'demolition',
+      'Демонтаж'
+    ],
+    [
+      'buildings',
+      'Здания'
+    ],
+    [
+      'works',
+      'Виды работ'
+    ],
+    [
+      'organizations',
+      'Организации'
+    ]
+  ];
+
+  return sets
+    .map(
+      (
+        [
+          key,
+          label
+        ]
+      ) => ({
+        key,
+        label,
+
+        ...compareCollections(
+          project[key],
+          incoming[key],
+          'id'
+        )
+      })
+    );
+}
+
+async function compareProjectFile(
+  file
+) {
+
+  try {
+
+    compareIncoming =
+      normalizeProject(
+        await readJsonFile(
+          file
+        )
+      );
+
+    const comparison =
+      buildComparison(
+        compareIncoming
+      );
+
+    const totals =
+      comparison
+        .reduce(
+          (
+            accumulator,
+            item
+          ) => ({
+            added:
+              accumulator.added +
+              item.added.length,
+
+            changed:
+              accumulator.changed +
+              item.changed.length,
+
+            missing:
+              accumulator.missing +
+              item.missing.length
+          }),
+
+          {
+            added:
+              0,
+
+            changed:
+              0,
+
+            missing:
+              0
+          }
+        );
+
+    openModal(
+      'Сравнение проекта',
+
+      `
+        <p>
+          <b>Файл:</b>
+          ${esc(file.name)}
+        </p>
+
+        <div class="compare-summary">
+
+          <div class="compare-box">
+            <span>Новых</span>
+            <h2>${totals.added}</h2>
+          </div>
+
+          <div class="compare-box">
+            <span>Изменено</span>
+            <h2>${totals.changed}</h2>
+          </div>
+
+          <div class="compare-box">
+            <span>Есть только у меня</span>
+            <h2>${totals.missing}</h2>
+          </div>
+
+        </div>
+
+        <div class="compare-details">
+
+          ${
+            comparison
+              .map(
+                item =>
+                  `
+                    <div class="item">
+
+                      <span>
+                        ${esc(item.label)}
+                      </span>
+
+                      <strong>
+                        +${item.added.length}
+                        /
+                        ~${item.changed.length}
+                        /
+                        локально ${item.missing.length}
+                      </strong>
+
+                    </div>
+                  `
+              )
+              .join('')
+          }
+
+        </div>
+
+        <p class="muted">
+          «Объединить» добавит новые записи
+          и заменит совпадающие ID версией из файла,
+          но не удалит локальные записи.
+          «Заменить полностью» сделает файл
+          новой рабочей базой.
+        </p>
+
+        <div class="editor-actions">
+
+          <button
+            id="mergeCompare"
+            class="btn"
+          >
+            Объединить
+          </button>
+
+          <button
+            id="replaceCompare"
+            class="btn primary"
+          >
+            Заменить полностью
+          </button>
+
+        </div>
+      `
+    );
+
+    $('mergeCompare').onclick =
+      mergeCompared;
+
+    $('replaceCompare').onclick =
+      replaceCompared;
+
+  } catch (error) {
+
+    alert(
+      'Ошибка сравнения: ' +
+      error.message
+    );
+
+  } finally {
+
+    $('compareInput')
+      .value =
+        '';
+  }
+}
+
+async function mergeCompared() {
+
+  if (
+    !compareIncoming
+  ) {
+    return;
+  }
+
+  const keys = [
+    'buildings',
+    'organizations',
+    'works',
+    'structures',
+    'fronts',
+    'planLog',
+    'factLog',
+    'resources',
+    'milestones',
+    'demolition'
+  ];
+
+  for (
+    const key
+    of keys
+  ) {
+
+    const map =
+      new Map(
+        project[key]
+          .map(
+            item => [
+              String(
+                item.id
+              ),
+              item
+            ]
+          )
+      );
+
+    for (
+      const row
+      of (
+        compareIncoming[key] ||
+        []
+      )
+    ) {
+
+      map.set(
+        String(
+          row.id
+        ),
+        row
+      );
+    }
+
+    project[key] =
+      [
+        ...map.values()
+      ];
+  }
+
+  log(
+    'Объединено',
+    'Проект',
+    'Применены изменения из сравниваемого файла'
+  );
+
+  await saveProject();
+
+  compareIncoming =
+    null;
+
+  closeModal();
+
+  renderAll();
+
+  alert(
+    'Изменения объединены.'
+  );
+}
+
+async function replaceCompared() {
+
+  if (
+    !compareIncoming
+  ) {
+    return;
+  }
+
+  if (
+    !confirm(
+      'Полностью заменить текущий проект версией из файла?'
+    )
+  ) {
+    return;
+  }
+
+  project =
+    compareIncoming;
+
+  log(
+    'Заменено',
+    'Проект',
+    'Применена сравниваемая версия целиком'
+  );
+
+  await saveProject();
+
+  compareIncoming =
+    null;
+
+  closeModal();
+
+  renderAll();
+}
+
+function renderBackupNotice() {
+
+  const last =
+    project
+      ?.meta
+      ?.lastBackupAt;
+
+  if (!last) {
+
+    $('backupNotice')
+      .textContent =
+        'Резервная копия проекта еще не создавалась.';
+
+    return;
+  }
+
+  const days =
+    Math.floor(
+      (
+        Date.now() -
+        Date.parse(
+          last
+        )
+      ) /
+      86400000
+    );
+
+  $('backupNotice')
+    .textContent =
+      `Последняя резервная копия: ${
+        new Date(
+          last
+        )
+          .toLocaleString(
+            'ru-RU'
+          )
+      }${
+        days >= 7
+          ? ' · рекомендуется создать новую копию'
+          : ''
+      }`;
+}
+
+async function readImportFile(
+  event
+) {
+
+  const file =
+    event.target
+      .files[0];
+
+  if (!file) {
+    return;
+  }
+
+  try {
+
+    const data =
+      await file
+        .arrayBuffer();
+
+    const workbook =
+      XLSX.read(
+        data,
+        {
+          type:
+            'array',
+
+          cellDates:
+            true
+        }
+      );
+
+    const sheet =
+      workbook.Sheets[
+        workbook.SheetNames[0]
+      ];
+
+    importRows =
+      XLSX.utils
+        .sheet_to_json(
+          sheet,
+          {
+            defval:
+              ''
+          }
+        );
+
+    $('importInfo')
+      .classList
+      .remove(
+        'hidden'
+      );
+
+    $('importInfo')
+      .textContent =
+        `Прочитано строк: ${importRows.length}. Показываю первые 50.`;
+
+    const headers =
+      importRows[0]
+        ? Object.keys(
+            importRows[0]
+          )
+        : [];
+
+    $('importHead')
+      .innerHTML =
+        '<tr>' +
+
+        headers
+          .map(
+            header =>
+              `<th>${esc(header)}</th>`
+          )
+          .join('') +
+
+        '</tr>';
+
+    $('importBody')
+      .innerHTML =
+        importRows
+          .slice(
+            0,
+            50
+          )
+          .map(
+            row =>
+              '<tr>' +
+
+              headers
+                .map(
+                  header =>
+                    `<td>${esc(row[header])}</td>`
+                )
+                .join('') +
+
+              '</tr>'
+          )
+          .join('');
+
+    $('commitImportBtn')
+      .disabled =
+        !importRows.length;
+
+  } catch (error) {
+
+    alert(
+      'Ошибка чтения файла: ' +
+      error.message
+    );
+  }
+}
+
+function normDate(
+  value
+) {
+
+  if (!value) {
+    return '';
+  }
+
+  if (
+    value instanceof Date
+  ) {
+
+    return value
+      .toISOString()
+      .slice(
+        0,
+        10
+      );
+  }
+
+  const string =
+    String(
+      value
+    )
+      .trim();
+
+  const match =
+    string.match(
+      /^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})$/
+    );
+
+  if (match) {
+
+    const year =
+      match[3].length ===
+        2
+        ? '20' +
+          match[3]
+        : match[3];
+
+    return `${year}-${match[2].padStart(2,'0')}-${match[1].padStart(2,'0')}`;
+  }
+
+  return /^\d{4}-\d{2}-\d{2}$/
+    .test(
+      string
+    )
+      ? string
+      : '';
+}
+
+function ensureNamed(
+  list,
+  prefix,
+  name,
+  extra = {}
+) {
+
+  let item =
+    list.find(
+      row =>
+        row.name ===
+        name
+    );
+
+  if (!item) {
+
+    item = {
+      id:
+        uid(prefix),
+
+      name,
+
+      active:
+        true,
+
+      ...extra
+    };
+
+    list.push(
+      item
+    );
+  }
+
+  return item;
+}
+
+async function commitImport() {
+
+  if (
+    !importRows.length
+  ) {
+    return;
+  }
+
+  if (
+    !confirm(
+      `Импортировать ${importRows.length} строк? Перед импортом рекомендуется сохранить проект.`
+    )
+  ) {
+    return;
+  }
+
+  let created =
+    0;
+
+  let updated =
+    0;
+
+  let skipped =
+    0;
+
+  for (
+    const row
+    of importRows
+  ) {
+
+    const buildingName =
+      String(
+        row['Здание'] ||
+        ''
+      )
+        .trim();
+
+    const workName =
+      String(
+        row['Работа'] ||
+        row['Вид работы'] ||
+        ''
+      )
+        .trim();
+
+    if (
+      !buildingName ||
+      !workName
+    ) {
+
+      skipped++;
+      continue;
+    }
+
+    const building =
+      ensureNamed(
+        project.buildings,
+        'BLD',
+        buildingName
+      );
+
+    const work =
+      ensureNamed(
+        project.works,
+        'WRK',
+        workName,
+        {
+          unit:
+            String(
+              row['Ед. изм.'] ||
+              ''
+            )
+              .trim()
+        }
+      );
+
+    const organizationName =
+      String(
+        row['Организация'] ||
+        ''
+      )
+        .trim();
+
+    const organization =
+      organizationName
+        ? ensureNamed(
+            project.organizations,
+            'ORG',
+            organizationName
+          )
+        : null;
+
+    const signature =
+      [
+        building.id,
+        row['Блок'] || '',
+        row['Этаж'] || '',
+        row['Захватка'] || '',
+        row['Ось'] || '',
+        row['Сторона'] || '',
+        row['Зона'] || '',
+        row['№ помещения'] ||
+        row['Номер помещения'] ||
+        ''
+      ]
+        .map(
+          String
+        )
+        .join('|');
+
+    let structure =
+      project.structures
+        .find(
+          item =>
+            item.signature ===
+            signature
+        );
+
+    if (!structure) {
+
+      structure = {
+        id:
+          uid('STR'),
+
+        signature,
+
+        buildingId:
+          building.id,
+
+        block:
+          String(
+            row['Блок'] ||
+            ''
+          )
+            .trim(),
+
+        floor:
+          row['Этаж'] ===
+            ''
+            ? ''
+            : num(
+                row['Этаж']
+              ),
+
+        capture:
+          String(
+            row['Захватка'] ||
+            ''
+          )
+            .trim(),
+
+        axis:
+          String(
+            row['Ось'] ||
+            ''
+          )
+            .trim(),
+
+        side:
+          String(
+            row['Сторона'] ||
+            ''
+          )
+            .trim(),
+
+        zone:
+          String(
+            row['Зона'] ||
+            ''
+          )
+            .trim(),
+
+        roomNo:
+          String(
+            row['№ помещения'] ||
+            row['Номер помещения'] ||
+            ''
+          )
+            .trim(),
+
+        roomName:
+          String(
+            row['Помещение'] ||
+            row['Название помещения'] ||
+            ''
+          )
+            .trim()
+      };
+
+      project.structures
+        .push(
+          structure
+        );
+    }
+
+    let front =
+      project.fronts
+        .find(
+          item =>
+            item.structureId ===
+              structure.id &&
+            item.workId ===
+              work.id
+        );
+
+    if (!front) {
+
+      front = {
+        id:
+          uid('F'),
+
+        structureId:
+          structure.id,
+
+        workId:
+          work.id,
+
+        status:
+          'Не начато',
+
+        createdAt:
+          nowIso()
+      };
+
+      project.fronts
+        .push(
+          front
+        );
+
+      created++;
+
+    } else {
+
+      updated++;
+    }
+
+    Object.assign(
+      front,
+      {
+        organizationId:
+          organization
+            ?.id ||
+          front.organizationId ||
+          '',
+
+        unit:
+          String(
+            row['Ед. изм.'] ||
+            front.unit ||
+            ''
+          )
+            .trim(),
+
+        totalQty:
+          row['Общий объем'] ===
+            ''
+            ? num(
+                front.totalQty
+              )
+            : num(
+                row['Общий объем']
+              ),
+
+        doneQty:
+          row['Накопительный итог'] ===
+            ''
+            ? num(
+                front.doneQty
+              )
+            : num(
+                row['Накопительный итог']
+              ),
+
+        status:
+          String(
+            row['Статус'] ||
+            front.status ||
+            'Не начато'
+          ),
+
+        contractStart:
+          normDate(
+            row['Договорное начало']
+          ) ||
+          front.contractStart ||
+          '',
+
+        contractEnd:
+          normDate(
+            row['Договорное окончание']
+          ) ||
+          front.contractEnd ||
+          '',
+
+        baselineStart:
+          normDate(
+            row['Базовое начало']
+          ) ||
+          front.baselineStart ||
+          '',
+
+        baselineEnd:
+          normDate(
+            row['Базовое окончание']
+          ) ||
+          front.baselineEnd ||
+          '',
+
+        planStart:
+          normDate(
+            row['Рабочее начало']
+          ) ||
+          front.planStart ||
+          '',
+
+        planEnd:
+          normDate(
+            row['Рабочее окончание']
+          ) ||
+          front.planEnd ||
+          '',
+
+        forecastEnd:
+          normDate(
+            row['Прогнозное окончание']
+          ) ||
+          front.forecastEnd ||
+          '',
+
+        updatedAt:
+          nowIso()
+      }
+    );
+  }
+
+  log(
+    'Импорт',
+    'Проект',
+    `Создано ${created}, обновлено ${updated}, пропущено ${skipped}`
+  );
+
+  await saveProject();
+
+  $('importInfo')
+    .textContent =
+      `Импорт завершен. Создано: ${created}, обновлено: ${updated}, пропущено: ${skipped}.`;
+
+  importRows =
+    [];
+
+  $('commitImportBtn')
+    .disabled =
+      true;
+
+  renderAll();
+}
+
+function printCurrent() {
+
+  const active =
+    document
+      .querySelector(
+        '.panel:not(.hidden)'
+      );
+
+  document
+    .querySelectorAll(
+      '.panel'
+    )
+    .forEach(
+      panel =>
+        panel
+          .classList
+          .remove(
+            'print-active'
+          )
+    );
+
+  if (active) {
+
+    active
+      .classList
+      .add(
+        'print-active'
+      );
+  }
+
+  window.print();
+
+  setTimeout(
+    () =>
+      active
+        ?.classList
+        .remove(
+          'print-active'
+        ),
+    500
+  );
+}
+
+function switchTab(
   name
 ) {
+
   document
     .querySelectorAll(
       '.tab'
     )
     .forEach(
-      button => {
+      button =>
         button
           .classList
           .toggle(
             'active',
             button.dataset.tab ===
               name
-          );
-      }
+          )
     );
 
   document
@@ -996,23 +4956,21 @@ function showTab(
       '.panel'
     )
     .forEach(
-      panel => {
+      panel =>
         panel
           .classList
-          .add('hidden');
-      }
+          .add(
+            'hidden'
+          )
     );
 
-  $('tab-' + name)
+  $(
+    `tab-${name}`
+  )
     .classList
-    .remove('hidden');
-
-  if (
-    name ===
-    'dashboard'
-  ) {
-    renderDashboard();
-  }
+    .remove(
+      'hidden'
+    );
 
   if (
     name ===
@@ -1051,9 +5009,9 @@ function showTab(
 
   if (
     name ===
-    'reports'
+    'demolition'
   ) {
-    buildReport();
+    renderDemolition();
   }
 
   if (
@@ -1071,3695 +5029,236 @@ function showTab(
   }
 }
 
-function hydrateFront(
-  front
-) {
-  const structure =
-    state.structures
-      .find(
-        item =>
-          item.id ===
-          front.structure_id
-      ) ||
-    {};
+function bindUi() {
 
-  return {
-    ...front,
-
-    structure,
-
-    building:
-      nameById(
-        state.buildings,
-        structure.building_id
-      ),
-
-    work:
-      nameById(
-        state.works,
-        front.work_id
-      ),
-
-    organization:
-      nameById(
-        state.organizations,
-        front.organization_id
-      ),
-
-    block:
-      structure.block_name ||
-      '',
-
-    floor:
-      structure.floor_no ??
-      '',
-
-    capture:
-      structure.capture_name ||
-      '',
-
-    axis:
-      structure.axis_name ||
-      '',
-
-    side:
-      structure.side_name ||
-      '',
-
-    zone:
-      structure.zone_name ||
-      '',
-
-    room_no:
-      structure.room_number ||
-      '',
-
-    room_name:
-      structure.room_name ||
-      '',
-
-    equipment:
-      structure.equipment_name ||
-      '',
-
-    fsm_priority:
-      structure.fsm_priority ||
-      '',
-
-    fsm_status:
-      structure.fsm_status ||
-      ''
-  };
-}
-
-function frontLabel(
-  front
-) {
-  const item =
-    hydrateFront(
-      front
+  document
+    .querySelectorAll(
+      '.tab'
+    )
+    .forEach(
+      button =>
+        button.onclick =
+          () =>
+            switchTab(
+              button.dataset.tab
+            )
     );
 
-  return [
-    item.building,
-    item.block,
+  $('modalClose').onclick =
+    closeModal;
 
-    item.floor !== ''
-      ? `${item.floor} эт.`
-      : '',
+  $('modal').onclick =
+    event => {
 
-    item.capture
-      ? `захв. ${item.capture}`
-      : '',
-
-    item.axis
-      ? `ось ${item.axis}`
-      : '',
-
-    item.side,
-    item.zone,
-
-    item.room_no
-      ? `пом. ${item.room_no}`
-      : '',
-
-    item.work
-  ]
-    .filter(Boolean)
-    .join(' / ');
-}
-
-function statusClass(
-  status
-) {
-  return (
-    status ===
-      'Фронт готов'
-      ? 's-ready'
-      :
-    status ===
-      'В работе'
-      ? 's-work'
-      :
-    status ===
-      'Завершено'
-      ? 's-done'
-      :
-    status ===
-      'Приостановлено'
-      ? 's-pause'
-      :
-    status ===
-      'Ограничение'
-      ? 's-risk'
-      :
-      's-not'
-  );
-}
-
-function initSelects() {
-  const buildings =
-    state.buildings
-      .map(
-        item => ({
-          id:
-            item.id,
-
-          name:
-            item.name
-        })
-      );
-
-  const works =
-    state.works
-      .map(
-        item => ({
-          id:
-            item.id,
-
-          name:
-            item.name
-        })
-      );
-
-  const organizations =
-    state.organizations
-      .map(
-        item => ({
-          id:
-            item.id,
-
-          name:
-            item.name
-        })
-      );
+      if (
+        event.target ===
+        $('modal')
+      ) {
+        closeModal();
+      }
+    };
 
   [
     'mfBuilding',
-    'gBuilding',
-    'pfBuilding',
-    'rBuilding',
-    'repBuilding'
-  ]
-    .forEach(
-      id => {
-        fill(
-          $(id),
-          buildings,
-          'Все здания'
-        );
-      }
-    );
-
-  fill(
-    $('msBuilding'),
-    buildings
-  );
-
-  [
+    'mfBlock',
+    'mfFloor',
     'mfWork',
-    'gWork',
-    'pfWork',
-    'repWork'
+    'mfOrg',
+    'mfStatus'
   ]
     .forEach(
-      id => {
-        fill(
-          $(id),
-          works,
-          'Все работы'
-        );
-      }
+      id =>
+        $(id).onchange =
+          renderMatrix
     );
 
   [
-    'mfOrg',
-    'gOrg',
-    'pfOrg',
-    'rOrg',
-    'repOrg'
+    'gBuilding',
+    'gWork',
+    'gMode'
   ]
     .forEach(
-      id => {
-        fill(
-          $(id),
-          organizations,
-          'Все организации'
-        );
-      }
+      id =>
+        $(id).onchange =
+          renderGantt
     );
 
-  fill(
-    $('fOrg'),
-    [
-      {
-        id: '',
-        name: '—'
-      },
-      ...organizations
-    ]
-  );
-
-  fill(
-    $('reOrg'),
-    organizations
-  );
-
-  fill(
-    $('reBuilding'),
-    buildings
-  );
-
-  fill(
-    $('sBuilding'),
-    buildings
-  );
-
-  fill(
-    $('sWork'),
-    works
-  );
-
-  updateMatrixDependent();
-
-  fill(
-    $('savedViewSelect'),
-    state.views
-      .map(
-        item => ({
-          id:
-            item.id,
-
-          name:
-            item.name
-        })
-      ),
-    'Выбери вид'
-  );
-}
-
-function updateMatrixDependent() {
-  const buildingId =
-    $('mfBuilding').value;
-
-  const structures =
-    state.structures
-      .filter(
-        structure =>
-          buildingId ===
-            'all' ||
-          structure.building_id ===
-            buildingId
-      );
-
-  fill(
-    $('mfBlock'),
-    uniq(
-      structures
-        .map(
-          item =>
-            item.block_name
-        )
-    )
-      .map(
-        value => ({
-          id:
-            value,
-
-          name:
-            value
-        })
-      ),
-    'Все блоки'
-  );
-
-  fill(
-    $('mfFloor'),
-    uniq(
-      structures
-        .map(
-          item =>
-            item.floor_no
-        )
-    )
-      .sort(
-        (a, b) =>
-          num(a) -
-          num(b)
-      )
-      .map(
-        value => ({
-          id:
-            value,
-
-          name:
-            value
-        })
-      ),
-    'Все этажи'
-  );
-}
-
-function renderDashboard() {
-  const fronts =
-    state.fronts
-      .map(
-        hydrateFront
-      );
-
-  $('dTotal').textContent =
-    fronts.length;
-
-  $('dWork').textContent =
-    fronts
-      .filter(
-        front =>
-          front.status ===
-          'В работе'
-      )
-      .length;
-
-  $('dDone').textContent =
-    fronts
-      .filter(
-        front =>
-          front.status ===
-            'Завершено' ||
-          front.completed
-      )
-      .length;
-
-  $('dAccepted').textContent =
-    fronts
-      .filter(
-        front =>
-          front.accepted
-      )
-      .length;
-
-  $('dLate').textContent =
-    fronts
-      .filter(
-        front =>
-          front.contract_end &&
-          !front.accepted &&
-          front.contract_end <
-            today()
-      )
-      .length;
-
-  $('dRisk').textContent =
-    fronts
-      .filter(
-        front =>
-          [
-            'Ограничение',
-            'Приостановлено'
-          ]
-            .includes(
-              front.status
-            )
-      )
-      .length;
-
-  const critical =
-    fronts
-      .filter(
-        front =>
-          (
-            front.contract_end &&
-            !front.accepted &&
-            front.contract_end <
-              today()
-          ) ||
-          [
-            'Ограничение',
-            'Приостановлено'
-          ]
-            .includes(
-              front.status
-            )
-      )
-      .slice(
-        0,
-        15
-      );
-
-  $('dCritical')
-    .innerHTML =
-      critical
-        .map(
-          front =>
-            `
-              <div class="item">
-
-                <span>
-                  ${esc(frontLabel(front))}
-                </span>
-
-                <strong>
-                  ${esc(front.status)}
-                </strong>
-
-              </div>
-            `
-        )
-        .join('') ||
-
-      '<div class="muted">Нет критичных работ</div>';
-
-  const lastDate =
-    [...state.resourceLog]
-      .sort(
-        (a, b) =>
-          String(
-            a.resource_date
-          )
-            .localeCompare(
-              String(
-                b.resource_date
-              )
-            )
-      )
-      .slice(-1)[0]
-      ?.resource_date;
-
-  const resourceRows =
-    state.resourceLog
-      .filter(
-        row =>
-          row.resource_date ===
-          lastDate
-      );
-
-  const people =
-    resourceRows
-      .reduce(
-        (
-          sum,
-          row
-        ) =>
-          sum +
-          num(row.itr) +
-          num(row.workers) +
-          num(row.mechanizers),
-        0
-      );
-
-  const equipment =
-    resourceRows
-      .reduce(
-        (
-          sum,
-          row
-        ) =>
-          sum +
-          num(
-            row.equipment_qty
-          ),
-        0
-      );
-
-  $('dResources')
-    .innerHTML =
-      lastDate
-        ? `
-          <div class="item">
-            <span>Дата</span>
-            <strong>${lastDate}</strong>
-          </div>
-
-          <div class="item">
-            <span>Людей</span>
-            <strong>${people}</strong>
-          </div>
-
-          <div class="item">
-            <span>Техники</span>
-            <strong>${equipment}</strong>
-          </div>
-        `
-        : '<div class="muted">Нет данных</div>';
-}
-
-function getColumnDefs() {
-  const customColumns =
-    state.customFields
-      .filter(
-        field =>
-          field.scope ===
-          'structure'
-      )
-      .map(
-        field => [
-          `cf:${field.id}`,
-          field.name
-        ]
-      );
-
-  return [
-    ...BASE_COLUMNS,
-    ...customColumns
-  ];
-}
-
-function renderColumnChooser() {
-  const definitions =
-    getColumnDefs();
-
-  $('columnChooser')
-    .innerHTML =
-      definitions
-        .map(
-          (
-            [
-              key,
-              name
-            ]
-          ) =>
-            `
-              <label>
-
-                <input
-                  type="checkbox"
-                  data-col="${key}"
-                  ${
-                    visibleColumns
-                      .includes(
-                        key
-                      )
-                      ? 'checked'
-                      : ''
-                  }>
-
-                ${esc(name)}
-
-              </label>
-            `
-        )
-        .join('');
-
-  document
-    .querySelectorAll(
-      '[data-col]'
-    )
+  [
+    'pfFrom',
+    'pfTo',
+    'pfBuilding',
+    'pfWork'
+  ]
     .forEach(
-      checkbox => {
-        checkbox.onchange =
-          () => {
-            visibleColumns =
-              [
-                ...document
-                  .querySelectorAll(
-                    '[data-col]:checked'
-                  )
-              ]
-                .map(
-                  element =>
-                    element.dataset.col
-                );
-
-            renderMatrix();
-          };
-      }
-    );
-}
-
-function matrixFiltered() {
-  return state.fronts
-    .map(
-      hydrateFront
-    )
-    .filter(
-      front =>
-        (
-          $('mfBuilding').value ===
-            'all' ||
-          front.structure
-            .building_id ===
-            $('mfBuilding').value
-        ) &&
-
-        (
-          $('mfBlock').value ===
-            'all' ||
-          front.block ===
-            $('mfBlock').value
-        ) &&
-
-        (
-          $('mfFloor').value ===
-            'all' ||
-          String(
-            front.floor
-          ) ===
-            $('mfFloor').value
-        ) &&
-
-        (
-          $('mfWork').value ===
-            'all' ||
-          front.work_id ===
-            $('mfWork').value
-        ) &&
-
-        (
-          $('mfOrg').value ===
-            'all' ||
-          front.organization_id ===
-            $('mfOrg').value
-        ) &&
-
-        (
-          $('mfStatus').value ===
-            'all' ||
-          front.status ===
-            $('mfStatus').value
-        )
-    );
-}
-
-function colValue(
-  front,
-  key
-) {
-  if (
-    key.startsWith(
-      'cf:'
-    )
-  ) {
-    return (
-      front.structure
-        .custom_data?.[
-          key.slice(3)
-        ] ??
-      ''
-    );
-  }
-
-  return (
-    front[key] ??
-    ''
-  );
-}
-
-function renderMatrix() {
-  initSelects();
-
-  renderColumnChooser();
-
-  const definitions =
-    new Map(
-      getColumnDefs()
+      id =>
+        $(id).onchange =
+          renderPlanFact
     );
 
-  const rows =
-    matrixFiltered();
-
-  $('matrixHead')
-    .innerHTML =
-      '<tr>' +
-
-      visibleColumns
-        .map(
-          key =>
-            `
-              <th>
-                ${esc(definitions.get(key) || key)}
-              </th>
-            `
-        )
-        .join('') +
-
-      '<th>Работа</th>' +
-      '<th>Карточка</th>' +
-
-      '</tr>';
-
-  $('matrixBody')
-    .innerHTML =
-      rows
-        .map(
-          front =>
-            `
-              <tr>
-
-                ${
-                  visibleColumns
-                    .map(
-                      key =>
-                        `
-                          <td>
-                            ${esc(colValue(front,key))}
-                          </td>
-                        `
-                    )
-                    .join('')
-                }
-
-                <td>
-                  ${esc(front.work)}
-                </td>
-
-                <td>
-
-                  <button
-                    class="cellbtn ${statusClass(front.status)}"
-                    data-open-front="${front.id}">
-
-                    <b>
-                      ${esc(front.status)}
-                    </b>
-
-                    <br>
-
-                    <small>
-                      ${esc(front.fact_text || 'Факт не указан')}
-                    </small>
-
-                  </button>
-
-                </td>
-
-              </tr>
-            `
-        )
-        .join('');
-
-  document
-    .querySelectorAll(
-      '[data-open-front]'
-    )
+  [
+    'rFrom',
+    'rTo',
+    'rOrg',
+    'rBuilding'
+  ]
     .forEach(
-      button => {
-        button.onclick =
-          () =>
-            openFront(
-              button.dataset.openFront
-            );
+      id =>
+        $(id).onchange =
+          renderResources
+    );
+
+  $('newFrontBtn').onclick =
+    () =>
+      openFrontEditor();
+
+  $('newPlanRow').onclick =
+    () =>
+      openLogEditor(
+        'plan'
+      );
+
+  $('newFactRow').onclick =
+    () =>
+      openLogEditor(
+        'fact'
+      );
+
+  $('newResourceBtn').onclick =
+    openResourceEditor;
+
+  $('newMilestoneBtn').onclick =
+    () =>
+      openMilestoneEditor();
+
+  $('addBuildingBtn').onclick =
+    () =>
+      addSimple(
+        'building'
+      );
+
+  $('addWorkBtn').onclick =
+    () =>
+      addSimple(
+        'work'
+      );
+
+  $('addOrgBtn').onclick =
+    () =>
+      addSimple(
+        'org'
+      );
+
+  $('backupBtn').onclick =
+    exportBackup;
+
+  $('restoreInput').onchange =
+    event =>
+      event.target.files[0] &&
+      restoreProject(
+        event.target.files[0]
+      );
+
+  $('compareInput').onchange =
+    event =>
+      event.target.files[0] &&
+      compareProjectFile(
+        event.target.files[0]
+      );
+
+  $('pdfBtn').onclick =
+    printCurrent;
+
+  $('importFile').onchange =
+    readImportFile;
+
+  $('commitImportBtn').onclick =
+    commitImport;
+
+  $('clearProjectBtn').onclick =
+    async () => {
+
+      if (
+        !confirm(
+          'Очистить рабочие данные? Справочники зданий и видов работ останутся.'
+        )
+      ) {
+        return;
       }
-    );
+
+      const fresh =
+        emptyProject();
+
+      fresh.organizations =
+        project.organizations;
+
+      project =
+        fresh;
+
+      log(
+        'Очищено',
+        'Проект',
+        'Рабочие данные очищены'
+      );
+
+      await saveProject();
+
+      renderAll();
+    };
 }
 
-async function saveView() {
-  const name =
-    $('viewName')
-      .value
-      .trim();
+async function init() {
 
-  if (!name) {
-    alert(
-      'Укажи название вида'
-    );
+  db =
+    await openDb();
 
-    return;
+  project =
+    await dbGet();
+
+  if (!project) {
+
+    project =
+      emptyProject();
+
+    await saveProject();
+
+  } else {
+
+    project =
+      normalizeProject(
+        project
+      );
   }
 
-  try {
-    await apiRequest(
-      'saveView',
-      {
-        data: {
-          name,
+  bindUi();
 
-          is_shared:
-            profile?.role ===
-              'admin' ||
-            profile?.role ===
-              'planner',
+  renderBackupNotice();
 
-          columns:
-            visibleColumns,
+  renderAll();
 
-          filters:
-            {}
-        }
-      }
-    );
-
-    await reloadAll();
-
-  } catch (error) {
-    alert(
-      error.message
-    );
-  }
-}
-
-function loadView() {
-  const view =
-    state.views
-      .find(
-        item =>
-          item.id ===
-          $('savedViewSelect')
-            .value
-      );
-
-  if (!view) {
-    return;
-  }
-
-  visibleColumns =
-    Array.isArray(
-      view.columns
-    )
-      ? view.columns
-      : [];
-
-  renderMatrix();
-}
-
-function renderFrontCustom(
-  front
-) {
-  const fields =
-    state.customFields
-      .filter(
-        field =>
-          field.scope ===
-          'front'
-      );
-
-  $('frontCustom')
-    .innerHTML =
-      fields
-        .map(
-          field => {
-            const value =
-              front.custom_data?.[
-                field.id
-              ] ??
-              '';
-
-            if (
-              field.field_type ===
-              'boolean'
-            ) {
-              return `
-                <div class="field inline">
-
-                  <label>
-
-                    <input
-                      id="fcf_${field.id}"
-                      type="checkbox"
-                      ${value ? 'checked' : ''}>
-
-                    ${esc(field.name)}
-
-                  </label>
-
-                </div>
-              `;
-            }
-
-            if (
-              field.field_type ===
-              'select'
-            ) {
-              return `
-                <div class="field">
-
-                  <label>
-                    ${esc(field.name)}
-                  </label>
-
-                  <select id="fcf_${field.id}">
-
-                    <option value=""></option>
-
-                    ${
-                      (
-                        field.options ||
-                        []
-                      )
-                        .map(
-                          option =>
-                            `
-                              <option
-                                ${
-                                  String(option) ===
-                                  String(value)
-                                    ? 'selected'
-                                    : ''
-                                }>
-
-                                ${esc(option)}
-
-                              </option>
-                            `
-                        )
-                        .join('')
-                    }
-
-                  </select>
-
-                </div>
-              `;
-            }
-
-            const type =
-              field.field_type ===
-                'date'
-                ? 'date'
-                :
-              [
-                'number',
-                'percent'
-              ]
-                .includes(
-                  field.field_type
-                )
-                ? 'number'
-                : 'text';
-
-            return `
-              <div class="field">
-
-                <label>
-                  ${esc(field.name)}
-                </label>
-
-                <input
-                  id="fcf_${field.id}"
-                  type="${type}"
-                  value="${esc(value)}">
-
-              </div>
-            `;
-          }
-        )
-        .join('');
-}
-
-function readFrontCustom() {
-  const result =
-    {};
-
-  state.customFields
-    .filter(
-      field =>
-        field.scope ===
-        'front'
-    )
-    .forEach(
-      field => {
-        const element =
-          $(
-            'fcf_' +
-            field.id
-          );
-
-        result[field.id] =
-          field.field_type ===
-            'boolean'
-            ? element.checked
-            : element.value;
-      }
-    );
-
-  return result;
-}
-
-function openFront(
-  id
-) {
-  const front =
-    state.fronts
-      .find(
-        item =>
-          item.id ===
-          id
-      );
-
-  if (!front) {
-    return;
-  }
-
-  selectedFrontId =
-    id;
-
-  $('frontTitle')
-    .textContent =
-      nameById(
-        state.works,
-        front.work_id
-      );
-
-  $('frontMeta')
-    .textContent =
-      frontLabel(
-        front
-      );
-
-  fill(
-    $('fOrg'),
-    [
-      {
-        id: '',
-        name: '—'
-      },
-      ...state.organizations
-    ]
-  );
-
-  $('fStatus').value =
-    front.status;
-
-  $('fOrg').value =
-    front.organization_id ||
-    '';
-
-  $('fResponsible').value =
-    front.responsible ||
-    '';
-
-  $('fContractStart').value =
-    front.contract_start ||
-    '';
-
-  $('fContractEnd').value =
-    front.contract_end ||
-    '';
-
-  $('fBaselineStart').value =
-    front.baseline_start ||
-    '';
-
-  $('fBaselineEnd').value =
-    front.baseline_end ||
-    '';
-
-  $('fPlanStart').value =
-    front.plan_start ||
-    '';
-
-  $('fPlanEnd').value =
-    front.plan_end ||
-    '';
-
-  $('fFactStart').value =
-    front.fact_start ||
-    '';
-
-  $('fFactEnd').value =
-    front.fact_end ||
-    '';
-
-  $('fForecastEnd').value =
-    front.forecast_end ||
-    '';
-
-  $('fUnit').value =
-    front.unit ||
-    '';
-
-  $('fTotalQty').value =
-    front.total_qty ??
-    '';
-
-  $('fDoneQty').value =
-    front.done_qty ??
-    '';
-
-  $('fPeople').value =
-    front.current_people ??
-    '';
-
-  $('fCompleted').checked =
-    !!front.completed;
-
-  $('fPresented').checked =
-    !!front.presented;
-
-  $('fAccepted').checked =
-    !!front.accepted;
-
-  $('fAcceptedDate').value =
-    front.accepted_date ||
-    '';
-
-  $('fFactText').value =
-    front.fact_text ||
-    '';
-
-  $('fConstraint').value =
-    front.constraint_text ||
-    '';
-
-  renderFrontCustom(
-    front
-  );
-
-  $('frontEditor')
-    .classList
-    .remove('hidden');
-
-  $('frontEditor')
-    .scrollIntoView({
-      behavior: 'smooth'
-    });
-}
-
-async function logChanges() {
-  return;
-}
-
-async function saveFront() {
-  const front =
-    state.fronts
-      .find(
-        item =>
-          item.id ===
-          selectedFrontId
-      );
-
-  if (!front) {
-    return;
-  }
-
-  const update = {
-    id:
-      front.id,
-
-    status:
-      $('fStatus').value,
-
-    organization_id:
-      $('fOrg').value ||
-      null,
-
-    responsible:
-      $('fResponsible').value ||
-      null,
-
-    contract_start:
-      $('fContractStart').value ||
-      null,
-
-    contract_end:
-      $('fContractEnd').value ||
-      null,
-
-    baseline_start:
-      $('fBaselineStart').value ||
-      null,
-
-    baseline_end:
-      $('fBaselineEnd').value ||
-      null,
-
-    plan_start:
-      $('fPlanStart').value ||
-      null,
-
-    plan_end:
-      $('fPlanEnd').value ||
-      null,
-
-    fact_start:
-      $('fFactStart').value ||
-      null,
-
-    fact_end:
-      $('fFactEnd').value ||
-      null,
-
-    forecast_end:
-      $('fForecastEnd').value ||
-      null,
-
-    unit:
-      $('fUnit').value ||
-      null,
-
-    total_qty:
-      $('fTotalQty').value ===
-        ''
-        ? null
-        : num(
-            $('fTotalQty').value
-          ),
-
-    done_qty:
-      $('fDoneQty').value ===
-        ''
-        ? null
-        : num(
-            $('fDoneQty').value
-          ),
-
-    current_people:
-      $('fPeople').value ===
-        ''
-        ? null
-        : num(
-            $('fPeople').value
-          ),
-
-    completed:
-      $('fCompleted').checked,
-
-    presented:
-      $('fPresented').checked,
-
-    accepted:
-      $('fAccepted').checked,
-
-    accepted_date:
-      $('fAcceptedDate').value ||
-      null,
-
-    fact_text:
-      $('fFactText').value ||
-      null,
-
-    constraint_text:
-      $('fConstraint').value ||
-      null
-  };
-
-  try {
-    await apiRequest(
-      'saveFront',
-      {
-        data:
-          update
-      }
-    );
-
-    const custom =
-      readFrontCustom();
-
-    for (
-      const [
-        fieldId,
-        value
-      ]
-      of Object.entries(
-        custom
-      )
-    ) {
-      await apiRequest(
-        'saveCustomValue',
-        {
-          data: {
-            field_id:
-              fieldId,
-
-            entity:
-              'front',
-
-            entity_id:
-              front.id,
-
-            value
-          }
-        }
-      );
-    }
-
-    await reloadAll();
-
-    notice(
-      'Сохранено',
-      true
-    );
-
-    $('frontEditor')
-      .classList
-      .add('hidden');
-
-  } catch (error) {
-    alert(
-      error.message
-    );
-  }
-}
-
-function modeDates(
-  front,
-  mode
-) {
-  if (
-    mode ===
-    'contract'
-  ) {
-    return [
-      front.contract_start,
-      front.contract_end
-    ];
-  }
-
-  if (
-    mode ===
-    'baseline'
-  ) {
-    return [
-      front.baseline_start,
-      front.baseline_end
-    ];
-  }
-
-  if (
-    mode ===
-    'fact'
-  ) {
-    return [
-      front.fact_start,
-      front.fact_end ||
-      front.fact_start
-    ];
-  }
-
-  if (
-    mode ===
-    'forecast'
-  ) {
-    return [
-      front.plan_start ||
-      front.fact_start,
-
-      front.forecast_end ||
-      front.plan_end
-    ];
-  }
-
-  return [
-    front.plan_start,
-    front.plan_end
-  ];
-}
-
-function renderGantt() {
-  initSelects();
-
-  const buildingId =
-    $('gBuilding').value;
-
-  const workId =
-    $('gWork').value;
-
-  const organizationId =
-    $('gOrg').value;
-
-  const mode =
-    $('gMode').value;
-
-  const items =
-    state.fronts
-      .map(
-        hydrateFront
-      )
-      .filter(
-        front =>
-          (
-            buildingId ===
-              'all' ||
-            front.structure
-              .building_id ===
-              buildingId
-          ) &&
-
-          (
-            workId ===
-              'all' ||
-            front.work_id ===
-              workId
-          ) &&
-
-          (
-            organizationId ===
-              'all' ||
-            front.organization_id ===
-              organizationId
-          )
-      )
-      .map(
-        front => ({
-          front,
-
-          dates:
-            modeDates(
-              front,
-              mode
-            )
-        })
-      )
-      .filter(
-        item =>
-          item.dates[0] &&
-          item.dates[1]
-      );
-
-  if (
-    !items.length
-  ) {
-    $('gantt')
-      .innerHTML =
-        `
-          <div
-            class="muted"
-            style="padding:14px">
-
-            Нет заполненных дат
-            для выбранного слоя.
-
-          </div>
-        `;
-
-    return;
-  }
-
-  const min =
-    items
-      .map(
-        item =>
-          item.dates[0]
-      )
-      .sort()[0];
-
-  const max =
-    items
-      .map(
-        item =>
-          item.dates[1]
-      )
-      .sort()
-      .slice(-1)[0];
-
-  const total =
-    Math.max(
-      1,
-      diffDays(
-        min,
-        max
-      ) + 1
-    );
-
-  $('gantt')
-    .innerHTML =
-      items
-        .map(
-          item => {
-            const front =
-              item.front;
-
-            const dates =
-              item.dates;
-
-            const left =
-              (
-                diffDays(
-                  min,
-                  dates[0]
-                ) /
-                total
-              ) * 100;
-
-            const width =
-              Math.max(
-                1,
-                (
-                  (
-                    diffDays(
-                      dates[0],
-                      dates[1]
-                    ) + 1
-                  ) /
-                  total
-                ) * 100
-              );
-
-            return `
-              <div class="gantt-row">
-
-                <div class="gantt-name">
-
-                  <b>
-                    ${esc(front.work)}
-                  </b>
-
-                  <br>
-
-                  <small>
-                    ${esc(frontLabel(front))}
-                  </small>
-
-                </div>
-
-                <div class="gantt-line">
-
-                  <div
-                    class="gantt-bar"
-                    style="
-                      left:${left}%;
-                      width:${width}%
-                    ">
-
-                    ${dates[0]}
-                    →
-                    ${dates[1]}
-
-                  </div>
-
-                </div>
-
-              </div>
-            `;
-          }
-        )
-        .join('');
-}
-
-function pfFrontIds() {
-  const buildingId =
-    $('pfBuilding').value;
-
-  const workId =
-    $('pfWork').value;
-
-  const organizationId =
-    $('pfOrg').value;
-
-  return new Set(
-    state.fronts
-      .filter(
-        front => {
-          const structure =
-            state.structures
-              .find(
-                item =>
-                  item.id ===
-                  front.structure_id
-              );
-
-          return (
-            (
-              buildingId ===
-                'all' ||
-              structure
-                ?.building_id ===
-                buildingId
-            ) &&
-
-            (
-              workId ===
-                'all' ||
-              front.work_id ===
-                workId
-            ) &&
-
-            (
-              organizationId ===
-                'all' ||
-              front.organization_id ===
-                organizationId
-            )
-          );
-        }
-      )
-      .map(
-        front =>
-          front.id
-      )
-  );
-}
-
-function renderPlanFact() {
-  initSelects();
-
-  const ids =
-    pfFrontIds();
-
-  const from =
-    $('pfFrom').value;
-
-  const to =
-    $('pfTo').value;
-
-  const planPeriodRows =
-    state.planLog
-      .filter(
-        row =>
-          ids.has(
-            row.front_id
-          ) &&
-
-          (
-            !from ||
-            row.plan_date >=
-              from
-          ) &&
-
-          (
-            !to ||
-            row.plan_date <=
-              to
-          )
-      );
-
-  const factPeriodRows =
-    state.factLog
-      .filter(
-        row =>
-          ids.has(
-            row.front_id
-          ) &&
-
-          (
-            !from ||
-            row.fact_date >=
-              from
-          ) &&
-
-          (
-            !to ||
-            row.fact_date <=
-              to
-          )
-      );
-
-  const planPeriod =
-    planPeriodRows
-      .reduce(
-        (
-          sum,
-          row
-        ) =>
-          sum +
-          num(
-            row.planned_qty
-          ),
-        0
-      );
-
-  const factPeriod =
-    factPeriodRows
-      .reduce(
-        (
-          sum,
-          row
-        ) =>
-          sum +
-          num(
-            row.qty
-          ),
-        0
-      );
-
-  const planCum =
-    state.planLog
-      .filter(
-        row =>
-          ids.has(
-            row.front_id
-          ) &&
-          (
-            !to ||
-            row.plan_date <=
-              to
-          )
-      )
-      .reduce(
-        (
-          sum,
-          row
-        ) =>
-          sum +
-          num(
-            row.planned_qty
-          ),
-        0
-      );
-
-  const factCum =
-    state.factLog
-      .filter(
-        row =>
-          ids.has(
-            row.front_id
-          ) &&
-          (
-            !to ||
-            row.fact_date <=
-              to
-          )
-      )
-      .reduce(
-        (
-          sum,
-          row
-        ) =>
-          sum +
-          num(
-            row.qty
-          ),
-        0
-      );
-
-  const total =
-    state.fronts
-      .filter(
-        front =>
-          ids.has(
-            front.id
-          )
-      )
-      .reduce(
-        (
-          sum,
-          front
-        ) =>
-          sum +
-          num(
-            front.total_qty
-          ),
-        0
-      );
-
-  $('pfPlanPeriod')
-    .textContent =
-      fmt(
-        planPeriod
-      );
-
-  $('pfFactPeriod')
-    .textContent =
-      fmt(
-        factPeriod
-      );
-
-  $('pfVarPeriod')
-    .textContent =
-      fmt(
-        factPeriod -
-        planPeriod
-      );
-
-  $('pfPlanCum')
-    .textContent =
-      fmt(
-        planCum
-      );
-
-  $('pfFactCum')
-    .textContent =
-      fmt(
-        factCum
-      );
-
-  const planPercent =
-    total
-      ? (
-          planCum /
-          total *
-          100
-        )
-      : 0;
-
-  const factPercent =
-    total
-      ? (
-          factCum /
-          total *
-          100
-        )
-      : 0;
-
-  $('pfPp')
-    .textContent =
-      fmt(
-        factPercent -
-        planPercent
-      );
-
-  $('planRows')
-    .innerHTML =
-      planPeriodRows
-        .sort(
-          (
-            a,
-            b
-          ) =>
-            String(
-              b.plan_date
-            )
-              .localeCompare(
-                String(
-                  a.plan_date
-                )
-              )
-        )
-        .map(
-          row => {
-            const front =
-              state.fronts
-                .find(
-                  item =>
-                    item.id ===
-                    row.front_id
-                );
-
-            return `
-              <tr>
-
-                <td>
-                  ${row.plan_date}
-                </td>
-
-                <td>
-                  ${esc(frontLabel(front))}
-                </td>
-
-                <td>
-                  ${fmt(row.planned_qty)}
-                </td>
-
-                <td>
-                  ${fmt(row.planned_people)}
-                </td>
-
-              </tr>
-            `;
-          }
-        )
-        .join('');
-
-  $('factRows')
-    .innerHTML =
-      factPeriodRows
-        .sort(
-          (
-            a,
-            b
-          ) =>
-            String(
-              b.fact_date
-            )
-              .localeCompare(
-                String(
-                  a.fact_date
-                )
-              )
-        )
-        .map(
-          row => {
-            const front =
-              state.fronts
-                .find(
-                  item =>
-                    item.id ===
-                    row.front_id
-                );
-
-            return `
-              <tr>
-
-                <td>
-                  ${row.fact_date}
-                </td>
-
-                <td>
-                  ${esc(frontLabel(front))}
-                </td>
-
-                <td>
-                  ${fmt(row.qty)}
-                </td>
-
-                <td>
-                  ${fmt(row.cumulative_qty)}
-                </td>
-
-                <td>
-                  ${fmt(row.people)}
-                </td>
-
-              </tr>
-            `;
-          }
-        )
-        .join('');
-}
-
-function openLogEditor(
-  mode
-) {
-  logMode =
-    mode;
-
-  fill(
-    $('logFront'),
-    state.fronts
-      .map(
-        front => ({
-          id:
-            front.id,
-
-          name:
-            frontLabel(
-              front
-            )
-        })
-      )
-  );
-
-  $('logDate').value =
+  $('pfTo').value =
     today();
 
-  $('logQty').value =
-    '';
-
-  $('logCum').value =
-    '';
-
-  $('logPeople').value =
-    '';
-
-  $('logComment').value =
-    '';
-
-  $('logCum')
-    .closest(
-      '.field'
-    )
-    .style.display =
-      mode ===
-        'fact'
-        ? ''
-        : 'none';
-
-  $('logEditor')
-    .classList
-    .remove('hidden');
-}
-
-async function saveLog() {
-  const frontId =
-    $('logFront').value;
-
-  try {
-    if (
-      logMode ===
-      'plan'
-    ) {
-      await apiRequest(
-        'addPlan',
-        {
-          data: {
-            front_id:
-              frontId,
-
-            plan_date:
-              $('logDate').value,
-
-            planned_qty:
-              num(
-                $('logQty').value
-              ),
-
-            planned_people:
-              num(
-                $('logPeople').value
-              ),
-
-            comment:
-              $('logComment').value ||
-              ''
-          }
-        }
-      );
-
-    } else {
-      await apiRequest(
-        'addFact',
-        {
-          data: {
-            front_id:
-              frontId,
-
-            fact_date:
-              $('logDate').value,
-
-            qty:
-              num(
-                $('logQty').value
-              ),
-
-            cumulative_qty:
-              $('logCum').value ===
-                ''
-                ? null
-                : num(
-                    $('logCum').value
-                  ),
-
-            people:
-              num(
-                $('logPeople').value
-              ),
-
-            comment:
-              $('logComment').value ||
-              ''
-          }
-        }
-      );
-    }
-
-    $('logEditor')
-      .classList
-      .add('hidden');
-
-    await reloadAll();
-
-  } catch (error) {
-    alert(
-      error.message
-    );
-  }
-}
-
-function resourceFiltered() {
-  const from =
-    $('rFrom').value;
-
-  const to =
-    $('rTo').value;
-
-  const organizationId =
-    $('rOrg').value;
-
-  const buildingId =
-    $('rBuilding').value;
-
-  return state.resourceLog
-    .filter(
-      row =>
-        (
-          !from ||
-          row.resource_date >=
-            from
-        ) &&
-
-        (
-          !to ||
-          row.resource_date <=
-            to
-        ) &&
-
-        (
-          organizationId ===
-            'all' ||
-          row.organization_id ===
-            organizationId
-        ) &&
-
-        (
-          buildingId ===
-            'all' ||
-          row.building_id ===
-            buildingId
-        )
-    );
-}
-
-function renderResources() {
-  initSelects();
-
-  const rows =
-    resourceFiltered();
-
-  const sum =
-    field =>
-      rows.reduce(
-        (
-          total,
-          row
-        ) =>
-          total +
-          num(
-            row[field]
-          ),
-        0
-      );
-
-  const daily =
-    {};
-
-  rows.forEach(
-    row => {
-      daily[
-        row.resource_date
-      ] =
-        (
-          daily[
-            row.resource_date
-          ] ||
-          0
-        ) +
-
-        num(row.itr) +
-        num(row.workers) +
-        num(row.mechanizers);
-    }
-  );
-
-  $('rItr').textContent =
-    sum(
-      'itr'
-    );
-
-  $('rWorkers').textContent =
-    sum(
-      'workers'
-    );
-
-  $('rMech').textContent =
-    sum(
-      'mechanizers'
-    );
-
-  $('rTotalPeople').textContent =
-    sum('itr') +
-    sum('workers') +
-    sum('mechanizers');
-
-  $('rPeak').textContent =
-    Math.max(
-      0,
-      ...Object.values(
-        daily
-      )
-    );
-
-  $('rEquipDays').textContent =
-    fmt(
-      sum(
-        'equipment_qty'
-      )
-    );
-
-  $('resourceRows')
-    .innerHTML =
-      rows
-        .sort(
-          (
-            a,
-            b
-          ) =>
-            String(
-              b.resource_date
-            )
-              .localeCompare(
-                String(
-                  a.resource_date
-                )
-              )
-        )
-        .map(
-          row =>
-            `
-              <tr>
-
-                <td>
-                  ${row.resource_date}
-                </td>
-
-                <td>
-                  ${
-                    esc(
-                      nameById(
-                        state.organizations,
-                        row.organization_id
-                      )
-                    )
-                  }
-                </td>
-
-                <td>
-                  ${
-                    esc(
-                      nameById(
-                        state.buildings,
-                        row.building_id
-                      )
-                    )
-                  }
-                </td>
-
-                <td>
-                  ${row.itr}
-                </td>
-
-                <td>
-                  ${row.workers}
-                </td>
-
-                <td>
-                  ${row.mechanizers}
-                </td>
-
-                <td>
-                  ${esc(row.equipment_type || '—')}
-                </td>
-
-                <td>
-                  ${fmt(row.equipment_qty)}
-                </td>
-
-                <td>
-                  ${esc(row.comment || '')}
-                </td>
-
-              </tr>
-            `
-        )
-        .join('');
-}
-
-async function saveResource() {
-  const payload = {
-    resource_date:
-      $('reDate').value,
-
-    organization_id:
-      $('reOrg').value,
-
-    building_id:
-      $('reBuilding').value ||
-      null,
-
-    itr:
-      num(
-        $('reItr').value
-      ),
-
-    workers:
-      num(
-        $('reWorkers').value
-      ),
-
-    operators:
-      num(
-        $('reMech').value
-      ),
-
-    equipment_type:
-      $('reEquipType').value ||
-      null,
-
-    equipment_qty:
-      num(
-        $('reEquipQty').value
-      ),
-
-    comment:
-      $('reComment').value ||
-      ''
-  };
-
-  try {
-    await apiRequest(
-      'addResource',
-      {
-        data:
-          payload
-      }
-    );
-
-    $('resourceEditor')
-      .classList
-      .add('hidden');
-
-    await reloadAll();
-
-  } catch (error) {
-    alert(
-      error.message
-    );
-  }
-}
-
-function renderMilestones() {
-  $('milestoneRows')
-    .innerHTML =
-      state.milestones
-        .map(
-          milestone =>
-            `
-              <tr>
-
-                <td>
-                  ${
-                    esc(
-                      nameById(
-                        state.buildings,
-                        milestone.building_id
-                      )
-                    )
-                  }
-                </td>
-
-                <td>
-                  ${esc(milestone.title)}
-                </td>
-
-                <td>
-                  ${milestone.contract_date || '—'}
-                </td>
-
-                <td>
-                  ${milestone.work_date || '—'}
-                </td>
-
-                <td>
-                  ${milestone.forecast_date || '—'}
-                </td>
-
-                <td>
-                  ${milestone.fact_date || '—'}
-                </td>
-
-                <td>
-
-                  <button
-                    class="btn small editMs"
-                    data-id="${milestone.id}">
-
-                    ${esc(milestone.status)}
-
-                  </button>
-
-                </td>
-
-              </tr>
-            `
-        )
-        .join('');
-
-  document
-    .querySelectorAll(
-      '.editMs'
-    )
-    .forEach(
-      button => {
-        button.onclick =
-          () =>
-            openMilestone(
-              button.dataset.id
-            );
-      }
-    );
-}
-
-function openMilestone(
-  id = null
-) {
-  editingMilestoneId =
-    id;
-
-  const milestone =
-    state.milestones
-      .find(
-        item =>
-          item.id ===
-          id
-      ) ||
-    {};
-
-  fill(
-    $('msBuilding'),
-    state.buildings
-  );
-
-  $('msBuilding').value =
-    milestone.building_id ||
-    state.buildings[0]?.id ||
-    '';
-
-  $('msTitle').value =
-    milestone.title ||
-    '';
-
-  $('msContract').value =
-    milestone.contract_date ||
-    '';
-
-  $('msWork').value =
-    milestone.work_date ||
-    '';
-
-  $('msForecast').value =
-    milestone.forecast_date ||
-    '';
-
-  $('msFact').value =
-    milestone.fact_date ||
-    '';
-
-  $('msStatus').value =
-    milestone.status ||
-    'Не наступила';
-
-  $('msComment').value =
-    milestone.comment ||
-    '';
-
-  $('milestoneEditor')
-    .classList
-    .remove('hidden');
-}
-
-async function saveMilestone() {
-  const payload = {
-    id:
-      editingMilestoneId ||
-      undefined,
-
-    building_id:
-      $('msBuilding').value ||
-      null,
-
-    title:
-      $('msTitle')
-        .value
-        .trim(),
-
-    contract_date:
-      $('msContract').value ||
-      null,
-
-    work_date:
-      $('msWork').value ||
-      null,
-
-    forecast_date:
-      $('msForecast').value ||
-      null,
-
-    fact_date:
-      $('msFact').value ||
-      null,
-
-    status:
-      $('msStatus').value,
-
-    comment:
-      $('msComment').value ||
-      null
-  };
-
-  if (
-    !payload.title
-  ) {
-    alert(
-      'Укажи наименование ключевой даты'
-    );
-
-    return;
-  }
-
-  try {
-    await apiRequest(
-      'saveMilestone',
-      {
-        data:
-          payload
-      }
-    );
-
-    $('milestoneEditor')
-      .classList
-      .add('hidden');
-
-    editingMilestoneId =
-      null;
-
-    await reloadAll();
-
-  } catch (error) {
-    alert(
-      error.message
-    );
-  }
-}
-
-function reportFronts() {
-  const buildingId =
-    $('repBuilding').value;
-
-  const workId =
-    $('repWork').value;
-
-  const organizationId =
-    $('repOrg').value;
-
-  const status =
-    $('repStatus').value;
-
-  return state.fronts
-    .map(
-      hydrateFront
-    )
-    .filter(
-      front =>
-        (
-          buildingId ===
-            'all' ||
-          front.structure
-            .building_id ===
-            buildingId
-        ) &&
-
-        (
-          workId ===
-            'all' ||
-          front.work_id ===
-            workId
-        ) &&
-
-        (
-          organizationId ===
-            'all' ||
-          front.organization_id ===
-            organizationId
-        ) &&
-
-        (
-          status ===
-            'all' ||
-          front.status ===
-            status
-        )
-    );
-}
-
-function buildReport() {
-  initSelects();
-
-  const buildingId =
-    $('repBuilding').value ||
-    'all';
-
-  const organizationId =
-    $('repOrg').value ||
-    'all';
-
-  const fronts =
-    reportFronts();
-
-  const ids =
-    new Set(
-      fronts
-        .map(
-          front =>
-            front.id
-        )
-    );
-
-  const from =
-    $('repFrom').value;
-
-  const to =
-    $('repTo').value;
-
-  const inPeriod =
-    date =>
-      date &&
-      (
-        !from ||
-        date >= from
-      ) &&
-      (
-        !to ||
-        date <= to
-      );
-
-  let html =
-    `
-      <p>
-        <b>Период:</b>
-        ${from || 'с начала'}
-        —
-        ${to || 'по текущую дату'}
-      </p>
-    `;
-
-  if (
-    $('repIncludePlanFact').checked
-  ) {
-    const plan =
-      state.planLog
-        .filter(
-          row =>
-            ids.has(
-              row.front_id
-            ) &&
-            inPeriod(
-              row.plan_date
-            )
-        )
-        .reduce(
-          (
-            sum,
-            row
-          ) =>
-            sum +
-            num(
-              row.planned_qty
-            ),
-          0
-        );
-
-    const fact =
-      state.factLog
-        .filter(
-          row =>
-            ids.has(
-              row.front_id
-            ) &&
-            inPeriod(
-              row.fact_date
-            )
-        )
-        .reduce(
-          (
-            sum,
-            row
-          ) =>
-            sum +
-            num(
-              row.qty
-            ),
-          0
-        );
-
-    html +=
-      `
-        <div class="report-section">
-
-          <h2>
-            План / факт
-          </h2>
-
-          <p>
-            План:
-            <b>${fmt(plan)}</b>
-
-            ·
-
-            Факт:
-            <b>${fmt(fact)}</b>
-
-            ·
-
-            Отклонение:
-            <b>${fmt(fact - plan)}</b>
-          </p>
-
-        </div>
-      `;
-  }
-
-  if (
-    $('repIncludeResources').checked
-  ) {
-    const resources =
-      state.resourceLog
-        .filter(
-          row =>
-            (
-              organizationId ===
-                'all' ||
-              row.organization_id ===
-                organizationId
-            ) &&
-
-            (
-              buildingId ===
-                'all' ||
-              row.building_id ===
-                buildingId
-            ) &&
-
-            inPeriod(
-              row.resource_date
-            )
-        );
-
-    const people =
-      resources
-        .reduce(
-          (
-            sum,
-            row
-          ) =>
-            sum +
-            num(row.itr) +
-            num(row.workers) +
-            num(row.mechanizers),
-          0
-        );
-
-    const equipment =
-      resources
-        .reduce(
-          (
-            sum,
-            row
-          ) =>
-            sum +
-            num(
-              row.equipment_qty
-            ),
-          0
-        );
-
-    html +=
-      `
-        <div class="report-section">
-
-          <h2>
-            Ресурсы
-          </h2>
-
-          <p>
-            Человеко-дни:
-            <b>${people}</b>
-
-            ·
-
-            Технико-дни:
-            <b>${fmt(equipment)}</b>
-          </p>
-
-        </div>
-      `;
-  }
-
-  if (
-    $('repIncludeMilestones').checked
-  ) {
-    const milestones =
-      state.milestones
-        .filter(
-          milestone =>
-            buildingId ===
-              'all' ||
-            milestone.building_id ===
-              buildingId
-        );
-
-    html +=
-      `
-        <div class="report-section">
-
-          <h2>
-            Ключевые даты
-          </h2>
-
-          <table>
-
-            <thead>
-              <tr>
-                <th>Наименование</th>
-                <th>Договор</th>
-                <th>Прогноз</th>
-                <th>Факт</th>
-                <th>Статус</th>
-              </tr>
-            </thead>
-
-            <tbody>
-
-              ${
-                milestones
-                  .map(
-                    milestone =>
-                      `
-                        <tr>
-
-                          <td>
-                            ${esc(milestone.title)}
-                          </td>
-
-                          <td>
-                            ${milestone.contract_date || '—'}
-                          </td>
-
-                          <td>
-                            ${milestone.forecast_date || '—'}
-                          </td>
-
-                          <td>
-                            ${milestone.fact_date || '—'}
-                          </td>
-
-                          <td>
-                            ${esc(milestone.status)}
-                          </td>
-
-                        </tr>
-                      `
-                  )
-                  .join('')
-              }
-
-            </tbody>
-
-          </table>
-
-        </div>
-      `;
-  }
-
-  if (
-    $('repIncludeWorks').checked
-  ) {
-    html +=
-      `
-        <div class="report-section">
-
-          <h2>
-            Работы
-          </h2>
-
-          <table>
-
-            <thead>
-              <tr>
-                <th>Фронт</th>
-                <th>Статус</th>
-                <th>Организация</th>
-                <th>Рабочее окончание</th>
-                <th>Прогноз</th>
-                <th>Сдано</th>
-              </tr>
-            </thead>
-
-            <tbody>
-
-              ${
-                fronts
-                  .map(
-                    front =>
-                      `
-                        <tr>
-
-                          <td>
-                            ${esc(frontLabel(front))}
-                          </td>
-
-                          <td>
-                            ${esc(front.status)}
-                          </td>
-
-                          <td>
-                            ${esc(front.organization)}
-                          </td>
-
-                          <td>
-                            ${front.plan_end || '—'}
-                          </td>
-
-                          <td>
-                            ${front.forecast_end || '—'}
-                          </td>
-
-                          <td>
-                            ${front.accepted ? 'Да' : 'Нет'}
-                          </td>
-
-                        </tr>
-                      `
-                  )
-                  .join('')
-              }
-
-            </tbody>
-
-          </table>
-
-        </div>
-      `;
-  }
-
-  $('reportContent')
-    .innerHTML =
-      html;
-}
-
-function downloadPdf() {
-  buildReport();
-
-  const options = {
-    margin: 8,
-
-    filename:
-      `ACONS_report_${today()}.pdf`,
-
-    image: {
-      type: 'jpeg',
-      quality: 0.96
-    },
-
-    html2canvas: {
-      scale: 2,
-      useCORS: true
-    },
-
-    jsPDF: {
-      unit: 'mm',
-      format: 'a4',
-      orientation: 'landscape'
-    }
-  };
-
-  html2pdf()
-    .set(
-      options
-    )
-    .from(
-      $('reportArea')
-    )
-    .save();
-}
-
-async function readImportFile(
-  event
-) {
-  const file =
-    event.target.files[0];
-
-  if (!file) {
-    return;
-  }
-
-  const data =
-    await file
-      .arrayBuffer();
-
-  const workbook =
-    XLSX.read(
-      data,
-      {
-        type: 'array',
-        cellDates: true
-      }
-    );
-
-  const sheet =
-    workbook.Sheets[
-      workbook.SheetNames[0]
-    ];
-
-  importRows =
-    XLSX.utils
-      .sheet_to_json(
-        sheet,
-        {
-          defval: ''
-        }
-      );
-
-  $('importInfo')
-    .classList
-    .remove('hidden');
-
-  $('importInfo')
-    .textContent =
-      `Прочитано строк: ${importRows.length}. Проверь предварительный просмотр.`;
-
-  const headers =
-    importRows[0]
-      ? Object.keys(
-          importRows[0]
-        )
-      : [];
-
-  $('importHead')
-    .innerHTML =
-      '<tr>' +
-
-      headers
-        .map(
-          header =>
-            `<th>${esc(header)}</th>`
-        )
-        .join('') +
-
-      '</tr>';
-
-  $('importBody')
-    .innerHTML =
-      importRows
-        .slice(
-          0,
-          50
-        )
-        .map(
-          row =>
-            '<tr>' +
-
-            headers
-              .map(
-                header =>
-                  `<td>${esc(row[header])}</td>`
-              )
-              .join('') +
-
-            '</tr>'
-        )
-        .join('');
-
-  $('commitImportBtn')
-    .disabled =
-      !importRows.length;
-}
-
-function normalizeDate(
-  value
-) {
-  if (!value) {
-    return null;
-  }
-
-  if (
-    value instanceof Date
-  ) {
-    return value
-      .toISOString()
-      .slice(
-        0,
-        10
-      );
-  }
-
-  const string =
-    String(
-      value
-    )
-      .trim();
-
-  const match =
-    string.match(
-      /^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})$/
-    );
-
-  if (match) {
-    const year =
-      match[3].length ===
-        2
-        ? '20' +
-          match[3]
-        : match[3];
-
-    return (
-      year +
-      '-' +
-      match[2]
-        .padStart(
-          2,
-          '0'
-        ) +
-      '-' +
-      match[1]
-        .padStart(
-          2,
-          '0'
-        )
-    );
-  }
-
-  if (
-    /^\d{4}-\d{2}-\d{2}$/
-      .test(
-        string
-      )
-  ) {
-    return string;
-  }
-
-  return null;
-}
-
-async function ensureNamed(
-  table,
-  name
-) {
-  if (!name) {
-    return null;
-  }
-
-  const list =
-    table ===
-      'buildings'
-      ? state.buildings
-      :
-    table ===
-      'works'
-      ? state.works
-      :
-      state.organizations;
-
-  const existing =
-    list.find(
-      item =>
-        item.name ===
-        name
-    );
-
-  if (existing) {
-    return existing.id;
-  }
-
-  const action =
-    table ===
-      'buildings'
-      ? 'addBuilding'
-      :
-    table ===
-      'works'
-      ? 'addWork'
-      :
-      'addOrganization';
-
-  const result =
-    await apiRequest(
-      action,
-      {
-        data: {
-          name
-        }
-      }
-    );
-
-  const item =
-    result.building ||
-    result.work ||
-    result.organization;
-
-  if (item) {
-    list.push(
-      item
-    );
-  }
-
-  return item?.id ||
-    null;
-}
-
-async function commitImport() {
-  if (
-    !importRows.length
-  ) {
-    return;
-  }
-
-  if (
-    ![
-      'admin',
-      'planner'
-    ]
-      .includes(
-        profile?.role
-      )
-  ) {
-    alert(
-      'Импорт доступен администратору или планировщику.'
-    );
-
-    return;
-  }
-
-  if (
-    !confirm(
-      `Импортировать ${importRows.length} строк в общую базу?`
-    )
-  ) {
-    return;
-  }
-
-  $('commitImportBtn')
-    .disabled =
-      true;
-
-  try {
-    const file =
-      $('importFile')
-        .files?.[0];
-
-    const response =
-      await apiRequest(
-        'importBatch',
-        {
-          fileName:
-            file?.name ||
-            '',
-
-          source:
-            'ACONS Planning',
-
-          rows:
-            importRows
-        }
-      );
-
-    const result =
-      response.result;
-
-    $('importInfo')
-      .textContent =
-        `Импорт завершён. Прочитано: ${result.read}, создано: ${result.created}, обновлено: ${result.updated}, не распознано: ${result.unmatched}, конфликтов: ${result.conflicts}.`;
-
-    if (
-      result.errors?.length
-    ) {
-      console.table(
-        result.errors
-      );
-    }
-
-    importRows =
-      [];
-
-    await reloadAll();
-
-  } catch (error) {
-    alert(
-      'Ошибка импорта: ' +
-      error.message
-    );
-
-  } finally {
-    $('commitImportBtn')
-      .disabled =
-        false;
-  }
-}
-
-function renderHistory() {
-  $('historyRows')
-    .innerHTML =
-      [...state.history]
-        .sort(
-          (
-            a,
-            b
-          ) =>
-            String(
-              b.changed_at
-            )
-              .localeCompare(
-                String(
-                  a.changed_at
-                )
-              )
-        )
-        .slice(
-          0,
-          500
-        )
-        .map(
-          history => {
-            const user =
-              state.users
-                .find(
-                  item =>
-                    item.id ===
-                    history.changed_by
-                );
-
-            return `
-              <tr>
-
-                <td>
-                  ${
-                    new Date(
-                      history.changed_at
-                    )
-                      .toLocaleString(
-                        'ru-RU'
-                      )
-                  }
-                </td>
-
-                <td>
-                  ${
-                    esc(
-                      user?.email ||
-                      history.changed_by ||
-                      ''
-                    )
-                  }
-                </td>
-
-                <td>
-                  ${esc(history.entity_type)}
-                </td>
-
-                <td>
-                  ${esc(history.field_name)}
-                </td>
-
-                <td>
-                  ${esc(history.old_value)}
-                </td>
-
-                <td>
-                  ${esc(history.new_value)}
-                </td>
-
-              </tr>
-            `;
-          }
-        )
-        .join('');
-}
-
-function renderSettings() {
-  initSelects();
-
-  $('buildingList')
-    .innerHTML =
-      state.buildings
-        .map(
-          item =>
-            `
-              <div class="item">
-                <span>${esc(item.name)}</span>
-              </div>
-            `
-        )
-        .join('');
-
-  $('workList')
-    .innerHTML =
-      state.works
-        .map(
-          item =>
-            `
-              <div class="item">
-                <span>${esc(item.name)}</span>
-              </div>
-            `
-        )
-        .join('');
-
-  $('orgList')
-    .innerHTML =
-      state.organizations
-        .map(
-          item =>
-            `
-              <div class="item">
-                <span>${esc(item.name)}</span>
-              </div>
-            `
-        )
-        .join('');
-
-  $('customFieldList')
-    .innerHTML =
-      state.customFields
-        .map(
-          item =>
-            `
-              <div class="item">
-
-                <span>
-                  ${esc(item.name)}
-                  ·
-                  ${esc(item.scope)}
-                  ·
-                  ${esc(item.field_type)}
-                </span>
-
-              </div>
-            `
-        )
-        .join('');
-}
-
-async function addSimple(
-  table,
-  name
-) {
-  if (!name) {
-    return;
-  }
-
-  const actions = {
-    buildings:
-      'addBuilding',
-
-    works:
-      'addWork',
-
-    organizations:
-      'addOrganization'
-  };
-
-  const action =
-    actions[table];
-
-  if (!action) {
-    alert(
-      'Неизвестный справочник.'
-    );
-
-    return;
-  }
-
-  try {
-    await apiRequest(
-      action,
-      {
-        data: {
-          name
-        }
-      }
-    );
-
-    if (
-      table ===
-      'buildings'
-    ) {
-      $('newBuilding')
-        .value =
-          '';
-    }
-
-    if (
-      table ===
-      'works'
-    ) {
-      $('newWork')
-        .value =
-          '';
-    }
-
-    if (
-      table ===
-      'organizations'
-    ) {
-      $('newOrg')
-        .value =
-          '';
-    }
-
-    await reloadAll();
-
-  } catch (error) {
-    alert(
-      error.message
-    );
-  }
-}
-
-async function addCustomField() {
-  const name =
-    $('cfName')
-      .value
-      .trim();
-
-  if (!name) {
-    return;
-  }
-
-  const type =
-    $('cfType').value;
-
-  const options =
-    type ===
-      'select'
-      ? $('cfOptions')
-          .value
-          .split(';')
-          .map(
-            value =>
-              value.trim()
-          )
-          .filter(Boolean)
-      : [];
-
-  try {
-    await apiRequest(
-      'addCustomField',
-      {
-        data: {
-          name,
-
-          scope:
-            $('cfScope').value,
-
-          field_type:
-            type,
-
-          options,
-
-          show_in_matrix:
-            true
-        }
-      }
-    );
-
-    $('cfName').value =
-      '';
-
-    $('cfOptions').value =
-      '';
-
-    await reloadAll();
-
-  } catch (error) {
-    alert(
-      error.message
-    );
-  }
-}
-
-async function addStructure() {
-  const workIds =
-    $('sWorkMode').value ===
-      'all'
-      ? state.works
-          .map(
-            work =>
-              work.id
-          )
-      : [
-          $('sWork').value
-        ];
-
-  const payload = {
-    building_id:
-      $('sBuilding').value,
-
-    block_name:
-      $('sBlock').value ||
-      null,
-
-    floor_no:
-      $('sFloor').value ===
-        ''
-        ? null
-        : num(
-            $('sFloor').value
-          ),
-
-    capture_name:
-      $('sCapture').value ||
-      null,
-
-    axis_name:
-      $('sAxis').value ||
-      null,
-
-    side_name:
-      $('sSide').value ||
-      null,
-
-    zone_name:
-      $('sZone').value ||
-      null,
-
-    room_number:
-      $('sRoomNo').value ||
-      null,
-
-    room_name:
-      $('sRoomName').value ||
-      null,
-
-    equipment_name:
-      $('sEquipment').value ||
-      null,
-
-    work_ids:
-      workIds
-  };
-
-  try {
-    await apiRequest(
-      'addStructure',
-      {
-        data:
-          payload
-      }
-    );
-
-    await reloadAll();
-
-  } catch (error) {
-    alert(
-      error.message
-    );
-  }
-}
-
-function renderAll() {
-  initSelects();
-
-  renderDashboard();
-
-  renderMatrix();
-
-  renderGantt();
-
-  renderPlanFact();
-
-  renderResources();
-
-  renderMilestones();
-
-  renderSettings();
-
-  renderHistory();
-
-  buildReport();
+  $('rTo').value =
+    today();
 }
 
 document
   .addEventListener(
     'DOMContentLoaded',
-    () => {
+    () =>
       init()
         .catch(
           error => {
+
             console.error(
               error
             );
 
-            showBootError(
+            alert(
+              'Ошибка запуска: ' +
               error.message
             );
           }
-        );
-    }
+        )
   );
-
 
