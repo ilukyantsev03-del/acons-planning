@@ -2,487 +2,123 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ACONS Planning v7</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
 
-<style>
-* {
-  box-sizing: border-box;
-}
+<title>ACONS Planning v8</title>
 
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: #f3f5f7;
-  color: #1f2937;
-}
+<link rel="stylesheet" href="style.css">
 
-button,
-input,
-select,
-textarea {
-  font: inherit;
-}
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
-button {
-  cursor: pointer;
-}
-
-.topbar {
-  background: #111827;
-  color: #fff;
-  padding: 16px 22px;
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.topbar h1 {
-  margin: 0;
-  font-size: 22px;
-}
-
-.topbar p {
-  margin: 4px 0 0;
-  color: #cbd5e1;
-}
-
-.top-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.container {
-  max-width: 1920px;
-  margin: auto;
-  padding: 18px;
-}
-
-.tabs {
-  display: flex;
-  gap: 7px;
-  flex-wrap: wrap;
-  margin-bottom: 14px;
-}
-
-.tab,
-.btn {
-  border: 1px solid #d1d5db;
-  background: #fff;
-  padding: 9px 12px;
-  border-radius: 8px;
-  color: #111827;
-}
-
-.tab.active,
-.btn.primary {
-  background: #111827;
-  color: #fff;
-  border-color: #111827;
-}
-
-.btn.danger {
-  background: #7f1d1d;
-  color: #fff;
-  border-color: #7f1d1d;
-}
-
-.btn.small {
-  padding: 5px 8px;
-  font-size: 12px;
-}
-
-.card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 14px;
-}
-
-.toolbar {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  align-items: end;
-}
-
-.field {
-  min-width: 145px;
-  flex: 1;
-}
-
-.field label {
-  display: block;
-  font-size: 12px;
-  font-weight: 700;
-  margin-bottom: 5px;
-}
-
-input,
-select,
-textarea {
-  width: 100%;
-  padding: 9px;
-  border: 1px solid #d1d5db;
-  border-radius: 7px;
-  background: #fff;
-}
-
-.stats {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(120px, 1fr));
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.stat {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 13px;
-}
-
-.stat span {
-  display: block;
-  color: #6b7280;
-  font-size: 12px;
-}
-
-.stat strong {
-  font-size: 25px;
-  display: block;
-  margin-top: 5px;
-}
-
-.hidden {
-  display: none !important;
-}
-
-.grid2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-}
-
-.grid3 {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-}
-
-.wide {
-  grid-column: 1 / -1;
-}
-
-.table-wrap {
-  overflow: auto;
-}
-
-.matrix {
-  min-width: 2150px;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-th,
-td {
-  border: 1px solid #e5e7eb;
-  padding: 7px;
-  vertical-align: top;
-  text-align: left;
-}
-
-th {
-  background: #f9fafb;
-  font-size: 12px;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-
-.cellbtn {
-  width: 100%;
-  min-height: 64px;
-  border: 0;
-  border-radius: 7px;
-  text-align: left;
-  padding: 7px;
-}
-
-.s-not {
-  background: #f3f4f6;
-}
-
-.s-ready {
-  background: #dbeafe;
-}
-
-.s-work {
-  background: #fef3c7;
-}
-
-.s-done {
-  background: #dcfce7;
-}
-
-.s-pause {
-  background: #e5e7eb;
-}
-
-.s-risk {
-  background: #fee2e2;
-}
-
-.muted {
-  color: #6b7280;
-}
-
-.editor-head,
-.section-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: flex-start;
-  flex-wrap: wrap;
-}
-
-.editor-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 12px;
-}
-
-.inline {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.inline label {
-  display: flex;
-  gap: 5px;
-  align-items: center;
-}
-
-.inline input {
-  width: auto;
-}
-
-.list {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  margin-top: 10px;
-}
-
-.item {
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 9px;
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  align-items: center;
-}
-
-.badge {
-  display: inline-block;
-  padding: 3px 7px;
-  border-radius: 999px;
-  background: #eef2ff;
-  font-size: 11px;
-}
-
-.gantt-wrap {
-  overflow: auto;
-  border: 1px solid #e5e7eb;
-  border-radius: 9px;
-}
-
-.gantt-row {
-  display: grid;
-  grid-template-columns: 360px 1fr;
-  min-width: 1200px;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.gantt-name {
-  padding: 8px;
-  background: #fff;
-  border-right: 1px solid #e5e7eb;
-}
-
-.gantt-line {
-  position: relative;
-  height: 44px;
-  background:
-    repeating-linear-gradient(
-      to right,
-      #fff 0,
-      #fff 29px,
-      #f3f4f6 30px
-    );
-}
-
-.gantt-bar {
-  position: absolute;
-  top: 9px;
-  height: 25px;
-  border-radius: 5px;
-  background: #dbeafe;
-  border: 1px solid #93c5fd;
-  overflow: hidden;
-  white-space: nowrap;
-  font-size: 11px;
-  padding: 4px 6px;
-}
-
-.gantt-bar.fact {
-  background: #dcfce7;
-  border-color: #86efac;
-}
-
-.gantt-bar.contract {
-  background: #fee2e2;
-  border-color: #fca5a5;
-}
-
-.gantt-bar.baseline {
-  background: #e0e7ff;
-  border-color: #a5b4fc;
-}
-
-.gantt-bar.forecast {
-  background: #fef3c7;
-  border-color: #fde68a;
-}
-
-.late {
-  color: #991b1b;
-  font-weight: 700;
-}
-
-.good {
-  color: #065f46;
-  font-weight: 700;
-}
-
-.diag-ok {
-  color: #065f46;
-}
-
-.diag-bad {
-  color: #991b1b;
-}
-
-.resource-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-}
-
-.resource-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 9px;
-  padding: 12px;
-}
-
-.resource-card strong {
-  font-size: 24px;
-  display: block;
-}
-
-@media(max-width:1100px) {
-  .stats {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .grid2,
-  .grid3,
-  .resource-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .wide {
-    grid-column: auto;
-  }
-}
-
-@media print {
-  .topbar,
-  .tabs,
-  .no-print {
-    display: none !important;
-  }
-
-  .container {
-    max-width: none;
-    padding: 0;
-  }
-
-  .card {
-    border: 0;
-  }
-}
-</style>
+<script src="config.js"></script>
 </head>
 
 <body>
 
-<header class="topbar">
-  <div>
-    <h1>ACONS Planning v7</h1>
-    <p>Полный локальный тест без многопользовательского режима</p>
+<div id="bootError" class="container hidden"></div>
+
+<section id="authScreen" class="login card">
+
+  <h1>ACONS Planning</h1>
+
+  <p class="muted">
+    Общая база, план/факт, ресурсы, графики и отчеты
+  </p>
+
+  <div id="authNotice"></div>
+
+  <div class="field">
+    <label>Email</label>
+    <input id="authEmail" type="email">
   </div>
 
-  <div class="top-actions">
-    <button id="selfTestBtn" class="btn">Проверка системы</button>
-    <button id="exportJson" class="btn">Резервная копия</button>
+  <div class="field">
+    <label>Пароль</label>
+    <input id="authPassword" type="password">
+  </div>
 
-    <label class="btn">
-      Загрузить копию
-      <input id="importJson" type="file" accept=".json" style="display:none">
-    </label>
+  <div class="editor-actions">
+    <button id="signInBtn" class="btn primary">
+      Войти
+    </button>
 
-    <button id="resetAll" class="btn danger">
-      Сбросить тест
+    <button id="signUpBtn" class="btn">
+      Создать учетную запись
     </button>
   </div>
+
+</section>
+
+<div id="app" class="hidden">
+
+<header class="topbar">
+
+  <div>
+    <h1>ACONS Planning v8</h1>
+    <p id="syncStatus">Подключение...</p>
+  </div>
+
+  <div class="auth-row">
+    <span id="userLabel"></span>
+    <button id="signOutBtn" class="btn">Выйти</button>
+  </div>
+
 </header>
 
 <main class="container">
 
 <nav class="tabs no-print">
-  <button class="tab active" data-tab="dashboard">Сводка</button>
-  <button class="tab" data-tab="matrix">Шахматка</button>
-  <button class="tab" data-tab="gantt">Гант</button>
-  <button class="tab" data-tab="demolition">Демонтаж</button>
-  <button class="tab" data-tab="plan">Журнал плана</button>
-  <button class="tab" data-tab="fact">Журнал факта</button>
-  <button class="tab" data-tab="resources">Ресурсы</button>
-  <button class="tab" data-tab="milestones">Ключевые даты</button>
-  <button class="tab" data-tab="analytics">Аналитика</button>
-  <button class="tab" data-tab="organizations">Организации</button>
-  <button class="tab" data-tab="reports">Отчеты</button>
-  <button class="tab" data-tab="history">История</button>
-  <button class="tab" data-tab="settings">Настройки</button>
+
+  <button class="tab active" data-tab="dashboard">
+    Сводка
+  </button>
+
+  <button class="tab" data-tab="matrix">
+    Шахматка
+  </button>
+
+  <button class="tab" data-tab="gantt">
+    Гант
+  </button>
+
+  <button class="tab" data-tab="planfact">
+    План / факт
+  </button>
+
+  <button class="tab" data-tab="resources">
+    Ресурсы
+  </button>
+
+  <button class="tab" data-tab="milestones">
+    Ключевые даты
+  </button>
+
+  <button class="tab" data-tab="reports">
+    Отчеты / PDF
+  </button>
+
+  <button class="tab" data-tab="import">
+    Импорт
+  </button>
+
+  <button class="tab" data-tab="history">
+    История
+  </button>
+
+  <button class="tab" data-tab="settings">
+    Настройки
+  </button>
+
 </nav>
 
 <section id="tab-dashboard" class="panel">
 
   <section class="stats">
+
     <div class="stat">
-      <span>Всего работ</span>
+      <span>Работ</span>
       <strong id="dTotal">0</strong>
     </div>
 
@@ -510,31 +146,18 @@ th {
       <span>Ограничения</span>
       <strong id="dRisk">0</strong>
     </div>
+
   </section>
 
   <section class="grid2">
 
     <div class="card">
-      <h2>Критичные работы</h2>
+      <h2>Работы под риском</h2>
       <div id="dCritical" class="list"></div>
     </div>
 
     <div class="card">
-      <h2>Выполнено, но не сдано</h2>
-      <div id="dUnsurrendered" class="list"></div>
-    </div>
-
-  </section>
-
-  <section class="grid2">
-
-    <div class="card">
-      <h2>Ключевые даты под риском</h2>
-      <div id="dMilestones" class="list"></div>
-    </div>
-
-    <div class="card">
-      <h2>Ресурсы сегодня / последняя дата</h2>
+      <h2>Ресурсы на последнюю дату</h2>
       <div id="dResources" class="list"></div>
     </div>
 
@@ -544,7 +167,22 @@ th {
 
 <section id="tab-matrix" class="panel hidden">
 
-  <section class="card no-print">
+  <div class="card no-print">
+
+    <div class="section-head">
+
+      <div>
+        <h2>Шахматка</h2>
+        <p class="muted">
+          Настраиваемые колонки и сохраненные виды
+        </p>
+      </div>
+
+      <button id="openViewSettings" class="btn primary">
+        Настроить вид
+      </button>
+
+    </div>
 
     <div class="toolbar">
 
@@ -564,31 +202,17 @@ th {
       </div>
 
       <div class="field">
-        <label>Захватка</label>
-        <select id="mfCapture"></select>
-      </div>
-
-      <div class="field">
-        <label>Ось</label>
-        <select id="mfAxis"></select>
-      </div>
-
-      <div class="field">
-        <label>Сторона</label>
-        <select id="mfSide"></select>
-      </div>
-
-      <div class="field">
-        <label>Зона</label>
-        <select id="mfZone"></select>
+        <label>Работа</label>
+        <select id="mfWork"></select>
       </div>
 
       <div class="field">
         <label>Организация</label>
-        <select id="mfOrganization"></select>
+        <select id="mfOrg"></select>
       </div>
 
       <div class="field">
+
         <label>Статус</label>
 
         <select id="mfStatus">
@@ -600,53 +224,61 @@ th {
           <option>Приостановлено</option>
           <option>Ограничение</option>
         </select>
+
       </div>
 
     </div>
 
+  </div>
+
+  <div id="viewSettings" class="card hidden">
+
+    <div class="editor-head">
+
+      <div>
+        <h2>Настройка вида шахматки</h2>
+        <p class="muted">
+          Выбери колонки и сохрани представление
+        </p>
+      </div>
+
+      <button id="closeViewSettings" class="btn">
+        Закрыть
+      </button>
+
+    </div>
+
+    <div class="toolbar">
+
+      <div class="field">
+        <label>Сохраненный вид</label>
+        <select id="savedViewSelect"></select>
+      </div>
+
+      <div class="field">
+        <label>Название вида</label>
+        <input id="viewName" placeholder="Например: Фасады">
+      </div>
+
+      <button id="loadViewBtn" class="btn">
+        Загрузить
+      </button>
+
+      <button id="saveViewBtn" class="btn primary">
+        Сохранить вид
+      </button>
+
+    </div>
+
     <div
-      id="matrixCustomFilters"
-      class="toolbar"
-      style="margin-top:10px">
+      id="columnChooser"
+      class="view-columns"
+      style="margin-top:12px">
     </div>
 
-  </section>
+  </div>
 
-  <section class="stats">
-
-    <div class="stat">
-      <span>Фронтов</span>
-      <strong id="mTotal">0</strong>
-    </div>
-
-    <div class="stat">
-      <span>В работе</span>
-      <strong id="mWork">0</strong>
-    </div>
-
-    <div class="stat">
-      <span>Завершено</span>
-      <strong id="mDone">0</strong>
-    </div>
-
-    <div class="stat">
-      <span>Сдано</span>
-      <strong id="mAccepted">0</strong>
-    </div>
-
-    <div class="stat">
-      <span>Ограничения</span>
-      <strong id="mRisk">0</strong>
-    </div>
-
-    <div class="stat">
-      <span>Людей на фронтах</span>
-      <strong id="mPeople">0</strong>
-    </div>
-
-  </section>
-
-  <section class="card">
+  <div class="card">
 
     <div class="table-wrap">
 
@@ -660,14 +292,14 @@ th {
 
     </div>
 
-  </section>
+  </div>
 
-  <section id="frontEditor" class="card hidden">
+  <div id="frontEditor" class="card hidden">
 
     <div class="editor-head">
 
       <div>
-        <h2 id="frontTitle">Карточка работы</h2>
+        <h2 id="frontTitle"></h2>
         <p id="frontMeta" class="muted"></p>
       </div>
 
@@ -680,6 +312,7 @@ th {
     <div class="grid3">
 
       <div class="field">
+
         <label>Статус</label>
 
         <select id="fStatus">
@@ -690,11 +323,12 @@ th {
           <option>Приостановлено</option>
           <option>Ограничение</option>
         </select>
+
       </div>
 
       <div class="field">
         <label>Организация</label>
-        <select id="fOrganization"></select>
+        <select id="fOrg"></select>
       </div>
 
       <div class="field">
@@ -748,8 +382,8 @@ th {
       </div>
 
       <div class="field">
-        <label>Единица измерения</label>
-        <input id="fUnit" placeholder="м² / м.п. / шт.">
+        <label>Ед. изм.</label>
+        <input id="fUnit">
       </div>
 
       <div class="field">
@@ -763,29 +397,8 @@ th {
       </div>
 
       <div class="field">
-        <label>Людей на фронте сейчас</label>
+        <label>Людей сейчас</label>
         <input id="fPeople" type="number">
-      </div>
-
-      <div class="field">
-        <label>Предшественник</label>
-        <select id="fPred"></select>
-      </div>
-
-      <div class="field">
-        <label>Тип связи</label>
-
-        <select id="fLink">
-          <option>Окончание → Начало</option>
-          <option>Начало → Начало</option>
-          <option>Окончание → Окончание</option>
-          <option>Начало → Окончание</option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label>Лаг, дней</label>
-        <input id="fLag" type="number" value="0">
       </div>
 
       <div class="field inline wide">
@@ -802,7 +415,7 @@ th {
 
         <label>
           <input id="fAccepted" type="checkbox">
-          Сдано / принято
+          Сдано
         </label>
 
       </div>
@@ -813,36 +426,34 @@ th {
       </div>
 
       <div class="field wide">
-        <label>Текущий факт / примечание</label>
+        <label>Факт / примечание</label>
         <input id="fFactText">
       </div>
 
       <div class="field wide">
-        <label>Ограничение / комментарий</label>
-        <textarea id="fConstraint" rows="3"></textarea>
+        <label>Ограничение</label>
+        <textarea id="fConstraint"></textarea>
       </div>
 
     </div>
 
-    <div
-      id="frontExtraFields"
-      class="grid3"
-      style="margin-top:10px">
-    </div>
+    <div id="frontCustom" class="grid3"></div>
 
     <div class="editor-actions">
-      <button id="saveFront" class="btn primary">Сохранить</button>
-      <button id="frontToPlan" class="btn">Запись плана</button>
-      <button id="frontToFact" class="btn">Запись факта</button>
+
+      <button id="saveFrontBtn" class="btn primary">
+        Сохранить
+      </button>
+
     </div>
 
-  </section>
+  </div>
 
 </section>
 
 <section id="tab-gantt" class="panel hidden">
 
-  <section class="card no-print">
+  <div class="card no-print">
 
     <div class="toolbar">
 
@@ -858,11 +469,12 @@ th {
 
       <div class="field">
         <label>Организация</label>
-        <select id="gOrganization"></select>
+        <select id="gOrg"></select>
       </div>
 
       <div class="field">
-        <label>Слой графика</label>
+
+        <label>Слой</label>
 
         <select id="gMode">
           <option value="contract">Договорный</option>
@@ -871,489 +483,226 @@ th {
           <option value="fact">Фактический</option>
           <option value="forecast">Прогнозный</option>
         </select>
+
       </div>
 
-      <button id="recalcLinks" class="btn">
-        Пересчитать связи
+    </div>
+
+  </div>
+
+  <div class="card">
+
+    <div id="gantt" class="gantt-wrap"></div>
+
+  </div>
+
+</section>
+
+<section id="tab-planfact" class="panel hidden">
+
+  <div class="card no-print">
+
+    <h2>План / факт объемов</h2>
+
+    <div class="toolbar">
+
+      <div class="field">
+        <label>С</label>
+        <input id="pfFrom" type="date">
+      </div>
+
+      <div class="field">
+        <label>По</label>
+        <input id="pfTo" type="date">
+      </div>
+
+      <div class="field">
+        <label>Здание</label>
+        <select id="pfBuilding"></select>
+      </div>
+
+      <div class="field">
+        <label>Работа</label>
+        <select id="pfWork"></select>
+      </div>
+
+      <div class="field">
+        <label>Организация</label>
+        <select id="pfOrg"></select>
+      </div>
+
+      <button id="calcPlanFact" class="btn primary">
+        Рассчитать
       </button>
 
     </div>
 
-  </section>
-
-  <section class="card">
-
-    <h2>Гант</h2>
-
-    <div id="gantt" class="gantt-wrap"></div>
-
-  </section>
-
-</section>
-
-<section id="tab-demolition" class="panel hidden">
+  </div>
 
   <section class="stats">
 
     <div class="stat">
-      <span>Объектов</span>
-      <strong id="demTotal">0</strong>
+      <span>План за период</span>
+      <strong id="pfPlanPeriod">0</strong>
     </div>
 
     <div class="stat">
-      <span>В работе</span>
-      <strong id="demWork">0</strong>
+      <span>Факт за период</span>
+      <strong id="pfFactPeriod">0</strong>
     </div>
 
     <div class="stat">
-      <span>Завершено</span>
-      <strong id="demDone">0</strong>
+      <span>Отклонение</span>
+      <strong id="pfVarPeriod">0</strong>
     </div>
 
     <div class="stat">
-      <span>Сдано</span>
-      <strong id="demAccepted">0</strong>
+      <span>План накопительно</span>
+      <strong id="pfPlanCum">0</strong>
     </div>
 
     <div class="stat">
-      <span>Просрочено</span>
-      <strong id="demLate">0</strong>
+      <span>Факт накопительно</span>
+      <strong id="pfFactCum">0</strong>
+    </div>
+
+    <div class="stat">
+      <span>Отклонение, п.п.</span>
+      <strong id="pfPp">0</strong>
     </div>
 
   </section>
 
-  <section class="card">
+  <div class="grid2">
 
-    <div class="table-wrap">
+    <div class="card">
 
-      <table>
+      <h2>Плановые записи</h2>
 
-        <thead>
-          <tr>
-            <th>Объект</th>
-            <th>Статус</th>
-            <th>Договор</th>
-            <th>Рабочий план</th>
-            <th>Факт</th>
-            <th>Прогноз</th>
-            <th>Связь</th>
-            <th>Сдача</th>
-            <th>Отклонение</th>
-          </tr>
-        </thead>
-
-        <tbody id="demBody"></tbody>
-
-      </table>
-
-    </div>
-
-  </section>
-
-  <section id="demEditor" class="card hidden">
-
-    <div class="editor-head">
-      <h2 id="demTitle"></h2>
-      <button id="closeDem" class="btn">Закрыть</button>
-    </div>
-
-    <div class="grid3">
-
-      <div class="field">
-        <label>Статус</label>
-
-        <select id="deStatus">
-          <option>Не начато</option>
-          <option>Готово к старту</option>
-          <option>В работе</option>
-          <option>Приостановлено</option>
-          <option>Завершено</option>
-          <option>Ограничение</option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label>Договорное начало</label>
-        <input id="deContractStart" type="date">
-      </div>
-
-      <div class="field">
-        <label>Договорное окончание</label>
-        <input id="deContractEnd" type="date">
-      </div>
-
-      <div class="field">
-        <label>Рабочее начало</label>
-        <input id="dePlanStart" type="date">
-      </div>
-
-      <div class="field">
-        <label>Рабочее окончание</label>
-        <input id="dePlanEnd" type="date">
-      </div>
-
-      <div class="field">
-        <label>Фактическое начало</label>
-        <input id="deFactStart" type="date">
-      </div>
-
-      <div class="field">
-        <label>Фактическое окончание</label>
-        <input id="deFactEnd" type="date">
-      </div>
-
-      <div class="field">
-        <label>Прогноз окончания</label>
-        <input id="deForecastEnd" type="date">
-      </div>
-
-      <div class="field">
-        <label>Предшественник</label>
-        <select id="dePred"></select>
-      </div>
-
-      <div class="field">
-        <label>Тип связи</label>
-
-        <select id="deLink">
-          <option>Окончание → Начало</option>
-          <option>Начало → Начало</option>
-          <option>Окончание → Окончание</option>
-          <option>Начало → Окончание</option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label>Лаг, дней</label>
-        <input id="deLag" type="number">
-      </div>
-
-      <div class="field inline wide">
-
-        <label>
-          <input id="dePresented" type="checkbox">
-          Предъявлено
-        </label>
-
-        <label>
-          <input id="deAccepted" type="checkbox">
-          Сдано
-        </label>
-
-      </div>
-
-      <div class="field">
-        <label>Дата сдачи</label>
-        <input id="deAcceptedDate" type="date">
-      </div>
-
-      <div class="field wide">
-        <label>Комментарий</label>
-        <textarea id="deComment"></textarea>
-      </div>
-
-    </div>
-
-    <div class="editor-actions">
-      <button id="saveDem" class="btn primary">Сохранить</button>
-    </div>
-
-  </section>
-
-</section>
-
-<section id="tab-plan" class="panel hidden">
-
-  <section class="card no-print">
-
-    <div class="section-head">
-
-      <div>
-        <h2>Журнал плана</h2>
-        <p class="muted">
-          Плановые объемы и плановая численность по датам.
-        </p>
-      </div>
-
-      <button id="newPlan" class="btn primary">
-        Новая запись
+      <button id="newPlanRow" class="btn primary no-print">
+        Добавить
       </button>
 
+      <div class="table-wrap">
+
+        <table>
+
+          <thead>
+            <tr>
+              <th>Дата</th>
+              <th>Фронт</th>
+              <th>Объем</th>
+              <th>Люди</th>
+            </tr>
+          </thead>
+
+          <tbody id="planRows"></tbody>
+
+        </table>
+
+      </div>
+
     </div>
 
-    <div class="toolbar">
+    <div class="card">
 
-      <div class="field">
-        <label>С</label>
-        <input id="plFrom" type="date">
-      </div>
+      <h2>Фактические записи</h2>
 
-      <div class="field">
-        <label>По</label>
-        <input id="plTo" type="date">
-      </div>
-
-      <div class="field">
-        <label>Здание</label>
-        <select id="plBuilding"></select>
-      </div>
-
-      <div class="field">
-        <label>Работа</label>
-        <select id="plWork"></select>
-      </div>
-
-      <button id="filterPlan" class="btn">
-        Фильтр
+      <button id="newFactRow" class="btn primary no-print">
+        Добавить
       </button>
 
-    </div>
+      <div class="table-wrap">
 
-  </section>
+        <table>
 
-  <section class="card">
+          <thead>
+            <tr>
+              <th>Дата</th>
+              <th>Фронт</th>
+              <th>Объем</th>
+              <th>Накопительно</th>
+              <th>Люди</th>
+            </tr>
+          </thead>
 
-    <div class="table-wrap">
+          <tbody id="factRows"></tbody>
 
-      <table>
+        </table>
 
-        <thead>
-          <tr>
-            <th>Дата</th>
-            <th>Фронт</th>
-            <th>Плановый объем</th>
-            <th>Плановые люди</th>
-            <th>Комментарий</th>
-            <th></th>
-          </tr>
-        </thead>
-
-        <tbody id="planBody"></tbody>
-
-      </table>
-
-    </div>
-
-  </section>
-
-  <section id="planEditor" class="card hidden">
-
-    <div class="editor-head">
-
-      <div>
-        <h2>Запись плана</h2>
-        <p id="planMeta" class="muted"></p>
       </div>
 
-      <button id="closePlan" class="btn">
-        Закрыть
-      </button>
-
     </div>
+
+  </div>
+
+  <div id="logEditor" class="card hidden">
 
     <div class="grid3">
 
       <div class="field wide">
         <label>Фронт</label>
-        <select id="planFront"></select>
+        <select id="logFront"></select>
       </div>
 
       <div class="field">
         <label>Дата</label>
-        <input id="planDate" type="date">
+        <input id="logDate" type="date">
       </div>
 
       <div class="field">
-        <label>Плановый объем</label>
-        <input id="planQty" type="number" step="0.01">
-      </div>
-
-      <div class="field">
-        <label>Плановые люди</label>
-        <input id="planPeople" type="number">
-      </div>
-
-      <div class="field wide">
-        <label>Комментарий</label>
-        <textarea id="planComment"></textarea>
-      </div>
-
-    </div>
-
-    <div class="editor-actions">
-      <button id="savePlan" class="btn primary">
-        Сохранить
-      </button>
-    </div>
-
-  </section>
-
-</section>
-
-<section id="tab-fact" class="panel hidden">
-
-  <section class="card no-print">
-
-    <div class="section-head">
-
-      <div>
-        <h2>Журнал факта</h2>
-        <p class="muted">
-          Фактические объемы, накопительный факт и люди по датам.
-        </p>
-      </div>
-
-      <button id="newFact" class="btn primary">
-        Новая запись
-      </button>
-
-    </div>
-
-    <div class="toolbar">
-
-      <div class="field">
-        <label>С</label>
-        <input id="faFrom" type="date">
-      </div>
-
-      <div class="field">
-        <label>По</label>
-        <input id="faTo" type="date">
-      </div>
-
-      <div class="field">
-        <label>Здание</label>
-        <select id="faBuilding"></select>
-      </div>
-
-      <div class="field">
-        <label>Работа</label>
-        <select id="faWork"></select>
-      </div>
-
-      <button id="filterFact" class="btn">
-        Фильтр
-      </button>
-
-    </div>
-
-  </section>
-
-  <section class="card">
-
-    <div class="table-wrap">
-
-      <table>
-
-        <thead>
-          <tr>
-            <th>Дата</th>
-            <th>Фронт</th>
-            <th>Факт объема</th>
-            <th>Накопительно</th>
-            <th>Людей</th>
-            <th>Статус</th>
-            <th>Комментарий</th>
-            <th></th>
-          </tr>
-        </thead>
-
-        <tbody id="factBody"></tbody>
-
-      </table>
-
-    </div>
-
-  </section>
-
-  <section id="factEditor" class="card hidden">
-
-    <div class="editor-head">
-
-      <div>
-        <h2>Запись факта</h2>
-        <p id="factMeta" class="muted"></p>
-      </div>
-
-      <button id="closeFact" class="btn">
-        Закрыть
-      </button>
-
-    </div>
-
-    <div class="grid3">
-
-      <div class="field wide">
-        <label>Фронт</label>
-        <select id="factFront"></select>
-      </div>
-
-      <div class="field">
-        <label>Дата</label>
-        <input id="factDate" type="date">
-      </div>
-
-      <div class="field">
-        <label>Факт объема</label>
-        <input id="factQty" type="number" step="0.01">
+        <label>Объем</label>
+        <input id="logQty" type="number" step="0.01">
       </div>
 
       <div class="field">
         <label>Накопительно</label>
-        <input id="factCum" type="number" step="0.01">
+        <input id="logCum" type="number" step="0.01">
       </div>
 
       <div class="field">
-        <label>Людей</label>
-        <input id="factPeople" type="number">
-      </div>
-
-      <div class="field">
-        <label>Статус</label>
-
-        <select id="factStatus">
-          <option>Не начато</option>
-          <option>Фронт готов</option>
-          <option>В работе</option>
-          <option>Завершено</option>
-          <option>Приостановлено</option>
-          <option>Ограничение</option>
-        </select>
+        <label>Люди</label>
+        <input id="logPeople" type="number">
       </div>
 
       <div class="field wide">
         <label>Комментарий</label>
-        <textarea id="factComment"></textarea>
+        <textarea id="logComment"></textarea>
       </div>
 
     </div>
 
     <div class="editor-actions">
-      <button id="saveFact" class="btn primary">
+
+      <button id="saveLogBtn" class="btn primary">
         Сохранить
       </button>
+
+      <button id="closeLogBtn" class="btn">
+        Закрыть
+      </button>
+
     </div>
 
-  </section>
+  </div>
 
 </section>
 
 <section id="tab-resources" class="panel hidden">
 
-  <section class="card no-print">
+  <div class="card no-print">
 
     <div class="section-head">
 
       <div>
-        <h2>Ресурсы по организациям</h2>
-
+        <h2>Ресурсы</h2>
         <p class="muted">
-          ИТР, рабочие, механизаторы и строительная техника по датам.
+          ИТР, рабочие, механизаторы и техника по организациям
         </p>
       </div>
 
-      <button id="newResource" class="btn primary">
-        Новая запись
+      <button id="newResourceBtn" class="btn primary">
+        Добавить запись
       </button>
 
     </div>
@@ -1362,49 +711,67 @@ th {
 
       <div class="field">
         <label>С</label>
-        <input id="rsFrom" type="date">
+        <input id="rFrom" type="date">
       </div>
 
       <div class="field">
         <label>По</label>
-        <input id="rsTo" type="date">
+        <input id="rTo" type="date">
       </div>
 
       <div class="field">
         <label>Организация</label>
-        <select id="rsOrganization"></select>
+        <select id="rOrg"></select>
       </div>
 
       <div class="field">
         <label>Здание</label>
-        <select id="rsBuilding"></select>
+        <select id="rBuilding"></select>
       </div>
 
-      <button id="filterResources" class="btn">
-        Фильтр
+      <button id="filterResourcesBtn" class="btn">
+        Применить
       </button>
 
     </div>
 
-  </section>
+  </div>
 
-  <section id="resourceSummary" class="resource-grid"></section>
+  <section class="stats">
 
-  <section class="grid2">
-
-    <div class="card">
-      <h2>Сводка по организациям</h2>
-      <div id="resourceByOrg" class="list"></div>
+    <div class="stat">
+      <span>ИТР, чел.-дн.</span>
+      <strong id="rItr">0</strong>
     </div>
 
-    <div class="card">
-      <h2>Техника</h2>
-      <div id="resourceEquipmentSummary" class="list"></div>
+    <div class="stat">
+      <span>Рабочие, чел.-дн.</span>
+      <strong id="rWorkers">0</strong>
+    </div>
+
+    <div class="stat">
+      <span>Механизаторы, чел.-дн.</span>
+      <strong id="rMech">0</strong>
+    </div>
+
+    <div class="stat">
+      <span>Всего, чел.-дн.</span>
+      <strong id="rTotalPeople">0</strong>
+    </div>
+
+    <div class="stat">
+      <span>Пик</span>
+      <strong id="rPeak">0</strong>
+    </div>
+
+    <div class="stat">
+      <span>Технико-дни</span>
+      <strong id="rEquipDays">0</strong>
     </div>
 
   </section>
 
-  <section class="card">
+  <div class="card">
 
     <div class="table-wrap">
 
@@ -1418,128 +785,106 @@ th {
             <th>ИТР</th>
             <th>Рабочие</th>
             <th>Механизаторы</th>
-            <th>Всего людей</th>
             <th>Техника</th>
             <th>Кол-во</th>
             <th>Комментарий</th>
-            <th></th>
           </tr>
         </thead>
 
-        <tbody id="resourceBody"></tbody>
+        <tbody id="resourceRows"></tbody>
 
       </table>
 
     </div>
 
-  </section>
+  </div>
 
-  <section id="resourceEditor" class="card hidden">
-
-    <div class="editor-head">
-
-      <h2>Запись ресурсов</h2>
-
-      <button id="closeResource" class="btn">
-        Закрыть
-      </button>
-
-    </div>
+  <div id="resourceEditor" class="card hidden">
 
     <div class="grid3">
 
       <div class="field">
         <label>Дата</label>
-        <input id="resDate" type="date">
+        <input id="reDate" type="date">
       </div>
 
       <div class="field">
         <label>Организация</label>
-        <select id="resOrganization"></select>
+        <select id="reOrg"></select>
       </div>
 
       <div class="field">
         <label>Здание</label>
-        <select id="resBuilding"></select>
+        <select id="reBuilding"></select>
       </div>
 
       <div class="field">
-        <label>ИТР, чел.</label>
-        <input id="resItr" type="number" min="0">
+        <label>ИТР</label>
+        <input id="reItr" type="number">
       </div>
 
       <div class="field">
-        <label>Рабочие, чел.</label>
-        <input id="resWorkers" type="number" min="0">
+        <label>Рабочие</label>
+        <input id="reWorkers" type="number">
       </div>
 
       <div class="field">
-        <label>Механизаторы, чел.</label>
-        <input id="resMechanizers" type="number" min="0">
+        <label>Механизаторы</label>
+        <input id="reMech" type="number">
       </div>
 
       <div class="field">
         <label>Тип техники</label>
-
-        <select id="resEquipmentType">
-          <option value="">Нет</option>
-          <option>Анкерная машина</option>
-          <option>Буровая установка</option>
-          <option>Экскаватор</option>
-          <option>Автокран</option>
-          <option>Самосвал</option>
-          <option>Бетононасос</option>
-          <option>Погрузчик</option>
-          <option>Каток</option>
-          <option>Манипулятор</option>
-          <option>Другая техника</option>
-        </select>
+        <input
+          id="reEquipType"
+          placeholder="Буровая установка">
       </div>
 
       <div class="field">
-        <label>Количество техники</label>
-        <input id="resEquipmentQty" type="number" min="0">
+        <label>Количество</label>
+        <input id="reEquipQty" type="number">
       </div>
 
       <div class="field wide">
         <label>Комментарий</label>
-        <textarea id="resComment"></textarea>
+        <textarea id="reComment"></textarea>
       </div>
 
     </div>
 
     <div class="editor-actions">
-      <button id="saveResource" class="btn primary">
+
+      <button id="saveResourceBtn" class="btn primary">
         Сохранить
       </button>
+
+      <button id="closeResourceBtn" class="btn">
+        Закрыть
+      </button>
+
     </div>
 
-  </section>
+  </div>
 
 </section>
 
 <section id="tab-milestones" class="panel hidden">
 
-  <section class="card no-print">
+  <div class="card no-print">
 
     <div class="section-head">
 
-      <div>
-        <h2>Ключевые даты</h2>
-        <p class="muted">
-          Договор, прогноз, факт и отклонение.
-        </p>
-      </div>
+      <h2>Ключевые даты</h2>
 
-      <button id="newMilestone" class="btn primary">
-        Добавить ключевую дату
+      <button id="newMilestoneBtn" class="btn primary">
+        Добавить
       </button>
 
     </div>
 
-  </section>
+  </div>
 
-  <section class="card">
+  <div class="card">
 
     <div class="table-wrap">
 
@@ -1548,25 +893,24 @@ th {
         <thead>
           <tr>
             <th>Здание</th>
-            <th>Ключевая дата</th>
+            <th>Наименование</th>
             <th>Договор</th>
+            <th>Рабочая</th>
             <th>Прогноз</th>
             <th>Факт</th>
             <th>Статус</th>
-            <th>Отклонение</th>
-            <th></th>
           </tr>
         </thead>
 
-        <tbody id="milestoneBody"></tbody>
+        <tbody id="milestoneRows"></tbody>
 
       </table>
 
     </div>
 
-  </section>
+  </div>
 
-  <section id="milestoneEditor" class="card hidden">
+  <div id="milestoneEditor" class="card hidden">
 
     <div class="grid3">
 
@@ -1586,6 +930,11 @@ th {
       </div>
 
       <div class="field">
+        <label>Рабочая дата</label>
+        <input id="msWork" type="date">
+      </div>
+
+      <div class="field">
         <label>Прогноз</label>
         <input id="msForecast" type="date">
       </div>
@@ -1596,6 +945,7 @@ th {
       </div>
 
       <div class="field">
+
         <label>Статус</label>
 
         <select id="msStatus">
@@ -1604,6 +954,7 @@ th {
           <option>Просрочена</option>
           <option>Выполнена</option>
         </select>
+
       </div>
 
       <div class="field wide">
@@ -1614,228 +965,178 @@ th {
     </div>
 
     <div class="editor-actions">
-      <button id="saveMilestone" class="btn primary">
+
+      <button id="saveMilestoneBtn" class="btn primary">
         Сохранить
       </button>
 
-      <button id="closeMilestone" class="btn">
+      <button id="closeMilestoneBtn" class="btn">
         Закрыть
       </button>
-    </div>
-
-  </section>
-
-</section>
-
-<section id="tab-analytics" class="panel hidden">
-
-  <section class="card no-print">
-
-    <div class="grid2">
-
-      <div>
-
-        <h3>Период 1</h3>
-
-        <div class="toolbar">
-
-          <div class="field">
-            <label>С</label>
-            <input id="a1From" type="date">
-          </div>
-
-          <div class="field">
-            <label>По</label>
-            <input id="a1To" type="date">
-          </div>
-
-        </div>
-
-      </div>
-
-      <div>
-
-        <h3>Период 2</h3>
-
-        <div class="toolbar">
-
-          <div class="field">
-            <label>С</label>
-            <input id="a2From" type="date">
-          </div>
-
-          <div class="field">
-            <label>По</label>
-            <input id="a2To" type="date">
-          </div>
-
-        </div>
-
-      </div>
 
     </div>
 
-    <div class="toolbar" style="margin-top:10px">
-
-      <div class="field">
-        <label>Здание</label>
-        <select id="aBuilding"></select>
-      </div>
-
-      <div class="field">
-        <label>Работа</label>
-        <select id="aWork"></select>
-      </div>
-
-      <div class="field">
-        <label>Организация</label>
-        <select id="aOrganization"></select>
-      </div>
-
-      <button id="calcAnalytics" class="btn primary">
-        Рассчитать
-      </button>
-
-    </div>
-
-  </section>
-
-  <section class="grid2">
-
-    <div class="card">
-      <h2>Период 1</h2>
-      <div id="aBox1" class="list"></div>
-    </div>
-
-    <div class="card">
-      <h2>Период 2</h2>
-      <div id="aBox2" class="list"></div>
-    </div>
-
-  </section>
-
-  <section class="card">
-
-    <h2>Разница периода 2 к периоду 1</h2>
-
-    <div id="aDelta" class="list"></div>
-
-  </section>
-
-</section>
-
-<section id="tab-organizations" class="panel hidden">
-
-  <section class="grid2">
-
-    <div class="card">
-
-      <h2>Организации</h2>
-
-      <div id="organizationList" class="list"></div>
-
-      <div class="toolbar" style="margin-top:10px">
-
-        <div class="field">
-          <input
-            id="newOrganization"
-            placeholder="Название организации">
-        </div>
-
-        <button id="addOrganization" class="btn primary">
-          Добавить
-        </button>
-
-      </div>
-
-    </div>
-
-    <div class="card">
-
-      <h2>Показатели организаций</h2>
-
-      <div id="organizationStats" class="list"></div>
-
-    </div>
-
-  </section>
+  </div>
 
 </section>
 
 <section id="tab-reports" class="panel hidden">
 
-  <section class="card no-print">
+  <div class="card no-print">
 
-    <h2>Отчет по производству</h2>
+    <h2>Конструктор отчета</h2>
 
     <div class="toolbar">
 
       <div class="field">
         <label>С</label>
-        <input id="rFrom" type="date">
+        <input id="repFrom" type="date">
       </div>
 
       <div class="field">
         <label>По</label>
-        <input id="rTo" type="date">
+        <input id="repTo" type="date">
       </div>
 
       <div class="field">
         <label>Здание</label>
-        <select id="rBuilding"></select>
+        <select id="repBuilding"></select>
+      </div>
+
+      <div class="field">
+        <label>Работа</label>
+        <select id="repWork"></select>
       </div>
 
       <div class="field">
         <label>Организация</label>
-        <select id="rOrganization"></select>
+        <select id="repOrg"></select>
       </div>
 
-      <button id="buildReport" class="btn primary">
+      <div class="field">
+
+        <label>Статус</label>
+
+        <select id="repStatus">
+          <option value="all">Все</option>
+          <option>Не начато</option>
+          <option>Фронт готов</option>
+          <option>В работе</option>
+          <option>Завершено</option>
+          <option>Приостановлено</option>
+          <option>Ограничение</option>
+        </select>
+
+      </div>
+
+    </div>
+
+    <div class="inline" style="margin-top:10px">
+
+      <label>
+        <input id="repIncludePlanFact" type="checkbox" checked>
+        План/факт
+      </label>
+
+      <label>
+        <input id="repIncludeResources" type="checkbox" checked>
+        Ресурсы
+      </label>
+
+      <label>
+        <input id="repIncludeMilestones" type="checkbox" checked>
+        Ключевые даты
+      </label>
+
+      <label>
+        <input id="repIncludeWorks" type="checkbox" checked>
+        Работы
+      </label>
+
+    </div>
+
+    <div class="editor-actions">
+
+      <button id="buildReportBtn" class="btn primary">
         Сформировать
       </button>
 
-      <button id="exportReportCsv" class="btn">
-        Выгрузить таблицу
-      </button>
-
-      <button id="printReport" class="btn">
-        Печать / PDF
+      <button id="downloadPdfBtn" class="btn">
+        Сохранить PDF
       </button>
 
     </div>
 
-  </section>
+  </div>
 
-  <section id="reportArea" class="card">
+  <div id="reportArea" class="card pdf-page">
 
-    <h2>Отчет</h2>
+    <h1>Отчет ACONS Planning</h1>
 
-    <div id="reportSummary" class="stats"></div>
+    <div id="reportContent"></div>
 
-    <div id="reportTables"></div>
+  </div>
 
-  </section>
+</section>
+
+<section id="tab-import" class="panel hidden">
+
+  <div class="card">
+
+    <h2>Импорт Excel / CSV</h2>
+
+    <p class="muted">
+      Поддерживаются колонки:
+      Здание, Блок, Этаж, Захватка, Ось, Сторона,
+      Зона, Номер помещения, Название помещения,
+      Оборудование, Работа, Организация,
+      Договорное начало, Договорное окончание,
+      Рабочее начало, Рабочее окончание,
+      Базовое начало, Базовое окончание,
+      Общий объем, Ед. изм.
+    </p>
+
+    <input
+      id="importFile"
+      type="file"
+      accept=".xlsx,.xls,.csv">
+
+    <div
+      id="importInfo"
+      class="notice hidden">
+    </div>
+
+    <div class="preview">
+
+      <table>
+        <thead id="importHead"></thead>
+        <tbody id="importBody"></tbody>
+      </table>
+
+    </div>
+
+    <div class="editor-actions">
+
+      <button
+        id="commitImportBtn"
+        class="btn primary"
+        disabled>
+
+        Импортировать в общую базу
+
+      </button>
+
+    </div>
+
+  </div>
 
 </section>
 
 <section id="tab-history" class="panel hidden">
 
-  <section class="card">
+  <div class="card">
 
-    <div class="section-head">
-
-      <div>
-        <h2>История изменений</h2>
-        <p class="muted">
-          Локальный журнал изменения карточек и дат.
-        </p>
-      </div>
-
-      <button id="clearHistory" class="btn danger no-print">
-        Очистить историю
-      </button>
-
-    </div>
+    <h2>История изменений</h2>
 
     <div class="table-wrap">
 
@@ -1844,6 +1145,7 @@ th {
         <thead>
           <tr>
             <th>Дата</th>
+            <th>Пользователь</th>
             <th>Сущность</th>
             <th>Поле</th>
             <th>Было</th>
@@ -1851,19 +1153,19 @@ th {
           </tr>
         </thead>
 
-        <tbody id="historyBody"></tbody>
+        <tbody id="historyRows"></tbody>
 
       </table>
 
     </div>
 
-  </section>
+  </div>
 
 </section>
 
 <section id="tab-settings" class="panel hidden">
 
-  <section class="grid2">
+  <div class="grid2">
 
     <div class="card">
 
@@ -1871,13 +1173,13 @@ th {
 
       <div id="buildingList" class="list"></div>
 
-      <div class="toolbar" style="margin-top:10px">
+      <div class="toolbar">
 
-        <div class="field">
-          <input id="newBuilding" placeholder="Новое здание">
-        </div>
+        <input
+          id="newBuilding"
+          placeholder="Новое здание">
 
-        <button id="addBuilding" class="btn primary">
+        <button id="addBuildingBtn" class="btn primary">
           Добавить
         </button>
 
@@ -1891,13 +1193,13 @@ th {
 
       <div id="workList" class="list"></div>
 
-      <div class="toolbar" style="margin-top:10px">
+      <div class="toolbar">
 
-        <div class="field">
-          <input id="newWork" placeholder="Новый вид работ">
-        </div>
+        <input
+          id="newWork"
+          placeholder="Новый вид работ">
 
-        <button id="addWork" class="btn primary">
+        <button id="addWorkBtn" class="btn primary">
           Добавить
         </button>
 
@@ -1905,9 +1207,89 @@ th {
 
     </div>
 
-  </section>
+  </div>
 
-  <section class="card">
+  <div class="grid2">
+
+    <div class="card">
+
+      <h2>Организации</h2>
+
+      <div id="orgList" class="list"></div>
+
+      <div class="toolbar">
+
+        <input
+          id="newOrg"
+          placeholder="Новая организация">
+
+        <button id="addOrgBtn" class="btn primary">
+          Добавить
+        </button>
+
+      </div>
+
+    </div>
+
+    <div class="card">
+
+      <h2>Дополнительные поля</h2>
+
+      <div id="customFieldList" class="list"></div>
+
+      <div class="grid3">
+
+        <div class="field">
+          <label>Название</label>
+          <input id="cfName">
+        </div>
+
+        <div class="field">
+
+          <label>Область</label>
+
+          <select id="cfScope">
+            <option value="structure">Разбивка</option>
+            <option value="front">Работа</option>
+          </select>
+
+        </div>
+
+        <div class="field">
+
+          <label>Тип</label>
+
+          <select id="cfType">
+            <option value="text">Текст</option>
+            <option value="number">Число</option>
+            <option value="date">Дата</option>
+            <option value="boolean">Да/нет</option>
+            <option value="select">Список</option>
+            <option value="percent">Процент</option>
+          </select>
+
+        </div>
+
+        <div class="field wide">
+          <label>Варианты списка через ;</label>
+          <input id="cfOptions">
+        </div>
+
+      </div>
+
+      <div class="editor-actions">
+
+        <button id="addCfBtn" class="btn primary">
+          Добавить поле
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <div class="card">
 
     <h2>Новая разбивка</h2>
 
@@ -1964,36 +1346,14 @@ th {
       </div>
 
       <div class="field">
-        <label>Приоритет ФСМ</label>
 
-        <select id="sFsmPriority">
-          <option value=""></option>
-          <option>Высокий</option>
-          <option>Средний</option>
-          <option>Низкий</option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label>Статус ФСМ</label>
-
-        <select id="sFsmStatus">
-          <option value=""></option>
-          <option>Не требуется</option>
-          <option>Запрошено</option>
-          <option>В работе</option>
-          <option>Согласовано</option>
-          <option>Отклонено</option>
-        </select>
-      </div>
-
-      <div class="field">
         <label>Создать работы</label>
 
         <select id="sWorkMode">
           <option value="all">Все виды работ</option>
           <option value="one">Один вид работ</option>
         </select>
+
       </div>
 
       <div class="field">
@@ -2003,6634 +1363,22 @@ th {
 
     </div>
 
-    <div
-      id="structureExtraFields"
-      class="grid3"
-      style="margin-top:10px">
-    </div>
-
     <div class="editor-actions">
-      <button id="addStructure" class="btn primary">
+
+      <button id="addStructureBtn" class="btn primary">
         Добавить разбивку
       </button>
-    </div>
-
-  </section>
-
-  <section class="card">
-
-    <h2>Дополнительные поля</h2>
-
-    <div class="grid3">
-
-      <div class="field">
-        <label>Название</label>
-
-        <input
-          id="cfName"
-          placeholder="Например: Тип фасада">
-      </div>
-
-      <div class="field">
-        <label>Где используется</label>
-
-        <select id="cfScope">
-          <option value="structure">Разбивка</option>
-          <option value="front">Карточка работы</option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label>Тип</label>
-
-        <select id="cfType">
-          <option value="text">Текст</option>
-          <option value="number">Число</option>
-          <option value="date">Дата</option>
-          <option value="boolean">Да / нет</option>
-          <option value="select">Список</option>
-          <option value="percent">Процент</option>
-        </select>
-      </div>
-
-      <div class="field wide">
-        <label>Варианты списка через ;</label>
-
-        <input
-          id="cfOptions"
-          placeholder="Тип 1; Тип 2; Тип 3">
-      </div>
-
-      <div class="field inline wide">
-
-        <label>
-          <input id="cfFilter" type="checkbox">
-          В фильтрах
-        </label>
-
-        <label>
-          <input id="cfMatrix" type="checkbox">
-          В шахматке
-        </label>
-
-      </div>
 
     </div>
-
-    <div class="editor-actions">
-      <button id="addCustomField" class="btn primary">
-        Добавить поле
-      </button>
-    </div>
-
-    <div id="customFieldList" class="list"></div>
-
-  </section>
-
-  <section class="card">
-
-    <h2>Сохраненные разбивки</h2>
-
-    <div id="structureList" class="list"></div>
-
-  </section>
-
-</section>
-
-<section id="selfTestPanel" class="card hidden">
-
-  <div class="editor-head">
-
-    <h2>Проверка системы</h2>
-
-    <button id="closeSelfTest" class="btn">
-      Закрыть
-    </button>
 
   </div>
-
-  <div id="selfTestResults" class="list"></div>
 
 </section>
 
 </main>
+</div>
 
-<script>
-"use strict";
-
-const VERSION = "7";
-const KEY = "aconsPlanningV7";
-
-const OLD_KEYS = [
-  "aconsPlanningV6",
-  "aconsPlanningV5",
-  "aconsPlanningV4",
-  "aconsPlanningV3"
-];
-
-const $ = id => document.getElementById(id);
-
-const uid = () =>
-  globalThis.crypto?.randomUUID
-    ? crypto.randomUUID()
-    : Date.now() + "-" + Math.random().toString(16).slice(2);
-
-const esc = value =>
-  String(value ?? "").replace(
-    /[&<>"']/g,
-    char => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      "\"": "&quot;",
-      "'": "&#039;"
-    }[char])
-  );
-
-const uniq = array => [
-  ...new Set(
-    array.filter(
-      value =>
-        value !== undefined &&
-        value !== null &&
-        String(value) !== ""
-    )
-  )
-];
-
-const today = () =>
-  new Date().toISOString().slice(0, 10);
-
-function addDays(date, days) {
-  if (!date) return "";
-
-  const result =
-    new Date(date + "T00:00:00");
-
-  result.setDate(
-    result.getDate() + Number(days || 0)
-  );
-
-  return result
-    .toISOString()
-    .slice(0, 10);
-}
-
-function diffDays(date1, date2) {
-  if (!date1 || !date2) return null;
-
-  return Math.round(
-    (
-      Date.parse(date2) -
-      Date.parse(date1)
-    ) / 86400000
-  );
-}
-
-const DEFAULT_BUILDINGS = [
-  "Главный корпус",
-  "Грязелечебница",
-  "Ресторан с банкетным залом",
-  "КПП",
-  "ДЭС",
-  "ТП-2",
-  "ТП-3",
-  "ТП-4",
-  "РТП. Хладоцентр",
-  "Котельная",
-  "РЧВ",
-  "Подпорные стены благоустройства",
-  "Аэрарий"
-];
-
-const DEFAULT_WORKS = [
-  "Кладка наружных стен",
-  "Вертикальное армирование",
-  "Штукатурка",
-  "Гидроизоляция балконов",
-  "Передача фронта"
-];
-
-const DEM_NAMES = [
-  "Склад (ангар) литера Д'",
-  "Нежилое здание, Корпус №10 литера Д",
-  "Нежилое здание, Корпус №9 литера Г",
-  "Нежилое здание №11 литера Е",
-  "Демонтаж «фонтана с оленем»",
-  "Аэрарий",
-  "Нежилое здание Корпус №12 литера З",
-  "Нежилое здание Корпус №1 литера Б",
-  "Котельная литера Ф'",
-  "Склад литера Б', 90:25:020102:170",
-  "Коттедж 1 литера Ш'",
-  "Парники",
-  "Коммунальная столовая литера Ц",
-  "Управление (бытовые помещения) литера Р",
-  "Теплица в ООПТ",
-  "Сауна литера Л'",
-  "Склад",
-  "Кладовая / Аккумуляторная литера Т'",
-  "Гараж литера Ж'",
-  "Гараж литера С'",
-  "Нежилое здание КТП / Диспетчерская литера П'",
-  "Нежилое здание, Корпус №4 литера В",
-  "Библиотека литера Ю",
-  "Нежилое здание Корпус №32 литера И",
-  "Спортивная площадка",
-  "Нежилое здание (Коттедж 3) литера Ц'",
-  "Приемная, спортзал литера Т (ЛФК)",
-  "Прачечная литера А (ОКН)",
-  "Нежилое здание литера У' (Склад ген.подрядчика)",
-  "Офис, нежилое здание литера Ф (штаб тех.заказчика)",
-  "Нежилое здание Корпус №35 литера Л (штаб ген.подрядчика)",
-  "Нежилое здание, Корпус №34 литера К (ООПТ)"
-];
-
-function normStruct(data = {}) {
-  return {
-    id: data.id || uid(),
-    building: data.building || "",
-    block: data.block || "",
-    floor: data.floor ?? "",
-    capture: data.capture || "",
-    axis: data.axis || "",
-    side: data.side || "",
-    zone: data.zone || "",
-    roomNo:
-      data.roomNo ||
-      data.roomNumber ||
-      "",
-    roomName: data.roomName || "",
-    equipment: data.equipment || "",
-    fsmPriority: data.fsmPriority || "",
-    fsmStatus: data.fsmStatus || "",
-    customData:
-      data.customData || {}
-  };
-}
-
-function makeFront(structure, work) {
-  return {
-    id: uid(),
-
-    structureId:
-      structure.id,
-
-    building:
-      structure.building,
-
-    block:
-      structure.block,
-
-    floor:
-      structure.floor,
-
-    capture:
-      structure.capture,
-
-    axis:
-      structure.axis,
-
-    side:
-      structure.side,
-
-    zone:
-      structure.zone,
-
-    roomNo:
-      structure.roomNo,
-
-    roomName:
-      structure.roomName,
-
-    equipment:
-      structure.equipment,
-
-    fsmPriority:
-      structure.fsmPriority,
-
-    fsmStatus:
-      structure.fsmStatus,
-
-    work,
-
-    status:
-      "Не начато",
-
-    organization: "",
-    responsible: "",
-
-    contractStart: "",
-    contractEnd: "",
-
-    baselineStart: "",
-    baselineEnd: "",
-
-    planStart: "",
-    planEnd: "",
-
-    factStart: "",
-    factEnd: "",
-
-    forecastEnd: "",
-
-    unit: "",
-    totalQty: "",
-    doneQty: "",
-
-    people: "",
-
-    predId: "",
-
-    linkType:
-      "Окончание → Начало",
-
-    lag: 0,
-
-    completed: false,
-    presented: false,
-    accepted: false,
-
-    acceptedDate: "",
-
-    factText: "",
-    constraint: "",
-
-    customData: {},
-
-    updatedAt: ""
-  };
-}
-
-function initialState() {
-  const structures = [];
-
-  function add(
-    building,
-    block,
-    floor,
-    axis,
-    side
-  ) {
-    structures.push(
-      normStruct({
-        building,
-        block,
-        floor,
-        axis,
-        side
-      })
-    );
-  }
-
-  [1,2,3,4,5,6].forEach(floor => {
-
-    add(
-      "Главный корпус",
-      "Блок 1",
-      floor,
-      "А",
-      "море"
-    );
-
-    add(
-      "Главный корпус",
-      "Блок 1",
-      floor,
-      "Г",
-      "штаб"
-    );
-
-  });
-
-  [4,5,6,7].forEach(floor => {
-
-    add(
-      "Главный корпус",
-      "Блок 2",
-      floor,
-      "А",
-      "море"
-    );
-
-    add(
-      "Главный корпус",
-      "Блок 2",
-      floor,
-      "Г",
-      "штаб"
-    );
-
-    add(
-      "Главный корпус",
-      "Блок 3",
-      floor,
-      "А",
-      "море"
-    );
-
-    add(
-      "Главный корпус",
-      "Блок 3",
-      floor,
-      "Г",
-      "штаб"
-    );
-
-  });
-
-  const fronts = [];
-
-  structures.forEach(structure => {
-
-    DEFAULT_WORKS.forEach(work => {
-
-      fronts.push(
-        makeFront(
-          structure,
-          work
-        )
-      );
-
-    });
-
-  });
-
-  return {
-    version: VERSION,
-
-    buildings:
-      [...DEFAULT_BUILDINGS],
-
-    works:
-      [...DEFAULT_WORKS],
-
-    organizations: [],
-
-    structures,
-
-    fronts,
-
-    planLog: [],
-
-    factLog: [],
-
-    resourceLog: [],
-
-    milestones: [],
-
-    demolition:
-      DEM_NAMES.map(name => ({
-        id: uid(),
-        name,
-
-        status:
-          "Не начато",
-
-        contractStart: "",
-        contractEnd: "",
-
-        planStart: "",
-        planEnd: "",
-
-        factStart: "",
-        factEnd: "",
-
-        forecastEnd: "",
-
-        predId: "",
-
-        linkType:
-          "Окончание → Начало",
-
-        lag: 0,
-
-        presented: false,
-        accepted: false,
-
-        acceptedDate: "",
-
-        comment: ""
-      })),
-
-    customFields: [],
-
-    changeLog: []
-  };
-}
-
-function migrate(data) {
-  data.version =
-    VERSION;
-
-  data.buildings =
-    data.buildings ||
-    [...DEFAULT_BUILDINGS];
-
-  data.works =
-    data.works ||
-    [...DEFAULT_WORKS];
-
-  data.organizations =
-    data.organizations ||
-    data.contractors ||
-    [];
-
-  data.customFields =
-    data.customFields ||
-    [];
-
-  data.planLog =
-    data.planLog ||
-    [];
-
-  data.factLog =
-    data.factLog ||
-    [];
-
-  data.resourceLog =
-    data.resourceLog ||
-    [];
-
-  data.milestones =
-    data.milestones ||
-    [];
-
-  data.changeLog =
-    data.changeLog ||
-    [];
-
-  data.structures =
-    (data.structures || [])
-      .map(item => {
-
-        if (
-          !item.axis &&
-          item.side &&
-          item.side.includes("/")
-        ) {
-          const parts =
-            item.side
-              .split("/")
-              .map(x => x.trim());
-
-          item.axis =
-            parts[0] || "";
-
-          item.side =
-            parts
-              .slice(1)
-              .join("/") || "";
-        }
-
-        return normStruct(item);
-      });
-
-  data.fronts =
-    (data.fronts || [])
-      .map(front => {
-
-        const structure =
-          data.structures
-            .find(
-              item =>
-                item.id ===
-                front.structureId
-            ) ||
-          normStruct(front);
-
-        const result = {
-          ...makeFront(
-            structure,
-            front.work || ""
-          ),
-          ...front
-        };
-
-        result.organization =
-          result.organization ||
-          result.contractor ||
-          "";
-
-        result.roomNo =
-          result.roomNo ||
-          result.roomNumber ||
-          structure.roomNo;
-
-        result.customData =
-          result.customData ||
-          {};
-
-        return result;
-      });
-
-  data.demolition =
-    data.demolition ||
-    [];
-
-  return data;
-}
-
-function loadState() {
-
-  try {
-
-    let raw =
-      localStorage
-        .getItem(KEY);
-
-    if (raw) {
-      return migrate(
-        JSON.parse(raw)
-      );
-    }
-
-    for (
-      const oldKey
-      of OLD_KEYS
-    ) {
-
-      raw =
-        localStorage
-          .getItem(oldKey);
-
-      if (raw) {
-
-        const migrated =
-          migrate(
-            JSON.parse(raw)
-          );
-
-        localStorage.setItem(
-          KEY,
-          JSON.stringify(migrated)
-        );
-
-        return migrated;
-      }
-    }
-
-  } catch (error) {
-
-    console.error(
-      "Ошибка чтения",
-      error
-    );
-  }
-
-  return initialState();
-}
-
-let state =
-  loadState();
-
-let selectedFrontId = "";
-let selectedDemId = "";
-let editingMilestoneId = "";
-
-function saveState() {
-
-  localStorage.setItem(
-    KEY,
-    JSON.stringify(state)
-  );
-}
-
-function logChange(
-  entity,
-  id,
-  field,
-  oldValue,
-  newValue
-) {
-
-  if (
-    String(oldValue ?? "") ===
-    String(newValue ?? "")
-  ) {
-    return;
-  }
-
-  state.changeLog.push({
-    id: uid(),
-
-    date:
-      new Date()
-        .toISOString(),
-
-    entity,
-    entityId: id,
-    field,
-
-    oldV:
-      oldValue,
-
-    newV:
-      newValue
-  });
-}
-
-function fill(
-  element,
-  items,
-  allLabel
-) {
-
-  if (!element) {
-    return;
-  }
-
-  const current =
-    element.value;
-
-  element.innerHTML =
-    "";
-
-  if (
-    allLabel !==
-    undefined
-  ) {
-
-    const option =
-      document
-        .createElement("option");
-
-    option.value =
-      "all";
-
-    option.textContent =
-      allLabel;
-
-    element
-      .appendChild(option);
-  }
-
-  items.forEach(value => {
-
-    const option =
-      document
-        .createElement("option");
-
-    option.value =
-      String(value);
-
-    option.textContent =
-      String(value);
-
-    element
-      .appendChild(option);
-  });
-
-  if (
-    [...element.options]
-      .some(
-        option =>
-          option.value ===
-          current
-      )
-  ) {
-    element.value =
-      current;
-  }
-}
-
-function showTab(name) {
-
-  document
-    .querySelectorAll(".tab")
-    .forEach(button => {
-
-      button
-        .classList
-        .toggle(
-          "active",
-          button.dataset.tab ===
-            name
-        );
-    });
-
-  document
-    .querySelectorAll(".panel")
-    .forEach(panel => {
-
-      panel
-        .classList
-        .add("hidden");
-    });
-
-  $("tab-" + name)
-    .classList
-    .remove("hidden");
-
-  if (name === "dashboard") {
-    renderDashboard();
-  }
-
-  if (name === "matrix") {
-    renderMatrix();
-  }
-
-  if (name === "gantt") {
-    renderGantt();
-  }
-
-  if (name === "demolition") {
-    renderDemolition();
-  }
-
-  if (name === "plan") {
-    renderPlan();
-  }
-
-  if (name === "fact") {
-    renderFact();
-  }
-
-  if (name === "resources") {
-    renderResources();
-  }
-
-  if (name === "milestones") {
-    renderMilestones();
-  }
-
-  if (name === "analytics") {
-    renderAnalytics();
-  }
-
-  if (name === "organizations") {
-    renderOrganizations();
-  }
-
-  if (name === "reports") {
-    buildReport();
-  }
-
-  if (name === "history") {
-    renderHistory();
-  }
-
-  if (name === "settings") {
-    renderSettings();
-  }
-}
-
-function initSelects() {
-
-  const buildings =
-    state.buildings;
-
-  const works =
-    state.works;
-
-  const organizations =
-    state.organizations;
-
-  [
-    "mfBuilding",
-    "gBuilding",
-    "plBuilding",
-    "faBuilding",
-    "rsBuilding",
-    "aBuilding",
-    "rBuilding"
-  ]
-    .forEach(id => {
-
-      fill(
-        $(id),
-        buildings,
-        "Все здания"
-      );
-    });
-
-  [
-    "gWork",
-    "plWork",
-    "faWork",
-    "aWork"
-  ]
-    .forEach(id => {
-
-      fill(
-        $(id),
-        works,
-        "Все работы"
-      );
-    });
-
-  [
-    "mfOrganization",
-    "gOrganization",
-    "rsOrganization",
-    "aOrganization",
-    "rOrganization"
-  ]
-    .forEach(id => {
-
-      fill(
-        $(id),
-        organizations,
-        "Все организации"
-      );
-    });
-
-  fill(
-    $("sBuilding"),
-    buildings
-  );
-
-  fill(
-    $("sWork"),
-    works
-  );
-
-  fill(
-    $("fOrganization"),
-    ["", ...organizations]
-  );
-
-  fill(
-    $("resOrganization"),
-    organizations
-  );
-
-  fill(
-    $("resBuilding"),
-    buildings
-  );
-
-  fill(
-    $("msBuilding"),
-    buildings
-  );
-
-  updateMatrixDependent();
-
-  renderMatrixCustomFilters();
-}
-
-function updateMatrixDependent() {
-
-  const building =
-    $("mfBuilding").value;
-
-  const structures =
-    state.structures
-      .filter(
-        item =>
-          building === "all" ||
-          item.building ===
-            building
-      );
-
-  fill(
-    $("mfBlock"),
-    uniq(
-      structures
-        .map(item => item.block)
-    ),
-    "Все блоки"
-  );
-
-  fill(
-    $("mfFloor"),
-    uniq(
-      structures
-        .map(item => item.floor)
-        .filter(
-          value =>
-            Number(value) >= 0
-        )
-        .sort(
-          (a, b) =>
-            Number(a) -
-            Number(b)
-        )
-    ),
-    "Все этажи"
-  );
-
-  fill(
-    $("mfCapture"),
-    uniq(
-      structures
-        .map(item => item.capture)
-    ),
-    "Все захватки"
-  );
-
-  fill(
-    $("mfAxis"),
-    uniq(
-      structures
-        .map(item => item.axis)
-    ),
-    "Все оси"
-  );
-
-  fill(
-    $("mfSide"),
-    uniq(
-      structures
-        .map(item => item.side)
-    ),
-    "Все стороны"
-  );
-
-  fill(
-    $("mfZone"),
-    uniq(
-      structures
-        .map(item => item.zone)
-    ),
-    "Все зоны"
-  );
-}
-
-function getStruct(front) {
-
-  return (
-    state.structures
-      .find(
-        structure =>
-          structure.id ===
-          front.structureId
-      ) ||
-    normStruct(front)
-  );
-}
-
-function cfValue(
-  front,
-  customField
-) {
-
-  if (
-    customField.scope ===
-    "front"
-  ) {
-
-    return (
-      front.customData?.[
-        customField.id
-      ] ?? ""
-    );
-  }
-
-  return (
-    getStruct(front)
-      .customData?.[
-        customField.id
-      ] ?? ""
-  );
-}
-
-function renderMatrixCustomFilters() {
-
-  const fields =
-    state.customFields
-      .filter(
-        field =>
-          field.showInFilters
-      );
-
-  $("matrixCustomFilters")
-    .innerHTML =
-      fields
-        .map(field => {
-
-          const values =
-            uniq(
-              state.fronts
-                .map(
-                  front =>
-                    String(
-                      cfValue(
-                        front,
-                        field
-                      )
-                    )
-                )
-                .filter(Boolean)
-            );
-
-          return `
-            <div class="field">
-              <label>
-                ${esc(field.name)}
-              </label>
-
-              <select id="mcf_${field.id}">
-                <option value="all">
-                  Все
-                </option>
-
-                ${
-                  values
-                    .map(
-                      value =>
-                        `<option>${esc(value)}</option>`
-                    )
-                    .join("")
-                }
-              </select>
-            </div>
-          `;
-        })
-        .join("");
-
-  fields.forEach(field => {
-
-    const element =
-      $("mcf_" + field.id);
-
-    if (element) {
-
-      element
-        .addEventListener(
-          "change",
-          renderMatrix
-        );
-    }
-  });
-}
-
-function matrixMatch(front) {
-
-  const checks = [
-    ["mfBuilding", "building"],
-    ["mfBlock", "block"],
-    ["mfFloor", "floor"],
-    ["mfCapture", "capture"],
-    ["mfAxis", "axis"],
-    ["mfSide", "side"],
-    ["mfZone", "zone"],
-    ["mfOrganization", "organization"],
-    ["mfStatus", "status"]
-  ];
-
-  for (
-    const [id, field]
-    of checks
-  ) {
-
-    const value =
-      $(id).value;
-
-    if (
-      value !== "all" &&
-      String(front[field]) !==
-        value
-    ) {
-      return false;
-    }
-  }
-
-  if (
-    Number(front.floor) < 0
-  ) {
-    return false;
-  }
-
-  for (
-    const customField
-    of state.customFields
-      .filter(
-        field =>
-          field.showInFilters
-      )
-  ) {
-
-    const element =
-      $("mcf_" + customField.id);
-
-    if (
-      element &&
-      element.value !== "all" &&
-      String(
-        cfValue(
-          front,
-          customField
-        )
-      ) !== element.value
-    ) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-function statusClass(status) {
-
-  if (
-    status ===
-    "Фронт готов"
-  ) {
-    return "s-ready";
-  }
-
-  if (
-    status ===
-    "В работе"
-  ) {
-    return "s-work";
-  }
-
-  if (
-    status ===
-    "Завершено"
-  ) {
-    return "s-done";
-  }
-
-  if (
-    status ===
-    "Приостановлено"
-  ) {
-    return "s-pause";
-  }
-
-  if (
-    status ===
-    "Ограничение"
-  ) {
-    return "s-risk";
-  }
-
-  return "s-not";
-}
-
-function frontLabel(front) {
-
-  return [
-    front.building,
-    front.block,
-
-    front.floor !== ""
-      ? front.floor + " эт."
-      : "",
-
-    front.capture
-      ? "захв. " +
-        front.capture
-      : "",
-
-    front.axis
-      ? "ось " +
-        front.axis
-      : "",
-
-    front.side,
-    front.zone,
-
-    front.roomNo
-      ? "пом. " +
-        front.roomNo
-      : "",
-
-    front.work
-  ]
-    .filter(Boolean)
-    .join(" / ");
-}
-
-function renderMatrix() {
-
-  const extraFields =
-    state.customFields
-      .filter(
-        field =>
-          field.showInMatrix &&
-          field.scope ===
-            "structure"
-      );
-
-  $("matrixHead")
-    .innerHTML =
-      "<tr>" +
-
-      "<th>Здание</th>" +
-      "<th>Блок</th>" +
-      "<th>Этаж</th>" +
-      "<th>Захватка</th>" +
-      "<th>Ось</th>" +
-      "<th>Сторона</th>" +
-      "<th>Зона</th>" +
-      "<th>№ помещения</th>" +
-      "<th>Помещение</th>" +
-      "<th>Оборудование</th>" +
-      "<th>Приоритет ФСМ</th>" +
-      "<th>Статус ФСМ</th>" +
-
-      extraFields
-        .map(
-          field =>
-            `<th>${esc(field.name)}</th>`
-        )
-        .join("") +
-
-      state.works
-        .map(
-          work =>
-            `<th>${esc(work)}</th>`
-        )
-        .join("") +
-
-      "</tr>";
-
-  $("matrixBody")
-    .innerHTML =
-      "";
-
-  const groups =
-    new Map();
-
-  state.fronts
-    .filter(matrixMatch)
-    .forEach(front => {
-
-      if (
-        !groups.has(
-          front.structureId
-        )
-      ) {
-
-        groups.set(
-          front.structureId,
-          {
-            structure:
-              getStruct(front),
-
-            items: {}
-          }
-        );
-      }
-
-      groups
-        .get(front.structureId)
-        .items[front.work] =
-          front;
-    });
-
-  groups.forEach(group => {
-
-    const structure =
-      group.structure;
-
-    const row =
-      document
-        .createElement("tr");
-
-    row.innerHTML =
-      `
-        <td>${esc(structure.building)}</td>
-        <td>${esc(structure.block)}</td>
-        <td>${esc(structure.floor)}</td>
-        <td>${esc(structure.capture)}</td>
-        <td>${esc(structure.axis)}</td>
-        <td>${esc(structure.side)}</td>
-        <td>${esc(structure.zone)}</td>
-        <td>${esc(structure.roomNo)}</td>
-        <td>${esc(structure.roomName)}</td>
-        <td>${esc(structure.equipment)}</td>
-        <td>${esc(structure.fsmPriority)}</td>
-        <td>${esc(structure.fsmStatus)}</td>
-      ` +
-
-      extraFields
-        .map(
-          field =>
-            `<td>${
-              esc(
-                structure
-                  .customData?.[
-                    field.id
-                  ] ?? ""
-              )
-            }</td>`
-        )
-        .join("");
-
-    state.works
-      .forEach(work => {
-
-        const front =
-          group.items[work];
-
-        const cell =
-          document
-            .createElement("td");
-
-        if (front) {
-
-          const quantity =
-            front.totalQty
-              ? (
-                  `${front.doneQty || 0}` +
-                  `/` +
-                  `${front.totalQty} ` +
-                  `${front.unit || ""}`
-                )
-              : "";
-
-          cell.innerHTML =
-            `
-              <button
-                class="cellbtn ${statusClass(front.status)}"
-                data-front="${front.id}">
-
-                <b>
-                  ${esc(front.status)}
-                </b>
-
-                <br>
-
-                <small>
-                  ${
-                    esc(
-                      front.factText ||
-                      "Факт не указан"
-                    )
-                  }
-                </small>
-
-                ${
-                  quantity
-                    ? `<br><small>${esc(quantity)}</small>`
-                    : ""
-                }
-
-                ${
-                  front.organization
-                    ? `<br><small>${esc(front.organization)}</small>`
-                    : ""
-                }
-
-                ${
-                  front.accepted
-                    ? "<br><small>✓ сдано</small>"
-                    : ""
-                }
-
-              </button>
-            `;
-        }
-
-        row
-          .appendChild(cell);
-      });
-
-    $("matrixBody")
-      .appendChild(row);
-  });
-
-  document
-    .querySelectorAll(
-      "[data-front]"
-    )
-    .forEach(button => {
-
-      button.onclick =
-        () =>
-          openFront(
-            button.dataset.front
-          );
-    });
-
-  const filtered =
-    state.fronts
-      .filter(matrixMatch);
-
-  $("mTotal").textContent =
-    filtered.length;
-
-  $("mWork").textContent =
-    filtered
-      .filter(
-        item =>
-          item.status ===
-          "В работе"
-      )
-      .length;
-
-  $("mDone").textContent =
-    filtered
-      .filter(
-        item =>
-          item.status ===
-          "Завершено"
-      )
-      .length;
-
-  $("mAccepted").textContent =
-    filtered
-      .filter(
-        item =>
-          item.accepted
-      )
-      .length;
-
-  $("mRisk").textContent =
-    filtered
-      .filter(
-        item =>
-          [
-            "Ограничение",
-            "Приостановлено"
-          ]
-            .includes(
-              item.status
-            )
-      )
-      .length;
-
-  $("mPeople").textContent =
-    filtered
-      .reduce(
-        (sum, item) =>
-          sum +
-          (
-            Number(
-              item.people
-            ) || 0
-          ),
-        0
-      );
-}
-
-function fieldHtml(
-  customField,
-  value,
-  prefix
-) {
-
-  const id =
-    prefix +
-    customField.id;
-
-  if (
-    customField.type ===
-    "boolean"
-  ) {
-
-    return `
-      <div class="field inline">
-
-        <label>
-
-          <input
-            id="${id}"
-            type="checkbox"
-            ${value ? "checked" : ""}>
-
-          ${esc(customField.name)}
-
-        </label>
-
-      </div>
-    `;
-  }
-
-  if (
-    customField.type ===
-    "select"
-  ) {
-
-    return `
-      <div class="field">
-
-        <label>
-          ${esc(customField.name)}
-        </label>
-
-        <select id="${id}">
-
-          <option value=""></option>
-
-          ${
-            (customField.options || [])
-              .map(
-                option =>
-                  `
-                    <option
-                      ${
-                        String(option) ===
-                        String(value)
-                          ? "selected"
-                          : ""
-                      }>
-                      ${esc(option)}
-                    </option>
-                  `
-              )
-              .join("")
-          }
-
-        </select>
-
-      </div>
-    `;
-  }
-
-  const type =
-    customField.type ===
-      "date"
-      ? "date"
-      :
-      [
-        "number",
-        "percent"
-      ]
-        .includes(
-          customField.type
-        )
-        ? "number"
-        : "text";
-
-  return `
-    <div class="field">
-
-      <label>
-        ${esc(customField.name)}
-      </label>
-
-      <input
-        id="${id}"
-        type="${type}"
-        value="${esc(value)}">
-
-    </div>
-  `;
-}
-
-function renderCustomInputs(
-  container,
-  scope,
-  data,
-  prefix
-) {
-
-  container.innerHTML =
-    state.customFields
-      .filter(
-        field =>
-          field.scope ===
-          scope
-      )
-      .map(
-        field =>
-          fieldHtml(
-            field,
-            data?.[
-              field.id
-            ] ?? "",
-            prefix
-          )
-      )
-      .join("");
-}
-
-function readCf(
-  customField,
-  prefix
-) {
-
-  const element =
-    $(
-      prefix +
-      customField.id
-    );
-
-  if (!element) {
-    return "";
-  }
-
-  if (
-    customField.type ===
-    "boolean"
-  ) {
-    return element.checked;
-  }
-
-  if (
-    [
-      "number",
-      "percent"
-    ]
-      .includes(
-        customField.type
-      ) &&
-    element.value !== ""
-  ) {
-    return Number(
-      element.value
-    );
-  }
-
-  return element.value;
-}
-
-function openFront(id) {
-
-  const front =
-    state.fronts
-      .find(
-        item =>
-          item.id === id
-      );
-
-  if (!front) {
-    return;
-  }
-
-  selectedFrontId =
-    id;
-
-  $("frontTitle")
-    .textContent =
-      front.work;
-
-  $("frontMeta")
-    .textContent =
-      frontLabel(front);
-
-  const map = {
-    fStatus:
-      "status",
-
-    fResponsible:
-      "responsible",
-
-    fContractStart:
-      "contractStart",
-
-    fContractEnd:
-      "contractEnd",
-
-    fBaselineStart:
-      "baselineStart",
-
-    fBaselineEnd:
-      "baselineEnd",
-
-    fPlanStart:
-      "planStart",
-
-    fPlanEnd:
-      "planEnd",
-
-    fFactStart:
-      "factStart",
-
-    fFactEnd:
-      "factEnd",
-
-    fForecastEnd:
-      "forecastEnd",
-
-    fUnit:
-      "unit",
-
-    fTotalQty:
-      "totalQty",
-
-    fDoneQty:
-      "doneQty",
-
-    fPeople:
-      "people",
-
-    fLink:
-      "linkType",
-
-    fLag:
-      "lag",
-
-    fAcceptedDate:
-      "acceptedDate",
-
-    fFactText:
-      "factText",
-
-    fConstraint:
-      "constraint"
-  };
-
-  Object
-    .entries(map)
-    .forEach(
-      ([id, field]) => {
-
-        $(id).value =
-          front[field] ?? "";
-      }
-    );
-
-  fill(
-    $("fOrganization"),
-    [
-      "",
-      ...state.organizations
-    ]
-  );
-
-  $("fOrganization").value =
-    front.organization ||
-    "";
-
-  $("fCompleted").checked =
-    !!front.completed;
-
-  $("fPresented").checked =
-    !!front.presented;
-
-  $("fAccepted").checked =
-    !!front.accepted;
-
-  $("fPred").innerHTML =
-    '<option value="">Нет связи</option>' +
-
-    state.fronts
-      .filter(
-        item =>
-          item.id !==
-          front.id
-      )
-      .map(
-        item =>
-          `
-            <option value="${item.id}">
-              ${esc(frontLabel(item))}
-            </option>
-          `
-      )
-      .join("");
-
-  $("fPred").value =
-    front.predId || "";
-
-  renderCustomInputs(
-    $("frontExtraFields"),
-    "front",
-    front.customData,
-    "fcf_"
-  );
-
-  $("frontEditor")
-    .classList
-    .remove("hidden");
-
-  $("frontEditor")
-    .scrollIntoView({
-      behavior:
-        "smooth"
-    });
-}
-
-function saveFrontCard() {
-
-  const front =
-    state.fronts
-      .find(
-        item =>
-          item.id ===
-          selectedFrontId
-      );
-
-  if (!front) {
-    return;
-  }
-
-  const values = {
-    status:
-      $("fStatus").value,
-
-    organization:
-      $("fOrganization").value,
-
-    responsible:
-      $("fResponsible").value,
-
-    contractStart:
-      $("fContractStart").value,
-
-    contractEnd:
-      $("fContractEnd").value,
-
-    baselineStart:
-      $("fBaselineStart").value,
-
-    baselineEnd:
-      $("fBaselineEnd").value,
-
-    planStart:
-      $("fPlanStart").value,
-
-    planEnd:
-      $("fPlanEnd").value,
-
-    factStart:
-      $("fFactStart").value,
-
-    factEnd:
-      $("fFactEnd").value,
-
-    forecastEnd:
-      $("fForecastEnd").value,
-
-    unit:
-      $("fUnit").value,
-
-    totalQty:
-      $("fTotalQty").value,
-
-    doneQty:
-      $("fDoneQty").value,
-
-    people:
-      $("fPeople").value,
-
-    predId:
-      $("fPred").value,
-
-    linkType:
-      $("fLink").value,
-
-    lag:
-      Number(
-        $("fLag").value
-      ) || 0,
-
-    completed:
-      $("fCompleted").checked,
-
-    presented:
-      $("fPresented").checked,
-
-    accepted:
-      $("fAccepted").checked,
-
-    acceptedDate:
-      $("fAcceptedDate").value,
-
-    factText:
-      $("fFactText").value,
-
-    constraint:
-      $("fConstraint").value
-  };
-
-  Object
-    .entries(values)
-    .forEach(
-      ([field, value]) => {
-
-        logChange(
-          "Работа",
-          front.id,
-          field,
-          front[field],
-          value
-        );
-
-        front[field] =
-          value;
-      }
-    );
-
-  front.customData =
-    front.customData ||
-    {};
-
-  state.customFields
-    .filter(
-      field =>
-        field.scope ===
-        "front"
-    )
-    .forEach(field => {
-
-      const value =
-        readCf(
-          field,
-          "fcf_"
-        );
-
-      logChange(
-        "Работа",
-        front.id,
-        field.name,
-        front.customData[
-          field.id
-        ],
-        value
-      );
-
-      front.customData[
-        field.id
-      ] = value;
-    });
-
-  front.updatedAt =
-    new Date()
-      .toISOString();
-
-  saveState();
-
-  renderAll();
-
-  $("frontMeta")
-    .textContent =
-      frontLabel(front) +
-      " · сохранено";
-}
-
-function modeDates(
-  front,
-  mode
-) {
-
-  if (
-    mode ===
-    "contract"
-  ) {
-    return [
-      front.contractStart,
-      front.contractEnd
-    ];
-  }
-
-  if (
-    mode ===
-    "baseline"
-  ) {
-    return [
-      front.baselineStart,
-      front.baselineEnd
-    ];
-  }
-
-  if (
-    mode ===
-    "fact"
-  ) {
-    return [
-      front.factStart,
-      front.factEnd ||
-      front.factStart
-    ];
-  }
-
-  if (
-    mode ===
-    "forecast"
-  ) {
-    return [
-      front.planStart ||
-      front.factStart,
-
-      front.forecastEnd ||
-      front.planEnd
-    ];
-  }
-
-  return [
-    front.planStart,
-    front.planEnd
-  ];
-}
-
-function renderGantt() {
-
-  const building =
-    $("gBuilding").value;
-
-  const work =
-    $("gWork").value;
-
-  const organization =
-    $("gOrganization").value;
-
-  const mode =
-    $("gMode").value;
-
-  const fronts =
-    state.fronts
-      .filter(
-        front =>
-          (
-            building === "all" ||
-            front.building ===
-              building
-          ) &&
-          (
-            work === "all" ||
-            front.work ===
-              work
-          ) &&
-          (
-            organization === "all" ||
-            front.organization ===
-              organization
-          )
-      );
-
-  const valid =
-    fronts
-      .map(
-        front => ({
-          front,
-          dates:
-            modeDates(
-              front,
-              mode
-            )
-        })
-      )
-      .filter(
-        item =>
-          item.dates[0] &&
-          item.dates[1]
-      );
-
-  if (
-    !valid.length
-  ) {
-
-    $("gantt")
-      .innerHTML =
-        `
-          <div
-            class="muted"
-            style="padding:14px">
-
-            Нет работ с заполненными датами
-            для выбранного слоя.
-
-          </div>
-        `;
-
-    return;
-  }
-
-  const min =
-    valid
-      .map(
-        item =>
-          item.dates[0]
-      )
-      .sort()[0];
-
-  const max =
-    valid
-      .map(
-        item =>
-          item.dates[1]
-      )
-      .sort()
-      .slice(-1)[0];
-
-  const total =
-    Math.max(
-      1,
-      diffDays(
-        min,
-        max
-      ) + 1
-    );
-
-  $("gantt")
-    .innerHTML =
-      valid
-        .map(item => {
-
-          const front =
-            item.front;
-
-          const dates =
-            item.dates;
-
-          const left =
-            (
-              diffDays(
-                min,
-                dates[0]
-              ) /
-              total
-            ) * 100;
-
-          const width =
-            Math.max(
-              1,
-              (
-                (
-                  diffDays(
-                    dates[0],
-                    dates[1]
-                  ) + 1
-                ) /
-                total
-              ) * 100
-            );
-
-          return `
-            <div class="gantt-row">
-
-              <div class="gantt-name">
-
-                <b>
-                  ${esc(front.work)}
-                </b>
-
-                <br>
-
-                <small>
-                  ${esc(frontLabel(front))}
-                </small>
-
-                <br>
-
-                <button
-                  class="btn small shift"
-                  data-id="${front.id}"
-                  data-n="-7">
-                  −7
-                </button>
-
-                <button
-                  class="btn small shift"
-                  data-id="${front.id}"
-                  data-n="-1">
-                  −1
-                </button>
-
-                <button
-                  class="btn small shift"
-                  data-id="${front.id}"
-                  data-n="1">
-                  +1
-                </button>
-
-                <button
-                  class="btn small shift"
-                  data-id="${front.id}"
-                  data-n="7">
-                  +7
-                </button>
-
-              </div>
-
-              <div class="gantt-line">
-
-                <div
-                  class="gantt-bar ${mode}"
-                  data-gfront="${front.id}"
-                  style="
-                    left:${left}%;
-                    width:${width}%
-                  ">
-
-                  ${dates[0]}
-                  →
-                  ${dates[1]}
-
-                </div>
-
-              </div>
-
-            </div>
-          `;
-        })
-        .join("");
-
-  document
-    .querySelectorAll(
-      "[data-gfront]"
-    )
-    .forEach(element => {
-
-      element.onclick =
-        () => {
-
-          showTab("matrix");
-
-          openFront(
-            element.dataset.gfront
-          );
-        };
-    });
-
-  document
-    .querySelectorAll(
-      ".shift"
-    )
-    .forEach(button => {
-
-      button.onclick =
-        () =>
-          shiftFront(
-            button.dataset.id,
-            Number(
-              button.dataset.n
-            ),
-            mode
-          );
-    });
-}
-
-function shiftFront(
-  id,
-  days,
-  mode
-) {
-
-  const front =
-    state.fronts
-      .find(
-        item =>
-          item.id === id
-      );
-
-  if (!front) {
-    return;
-  }
-
-  const map = {
-    contract:
-      [
-        "contractStart",
-        "contractEnd"
-      ],
-
-    baseline:
-      [
-        "baselineStart",
-        "baselineEnd"
-      ],
-
-    plan:
-      [
-        "planStart",
-        "planEnd"
-      ],
-
-    fact:
-      [
-        "factStart",
-        "factEnd"
-      ],
-
-    forecast:
-      [
-        "planStart",
-        "forecastEnd"
-      ]
-  };
-
-  const fields =
-    map[mode];
-
-  fields.forEach(field => {
-
-    if (front[field]) {
-
-      const oldValue =
-        front[field];
-
-      const newValue =
-        addDays(
-          front[field],
-          days
-        );
-
-      logChange(
-        "Работа",
-        front.id,
-        field,
-        oldValue,
-        newValue
-      );
-
-      front[field] =
-        newValue;
-    }
-  });
-
-  saveState();
-
-  renderGantt();
-}
-
-function recalcLinks() {
-
-  let changed = 0;
-
-  for (
-    let pass = 0;
-    pass < 5;
-    pass++
-  ) {
-
-    for (
-      const front
-      of state.fronts
-    ) {
-
-      if (!front.predId) {
-        continue;
-      }
-
-      const predecessor =
-        state.fronts
-          .find(
-            item =>
-              item.id ===
-              front.predId
-          );
-
-      if (!predecessor) {
-        continue;
-      }
-
-      const lag =
-        Number(front.lag) ||
-        0;
-
-      const duration =
-        (
-          front.planStart &&
-          front.planEnd
-        )
-          ?
-          diffDays(
-            front.planStart,
-            front.planEnd
-          )
-          :
-          0;
-
-      let newStart = "";
-      let newEnd = "";
-
-      if (
-        front.linkType ===
-          "Окончание → Начало" &&
-        predecessor.planEnd
-      ) {
-
-        newStart =
-          addDays(
-            predecessor.planEnd,
-            lag + 1
-          );
-
-        newEnd =
-          addDays(
-            newStart,
-            duration
-          );
-      }
-
-      if (
-        front.linkType ===
-          "Начало → Начало" &&
-        predecessor.planStart
-      ) {
-
-        newStart =
-          addDays(
-            predecessor.planStart,
-            lag
-          );
-
-        newEnd =
-          addDays(
-            newStart,
-            duration
-          );
-      }
-
-      if (
-        front.linkType ===
-          "Окончание → Окончание" &&
-        predecessor.planEnd
-      ) {
-
-        newEnd =
-          addDays(
-            predecessor.planEnd,
-            lag
-          );
-
-        newStart =
-          addDays(
-            newEnd,
-            -duration
-          );
-      }
-
-      if (
-        front.linkType ===
-          "Начало → Окончание" &&
-        predecessor.planStart
-      ) {
-
-        newEnd =
-          addDays(
-            predecessor.planStart,
-            lag
-          );
-
-        newStart =
-          addDays(
-            newEnd,
-            -duration
-          );
-      }
-
-      if (
-        newStart &&
-        front.planStart !==
-          newStart
-      ) {
-
-        logChange(
-          "Работа",
-          front.id,
-          "planStart",
-          front.planStart,
-          newStart
-        );
-
-        front.planStart =
-          newStart;
-
-        front.planEnd =
-          newEnd;
-
-        changed++;
-      }
-    }
-  }
-
-  saveState();
-
-  renderAll();
-
-  alert(
-    "Пересчитано работ: " +
-    changed
-  );
-}
-
-function fillFrontSelect(
-  element
-) {
-
-  element.innerHTML =
-    state.fronts
-      .map(
-        front =>
-          `
-            <option value="${front.id}">
-              ${esc(frontLabel(front))}
-            </option>
-          `
-      )
-      .join("");
-}
-
-function openPlan(
-  frontId = ""
-) {
-
-  fillFrontSelect(
-    $("planFront")
-  );
-
-  if (frontId) {
-    $("planFront").value =
-      frontId;
-  }
-
-  $("planDate").value =
-    today();
-
-  $("planQty").value =
-    "";
-
-  $("planPeople").value =
-    "";
-
-  $("planComment").value =
-    "";
-
-  const front =
-    state.fronts
-      .find(
-        item =>
-          item.id ===
-          $("planFront").value
-      );
-
-  $("planMeta")
-    .textContent =
-      front
-        ? frontLabel(front)
-        : "";
-
-  $("planEditor")
-    .classList
-    .remove("hidden");
-}
-
-function savePlanRow() {
-
-  const frontId =
-    $("planFront").value;
-
-  if (
-    !frontId ||
-    !$("planDate").value
-  ) {
-    return;
-  }
-
-  state.planLog.push({
-    id: uid(),
-
-    frontId,
-
-    date:
-      $("planDate").value,
-
-    qty:
-      Number(
-        $("planQty").value
-      ) || 0,
-
-    people:
-      Number(
-        $("planPeople").value
-      ) || 0,
-
-    comment:
-      $("planComment").value
-  });
-
-  saveState();
-
-  renderPlan();
-}
-
-function renderPlan() {
-
-  fill(
-    $("plBuilding"),
-    state.buildings,
-    "Все здания"
-  );
-
-  fill(
-    $("plWork"),
-    state.works,
-    "Все работы"
-  );
-
-  const rows =
-    state.planLog
-      .filter(row => {
-
-        const front =
-          state.fronts
-            .find(
-              item =>
-                item.id ===
-                row.frontId
-            );
-
-        return (
-          front &&
-
-          (
-            !$("plFrom").value ||
-            row.date >=
-              $("plFrom").value
-          ) &&
-
-          (
-            !$("plTo").value ||
-            row.date <=
-              $("plTo").value
-          ) &&
-
-          (
-            $("plBuilding").value ===
-              "all" ||
-            front.building ===
-              $("plBuilding").value
-          ) &&
-
-          (
-            $("plWork").value ===
-              "all" ||
-            front.work ===
-              $("plWork").value
-          )
-        );
-      })
-      .sort(
-        (a, b) =>
-          b.date
-            .localeCompare(
-              a.date
-            )
-      );
-
-  $("planBody")
-    .innerHTML =
-      rows
-        .map(row => {
-
-          const front =
-            state.fronts
-              .find(
-                item =>
-                  item.id ===
-                  row.frontId
-              );
-
-          return `
-            <tr>
-              <td>${row.date}</td>
-
-              <td>
-                ${esc(frontLabel(front))}
-              </td>
-
-              <td>${row.qty}</td>
-
-              <td>${row.people}</td>
-
-              <td>
-                ${esc(row.comment || "")}
-              </td>
-
-              <td>
-                <button
-                  class="btn small delPlan"
-                  data-id="${row.id}">
-                  Удалить
-                </button>
-              </td>
-            </tr>
-          `;
-        })
-        .join("");
-
-  document
-    .querySelectorAll(
-      ".delPlan"
-    )
-    .forEach(button => {
-
-      button.onclick =
-        () => {
-
-          state.planLog =
-            state.planLog
-              .filter(
-                item =>
-                  item.id !==
-                  button.dataset.id
-              );
-
-          saveState();
-
-          renderPlan();
-        };
-    });
-}
-
-function openFact(
-  frontId = ""
-) {
-
-  fillFrontSelect(
-    $("factFront")
-  );
-
-  if (frontId) {
-    $("factFront").value =
-      frontId;
-  }
-
-  $("factDate").value =
-    today();
-
-  const front =
-    state.fronts
-      .find(
-        item =>
-          item.id ===
-          $("factFront").value
-      );
-
-  $("factMeta")
-    .textContent =
-      front
-        ? frontLabel(front)
-        : "";
-
-  $("factQty").value =
-    "";
-
-  $("factCum").value =
-    front?.doneQty || "";
-
-  $("factPeople").value =
-    front?.people || "";
-
-  $("factStatus").value =
-    front?.status ||
-    "В работе";
-
-  $("factComment").value =
-    "";
-
-  $("factEditor")
-    .classList
-    .remove("hidden");
-}
-
-function saveFactRow() {
-
-  const frontId =
-    $("factFront").value;
-
-  const front =
-    state.fronts
-      .find(
-        item =>
-          item.id ===
-          frontId
-      );
-
-  if (
-    !front ||
-    !$("factDate").value
-  ) {
-    return;
-  }
-
-  state.factLog.push({
-    id: uid(),
-
-    frontId,
-
-    date:
-      $("factDate").value,
-
-    qty:
-      Number(
-        $("factQty").value
-      ) || 0,
-
-    cum:
-      $("factCum").value === ""
-        ? null
-        : Number(
-            $("factCum").value
-          ),
-
-    people:
-      Number(
-        $("factPeople").value
-      ) || 0,
-
-    status:
-      $("factStatus").value,
-
-    comment:
-      $("factComment").value
-  });
-
-  if (
-    $("factCum").value !== ""
-  ) {
-
-    front.doneQty =
-      Number(
-        $("factCum").value
-      );
-  }
-
-  front.people =
-    Number(
-      $("factPeople").value
-    ) || "";
-
-  front.status =
-    $("factStatus").value;
-
-  if (
-    $("factComment").value
-  ) {
-
-    front.factText =
-      $("factComment").value;
-  }
-
-  saveState();
-
-  renderAll();
-}
-
-function renderFact() {
-
-  fill(
-    $("faBuilding"),
-    state.buildings,
-    "Все здания"
-  );
-
-  fill(
-    $("faWork"),
-    state.works,
-    "Все работы"
-  );
-
-  const rows =
-    state.factLog
-      .filter(row => {
-
-        const front =
-          state.fronts
-            .find(
-              item =>
-                item.id ===
-                row.frontId
-            );
-
-        return (
-          front &&
-
-          (
-            !$("faFrom").value ||
-            row.date >=
-              $("faFrom").value
-          ) &&
-
-          (
-            !$("faTo").value ||
-            row.date <=
-              $("faTo").value
-          ) &&
-
-          (
-            $("faBuilding").value ===
-              "all" ||
-            front.building ===
-              $("faBuilding").value
-          ) &&
-
-          (
-            $("faWork").value ===
-              "all" ||
-            front.work ===
-              $("faWork").value
-          )
-        );
-      })
-      .sort(
-        (a, b) =>
-          b.date
-            .localeCompare(
-              a.date
-            )
-      );
-
-  $("factBody")
-    .innerHTML =
-      rows
-        .map(row => {
-
-          const front =
-            state.fronts
-              .find(
-                item =>
-                  item.id ===
-                  row.frontId
-              );
-
-          return `
-            <tr>
-
-              <td>${row.date}</td>
-
-              <td>
-                ${esc(frontLabel(front))}
-              </td>
-
-              <td>${row.qty}</td>
-
-              <td>
-                ${
-                  row.cum ??
-                  "—"
-                }
-              </td>
-
-              <td>${row.people}</td>
-
-              <td>
-                ${esc(row.status)}
-              </td>
-
-              <td>
-                ${esc(row.comment || "")}
-              </td>
-
-              <td>
-
-                <button
-                  class="btn small delFact"
-                  data-id="${row.id}">
-                  Удалить
-                </button>
-
-              </td>
-
-            </tr>
-          `;
-        })
-        .join("");
-
-  document
-    .querySelectorAll(
-      ".delFact"
-    )
-    .forEach(button => {
-
-      button.onclick =
-        () => {
-
-          state.factLog =
-            state.factLog
-              .filter(
-                item =>
-                  item.id !==
-                  button.dataset.id
-              );
-
-          saveState();
-
-          renderFact();
-        };
-    });
-}
-
-function resourceRowsFiltered() {
-
-  return state.resourceLog
-    .filter(row =>
-
-      (
-        !$("rsFrom").value ||
-        row.date >=
-          $("rsFrom").value
-      ) &&
-
-      (
-        !$("rsTo").value ||
-        row.date <=
-          $("rsTo").value
-      ) &&
-
-      (
-        $("rsOrganization").value ===
-          "all" ||
-        row.organization ===
-          $("rsOrganization").value
-      ) &&
-
-      (
-        $("rsBuilding").value ===
-          "all" ||
-        row.building ===
-          $("rsBuilding").value
-      )
-    );
-}
-
-function openResource() {
-
-  fill(
-    $("resOrganization"),
-    state.organizations
-  );
-
-  fill(
-    $("resBuilding"),
-    state.buildings
-  );
-
-  $("resDate").value =
-    today();
-
-  [
-    "resItr",
-    "resWorkers",
-    "resMechanizers",
-    "resEquipmentQty",
-    "resComment"
-  ]
-    .forEach(
-      id =>
-        $(id).value = ""
-    );
-
-  $("resEquipmentType").value =
-    "";
-
-  $("resourceEditor")
-    .classList
-    .remove("hidden");
-}
-
-function saveResourceRow() {
-
-  if (
-    !$("resDate").value ||
-    !$("resOrganization").value
-  ) {
-
-    alert(
-      "Укажи дату и организацию."
-    );
-
-    return;
-  }
-
-  state.resourceLog.push({
-    id: uid(),
-
-    date:
-      $("resDate").value,
-
-    organization:
-      $("resOrganization").value,
-
-    building:
-      $("resBuilding").value,
-
-    itr:
-      Number(
-        $("resItr").value
-      ) || 0,
-
-    workers:
-      Number(
-        $("resWorkers").value
-      ) || 0,
-
-    mechanizers:
-      Number(
-        $("resMechanizers").value
-      ) || 0,
-
-    equipmentType:
-      $("resEquipmentType").value,
-
-    equipmentQty:
-      Number(
-        $("resEquipmentQty").value
-      ) || 0,
-
-    comment:
-      $("resComment").value
-  });
-
-  saveState();
-
-  renderAll();
-}
-
-function renderResources() {
-
-  fill(
-    $("rsOrganization"),
-    state.organizations,
-    "Все организации"
-  );
-
-  fill(
-    $("rsBuilding"),
-    state.buildings,
-    "Все здания"
-  );
-
-  const rows =
-    resourceRowsFiltered()
-      .sort(
-        (a, b) =>
-          b.date
-            .localeCompare(
-              a.date
-            )
-      );
-
-  const sum =
-    field =>
-      rows.reduce(
-        (total, row) =>
-          total +
-          (
-            Number(
-              row[field]
-            ) || 0
-          ),
-        0
-      );
-
-  const totalPeople =
-    sum("itr") +
-    sum("workers") +
-    sum("mechanizers");
-
-  const daily = {};
-
-  rows.forEach(row => {
-
-    daily[row.date] =
-      (
-        daily[row.date] ||
-        0
-      ) +
-
-      Number(
-        row.itr || 0
-      ) +
-
-      Number(
-        row.workers || 0
-      ) +
-
-      Number(
-        row.mechanizers || 0
-      );
-  });
-
-  const peak =
-    Math.max(
-      0,
-      ...Object.values(daily)
-    );
-
-  $("resourceSummary")
-    .innerHTML =
-      `
-        <div class="resource-card">
-          <span>ИТР, человеко-дни</span>
-          <strong>${sum("itr")}</strong>
-        </div>
-
-        <div class="resource-card">
-          <span>Рабочие, человеко-дни</span>
-          <strong>${sum("workers")}</strong>
-        </div>
-
-        <div class="resource-card">
-          <span>Механизаторы, человеко-дни</span>
-          <strong>${sum("mechanizers")}</strong>
-        </div>
-
-        <div class="resource-card">
-          <span>Всего человеко-дней</span>
-          <strong>${totalPeople}</strong>
-        </div>
-
-        <div class="resource-card">
-          <span>Пиковая численность</span>
-          <strong>${peak}</strong>
-        </div>
-
-        <div class="resource-card">
-          <span>Технико-дни</span>
-          <strong>${sum("equipmentQty")}</strong>
-        </div>
-      `;
-
-  const organizations =
-    {};
-
-  rows.forEach(row => {
-
-    if (
-      !organizations[
-        row.organization
-      ]
-    ) {
-
-      organizations[
-        row.organization
-      ] = {
-        people: 0,
-        equipment: 0
-      };
-    }
-
-    organizations[
-      row.organization
-    ].people +=
-
-      Number(row.itr || 0) +
-      Number(row.workers || 0) +
-      Number(row.mechanizers || 0);
-
-    organizations[
-      row.organization
-    ].equipment +=
-
-      Number(
-        row.equipmentQty || 0
-      );
-  });
-
-  $("resourceByOrg")
-    .innerHTML =
-      Object
-        .entries(
-          organizations
-        )
-        .map(
-          ([name, value]) =>
-            `
-              <div class="item">
-
-                <span>
-                  ${esc(name)}
-                </span>
-
-                <strong>
-                  ${value.people}
-                  чел.-дн.
-                  ·
-                  ${value.equipment}
-                  тех.-дн.
-                </strong>
-
-              </div>
-            `
-        )
-        .join("") ||
-
-      '<div class="muted">Нет данных</div>';
-
-  const equipment =
-    {};
-
-  rows.forEach(row => {
-
-    if (
-      row.equipmentType
-    ) {
-
-      equipment[
-        row.equipmentType
-      ] =
-        (
-          equipment[
-            row.equipmentType
-          ] ||
-          0
-        ) +
-
-        Number(
-          row.equipmentQty || 0
-        );
-    }
-  });
-
-  $("resourceEquipmentSummary")
-    .innerHTML =
-      Object
-        .entries(
-          equipment
-        )
-        .map(
-          ([name, quantity]) =>
-            `
-              <div class="item">
-
-                <span>
-                  ${esc(name)}
-                </span>
-
-                <strong>
-                  ${quantity}
-                </strong>
-
-              </div>
-            `
-        )
-        .join("") ||
-
-      '<div class="muted">Нет данных</div>';
-
-  $("resourceBody")
-    .innerHTML =
-      rows
-        .map(row => {
-
-          const total =
-            Number(row.itr) +
-            Number(row.workers) +
-            Number(row.mechanizers);
-
-          return `
-            <tr>
-
-              <td>
-                ${row.date}
-              </td>
-
-              <td>
-                ${esc(row.organization)}
-              </td>
-
-              <td>
-                ${esc(row.building)}
-              </td>
-
-              <td>
-                ${row.itr}
-              </td>
-
-              <td>
-                ${row.workers}
-              </td>
-
-              <td>
-                ${row.mechanizers}
-              </td>
-
-              <td>
-                ${total}
-              </td>
-
-              <td>
-                ${esc(row.equipmentType || "—")}
-              </td>
-
-              <td>
-                ${row.equipmentQty || 0}
-              </td>
-
-              <td>
-                ${esc(row.comment || "")}
-              </td>
-
-              <td>
-
-                <button
-                  class="btn small delRes"
-                  data-id="${row.id}">
-                  Удалить
-                </button>
-
-              </td>
-
-            </tr>
-          `;
-        })
-        .join("");
-
-  document
-    .querySelectorAll(
-      ".delRes"
-    )
-    .forEach(button => {
-
-      button.onclick =
-        () => {
-
-          state.resourceLog =
-            state.resourceLog
-              .filter(
-                item =>
-                  item.id !==
-                  button.dataset.id
-              );
-
-          saveState();
-
-          renderResources();
-        };
-    });
-}
-
-function renderDemolition() {
-
-  const items =
-    state.demolition;
-
-  $("demBody")
-    .innerHTML =
-      items
-        .map(item => {
-
-          const basis =
-            item.factEnd ||
-            item.forecastEnd ||
-            item.planEnd;
-
-          const delta =
-            diffDays(
-              item.contractEnd,
-              basis
-            );
-
-          return `
-            <tr>
-
-              <td>
-
-                <button
-                  class="btn small openDem"
-                  data-id="${item.id}">
-
-                  ${esc(item.name)}
-
-                </button>
-
-              </td>
-
-              <td>
-                ${esc(item.status)}
-              </td>
-
-              <td>
-                ${item.contractStart || "—"}
-                →
-                ${item.contractEnd || "—"}
-              </td>
-
-              <td>
-                ${item.planStart || "—"}
-                →
-                ${item.planEnd || "—"}
-              </td>
-
-              <td>
-                ${item.factStart || "—"}
-                →
-                ${item.factEnd || "—"}
-              </td>
-
-              <td>
-                ${item.forecastEnd || "—"}
-              </td>
-
-              <td>
-                ${
-                  esc(
-                    state.demolition
-                      .find(
-                        other =>
-                          other.id ===
-                          item.predId
-                      )
-                      ?.name ||
-                    "—"
-                  )
-                }
-              </td>
-
-              <td>
-                ${
-                  item.accepted
-                    ? "Сдано"
-                    :
-                    item.presented
-                      ? "Предъявлено"
-                      : "—"
-                }
-              </td>
-
-              <td
-                class="${
-                  delta > 0
-                    ? "late"
-                    :
-                    delta < 0
-                      ? "good"
-                      : ""
-                }">
-
-                ${
-                  delta === null
-                    ? "—"
-                    :
-                    (
-                      delta > 0
-                        ? "+"
-                        : ""
-                    ) +
-                    delta +
-                    " дн."
-                }
-
-              </td>
-
-            </tr>
-          `;
-        })
-        .join("");
-
-  document
-    .querySelectorAll(
-      ".openDem"
-    )
-    .forEach(button => {
-
-      button.onclick =
-        () =>
-          openDem(
-            button.dataset.id
-          );
-    });
-
-  $("demTotal").textContent =
-    items.length;
-
-  $("demWork").textContent =
-    items
-      .filter(
-        item =>
-          item.status ===
-          "В работе"
-      )
-      .length;
-
-  $("demDone").textContent =
-    items
-      .filter(
-        item =>
-          item.status ===
-          "Завершено"
-      )
-      .length;
-
-  $("demAccepted").textContent =
-    items
-      .filter(
-        item =>
-          item.accepted
-      )
-      .length;
-
-  $("demLate").textContent =
-    items
-      .filter(item => {
-
-        const delta =
-          diffDays(
-            item.contractEnd,
-            item.factEnd ||
-            item.forecastEnd ||
-            item.planEnd
-          );
-
-        return delta > 0;
-      })
-      .length;
-}
-
-function openDem(id) {
-
-  const item =
-    state.demolition
-      .find(
-        demolition =>
-          demolition.id === id
-      );
-
-  if (!item) {
-    return;
-  }
-
-  selectedDemId =
-    id;
-
-  $("demTitle")
-    .textContent =
-      item.name;
-
-  const map = {
-    deStatus:
-      "status",
-
-    deContractStart:
-      "contractStart",
-
-    deContractEnd:
-      "contractEnd",
-
-    dePlanStart:
-      "planStart",
-
-    dePlanEnd:
-      "planEnd",
-
-    deFactStart:
-      "factStart",
-
-    deFactEnd:
-      "factEnd",
-
-    deForecastEnd:
-      "forecastEnd",
-
-    deLink:
-      "linkType",
-
-    deLag:
-      "lag",
-
-    deAcceptedDate:
-      "acceptedDate",
-
-    deComment:
-      "comment"
-  };
-
-  Object
-    .entries(map)
-    .forEach(
-      ([id, field]) => {
-
-        $(id).value =
-          item[field] ?? "";
-      }
-    );
-
-  $("dePresented").checked =
-    !!item.presented;
-
-  $("deAccepted").checked =
-    !!item.accepted;
-
-  $("dePred").innerHTML =
-    '<option value="">Нет связи</option>' +
-
-    state.demolition
-      .filter(
-        other =>
-          other.id !== id
-      )
-      .map(
-        other =>
-          `
-            <option value="${other.id}">
-              ${esc(other.name)}
-            </option>
-          `
-      )
-      .join("");
-
-  $("dePred").value =
-    item.predId || "";
-
-  $("demEditor")
-    .classList
-    .remove("hidden");
-}
-
-function saveDem() {
-
-  const item =
-    state.demolition
-      .find(
-        demolition =>
-          demolition.id ===
-          selectedDemId
-      );
-
-  if (!item) {
-    return;
-  }
-
-  const values = {
-    status:
-      $("deStatus").value,
-
-    contractStart:
-      $("deContractStart").value,
-
-    contractEnd:
-      $("deContractEnd").value,
-
-    planStart:
-      $("dePlanStart").value,
-
-    planEnd:
-      $("dePlanEnd").value,
-
-    factStart:
-      $("deFactStart").value,
-
-    factEnd:
-      $("deFactEnd").value,
-
-    forecastEnd:
-      $("deForecastEnd").value,
-
-    predId:
-      $("dePred").value,
-
-    linkType:
-      $("deLink").value,
-
-    lag:
-      Number(
-        $("deLag").value
-      ) || 0,
-
-    presented:
-      $("dePresented").checked,
-
-    accepted:
-      $("deAccepted").checked,
-
-    acceptedDate:
-      $("deAcceptedDate").value,
-
-    comment:
-      $("deComment").value
-  };
-
-  Object
-    .entries(values)
-    .forEach(
-      ([field, value]) => {
-
-        logChange(
-          "Демонтаж",
-          item.id,
-          field,
-          item[field],
-          value
-        );
-
-        item[field] =
-          value;
-      }
-    );
-
-  saveState();
-
-  renderDemolition();
-}
-
-function renderMilestones() {
-
-  $("milestoneBody")
-    .innerHTML =
-      state.milestones
-        .map(item => {
-
-          const basis =
-            item.fact ||
-            item.forecast;
-
-          const delta =
-            diffDays(
-              item.contract,
-              basis
-            );
-
-          return `
-            <tr>
-
-              <td>
-                ${esc(item.building)}
-              </td>
-
-              <td>
-                ${esc(item.title)}
-              </td>
-
-              <td>
-                ${item.contract || "—"}
-              </td>
-
-              <td>
-                ${item.forecast || "—"}
-              </td>
-
-              <td>
-                ${item.fact || "—"}
-              </td>
-
-              <td>
-                ${esc(item.status)}
-              </td>
-
-              <td
-                class="${
-                  delta > 0
-                    ? "late"
-                    :
-                    delta < 0
-                      ? "good"
-                      : ""
-                }">
-
-                ${
-                  delta === null
-                    ? "—"
-                    :
-                    (
-                      delta > 0
-                        ? "+"
-                        : ""
-                    ) +
-                    delta +
-                    " дн."
-                }
-
-              </td>
-
-              <td>
-
-                <button
-                  class="btn small editMs"
-                  data-id="${item.id}">
-                  Изменить
-                </button>
-
-                <button
-                  class="btn small delMs"
-                  data-id="${item.id}">
-                  Удалить
-                </button>
-
-              </td>
-
-            </tr>
-          `;
-        })
-        .join("");
-
-  document
-    .querySelectorAll(
-      ".editMs"
-    )
-    .forEach(button => {
-
-      button.onclick =
-        () =>
-          openMilestone(
-            button.dataset.id
-          );
-    });
-
-  document
-    .querySelectorAll(
-      ".delMs"
-    )
-    .forEach(button => {
-
-      button.onclick =
-        () => {
-
-          state.milestones =
-            state.milestones
-              .filter(
-                item =>
-                  item.id !==
-                  button.dataset.id
-              );
-
-          saveState();
-
-          renderMilestones();
-        };
-    });
-}
-
-function openMilestone(
-  id = ""
-) {
-
-  editingMilestoneId =
-    id;
-
-  const item =
-    state.milestones
-      .find(
-        milestone =>
-          milestone.id === id
-      ) ||
-    {
-      building:
-        state.buildings[0] ||
-        "",
-
-      title: "",
-      contract: "",
-      forecast: "",
-      fact: "",
-
-      status:
-        "Не наступила",
-
-      comment: ""
-    };
-
-  fill(
-    $("msBuilding"),
-    state.buildings
-  );
-
-  $("msBuilding").value =
-    item.building;
-
-  $("msTitle").value =
-    item.title;
-
-  $("msContract").value =
-    item.contract;
-
-  $("msForecast").value =
-    item.forecast;
-
-  $("msFact").value =
-    item.fact;
-
-  $("msStatus").value =
-    item.status;
-
-  $("msComment").value =
-    item.comment;
-
-  $("milestoneEditor")
-    .classList
-    .remove("hidden");
-}
-
-function saveMilestoneRow() {
-
-  const values = {
-    building:
-      $("msBuilding").value,
-
-    title:
-      $("msTitle").value,
-
-    contract:
-      $("msContract").value,
-
-    forecast:
-      $("msForecast").value,
-
-    fact:
-      $("msFact").value,
-
-    status:
-      $("msStatus").value,
-
-    comment:
-      $("msComment").value
-  };
-
-  if (
-    editingMilestoneId
-  ) {
-
-    Object.assign(
-      state.milestones
-        .find(
-          item =>
-            item.id ===
-            editingMilestoneId
-        ),
-      values
-    );
-
-  } else {
-
-    state.milestones.push({
-      id: uid(),
-      ...values
-    });
-  }
-
-  saveState();
-
-  $("milestoneEditor")
-    .classList
-    .add("hidden");
-
-  renderAll();
-}
-
-function periodMetrics(
-  from,
-  to,
-  building,
-  work,
-  organization
-) {
-
-  const fronts =
-    state.fronts
-      .filter(
-        front =>
-          (
-            building === "all" ||
-            front.building ===
-              building
-          ) &&
-          (
-            work === "all" ||
-            front.work ===
-              work
-          ) &&
-          (
-            organization === "all" ||
-            front.organization ===
-              organization
-          )
-      );
-
-  const frontIds =
-    new Set(
-      fronts
-        .map(
-          front =>
-            front.id
-        )
-    );
-
-  const inPeriod =
-    date =>
-      date &&
-      (
-        !from ||
-        date >= from
-      ) &&
-      (
-        !to ||
-        date <= to
-      );
-
-  const plans =
-    state.planLog
-      .filter(
-        row =>
-          frontIds.has(
-            row.frontId
-          ) &&
-          inPeriod(row.date)
-      );
-
-  const facts =
-    state.factLog
-      .filter(
-        row =>
-          frontIds.has(
-            row.frontId
-          ) &&
-          inPeriod(row.date)
-      );
-
-  const resources =
-    state.resourceLog
-      .filter(
-        row =>
-          (
-            organization === "all" ||
-            row.organization ===
-              organization
-          ) &&
-          (
-            building === "all" ||
-            row.building ===
-              building
-          ) &&
-          inPeriod(row.date)
-      );
-
-  const sum =
-    (rows, field) =>
-      rows.reduce(
-        (total, row) =>
-          total +
-          (
-            Number(
-              row[field]
-            ) || 0
-          ),
-        0
-      );
-
-  const daily =
-    {};
-
-  resources.forEach(row => {
-
-    daily[row.date] =
-      (
-        daily[row.date] ||
-        0
-      ) +
-
-      Number(row.itr || 0) +
-      Number(row.workers || 0) +
-      Number(row.mechanizers || 0);
-  });
-
-  return {
-    planQty:
-      sum(
-        plans,
-        "qty"
-      ),
-
-    factQty:
-      sum(
-        facts,
-        "qty"
-      ),
-
-    planPeople:
-      sum(
-        plans,
-        "people"
-      ),
-
-    factPeople:
-      sum(
-        facts,
-        "people"
-      ),
-
-    planStarts:
-      fronts
-        .filter(
-          front =>
-            inPeriod(
-              front.planStart
-            )
-        )
-        .length,
-
-    factStarts:
-      fronts
-        .filter(
-          front =>
-            inPeriod(
-              front.factStart
-            )
-        )
-        .length,
-
-    planEnds:
-      fronts
-        .filter(
-          front =>
-            inPeriod(
-              front.planEnd
-            )
-        )
-        .length,
-
-    factEnds:
-      fronts
-        .filter(
-          front =>
-            inPeriod(
-              front.factEnd
-            )
-        )
-        .length,
-
-    accepted:
-      fronts
-        .filter(
-          front =>
-            front.accepted &&
-            inPeriod(
-              front.acceptedDate ||
-              front.factEnd
-            )
-        )
-        .length,
-
-    itr:
-      sum(
-        resources,
-        "itr"
-      ),
-
-    workers:
-      sum(
-        resources,
-        "workers"
-      ),
-
-    mechanizers:
-      sum(
-        resources,
-        "mechanizers"
-      ),
-
-    equipment:
-      sum(
-        resources,
-        "equipmentQty"
-      ),
-
-    peak:
-      Math.max(
-        0,
-        ...Object.values(daily)
-      )
-  };
-}
-
-function metricsHtml(metrics) {
-
-  const rows = [
-    [
-      "Плановый объем",
-      metrics.planQty
-    ],
-
-    [
-      "Фактический объем",
-      metrics.factQty
-    ],
-
-    [
-      "Отклонение объема",
-      metrics.factQty -
-      metrics.planQty
-    ],
-
-    [
-      "Плановые люди, чел.-дн.",
-      metrics.planPeople
-    ],
-
-    [
-      "Фактические люди на фронтах, чел.-дн.",
-      metrics.factPeople
-    ],
-
-    [
-      "ИТР, чел.-дн.",
-      metrics.itr
-    ],
-
-    [
-      "Рабочие, чел.-дн.",
-      metrics.workers
-    ],
-
-    [
-      "Механизаторы, чел.-дн.",
-      metrics.mechanizers
-    ],
-
-    [
-      "Пиковая численность",
-      metrics.peak
-    ],
-
-    [
-      "Технико-дни",
-      metrics.equipment
-    ],
-
-    [
-      "Плановые старты",
-      metrics.planStarts
-    ],
-
-    [
-      "Фактические старты",
-      metrics.factStarts
-    ],
-
-    [
-      "Плановые окончания",
-      metrics.planEnds
-    ],
-
-    [
-      "Фактические окончания",
-      metrics.factEnds
-    ],
-
-    [
-      "Сдано",
-      metrics.accepted
-    ]
-  ];
-
-  return rows
-    .map(
-      ([name, value]) =>
-        `
-          <div class="item">
-
-            <span>
-              ${name}
-            </span>
-
-            <strong>
-              ${
-                typeof value ===
-                  "number"
-                  ?
-                  Math.round(
-                    value * 100
-                  ) / 100
-                  :
-                  value
-              }
-            </strong>
-
-          </div>
-        `
-    )
-    .join("");
-}
-
-function renderAnalytics() {
-
-  fill(
-    $("aBuilding"),
-    state.buildings,
-    "Все здания"
-  );
-
-  fill(
-    $("aWork"),
-    state.works,
-    "Все работы"
-  );
-
-  fill(
-    $("aOrganization"),
-    state.organizations,
-    "Все организации"
-  );
-
-  calcAnalytics();
-}
-
-function calcAnalytics() {
-
-  const argumentsList = [
-    $("aBuilding").value,
-    $("aWork").value,
-    $("aOrganization").value
-  ];
-
-  const period1 =
-    periodMetrics(
-      $("a1From").value,
-      $("a1To").value,
-      ...argumentsList
-    );
-
-  const period2 =
-    periodMetrics(
-      $("a2From").value,
-      $("a2To").value,
-      ...argumentsList
-    );
-
-  $("aBox1").innerHTML =
-    metricsHtml(period1);
-
-  $("aBox2").innerHTML =
-    metricsHtml(period2);
-
-  const keys = [
-    "planQty",
-    "factQty",
-    "planPeople",
-    "factPeople",
-    "itr",
-    "workers",
-    "mechanizers",
-    "peak",
-    "equipment",
-    "planStarts",
-    "factStarts",
-    "planEnds",
-    "factEnds",
-    "accepted"
-  ];
-
-  const names = {
-    planQty:
-      "Плановый объем",
-
-    factQty:
-      "Фактический объем",
-
-    planPeople:
-      "Плановые люди",
-
-    factPeople:
-      "Факт людей на фронтах",
-
-    itr:
-      "ИТР",
-
-    workers:
-      "Рабочие",
-
-    mechanizers:
-      "Механизаторы",
-
-    peak:
-      "Пиковая численность",
-
-    equipment:
-      "Технико-дни",
-
-    planStarts:
-      "Плановые старты",
-
-    factStarts:
-      "Фактические старты",
-
-    planEnds:
-      "Плановые окончания",
-
-    factEnds:
-      "Фактические окончания",
-
-    accepted:
-      "Сдано"
-  };
-
-  $("aDelta")
-    .innerHTML =
-      keys
-        .map(key => {
-
-          const delta =
-            period2[key] -
-            period1[key];
-
-          return `
-            <div class="item">
-
-              <span>
-                ${names[key]}
-              </span>
-
-              <strong>
-                ${
-                  Math.round(
-                    delta * 100
-                  ) / 100
-                }
-              </strong>
-
-            </div>
-          `;
-        })
-        .join("");
-}
-
-function renderOrganizations() {
-
-  $("organizationList")
-    .innerHTML =
-      state.organizations
-        .map(
-          (organization, index) =>
-            `
-              <div class="item">
-
-                <span>
-                  ${esc(organization)}
-                </span>
-
-                <button
-                  class="btn small delOrg"
-                  data-i="${index}">
-                  Удалить
-                </button>
-
-              </div>
-            `
-        )
-        .join("") ||
-
-      '<div class="muted">Организации пока не добавлены.</div>';
-
-  document
-    .querySelectorAll(
-      ".delOrg"
-    )
-    .forEach(button => {
-
-      button.onclick =
-        () => {
-
-          const index =
-            Number(
-              button.dataset.i
-            );
-
-          const name =
-            state.organizations[
-              index
-            ];
-
-          if (
-            confirm(
-              `Удалить организацию «${name}» из справочника?`
-            )
-          ) {
-
-            state.organizations
-              .splice(
-                index,
-                1
-              );
-
-            saveState();
-
-            initSelects();
-
-            renderOrganizations();
-          }
-        };
-    });
-
-  const stats =
-    {};
-
-  state.organizations
-    .forEach(
-      organization => {
-
-        stats[
-          organization
-        ] = {
-
-          fronts:
-            state.fronts
-              .filter(
-                front =>
-                  front.organization ===
-                  organization
-              )
-              .length,
-
-          resources:
-            state.resourceLog
-              .filter(
-                row =>
-                  row.organization ===
-                  organization
-              )
-              .reduce(
-                (sum, row) =>
-                  sum +
-                  Number(row.itr || 0) +
-                  Number(row.workers || 0) +
-                  Number(row.mechanizers || 0),
-                0
-              )
-        };
-      }
-    );
-
-  $("organizationStats")
-    .innerHTML =
-      Object
-        .entries(stats)
-        .map(
-          ([organization, value]) =>
-            `
-              <div class="item">
-
-                <span>
-                  ${esc(organization)}
-                </span>
-
-                <strong>
-                  ${value.fronts}
-                  фронтов
-                  ·
-                  ${value.resources}
-                  чел.-дн.
-                </strong>
-
-              </div>
-            `
-        )
-        .join("") ||
-
-      '<div class="muted">Нет данных</div>';
-}
-
-function renderDashboard() {
-
-  const currentDate =
-    today();
-
-  const late =
-    state.fronts
-      .filter(
-        front =>
-          front.contractEnd &&
-          !front.accepted &&
-          front.contractEnd <
-            currentDate
-      );
-
-  const risk =
-    state.fronts
-      .filter(
-        front =>
-          [
-            "Ограничение",
-            "Приостановлено"
-          ]
-            .includes(
-              front.status
-            )
-      );
-
-  const done =
-    state.fronts
-      .filter(
-        front =>
-          front.status ===
-            "Завершено" ||
-          front.completed
-      );
-
-  const unsurrendered =
-    done
-      .filter(
-        front =>
-          !front.accepted
-      );
-
-  $("dTotal").textContent =
-    state.fronts.length;
-
-  $("dWork").textContent =
-    state.fronts
-      .filter(
-        front =>
-          front.status ===
-          "В работе"
-      )
-      .length;
-
-  $("dDone").textContent =
-    done.length;
-
-  $("dAccepted").textContent =
-    state.fronts
-      .filter(
-        front =>
-          front.accepted
-      )
-      .length;
-
-  $("dLate").textContent =
-    late.length;
-
-  $("dRisk").textContent =
-    risk.length;
-
-  $("dCritical")
-    .innerHTML =
-      [
-        ...late,
-        ...risk
-      ]
-        .slice(0, 15)
-        .map(
-          front =>
-            `
-              <div class="item">
-
-                <span>
-                  ${esc(frontLabel(front))}
-                </span>
-
-                <span class="late">
-                  ${
-                    front.contractEnd &&
-                    front.contractEnd <
-                      currentDate
-                      ?
-                      "Просрочено"
-                      :
-                      "Ограничение"
-                  }
-                </span>
-
-              </div>
-            `
-        )
-        .join("") ||
-
-      '<div class="muted">Нет критичных работ</div>';
-
-  $("dUnsurrendered")
-    .innerHTML =
-      unsurrendered
-        .slice(0, 15)
-        .map(
-          front =>
-            `
-              <div class="item">
-
-                <span>
-                  ${esc(frontLabel(front))}
-                </span>
-
-                <strong>
-                  не сдано
-                </strong>
-
-              </div>
-            `
-        )
-        .join("") ||
-
-      '<div class="muted">Нет</div>';
-
-  $("dMilestones")
-    .innerHTML =
-      state.milestones
-        .filter(
-          item =>
-            [
-              "Под риском",
-              "Просрочена"
-            ]
-              .includes(
-                item.status
-              )
-        )
-        .map(
-          item =>
-            `
-              <div class="item">
-
-                <span>
-                  ${esc(item.title)}
-                </span>
-
-                <strong>
-                  ${esc(item.status)}
-                </strong>
-
-              </div>
-            `
-        )
-        .join("") ||
-
-      '<div class="muted">Нет</div>';
-
-  const lastDate =
-    state.resourceLog
-      .map(
-        row =>
-          row.date
-      )
-      .sort()
-      .slice(-1)[0];
-
-  const resourceRows =
-    state.resourceLog
-      .filter(
-        row =>
-          row.date ===
-          lastDate
-      );
-
-  const people =
-    resourceRows
-      .reduce(
-        (sum, row) =>
-          sum +
-          Number(row.itr || 0) +
-          Number(row.workers || 0) +
-          Number(row.mechanizers || 0),
-        0
-      );
-
-  const equipment =
-    resourceRows
-      .reduce(
-        (sum, row) =>
-          sum +
-          Number(
-            row.equipmentQty ||
-            0
-          ),
-        0
-      );
-
-  $("dResources")
-    .innerHTML =
-      lastDate
-        ?
-        `
-          <div class="item">
-            <span>Дата</span>
-            <strong>${lastDate}</strong>
-          </div>
-
-          <div class="item">
-            <span>Людей</span>
-            <strong>${people}</strong>
-          </div>
-
-          <div class="item">
-            <span>Единиц техники</span>
-            <strong>${equipment}</strong>
-          </div>
-        `
-        :
-        '<div class="muted">Нет записей ресурсов</div>';
-}
-
-function buildReport() {
-
-  fill(
-    $("rBuilding"),
-    state.buildings,
-    "Все здания"
-  );
-
-  fill(
-    $("rOrganization"),
-    state.organizations,
-    "Все организации"
-  );
-
-  const building =
-    $("rBuilding").value ||
-    "all";
-
-  const organization =
-    $("rOrganization").value ||
-    "all";
-
-  const from =
-    $("rFrom").value;
-
-  const to =
-    $("rTo").value;
-
-  const inPeriod =
-    date =>
-      date &&
-      (
-        !from ||
-        date >= from
-      ) &&
-      (
-        !to ||
-        date <= to
-      );
-
-  const fronts =
-    state.fronts
-      .filter(
-        front =>
-          (
-            building === "all" ||
-            front.building ===
-              building
-          ) &&
-          (
-            organization === "all" ||
-            front.organization ===
-              organization
-          )
-      );
-
-  const frontIds =
-    new Set(
-      fronts
-        .map(
-          front =>
-            front.id
-        )
-    );
-
-  const facts =
-    state.factLog
-      .filter(
-        row =>
-          frontIds
-            .has(
-              row.frontId
-            ) &&
-          inPeriod(row.date)
-      );
-
-  const resources =
-    state.resourceLog
-      .filter(
-        row =>
-          (
-            building === "all" ||
-            row.building ===
-              building
-          ) &&
-          (
-            organization === "all" ||
-            row.organization ===
-              organization
-          ) &&
-          inPeriod(row.date)
-      );
-
-  const factQuantity =
-    facts
-      .reduce(
-        (sum, row) =>
-          sum +
-          Number(
-            row.qty || 0
-          ),
-        0
-      );
-
-  const people =
-    resources
-      .reduce(
-        (sum, row) =>
-          sum +
-          Number(row.itr || 0) +
-          Number(row.workers || 0) +
-          Number(row.mechanizers || 0),
-        0
-      );
-
-  $("reportSummary")
-    .innerHTML =
-      `
-        <div class="stat">
-          <span>Фронтов</span>
-          <strong>${fronts.length}</strong>
-        </div>
-
-        <div class="stat">
-          <span>В работе</span>
-          <strong>
-            ${
-              fronts
-                .filter(
-                  front =>
-                    front.status ===
-                    "В работе"
-                )
-                .length
-            }
-          </strong>
-        </div>
-
-        <div class="stat">
-          <span>Сдано</span>
-          <strong>
-            ${
-              fronts
-                .filter(
-                  front =>
-                    front.accepted
-                )
-                .length
-            }
-          </strong>
-        </div>
-
-        <div class="stat">
-          <span>Факт объема за период</span>
-          <strong>${factQuantity}</strong>
-        </div>
-
-        <div class="stat">
-          <span>Человеко-дни</span>
-          <strong>${people}</strong>
-        </div>
-
-        <div class="stat">
-          <span>Ограничения</span>
-          <strong>
-            ${
-              fronts
-                .filter(
-                  front =>
-                    [
-                      "Ограничение",
-                      "Приостановлено"
-                    ]
-                      .includes(
-                        front.status
-                      )
-                )
-                .length
-            }
-          </strong>
-        </div>
-      `;
-
-  $("reportTables")
-    .innerHTML =
-      `
-        <h3>
-          Работы
-        </h3>
-
-        <div class="table-wrap">
-
-          <table>
-
-            <thead>
-              <tr>
-                <th>Фронт</th>
-                <th>Статус</th>
-                <th>Организация</th>
-                <th>Рабочее окончание</th>
-                <th>Прогноз</th>
-                <th>Сдача</th>
-              </tr>
-            </thead>
-
-            <tbody>
-
-              ${
-                fronts
-                  .map(
-                    front =>
-                      `
-                        <tr>
-
-                          <td>
-                            ${esc(frontLabel(front))}
-                          </td>
-
-                          <td>
-                            ${esc(front.status)}
-                          </td>
-
-                          <td>
-                            ${esc(front.organization)}
-                          </td>
-
-                          <td>
-                            ${front.planEnd || "—"}
-                          </td>
-
-                          <td>
-                            ${front.forecastEnd || "—"}
-                          </td>
-
-                          <td>
-                            ${front.accepted ? "Сдано" : "—"}
-                          </td>
-
-                        </tr>
-                      `
-                  )
-                  .join("")
-              }
-
-            </tbody>
-
-          </table>
-
-        </div>
-      `;
-}
-
-function exportReportCsv() {
-
-  const rows = [
-    [
-      "Фронт",
-      "Статус",
-      "Организация",
-      "Рабочее окончание",
-      "Прогноз",
-      "Сдано"
-    ],
-
-    ...state.fronts
-      .map(
-        front => [
-          frontLabel(front),
-          front.status,
-          front.organization,
-          front.planEnd,
-          front.forecastEnd,
-          front.accepted
-            ? "Да"
-            : "Нет"
-        ]
-      )
-  ];
-
-  const csv =
-    rows
-      .map(
-        row =>
-          row
-            .map(
-              value =>
-                '"' +
-                String(value ?? "")
-                  .replaceAll(
-                    '"',
-                    '""'
-                  ) +
-                '"'
-            )
-            .join(";")
-      )
-      .join("\n");
-
-  const blob =
-    new Blob(
-      [
-        "\ufeff" +
-        csv
-      ],
-      {
-        type:
-          "text/csv;charset=utf-8"
-      }
-    );
-
-  const url =
-    URL.createObjectURL(
-      blob
-    );
-
-  const link =
-    document
-      .createElement("a");
-
-  link.href =
-    url;
-
-  link.download =
-    "acons-report.csv";
-
-  link.click();
-
-  URL.revokeObjectURL(
-    url
-  );
-}
-
-function renderHistory() {
-
-  $("historyBody")
-    .innerHTML =
-      [
-        ...state.changeLog
-      ]
-        .reverse()
-        .map(
-          item =>
-            `
-              <tr>
-
-                <td>
-                  ${
-                    new Date(
-                      item.date
-                    )
-                      .toLocaleString(
-                        "ru-RU"
-                      )
-                  }
-                </td>
-
-                <td>
-                  ${esc(item.entity)}
-                </td>
-
-                <td>
-                  ${esc(item.field)}
-                </td>
-
-                <td>
-                  ${esc(item.oldV)}
-                </td>
-
-                <td>
-                  ${esc(item.newV)}
-                </td>
-
-              </tr>
-            `
-        )
-        .join("");
-}
-
-function structureSummary(
-  structure
-) {
-
-  return [
-    structure.building,
-    structure.block,
-
-    structure.floor !== ""
-      ? "этаж " +
-        structure.floor
-      : "",
-
-    structure.capture
-      ? "захватка " +
-        structure.capture
-      : "",
-
-    structure.axis
-      ? "ось " +
-        structure.axis
-      : "",
-
-    structure.side,
-
-    structure.zone,
-
-    structure.roomNo
-      ? "пом. " +
-        structure.roomNo
-      : "",
-
-    structure.roomName,
-
-    structure.equipment
-  ]
-    .filter(Boolean)
-    .join(" · ");
-}
-
-function renderSettings() {
-
-  $("buildingList")
-    .innerHTML =
-      state.buildings
-        .map(
-          (building, index) =>
-            `
-              <div class="item">
-
-                <span>
-                  ${esc(building)}
-                </span>
-
-                <button
-                  class="btn small delBuilding"
-                  data-i="${index}">
-                  Удалить
-                </button>
-
-              </div>
-            `
-        )
-        .join("");
-
-  $("workList")
-    .innerHTML =
-      state.works
-        .map(
-          (work, index) =>
-            `
-              <div class="item">
-
-                <span>
-                  ${esc(work)}
-                </span>
-
-                <button
-                  class="btn small delWork"
-                  data-i="${index}">
-                  Удалить
-                </button>
-
-              </div>
-            `
-        )
-        .join("");
-
-  document
-    .querySelectorAll(
-      ".delBuilding"
-    )
-    .forEach(button => {
-
-      button.onclick =
-        () => {
-
-          if (
-            confirm(
-              "Удалить из справочника?"
-            )
-          ) {
-
-            state.buildings
-              .splice(
-                Number(
-                  button.dataset.i
-                ),
-                1
-              );
-
-            saveState();
-
-            renderAll();
-          }
-        };
-    });
-
-  document
-    .querySelectorAll(
-      ".delWork"
-    )
-    .forEach(button => {
-
-      button.onclick =
-        () => {
-
-          if (
-            confirm(
-              "Удалить из справочника?"
-            )
-          ) {
-
-            state.works
-              .splice(
-                Number(
-                  button.dataset.i
-                ),
-                1
-              );
-
-            saveState();
-
-            renderAll();
-          }
-        };
-    });
-
-  fill(
-    $("sBuilding"),
-    state.buildings
-  );
-
-  fill(
-    $("sWork"),
-    state.works
-  );
-
-  renderCustomInputs(
-    $("structureExtraFields"),
-    "structure",
-    {},
-    "scf_"
-  );
-
-  $("customFieldList")
-    .innerHTML =
-      state.customFields
-        .map(
-          field =>
-            `
-              <div class="item">
-
-                <span>
-
-                  <b>
-                    ${esc(field.name)}
-                  </b>
-
-                  ·
-
-                  ${
-                    field.scope ===
-                      "structure"
-                      ?
-                      "разбивка"
-                      :
-                      "работа"
-                  }
-
-                  ·
-
-                  ${esc(field.type)}
-
-                  ${
-                    field.showInFilters
-                      ?
-                      " · фильтр"
-                      :
-                      ""
-                  }
-
-                  ${
-                    field.showInMatrix
-                      ?
-                      " · шахматка"
-                      :
-                      ""
-                  }
-
-                </span>
-
-                <button
-                  class="btn small delCf"
-                  data-id="${field.id}">
-                  Удалить
-                </button>
-
-              </div>
-            `
-        )
-        .join("") ||
-
-      '<div class="muted">Нет дополнительных полей</div>';
-
-  document
-    .querySelectorAll(
-      ".delCf"
-    )
-    .forEach(button => {
-
-      button.onclick =
-        () => {
-
-          if (
-            confirm(
-              "Удалить поле и его значения?"
-            )
-          ) {
-
-            const id =
-              button.dataset.id;
-
-            state.customFields =
-              state.customFields
-                .filter(
-                  field =>
-                    field.id !==
-                    id
-                );
-
-            state.structures
-              .forEach(
-                structure => {
-
-                  delete structure
-                    .customData[id];
-                }
-              );
-
-            state.fronts
-              .forEach(
-                front => {
-
-                  delete front
-                    .customData[id];
-                }
-              );
-
-            saveState();
-
-            renderAll();
-          }
-        };
-    });
-
-  $("structureList")
-    .innerHTML =
-      state.structures
-        .map(
-          structure =>
-            `
-              <div class="item">
-
-                <span>
-                  ${esc(structureSummary(structure))}
-                </span>
-
-                <button
-                  class="btn small delStruct"
-                  data-id="${structure.id}">
-                  Удалить
-                </button>
-
-              </div>
-            `
-        )
-        .join("");
-
-  document
-    .querySelectorAll(
-      ".delStruct"
-    )
-    .forEach(button => {
-
-      button.onclick =
-        () =>
-          deleteStructure(
-            button.dataset.id
-          );
-    });
-}
-
-function addStructure() {
-
-  const structure =
-    normStruct({
-      building:
-        $("sBuilding").value,
-
-      block:
-        $("sBlock")
-          .value
-          .trim(),
-
-      floor:
-        $("sFloor").value === ""
-          ? ""
-          : Number(
-              $("sFloor").value
-            ),
-
-      capture:
-        $("sCapture")
-          .value
-          .trim(),
-
-      axis:
-        $("sAxis")
-          .value
-          .trim(),
-
-      side:
-        $("sSide")
-          .value
-          .trim(),
-
-      zone:
-        $("sZone")
-          .value
-          .trim(),
-
-      roomNo:
-        $("sRoomNo")
-          .value
-          .trim(),
-
-      roomName:
-        $("sRoomName")
-          .value
-          .trim(),
-
-      equipment:
-        $("sEquipment")
-          .value
-          .trim(),
-
-      fsmPriority:
-        $("sFsmPriority").value,
-
-      fsmStatus:
-        $("sFsmStatus").value,
-
-      customData: {}
-    });
-
-  if (
-    !structure.building
-  ) {
-
-    alert(
-      "Укажи здание."
-    );
-
-    return;
-  }
-
-  state.customFields
-    .filter(
-      field =>
-        field.scope ===
-        "structure"
-    )
-    .forEach(field => {
-
-      structure.customData[
-        field.id
-      ] =
-        readCf(
-          field,
-          "scf_"
-        );
-    });
-
-  state.structures
-    .push(structure);
-
-  const works =
-    $("sWorkMode").value ===
-      "all"
-      ?
-      state.works
-      :
-      [
-        $("sWork").value
-      ];
-
-  works.forEach(work => {
-
-    state.fronts
-      .push(
-        makeFront(
-          structure,
-          work
-        )
-      );
-  });
-
-  saveState();
-
-  renderAll();
-
-  alert(
-    "Разбивка добавлена"
-  );
-}
-
-function deleteStructure(id) {
-
-  if (
-    !confirm(
-      "Удалить разбивку и связанные фронты?"
-    )
-  ) {
-    return;
-  }
-
-  const frontIds =
-    state.fronts
-      .filter(
-        front =>
-          front.structureId ===
-          id
-      )
-      .map(
-        front =>
-          front.id
-      );
-
-  state.structures =
-    state.structures
-      .filter(
-        structure =>
-          structure.id !== id
-      );
-
-  state.fronts =
-    state.fronts
-      .filter(
-        front =>
-          front.structureId !==
-          id
-      );
-
-  state.planLog =
-    state.planLog
-      .filter(
-        row =>
-          !frontIds
-            .includes(
-              row.frontId
-            )
-      );
-
-  state.factLog =
-    state.factLog
-      .filter(
-        row =>
-          !frontIds
-            .includes(
-              row.frontId
-            )
-      );
-
-  saveState();
-
-  renderAll();
-}
-
-function addCustomField() {
-
-  const name =
-    $("cfName")
-      .value
-      .trim();
-
-  if (!name) {
-
-    alert(
-      "Укажи название поля"
-    );
-
-    return;
-  }
-
-  const type =
-    $("cfType").value;
-
-  const options =
-    type === "select"
-      ?
-      $("cfOptions")
-        .value
-        .split(";")
-        .map(
-          value =>
-            value.trim()
-        )
-        .filter(Boolean)
-      :
-      [];
-
-  state.customFields.push({
-    id: uid(),
-
-    name,
-
-    scope:
-      $("cfScope").value,
-
-    type,
-
-    options,
-
-    showInFilters:
-      $("cfFilter").checked,
-
-    showInMatrix:
-      $("cfMatrix").checked
-  });
-
-  $("cfName").value =
-    "";
-
-  $("cfOptions").value =
-    "";
-
-  $("cfFilter").checked =
-    false;
-
-  $("cfMatrix").checked =
-    false;
-
-  saveState();
-
-  renderAll();
-}
-
-function exportJson() {
-
-  const blob =
-    new Blob(
-      [
-        JSON.stringify(
-          state,
-          null,
-          2
-        )
-      ],
-      {
-        type:
-          "application/json"
-      }
-    );
-
-  const url =
-    URL.createObjectURL(
-      blob
-    );
-
-  const link =
-    document
-      .createElement("a");
-
-  link.href =
-    url;
-
-  link.download =
-    "acons-planning-v7-backup.json";
-
-  link.click();
-
-  URL.revokeObjectURL(
-    url
-  );
-}
-
-function importJson(file) {
-
-  const reader =
-    new FileReader();
-
-  reader.onload =
-    () => {
-
-      try {
-
-        state =
-          migrate(
-            JSON.parse(
-              reader.result
-            )
-          );
-
-        saveState();
-
-        location.reload();
-
-      } catch (error) {
-
-        alert(
-          "Не удалось прочитать копию"
-        );
-      }
-    };
-
-  reader
-    .readAsText(file);
-}
-
-function selfTest() {
-
-  const checks =
-    [];
-
-  function check(
-    name,
-    ok,
-    detail = ""
-  ) {
-
-    checks.push({
-      name,
-      ok,
-      detail
-    });
-  }
-
-  check(
-    "Главный корпус есть в справочнике",
-
-    state.buildings
-      .includes(
-        "Главный корпус"
-      )
-  );
-
-  check(
-    "Тестовые фронты созданы",
-
-    state.fronts.length >=
-      140,
-
-    "Сейчас: " +
-    state.fronts.length
-  );
-
-  check(
-    "Список зданий заполнен",
-
-    $("mfBuilding")
-      .options
-      .length > 1,
-
-    "Вариантов: " +
-    $("mfBuilding")
-      .options
-      .length
-  );
-
-  check(
-    "Список блоков заполнен",
-
-    $("mfBlock")
-      .options
-      .length > 1,
-
-    "Вариантов: " +
-    $("mfBlock")
-      .options
-      .length
-  );
-
-  check(
-    "Список этажей заполнен",
-
-    $("mfFloor")
-      .options
-      .length > 1,
-
-    "Вариантов: " +
-    $("mfFloor")
-      .options
-      .length
-  );
-
-  check(
-    "Виды работ заполнены",
-
-    state.works.length >=
-      5
-  );
-
-  check(
-    "Демонтаж загружен",
-
-    state.demolition.length ===
-      32,
-
-    "Объектов: " +
-    state.demolition.length
-  );
-
-  check(
-    "Журнал плана доступен",
-
-    Array.isArray(
-      state.planLog
-    )
-  );
-
-  check(
-    "Журнал факта доступен",
-
-    Array.isArray(
-      state.factLog
-    )
-  );
-
-  check(
-    "Журнал ресурсов доступен",
-
-    Array.isArray(
-      state.resourceLog
-    )
-  );
-
-  check(
-    "Ключевые даты доступны",
-
-    Array.isArray(
-      state.milestones
-    )
-  );
-
-  check(
-    "История изменений доступна",
-
-    Array.isArray(
-      state.changeLog
-    )
-  );
-
-  check(
-    "Дополнительные поля доступны",
-
-    Array.isArray(
-      state.customFields
-    )
-  );
-
-  const required = [
-    "matrixBody",
-    "gantt",
-    "planBody",
-    "factBody",
-    "resourceBody",
-    "milestoneBody",
-    "historyBody",
-    "buildingList",
-    "workList"
-  ];
-
-  check(
-    "Ключевые элементы интерфейса найдены",
-
-    required
-      .every(
-        id =>
-          !!$(id)
-      ),
-
-    required
-      .filter(
-        id =>
-          !$(id)
-      )
-      .join(", ")
-  );
-
-  $("selfTestResults")
-    .innerHTML =
-      checks
-        .map(
-          item =>
-            `
-              <div class="item">
-
-                <span>
-
-                  ${esc(item.name)}
-
-                  ${
-                    item.detail
-                      ?
-                      `
-                        <br>
-
-                        <small class="muted">
-                          ${esc(item.detail)}
-                        </small>
-                      `
-                      :
-                      ""
-                  }
-
-                </span>
-
-                <strong
-                  class="${
-                    item.ok
-                      ?
-                      "diag-ok"
-                      :
-                      "diag-bad"
-                  }">
-
-                  ${
-                    item.ok
-                      ?
-                      "ОК"
-                      :
-                      "ОШИБКА"
-                  }
-
-                </strong>
-
-              </div>
-            `
-        )
-        .join("");
-
-  $("selfTestPanel")
-    .classList
-    .remove("hidden");
-
-  $("selfTestPanel")
-    .scrollIntoView({
-      behavior:
-        "smooth"
-    });
-
-  return checks
-    .every(
-      item =>
-        item.ok
-    );
-}
-
-function renderAll() {
-
-  initSelects();
-
-  renderDashboard();
-
-  renderMatrix();
-
-  renderDemolition();
-
-  renderPlan();
-
-  renderFact();
-
-  renderResources();
-
-  renderMilestones();
-
-  renderOrganizations();
-
-  renderHistory();
-
-  renderSettings();
-
-  renderGantt();
-
-  renderAnalytics();
-
-  buildReport();
-}
-
-function bind() {
-
-  document
-    .querySelectorAll(".tab")
-    .forEach(button => {
-
-      button.onclick =
-        () =>
-          showTab(
-            button.dataset.tab
-          );
-    });
-
-  [
-    "mfBuilding",
-    "mfBlock",
-    "mfFloor",
-    "mfCapture",
-    "mfAxis",
-    "mfSide",
-    "mfZone",
-    "mfOrganization",
-    "mfStatus"
-  ]
-    .forEach(id => {
-
-      $(id)
-        .addEventListener(
-          "change",
-          () => {
-
-            if (
-              id ===
-              "mfBuilding"
-            ) {
-              updateMatrixDependent();
-            }
-
-            renderMatrix();
-          }
-        );
-    });
-
-  [
-    "gBuilding",
-    "gWork",
-    "gOrganization",
-    "gMode"
-  ]
-    .forEach(id => {
-
-      $(id)
-        .addEventListener(
-          "change",
-          renderGantt
-        );
-    });
-
-  $("saveFront").onclick =
-    saveFrontCard;
-
-  $("closeFront").onclick =
-    () =>
-      $("frontEditor")
-        .classList
-        .add("hidden");
-
-  $("frontToPlan").onclick =
-    () => {
-
-      showTab("plan");
-
-      openPlan(
-        selectedFrontId
-      );
-    };
-
-  $("frontToFact").onclick =
-    () => {
-
-      showTab("fact");
-
-      openFact(
-        selectedFrontId
-      );
-    };
-
-  $("recalcLinks").onclick =
-    recalcLinks;
-
-  $("newPlan").onclick =
-    () =>
-      openPlan();
-
-  $("closePlan").onclick =
-    () =>
-      $("planEditor")
-        .classList
-        .add("hidden");
-
-  $("savePlan").onclick =
-    savePlanRow;
-
-  $("filterPlan").onclick =
-    renderPlan;
-
-  $("newFact").onclick =
-    () =>
-      openFact();
-
-  $("closeFact").onclick =
-    () =>
-      $("factEditor")
-        .classList
-        .add("hidden");
-
-  $("saveFact").onclick =
-    saveFactRow;
-
-  $("filterFact").onclick =
-    renderFact;
-
-  $("newResource").onclick =
-    openResource;
-
-  $("closeResource").onclick =
-    () =>
-      $("resourceEditor")
-        .classList
-        .add("hidden");
-
-  $("saveResource").onclick =
-    saveResourceRow;
-
-  $("filterResources").onclick =
-    renderResources;
-
-  $("saveDem").onclick =
-    saveDem;
-
-  $("closeDem").onclick =
-    () =>
-      $("demEditor")
-        .classList
-        .add("hidden");
-
-  $("newMilestone").onclick =
-    () =>
-      openMilestone();
-
-  $("saveMilestone").onclick =
-    saveMilestoneRow;
-
-  $("closeMilestone").onclick =
-    () =>
-      $("milestoneEditor")
-        .classList
-        .add("hidden");
-
-  $("calcAnalytics").onclick =
-    calcAnalytics;
-
-  $("addOrganization").onclick =
-    () => {
-
-      const value =
-        $("newOrganization")
-          .value
-          .trim();
-
-      if (
-        value &&
-        !state.organizations
-          .includes(value)
-      ) {
-
-        state.organizations
-          .push(value);
-
-        $("newOrganization").value =
-          "";
-
-        saveState();
-
-        renderAll();
-      }
-    };
-
-  $("buildReport").onclick =
-    buildReport;
-
-  $("exportReportCsv").onclick =
-    exportReportCsv;
-
-  $("printReport").onclick =
-    () =>
-      window.print();
-
-  $("clearHistory").onclick =
-    () => {
-
-      if (
-        confirm(
-          "Очистить историю?"
-        )
-      ) {
-
-        state.changeLog =
-          [];
-
-        saveState();
-
-        renderHistory();
-      }
-    };
-
-  $("addBuilding").onclick =
-    () => {
-
-      const value =
-        $("newBuilding")
-          .value
-          .trim();
-
-      if (
-        value &&
-        !state.buildings
-          .includes(value)
-      ) {
-
-        state.buildings
-          .push(value);
-
-        $("newBuilding").value =
-          "";
-
-        saveState();
-
-        renderAll();
-      }
-    };
-
-  $("addWork").onclick =
-    () => {
-
-      const value =
-        $("newWork")
-          .value
-          .trim();
-
-      if (
-        value &&
-        !state.works
-          .includes(value)
-      ) {
-
-        state.works
-          .push(value);
-
-        $("newWork").value =
-          "";
-
-        saveState();
-
-        renderAll();
-      }
-    };
-
-  $("addStructure").onclick =
-    addStructure;
-
-  $("addCustomField").onclick =
-    addCustomField;
-
-  $("exportJson").onclick =
-    exportJson;
-
-  $("importJson").onchange =
-    event => {
-
-      if (
-        event.target.files[0]
-      ) {
-
-        importJson(
-          event.target.files[0]
-        );
-      }
-    };
-
-  $("resetAll").onclick =
-    () => {
-
-      if (
-        confirm(
-          "Удалить все локальные тестовые данные и вернуть исходную структуру?"
-        )
-      ) {
-
-        localStorage.removeItem(
-          KEY
-        );
-
-        OLD_KEYS
-          .forEach(
-            key =>
-              localStorage
-                .removeItem(key)
-          );
-
-        location.reload();
-      }
-    };
-
-  $("selfTestBtn").onclick =
-    selfTest;
-
-  $("closeSelfTest").onclick =
-    () =>
-      $("selfTestPanel")
-        .classList
-        .add("hidden");
-}
-
-document.addEventListener(
-  "DOMContentLoaded",
-  () => {
-
-    try {
-
-      initSelects();
-
-      bind();
-
-      renderAll();
-
-      console.log(
-        "ACONS Planning v7 initialized",
-        {
-          fronts:
-            state.fronts.length,
-
-          buildings:
-            state.buildings.length,
-
-          works:
-            state.works.length
-        }
-      );
-
-    } catch (error) {
-
-      console.error(
-        "Ошибка запуска ACONS Planning",
-        error
-      );
-
-      alert(
-        "Ошибка запуска интерфейса: " +
-        error.message
-      );
-    }
-  }
-);
-</script>
+<script src="app.js"></script>
 
 </body>
 </html>
