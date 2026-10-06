@@ -7,28 +7,22 @@ const cfg =
   window.ACONS_CONFIG || {};
 
 const badConfig =
-  !cfg.SUPABASE_URL ||
-  !cfg.SUPABASE_PUBLISHABLE_KEY ||
-  cfg.SUPABASE_URL.includes('PASTE_') ||
-  cfg.SUPABASE_PUBLISHABLE_KEY.includes('PASTE_');
+  !cfg.API_URL ||
+  String(cfg.API_URL).includes('PASTE_');
 
-let sb = null;
 let currentUser = null;
 let profile = null;
-
 let selectedFrontId = null;
 let logMode = 'plan';
-
 let importRows = [];
-
 let realtimeChannel = null;
-
 let editingMilestoneId = null;
 
 const state = {
   buildings: [],
   works: [],
   organizations: [],
+  equipmentTypes: [],
   structures: [],
   fronts: [],
   planLog: [],
@@ -36,9 +30,15 @@ const state = {
   resourceLog: [],
   milestones: [],
   customFields: [],
+  customValues: [],
   views: [],
+  demolition: [],
+  demolitionDependencies: [],
   history: [],
-  users: []
+  users: [],
+  settings: {},
+  calendars: [],
+  calendarExceptions: []
 };
 
 const BASE_COLUMNS = [
@@ -113,42 +113,35 @@ const diffDays = (
   date2
 ) =>
   date1 && date2
-    ?
-    Math.round(
-      (
-        Date.parse(date2) -
-        Date.parse(date1)
-      ) /
-      86400000
-    )
-    :
-    null;
+    ? Math.round(
+        (
+          Date.parse(date2) -
+          Date.parse(date1)
+        ) / 86400000
+      )
+    : null;
 
 function showBootError(text) {
-
   $('bootError')
     .classList
     .remove('hidden');
 
   $('bootError')
-    .innerHTML =
-      `
-        <div class="notice error">
-
-          <b>
-            Ошибка запуска:
-          </b>
-
-          ${esc(text)}
-
-        </div>
-      `;
+    .innerHTML = `
+      <div class="notice error">
+        <b>Ошибка запуска:</b>
+        ${esc(text)}
+      </div>
+    `;
 }
 
 function notice(
   text,
   ok = false
 ) {
+  if (!$('syncStatus')) {
+    return;
+  }
 
   $('syncStatus')
     .textContent =
@@ -157,10 +150,8 @@ function notice(
   $('syncStatus')
     .style.color =
       ok
-        ?
-        '#86efac'
-        :
-        '#fde68a';
+        ? '#86efac'
+        : '#fde68a';
 }
 
 function fill(
@@ -168,7 +159,6 @@ function fill(
   items,
   allLabel
 ) {
-
   if (!element) {
     return;
   }
@@ -183,7 +173,6 @@ function fill(
     allLabel !==
     undefined
   ) {
-
     const option =
       document
         .createElement(
@@ -197,30 +186,37 @@ function fill(
       allLabel;
 
     element
-      .appendChild(option);
+      .appendChild(
+        option
+      );
   }
 
-  items.forEach(item => {
+  items.forEach(
+    item => {
+      const option =
+        document
+          .createElement(
+            'option'
+          );
 
-    const option =
-      document
-        .createElement(
-          'option'
+      option.value =
+        String(
+          item.id ??
+          item
         );
 
-    option.value =
-      String(
-        item.id ?? item
-      );
+      option.textContent =
+        String(
+          item.name ??
+          item
+        );
 
-    option.textContent =
-      String(
-        item.name ?? item
-      );
-
-    element
-      .appendChild(option);
-  });
+      element
+        .appendChild(
+          option
+        );
+    }
+  );
 
   if (
     [...element.options]
@@ -230,7 +226,6 @@ function fill(
           current
       )
   ) {
-
     element.value =
       current;
   }
@@ -240,101 +235,89 @@ function nameById(
   list,
   id
 ) {
-
   return (
     list.find(
       item =>
-        item.id === id
+        String(item.id) ===
+        String(id)
     )?.name ||
     ''
   );
 }
 
-async function init() {
-
+async function apiRequest(
+  action,
+  data = {}
+) {
   if (badConfig) {
-
-    showBootError(
-      'В config.js не заполнены адрес проекта и публикуемый ключ Supabase.'
-    );
-
-    return;
-  }
-
-  sb =
-    window.supabase
-      .createClient(
-        cfg.SUPABASE_URL,
-        cfg.SUPABASE_PUBLISHABLE_KEY,
-        {
-          auth: {
-            persistSession: true,
-            autoRefreshToken: true,
-            detectSessionInUrl: true
-          }
-        }
-      );
-
-  bindAuth();
-
-  const {
-    data: {
-      session
-    }
-  } =
-    await sb.auth
-      .getSession();
-
-  if (session) {
-
-    await enterApp(
-      session.user
+    throw new Error(
+      'В config.js не указан адрес ACONS API.'
     );
   }
 
-  sb.auth
-    .onAuthStateChange(
-      async (
-        _event,
-        session
-      ) => {
+  const token =
+    localStorage
+      .getItem(
+        'acons_token'
+      ) ||
+    '';
 
-        if (
-          session?.user &&
-          session.user.id !==
-            currentUser?.id
-        ) {
+  const response =
+    await fetch(
+      cfg.API_URL,
+      {
+        method: 'POST',
 
-          await enterApp(
-            session.user
-          );
-        }
+        headers: {
+          'Content-Type':
+            'text/plain;charset=utf-8'
+        },
 
-        if (!session) {
+        redirect: 'follow',
 
-          currentUser =
-            null;
-
-          profile =
-            null;
-
-          $('app')
-            .classList
-            .add('hidden');
-
-          $('authScreen')
-            .classList
-            .remove('hidden');
-        }
+        body:
+          JSON.stringify({
+            action,
+            token,
+            ...data
+          })
       }
     );
+
+  if (!response.ok) {
+    throw new Error(
+      'Сервер вернул HTTP ' +
+      response.status
+    );
+  }
+
+  const text =
+    await response.text();
+
+  let result;
+
+  try {
+    result =
+      JSON.parse(text);
+  } catch (error) {
+    throw new Error(
+      'Сервер вернул некорректный ответ.'
+    );
+  }
+
+  if (!result.ok) {
+    throw new Error(
+      result.error ||
+      'Ошибка сервера.'
+    );
+  }
+
+  return result;
 }
 
 function bindAuth() {
-
   $('signInBtn').onclick =
     async () => {
-
       const email =
         $('authEmail')
           .value
@@ -348,101 +331,196 @@ function bindAuth() {
         .innerHTML =
           '';
 
-      const {
-        error
-      } =
-        await sb.auth
-          .signInWithPassword({
-            email,
-            password
-          });
+      if (
+        !email ||
+        !password
+      ) {
+        $('authNotice')
+          .innerHTML =
+            '<div class="notice error">Введите email и пароль.</div>';
 
-      if (error) {
+        return;
+      }
+
+      $('signInBtn')
+        .disabled =
+          true;
+
+      try {
+        const login =
+          await apiRequest(
+            'login',
+            {
+              email,
+              password
+            }
+          );
+
+        localStorage
+          .setItem(
+            'acons_token',
+            login.token
+          );
+
+        const data =
+          await apiRequest(
+            'bootstrap'
+          );
+
+        await enterApp(
+          data.user,
+          data
+        );
+
+      } catch (error) {
+        localStorage
+          .removeItem(
+            'acons_token'
+          );
 
         $('authNotice')
           .innerHTML =
-            `
-              <div class="notice error">
-                ${esc(error.message)}
-              </div>
-            `;
+            `<div class="notice error">${esc(error.message)}</div>`;
+
+      } finally {
+        $('signInBtn')
+          .disabled =
+            false;
       }
     };
 
+  $('authPassword')
+    .addEventListener(
+      'keydown',
+      event => {
+        if (
+          event.key ===
+          'Enter'
+        ) {
+          $('signInBtn')
+            .click();
+        }
+      }
+    );
+
   $('signUpBtn').onclick =
-    async () => {
-
-      const email =
-        $('authEmail')
-          .value
-          .trim();
-
-      const password =
-        $('authPassword')
-          .value;
-
-      const {
-        error
-      } =
-        await sb.auth
-          .signUp({
-            email,
-            password
-          });
-
+    () => {
       $('authNotice')
         .innerHTML =
-          error
-            ?
-            `
-              <div class="notice error">
-                ${esc(error.message)}
-              </div>
-            `
-            :
-            `
-              <div class="notice ok">
-                Учетная запись создана.
-                Если включено подтверждение почты,
-                подтверди email и войди.
-              </div>
-            `;
+          '<div class="notice">Учетные записи создаёт администратор ACONS Planning.</div>';
     };
 
   $('signOutBtn').onclick =
-    () =>
-      sb.auth
-        .signOut();
+    async () => {
+      try {
+        await apiRequest(
+          'logout'
+        );
+      } catch (error) {
+        console.warn(
+          error
+        );
+      }
+
+      localStorage
+        .removeItem(
+          'acons_token'
+        );
+
+      if (
+        realtimeChannel
+      ) {
+        clearInterval(
+          realtimeChannel
+        );
+
+        realtimeChannel =
+          null;
+      }
+
+      currentUser =
+        null;
+
+      profile =
+        null;
+
+      $('app')
+        .classList
+        .add('hidden');
+
+      $('authScreen')
+        .classList
+        .remove('hidden');
+    };
 }
 
-async function enterApp(user) {
+async function init() {
+  if (badConfig) {
+    showBootError(
+      'В config.js не указан адрес ACONS API.'
+    );
 
+    return;
+  }
+
+  bindAuth();
+
+  const token =
+    localStorage
+      .getItem(
+        'acons_token'
+      );
+
+  if (!token) {
+    return;
+  }
+
+  try {
+    const data =
+      await apiRequest(
+        'bootstrap'
+      );
+
+    await enterApp(
+      data.user,
+      data
+    );
+
+  } catch (error) {
+    localStorage
+      .removeItem(
+        'acons_token'
+      );
+
+    currentUser =
+      null;
+
+    profile =
+      null;
+
+    $('app')
+      .classList
+      .add('hidden');
+
+    $('authScreen')
+      .classList
+      .remove('hidden');
+  }
+}
+
+async function enterApp(
+  user,
+  bootstrapData = null
+) {
   currentUser =
     user;
 
-  const {
-    data,
-    error
-  } =
-    await sb
-      .from('app_users')
-      .select('*')
-      .eq(
-        'id',
-        user.id
-      )
-      .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
   profile =
-    data;
+    user;
 
   $('userLabel')
     .textContent =
-      `${user.email} · ${profile?.role || 'без роли'}`;
+      `${user.email} · ${user.role || 'без роли'}`;
 
   $('authScreen')
     .classList
@@ -454,107 +532,196 @@ async function enterApp(user) {
 
   bindUi();
 
-  await reloadAll();
+  if (bootstrapData) {
+    applyBootstrap(
+      bootstrapData
+    );
+  } else {
+    await reloadAll();
+  }
 
   subscribeRealtime();
 }
 
-async function reloadAll() {
-
-  notice(
-    'Загрузка общей базы...'
-  );
-
-  const tables = [
-    [
-      'buildings',
-      'buildings'
-    ],
-
-    [
-      'works',
-      'works'
-    ],
-
-    [
-      'organizations',
-      'organizations'
-    ],
-
-    [
-      'custom_fields',
-      'customFields'
-    ],
-
-    [
-      'structures',
-      'structures'
-    ],
-
-    [
-      'fronts',
-      'fronts'
-    ],
-
-    [
-      'plan_log',
-      'planLog'
-    ],
-
-    [
-      'fact_log',
-      'factLog'
-    ],
-
-    [
-      'resource_log',
-      'resourceLog'
-    ],
-
-    [
-      'milestones',
-      'milestones'
-    ],
-
-    [
-      'matrix_views',
-      'views'
-    ],
-
-    [
-      'change_log',
-      'history'
-    ],
-
-    [
-      'app_users',
-      'users'
-    ]
-  ];
-
-  for (
-    const [
-      table,
-      key
-    ]
-    of tables
+function parseCustomValue(
+  value
+) {
+  if (
+    value ===
+    'true'
   ) {
-
-    const {
-      data,
-      error
-    } =
-      await sb
-        .from(table)
-        .select('*');
-
-    if (error) {
-      throw error;
-    }
-
-    state[key] =
-      data || [];
+    return true;
   }
+
+  if (
+    value ===
+    'false'
+  ) {
+    return false;
+  }
+
+  if (
+    value === null ||
+    value === undefined
+  ) {
+    return '';
+  }
+
+  return value;
+}
+
+function applyBootstrap(
+  data
+) {
+  state.buildings =
+    data.buildings || [];
+
+  state.works =
+    data.works || [];
+
+  state.organizations =
+    data.organizations || [];
+
+  state.equipmentTypes =
+    data.equipmentTypes || [];
+
+  state.structures =
+    data.structures || [];
+
+  state.fronts =
+    data.fronts || [];
+
+  state.planLog =
+    data.planLog || [];
+
+  state.factLog =
+    data.factLog || [];
+
+  state.resourceLog =
+    (
+      data.resourceLog ||
+      []
+    )
+      .map(
+        row => ({
+          ...row,
+
+          mechanizers:
+            row.mechanizers ??
+            row.operators ??
+            0
+        })
+      );
+
+  state.milestones =
+    data.milestones || [];
+
+  state.customFields =
+    data.customFields || [];
+
+  state.customValues =
+    data.customValues || [];
+
+  state.views =
+    data.views || [];
+
+  state.demolition =
+    data.demolition || [];
+
+  state.demolitionDependencies =
+    data.demolitionDependencies ||
+    [];
+
+  state.history =
+    data.history || [];
+
+  state.users =
+    data.users || [];
+
+  state.settings =
+    data.settings || {};
+
+  state.calendars =
+    data.calendars || [];
+
+  state.calendarExceptions =
+    data.calendarExceptions ||
+    [];
+
+  state.structures
+    .forEach(
+      item => {
+        item.custom_data =
+          {};
+      }
+    );
+
+  state.fronts
+    .forEach(
+      item => {
+        item.custom_data =
+          {};
+      }
+    );
+
+  state.customValues
+    .forEach(
+      value => {
+        if (
+          value.entity ===
+          'structure'
+        ) {
+          const structure =
+            state.structures
+              .find(
+                item =>
+                  String(
+                    item.id
+                  ) ===
+                  String(
+                    value.entity_id
+                  )
+              );
+
+          if (structure) {
+            structure
+              .custom_data[
+                value.field_id
+              ] =
+                parseCustomValue(
+                  value.value
+                );
+          }
+        }
+
+        if (
+          value.entity ===
+          'front'
+        ) {
+          const front =
+            state.fronts
+              .find(
+                item =>
+                  String(
+                    item.id
+                  ) ===
+                  String(
+                    value.entity_id
+                  )
+              );
+
+          if (front) {
+            front
+              .custom_data[
+                value.field_id
+              ] =
+                parseCustomValue(
+                  value.value
+                );
+          }
+        }
+      }
+    );
 
   renderAll();
 
@@ -564,71 +731,64 @@ async function reloadAll() {
   );
 }
 
+async function reloadAll() {
+  notice(
+    'Загрузка общей базы...'
+  );
+
+  const data =
+    await apiRequest(
+      'reloadAll'
+    );
+
+  currentUser =
+    data.user;
+
+  profile =
+    data.user;
+
+  applyBootstrap(
+    data
+  );
+}
+
 function subscribeRealtime() {
-
-  if (realtimeChannel) {
-
-    sb.removeChannel(
+  if (
+    realtimeChannel
+  ) {
+    clearInterval(
       realtimeChannel
     );
   }
 
   realtimeChannel =
-    sb.channel(
-      'acons-live'
+    setInterval(
+      async () => {
+        if (
+          document.hidden
+        ) {
+          return;
+        }
+
+        try {
+          await reloadAll();
+        } catch (error) {
+          console.warn(
+            'Ошибка фонового обновления',
+            error
+          );
+        }
+      },
+      60000
     );
 
-  [
-    'fronts',
-    'plan_log',
-    'fact_log',
-    'resource_log',
-    'milestones',
-    'buildings',
-    'works',
-    'structures',
-    'organizations',
-    'matrix_views'
-  ]
-    .forEach(table => {
-
-      realtimeChannel
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table
-          },
-          async () => {
-
-            notice(
-              'Получено изменение...'
-            );
-
-            await reloadAll();
-          }
-        );
-    });
-
-  realtimeChannel
-    .subscribe(status => {
-
-      if (
-        status ===
-        'SUBSCRIBED'
-      ) {
-
-        notice(
-          'Онлайн · изменения видны всем',
-          true
-        );
-      }
-    });
+  notice(
+    'Онлайн · автообновление каждую минуту',
+    true
+  );
 }
 
 function bindUi() {
-
   if (
     window.__aconsBound
   ) {
@@ -642,14 +802,15 @@ function bindUi() {
     .querySelectorAll(
       '.tab'
     )
-    .forEach(button => {
-
-      button.onclick =
-        () =>
-          showTab(
-            button.dataset.tab
-          );
-    });
+    .forEach(
+      button => {
+        button.onclick =
+          () =>
+            showTab(
+              button.dataset.tab
+            );
+      }
+    );
 
   $('closeFront').onclick =
     () =>
@@ -686,11 +847,12 @@ function bindUi() {
     'mfOrg',
     'mfStatus'
   ]
-    .forEach(id => {
-
-      $(id).onchange =
-        renderMatrix;
-    });
+    .forEach(
+      id => {
+        $(id).onchange =
+          renderMatrix;
+      }
+    );
 
   [
     'gBuilding',
@@ -698,11 +860,12 @@ function bindUi() {
     'gOrg',
     'gMode'
   ]
-    .forEach(id => {
-
-      $(id).onchange =
-        renderGantt;
-    });
+    .forEach(
+      id => {
+        $(id).onchange =
+          renderGantt;
+      }
+    );
 
   $('calcPlanFact').onclick =
     renderPlanFact;
@@ -730,7 +893,6 @@ function bindUi() {
 
   $('newResourceBtn').onclick =
     () => {
-
       $('resourceEditor')
         .classList
         .remove('hidden');
@@ -810,33 +972,36 @@ function bindUi() {
     addStructure;
 }
 
-function showTab(name) {
-
+function showTab(
+  name
+) {
   document
     .querySelectorAll(
       '.tab'
     )
-    .forEach(button => {
-
-      button
-        .classList
-        .toggle(
-          'active',
-          button.dataset.tab ===
-            name
-        );
-    });
+    .forEach(
+      button => {
+        button
+          .classList
+          .toggle(
+            'active',
+            button.dataset.tab ===
+              name
+          );
+      }
+    );
 
   document
     .querySelectorAll(
       '.panel'
     )
-    .forEach(panel => {
-
-      panel
-        .classList
-        .add('hidden');
-    });
+    .forEach(
+      panel => {
+        panel
+          .classList
+          .add('hidden');
+      }
+    );
 
   $('tab-' + name)
     .classList
@@ -906,8 +1071,9 @@ function showTab(name) {
   }
 }
 
-function hydrateFront(front) {
-
+function hydrateFront(
+  front
+) {
   const structure =
     state.structures
       .find(
@@ -986,41 +1152,36 @@ function hydrateFront(front) {
   };
 }
 
-function frontLabel(front) {
-
+function frontLabel(
+  front
+) {
   const item =
-    hydrateFront(front);
+    hydrateFront(
+      front
+    );
 
   return [
     item.building,
     item.block,
 
     item.floor !== ''
-      ?
-      `${item.floor} эт.`
-      :
-      '',
+      ? `${item.floor} эт.`
+      : '',
 
     item.capture
-      ?
-      `захв. ${item.capture}`
-      :
-      '',
+      ? `захв. ${item.capture}`
+      : '',
 
     item.axis
-      ?
-      `ось ${item.axis}`
-      :
-      '',
+      ? `ось ${item.axis}`
+      : '',
 
     item.side,
     item.zone,
 
     item.room_no
-      ?
-      `пом. ${item.room_no}`
-      :
-      '',
+      ? `пом. ${item.room_no}`
+      : '',
 
     item.work
   ]
@@ -1028,46 +1189,44 @@ function frontLabel(front) {
     .join(' / ');
 }
 
-function statusClass(status) {
-
+function statusClass(
+  status
+) {
   return (
     status ===
       'Фронт готов'
-      ?
-      's-ready'
+      ? 's-ready'
       :
     status ===
       'В работе'
-      ?
-      's-work'
+      ? 's-work'
       :
     status ===
       'Завершено'
-      ?
-      's-done'
+      ? 's-done'
       :
     status ===
       'Приостановлено'
-      ?
-      's-pause'
+      ? 's-pause'
       :
     status ===
       'Ограничение'
-      ?
-      's-risk'
+      ? 's-risk'
       :
       's-not'
   );
 }
 
 function initSelects() {
-
   const buildings =
     state.buildings
       .map(
         item => ({
-          id: item.id,
-          name: item.name
+          id:
+            item.id,
+
+          name:
+            item.name
         })
       );
 
@@ -1075,8 +1234,11 @@ function initSelects() {
     state.works
       .map(
         item => ({
-          id: item.id,
-          name: item.name
+          id:
+            item.id,
+
+          name:
+            item.name
         })
       );
 
@@ -1084,8 +1246,11 @@ function initSelects() {
     state.organizations
       .map(
         item => ({
-          id: item.id,
-          name: item.name
+          id:
+            item.id,
+
+          name:
+            item.name
         })
       );
 
@@ -1096,14 +1261,15 @@ function initSelects() {
     'rBuilding',
     'repBuilding'
   ]
-    .forEach(id => {
-
-      fill(
-        $(id),
-        buildings,
-        'Все здания'
-      );
-    });
+    .forEach(
+      id => {
+        fill(
+          $(id),
+          buildings,
+          'Все здания'
+        );
+      }
+    );
 
   fill(
     $('msBuilding'),
@@ -1116,14 +1282,15 @@ function initSelects() {
     'pfWork',
     'repWork'
   ]
-    .forEach(id => {
-
-      fill(
-        $(id),
-        works,
-        'Все работы'
-      );
-    });
+    .forEach(
+      id => {
+        fill(
+          $(id),
+          works,
+          'Все работы'
+        );
+      }
+    );
 
   [
     'mfOrg',
@@ -1132,14 +1299,15 @@ function initSelects() {
     'rOrg',
     'repOrg'
   ]
-    .forEach(id => {
-
-      fill(
-        $(id),
-        organizations,
-        'Все организации'
-      );
-    });
+    .forEach(
+      id => {
+        fill(
+          $(id),
+          organizations,
+          'Все организации'
+        );
+      }
+    );
 
   fill(
     $('fOrg'),
@@ -1179,8 +1347,11 @@ function initSelects() {
     state.views
       .map(
         item => ({
-          id: item.id,
-          name: item.name
+          id:
+            item.id,
+
+          name:
+            item.name
         })
       ),
     'Выбери вид'
@@ -1188,7 +1359,6 @@ function initSelects() {
 }
 
 function updateMatrixDependent() {
-
   const buildingId =
     $('mfBuilding').value;
 
@@ -1213,8 +1383,11 @@ function updateMatrixDependent() {
     )
       .map(
         value => ({
-          id: value,
-          name: value
+          id:
+            value,
+
+          name:
+            value
         })
       ),
     'Все блоки'
@@ -1236,8 +1409,11 @@ function updateMatrixDependent() {
       )
       .map(
         value => ({
-          id: value,
-          name: value
+          id:
+            value,
+
+          name:
+            value
         })
       ),
     'Все этажи'
@@ -1245,7 +1421,6 @@ function updateMatrixDependent() {
 }
 
 function renderDashboard() {
-
   const fronts =
     state.fronts
       .map(
@@ -1357,9 +1532,13 @@ function renderDashboard() {
     [...state.resourceLog]
       .sort(
         (a, b) =>
-          String(a.resource_date)
+          String(
+            a.resource_date
+          )
             .localeCompare(
-              String(b.resource_date)
+              String(
+                b.resource_date
+              )
             )
       )
       .slice(-1)[0]
@@ -1376,7 +1555,10 @@ function renderDashboard() {
   const people =
     resourceRows
       .reduce(
-        (sum, row) =>
+        (
+          sum,
+          row
+        ) =>
           sum +
           num(row.itr) +
           num(row.workers) +
@@ -1387,7 +1569,10 @@ function renderDashboard() {
   const equipment =
     resourceRows
       .reduce(
-        (sum, row) =>
+        (
+          sum,
+          row
+        ) =>
           sum +
           num(
             row.equipment_qty
@@ -1398,8 +1583,7 @@ function renderDashboard() {
   $('dResources')
     .innerHTML =
       lastDate
-        ?
-        `
+        ? `
           <div class="item">
             <span>Дата</span>
             <strong>${lastDate}</strong>
@@ -1415,12 +1599,10 @@ function renderDashboard() {
             <strong>${equipment}</strong>
           </div>
         `
-        :
-        '<div class="muted">Нет данных</div>';
+        : '<div class="muted">Нет данных</div>';
 }
 
 function getColumnDefs() {
-
   const customColumns =
     state.customFields
       .filter(
@@ -1442,7 +1624,6 @@ function getColumnDefs() {
 }
 
 function renderColumnChooser() {
-
   const definitions =
     getColumnDefs();
 
@@ -1450,7 +1631,12 @@ function renderColumnChooser() {
     .innerHTML =
       definitions
         .map(
-          ([key, name]) =>
+          (
+            [
+              key,
+              name
+            ]
+          ) =>
             `
               <label>
 
@@ -1459,11 +1645,11 @@ function renderColumnChooser() {
                   data-col="${key}"
                   ${
                     visibleColumns
-                      .includes(key)
-                      ?
-                      'checked'
-                      :
-                      ''
+                      .includes(
+                        key
+                      )
+                      ? 'checked'
+                      : ''
                   }>
 
                 ${esc(name)}
@@ -1477,30 +1663,29 @@ function renderColumnChooser() {
     .querySelectorAll(
       '[data-col]'
     )
-    .forEach(checkbox => {
+    .forEach(
+      checkbox => {
+        checkbox.onchange =
+          () => {
+            visibleColumns =
+              [
+                ...document
+                  .querySelectorAll(
+                    '[data-col]:checked'
+                  )
+              ]
+                .map(
+                  element =>
+                    element.dataset.col
+                );
 
-      checkbox.onchange =
-        () => {
-
-          visibleColumns =
-            [
-              ...document
-                .querySelectorAll(
-                  '[data-col]:checked'
-                )
-            ]
-              .map(
-                element =>
-                  element.dataset.col
-              );
-
-          renderMatrix();
-        };
-    });
+            renderMatrix();
+          };
+      }
+    );
 }
 
 function matrixFiltered() {
-
   return state.fronts
     .map(
       hydrateFront
@@ -1525,7 +1710,9 @@ function matrixFiltered() {
         (
           $('mfFloor').value ===
             'all' ||
-          String(front.floor) ===
+          String(
+            front.floor
+          ) ===
             $('mfFloor').value
         ) &&
 
@@ -1556,13 +1743,11 @@ function colValue(
   front,
   key
 ) {
-
   if (
     key.startsWith(
       'cf:'
     )
   ) {
-
     return (
       front.structure
         .custom_data?.[
@@ -1579,7 +1764,6 @@ function colValue(
 }
 
 function renderMatrix() {
-
   initSelects();
 
   renderColumnChooser();
@@ -1666,25 +1850,24 @@ function renderMatrix() {
     .querySelectorAll(
       '[data-open-front]'
     )
-    .forEach(button => {
-
-      button.onclick =
-        () =>
-          openFront(
-            button.dataset.openFront
-          );
-    });
+    .forEach(
+      button => {
+        button.onclick =
+          () =>
+            openFront(
+              button.dataset.openFront
+            );
+      }
+    );
 }
 
 async function saveView() {
-
   const name =
     $('viewName')
       .value
       .trim();
 
   if (!name) {
-
     alert(
       'Укажи название вида'
     );
@@ -1692,49 +1875,38 @@ async function saveView() {
     return;
   }
 
-  const payload = {
-    name,
+  try {
+    await apiRequest(
+      'saveView',
+      {
+        data: {
+          name,
 
-    owner_user_id:
-      currentUser.id,
+          is_shared:
+            profile?.role ===
+              'admin' ||
+            profile?.role ===
+              'planner',
 
-    is_shared:
-      profile?.role ===
-        'admin' ||
-      profile?.role ===
-        'planner',
+          columns:
+            visibleColumns,
 
-    columns:
-      visibleColumns,
+          filters:
+            {}
+        }
+      }
+    );
 
-    filters: {}
-  };
+    await reloadAll();
 
-  const {
-    error
-  } =
-    await sb
-      .from(
-        'matrix_views'
-      )
-      .insert(
-        payload
-      );
-
-  if (error) {
-
+  } catch (error) {
     alert(
       error.message
     );
-
-    return;
   }
-
-  await reloadAll();
 }
 
 function loadView() {
-
   const view =
     state.views
       .find(
@@ -1752,10 +1924,8 @@ function loadView() {
     Array.isArray(
       view.columns
     )
-      ?
-      view.columns
-      :
-      [];
+      ? view.columns
+      : [];
 
   renderMatrix();
 }
@@ -1763,7 +1933,6 @@ function loadView() {
 function renderFrontCustom(
   front
 ) {
-
   const fields =
     state.customFields
       .filter(
@@ -1775,41 +1944,95 @@ function renderFrontCustom(
   $('frontCustom')
     .innerHTML =
       fields
-        .map(field => {
+        .map(
+          field => {
+            const value =
+              front.custom_data?.[
+                field.id
+              ] ??
+              '';
 
-          const value =
-            front.custom_data?.[
-              field.id
-            ] ??
-            '';
+            if (
+              field.field_type ===
+              'boolean'
+            ) {
+              return `
+                <div class="field inline">
 
-          if (
-            field.field_type ===
-            'boolean'
-          ) {
+                  <label>
 
-            return `
-              <div class="field inline">
+                    <input
+                      id="fcf_${field.id}"
+                      type="checkbox"
+                      ${value ? 'checked' : ''}>
 
-                <label>
+                    ${esc(field.name)}
 
-                  <input
-                    id="fcf_${field.id}"
-                    type="checkbox"
-                    ${value ? 'checked' : ''}>
+                  </label>
 
-                  ${esc(field.name)}
+                </div>
+              `;
+            }
 
-                </label>
+            if (
+              field.field_type ===
+              'select'
+            ) {
+              return `
+                <div class="field">
 
-              </div>
-            `;
-          }
+                  <label>
+                    ${esc(field.name)}
+                  </label>
 
-          if (
-            field.field_type ===
-            'select'
-          ) {
+                  <select id="fcf_${field.id}">
+
+                    <option value=""></option>
+
+                    ${
+                      (
+                        field.options ||
+                        []
+                      )
+                        .map(
+                          option =>
+                            `
+                              <option
+                                ${
+                                  String(option) ===
+                                  String(value)
+                                    ? 'selected'
+                                    : ''
+                                }>
+
+                                ${esc(option)}
+
+                              </option>
+                            `
+                        )
+                        .join('')
+                    }
+
+                  </select>
+
+                </div>
+              `;
+            }
+
+            const type =
+              field.field_type ===
+                'date'
+                ? 'date'
+                :
+              [
+                'number',
+                'percent'
+              ]
+                .includes(
+                  field.field_type
+                )
+                ? 'number'
+                : 'text';
 
             return `
               <div class="field">
@@ -1818,77 +2041,19 @@ function renderFrontCustom(
                   ${esc(field.name)}
                 </label>
 
-                <select id="fcf_${field.id}">
-
-                  <option value=""></option>
-
-                  ${
-                    (field.options || [])
-                      .map(
-                        option =>
-                          `
-                            <option
-                              ${
-                                String(option) ===
-                                String(value)
-                                  ?
-                                  'selected'
-                                  :
-                                  ''
-                              }>
-
-                              ${esc(option)}
-
-                            </option>
-                          `
-                      )
-                      .join('')
-                  }
-
-                </select>
+                <input
+                  id="fcf_${field.id}"
+                  type="${type}"
+                  value="${esc(value)}">
 
               </div>
             `;
           }
-
-          const type =
-            field.field_type ===
-              'date'
-              ?
-              'date'
-              :
-            [
-              'number',
-              'percent'
-            ]
-              .includes(
-                field.field_type
-              )
-              ?
-              'number'
-              :
-              'text';
-
-          return `
-            <div class="field">
-
-              <label>
-                ${esc(field.name)}
-              </label>
-
-              <input
-                id="fcf_${field.id}"
-                type="${type}"
-                value="${esc(value)}">
-
-            </div>
-          `;
-        })
+        )
         .join('');
 }
 
 function readFrontCustom() {
-
   const result =
     {};
 
@@ -1898,30 +2063,34 @@ function readFrontCustom() {
         field.scope ===
         'front'
     )
-    .forEach(field => {
+    .forEach(
+      field => {
+        const element =
+          $(
+            'fcf_' +
+            field.id
+          );
 
-      const element =
-        $('fcf_' + field.id);
-
-      result[field.id] =
-        field.field_type ===
-          'boolean'
-          ?
-          element.checked
-          :
-          element.value;
-    });
+        result[field.id] =
+          field.field_type ===
+            'boolean'
+            ? element.checked
+            : element.value;
+      }
+    );
 
   return result;
 }
 
-function openFront(id) {
-
+function openFront(
+  id
+) {
   const front =
     state.fronts
       .find(
         item =>
-          item.id === id
+          item.id ===
+          id
       );
 
   if (!front) {
@@ -1940,7 +2109,9 @@ function openFront(id) {
 
   $('frontMeta')
     .textContent =
-      frontLabel(front);
+      frontLabel(
+        front
+      );
 
   fill(
     $('fOrg'),
@@ -2051,79 +2222,11 @@ function openFront(id) {
     });
 }
 
-async function logChanges(
-  entity,
-  id,
-  oldRow,
-  newRow
-) {
-
-  const rows =
-    [];
-
-  for (
-    const [
-      field,
-      value
-    ]
-    of Object.entries(newRow)
-  ) {
-
-    if (
-      String(
-        oldRow[field] ??
-        ''
-      ) !==
-      String(
-        value ??
-        ''
-      )
-    ) {
-
-      rows.push({
-        entity_type:
-          entity,
-
-        entity_id:
-          id,
-
-        field_name:
-          field,
-
-        old_value:
-          String(
-            oldRow[field] ??
-            ''
-          ),
-
-        new_value:
-          String(
-            value ??
-            ''
-          ),
-
-        changed_by:
-          currentUser.id
-      });
-    }
-  }
-
-  if (
-    rows.length
-  ) {
-
-    await sb
-      .from(
-        'change_log'
-      )
-      .insert(
-        rows
-      );
-  }
+async function logChanges() {
+  return;
 }
 
 async function saveFront() {
-
   const front =
     state.fronts
       .find(
@@ -2137,6 +2240,8 @@ async function saveFront() {
   }
 
   const update = {
+    id:
+      front.id,
 
     status:
       $('fStatus').value,
@@ -2192,32 +2297,26 @@ async function saveFront() {
     total_qty:
       $('fTotalQty').value ===
         ''
-        ?
-        null
-        :
-        num(
-          $('fTotalQty').value
-        ),
+        ? null
+        : num(
+            $('fTotalQty').value
+          ),
 
     done_qty:
       $('fDoneQty').value ===
         ''
-        ?
-        null
-        :
-        num(
-          $('fDoneQty').value
-        ),
+        ? null
+        : num(
+            $('fDoneQty').value
+          ),
 
     current_people:
       $('fPeople').value ===
         ''
-        ?
-        null
-        :
-        num(
-          $('fPeople').value
-        ),
+        ? null
+        : num(
+            $('fPeople').value
+          ),
 
     completed:
       $('fCompleted').checked,
@@ -2238,59 +2337,75 @@ async function saveFront() {
 
     constraint_text:
       $('fConstraint').value ||
-      null,
-
-    custom_data:
-      readFrontCustom(),
-
-    updated_at:
-      new Date()
-        .toISOString()
+      null
   };
 
-  const {
-    error
-  } =
-    await sb
-      .from('fronts')
-      .update(update)
-      .eq(
-        'id',
-        front.id
+  try {
+    await apiRequest(
+      'saveFront',
+      {
+        data:
+          update
+      }
+    );
+
+    const custom =
+      readFrontCustom();
+
+    for (
+      const [
+        fieldId,
+        value
+      ]
+      of Object.entries(
+        custom
+      )
+    ) {
+      await apiRequest(
+        'saveCustomValue',
+        {
+          data: {
+            field_id:
+              fieldId,
+
+            entity:
+              'front',
+
+            entity_id:
+              front.id,
+
+            value
+          }
+        }
       );
+    }
 
-  if (error) {
+    await reloadAll();
 
+    notice(
+      'Сохранено',
+      true
+    );
+
+    $('frontEditor')
+      .classList
+      .add('hidden');
+
+  } catch (error) {
     alert(
       error.message
     );
-
-    return;
   }
-
-  await logChanges(
-    'front',
-    front.id,
-    front,
-    update
-  );
-
-  notice(
-    'Сохранено · остальные пользователи получат обновление',
-    true
-  );
 }
 
 function modeDates(
   front,
   mode
 ) {
-
   if (
     mode ===
     'contract'
   ) {
-
     return [
       front.contract_start,
       front.contract_end
@@ -2301,7 +2416,6 @@ function modeDates(
     mode ===
     'baseline'
   ) {
-
     return [
       front.baseline_start,
       front.baseline_end
@@ -2312,7 +2426,6 @@ function modeDates(
     mode ===
     'fact'
   ) {
-
     return [
       front.fact_start,
       front.fact_end ||
@@ -2324,7 +2437,6 @@ function modeDates(
     mode ===
     'forecast'
   ) {
-
     return [
       front.plan_start ||
       front.fact_start,
@@ -2341,7 +2453,6 @@ function modeDates(
 }
 
 function renderGantt() {
-
   initSelects();
 
   const buildingId =
@@ -2405,7 +2516,6 @@ function renderGantt() {
   if (
     !items.length
   ) {
-
     $('gantt')
       .innerHTML =
         `
@@ -2451,79 +2561,79 @@ function renderGantt() {
   $('gantt')
     .innerHTML =
       items
-        .map(item => {
+        .map(
+          item => {
+            const front =
+              item.front;
 
-          const front =
-            item.front;
+            const dates =
+              item.dates;
 
-          const dates =
-            item.dates;
-
-          const left =
-            (
-              diffDays(
-                min,
-                dates[0]
-              ) /
-              total
-            ) * 100;
-
-          const width =
-            Math.max(
-              1,
+            const left =
               (
-                (
-                  diffDays(
-                    dates[0],
-                    dates[1]
-                  ) + 1
+                diffDays(
+                  min,
+                  dates[0]
                 ) /
                 total
-              ) * 100
-            );
+              ) * 100;
 
-          return `
-            <div class="gantt-row">
+            const width =
+              Math.max(
+                1,
+                (
+                  (
+                    diffDays(
+                      dates[0],
+                      dates[1]
+                    ) + 1
+                  ) /
+                  total
+                ) * 100
+              );
 
-              <div class="gantt-name">
+            return `
+              <div class="gantt-row">
 
-                <b>
-                  ${esc(front.work)}
-                </b>
+                <div class="gantt-name">
 
-                <br>
+                  <b>
+                    ${esc(front.work)}
+                  </b>
 
-                <small>
-                  ${esc(frontLabel(front))}
-                </small>
+                  <br>
 
-              </div>
+                  <small>
+                    ${esc(frontLabel(front))}
+                  </small>
 
-              <div class="gantt-line">
+                </div>
 
-                <div
-                  class="gantt-bar"
-                  style="
-                    left:${left}%;
-                    width:${width}%
-                  ">
+                <div class="gantt-line">
 
-                  ${dates[0]}
-                  →
-                  ${dates[1]}
+                  <div
+                    class="gantt-bar"
+                    style="
+                      left:${left}%;
+                      width:${width}%
+                    ">
+
+                    ${dates[0]}
+                    →
+                    ${dates[1]}
+
+                  </div>
 
                 </div>
 
               </div>
-
-            </div>
-          `;
-        })
+            `;
+          }
+        )
         .join('');
 }
 
 function pfFrontIds() {
-
   const buildingId =
     $('pfBuilding').value;
 
@@ -2534,42 +2644,42 @@ function pfFrontIds() {
     $('pfOrg').value;
 
   return new Set(
-
     state.fronts
-      .filter(front => {
+      .filter(
+        front => {
+          const structure =
+            state.structures
+              .find(
+                item =>
+                  item.id ===
+                  front.structure_id
+              );
 
-        const structure =
-          state.structures
-            .find(
-              item =>
-                item.id ===
-                front.structure_id
-            );
+          return (
+            (
+              buildingId ===
+                'all' ||
+              structure
+                ?.building_id ===
+                buildingId
+            ) &&
 
-        return (
-          (
-            buildingId ===
-              'all' ||
-            structure
-              ?.building_id ===
-              buildingId
-          ) &&
+            (
+              workId ===
+                'all' ||
+              front.work_id ===
+                workId
+            ) &&
 
-          (
-            workId ===
-              'all' ||
-            front.work_id ===
-              workId
-          ) &&
-
-          (
-            organizationId ===
-              'all' ||
-            front.organization_id ===
-              organizationId
-          )
-        );
-      })
+            (
+              organizationId ===
+                'all' ||
+              front.organization_id ===
+                organizationId
+            )
+          );
+        }
+      )
       .map(
         front =>
           front.id
@@ -2578,7 +2688,6 @@ function pfFrontIds() {
 }
 
 function renderPlanFact() {
-
   initSelects();
 
   const ids =
@@ -2635,7 +2744,10 @@ function renderPlanFact() {
   const planPeriod =
     planPeriodRows
       .reduce(
-        (sum, row) =>
+        (
+          sum,
+          row
+        ) =>
           sum +
           num(
             row.planned_qty
@@ -2646,7 +2758,10 @@ function renderPlanFact() {
   const factPeriod =
     factPeriodRows
       .reduce(
-        (sum, row) =>
+        (
+          sum,
+          row
+        ) =>
           sum +
           num(
             row.qty
@@ -2668,7 +2783,10 @@ function renderPlanFact() {
           )
       )
       .reduce(
-        (sum, row) =>
+        (
+          sum,
+          row
+        ) =>
           sum +
           num(
             row.planned_qty
@@ -2690,7 +2808,10 @@ function renderPlanFact() {
           )
       )
       .reduce(
-        (sum, row) =>
+        (
+          sum,
+          row
+        ) =>
           sum +
           num(
             row.qty
@@ -2707,7 +2828,10 @@ function renderPlanFact() {
           )
       )
       .reduce(
-        (sum, front) =>
+        (
+          sum,
+          front
+        ) =>
           sum +
           num(
             front.total_qty
@@ -2715,57 +2839,70 @@ function renderPlanFact() {
         0
       );
 
-  $('pfPlanPeriod').textContent =
-    fmt(planPeriod);
+  $('pfPlanPeriod')
+    .textContent =
+      fmt(
+        planPeriod
+      );
 
-  $('pfFactPeriod').textContent =
-    fmt(factPeriod);
+  $('pfFactPeriod')
+    .textContent =
+      fmt(
+        factPeriod
+      );
 
-  $('pfVarPeriod').textContent =
-    fmt(
-      factPeriod -
-      planPeriod
-    );
+  $('pfVarPeriod')
+    .textContent =
+      fmt(
+        factPeriod -
+        planPeriod
+      );
 
-  $('pfPlanCum').textContent =
-    fmt(planCum);
+  $('pfPlanCum')
+    .textContent =
+      fmt(
+        planCum
+      );
 
-  $('pfFactCum').textContent =
-    fmt(factCum);
+  $('pfFactCum')
+    .textContent =
+      fmt(
+        factCum
+      );
 
   const planPercent =
     total
-      ?
-      (
-        planCum /
-        total *
-        100
-      )
-      :
-      0;
+      ? (
+          planCum /
+          total *
+          100
+        )
+      : 0;
 
   const factPercent =
     total
-      ?
-      (
-        factCum /
-        total *
-        100
-      )
-      :
-      0;
+      ? (
+          factCum /
+          total *
+          100
+        )
+      : 0;
 
-  $('pfPp').textContent =
-    fmt(
-      factPercent -
-      planPercent
-    );
+  $('pfPp')
+    .textContent =
+      fmt(
+        factPercent -
+        planPercent
+      );
 
   $('planRows')
     .innerHTML =
       planPeriodRows
         .sort(
-          (a, b) =>
+          (
+            a,
+            b
+          ) =>
             String(
               b.plan_date
             )
@@ -2775,45 +2912,49 @@ function renderPlanFact() {
                 )
               )
         )
-        .map(row => {
+        .map(
+          row => {
+            const front =
+              state.fronts
+                .find(
+                  item =>
+                    item.id ===
+                    row.front_id
+                );
 
-          const front =
-            state.fronts
-              .find(
-                item =>
-                  item.id ===
-                  row.front_id
-              );
+            return `
+              <tr>
 
-          return `
-            <tr>
+                <td>
+                  ${row.plan_date}
+                </td>
 
-              <td>
-                ${row.plan_date}
-              </td>
+                <td>
+                  ${esc(frontLabel(front))}
+                </td>
 
-              <td>
-                ${esc(frontLabel(front))}
-              </td>
+                <td>
+                  ${fmt(row.planned_qty)}
+                </td>
 
-              <td>
-                ${fmt(row.planned_qty)}
-              </td>
+                <td>
+                  ${fmt(row.planned_people)}
+                </td>
 
-              <td>
-                ${fmt(row.planned_people)}
-              </td>
-
-            </tr>
-          `;
-        })
+              </tr>
+            `;
+          }
+        )
         .join('');
 
   $('factRows')
     .innerHTML =
       factPeriodRows
         .sort(
-          (a, b) =>
+          (
+            a,
+            b
+          ) =>
             String(
               b.fact_date
             )
@@ -2823,47 +2964,49 @@ function renderPlanFact() {
                 )
               )
         )
-        .map(row => {
+        .map(
+          row => {
+            const front =
+              state.fronts
+                .find(
+                  item =>
+                    item.id ===
+                    row.front_id
+                );
 
-          const front =
-            state.fronts
-              .find(
-                item =>
-                  item.id ===
-                  row.front_id
-              );
+            return `
+              <tr>
 
-          return `
-            <tr>
+                <td>
+                  ${row.fact_date}
+                </td>
 
-              <td>
-                ${row.fact_date}
-              </td>
+                <td>
+                  ${esc(frontLabel(front))}
+                </td>
 
-              <td>
-                ${esc(frontLabel(front))}
-              </td>
+                <td>
+                  ${fmt(row.qty)}
+                </td>
 
-              <td>
-                ${fmt(row.qty)}
-              </td>
+                <td>
+                  ${fmt(row.cumulative_qty)}
+                </td>
 
-              <td>
-                ${fmt(row.cumulative_qty)}
-              </td>
+                <td>
+                  ${fmt(row.people)}
+                </td>
 
-              <td>
-                ${fmt(row.people)}
-              </td>
-
-            </tr>
-          `;
-        })
+              </tr>
+            `;
+          }
+        )
         .join('');
 }
 
-function openLogEditor(mode) {
-
+function openLogEditor(
+  mode
+) {
   logMode =
     mode;
 
@@ -2872,8 +3015,13 @@ function openLogEditor(mode) {
     state.fronts
       .map(
         front => ({
-          id: front.id,
-          name: frontLabel(front)
+          id:
+            front.id,
+
+          name:
+            frontLabel(
+              front
+            )
         })
       )
   );
@@ -2894,14 +3042,14 @@ function openLogEditor(mode) {
     '';
 
   $('logCum')
-    .closest('.field')
+    .closest(
+      '.field'
+    )
     .style.display =
       mode ===
         'fact'
-        ?
-        ''
-        :
-        'none';
+        ? ''
+        : 'none';
 
   $('logEditor')
     .classList
@@ -2909,113 +3057,92 @@ function openLogEditor(mode) {
 }
 
 async function saveLog() {
-
   const frontId =
     $('logFront').value;
 
-  if (
-    logMode ===
-    'plan'
-  ) {
+  try {
+    if (
+      logMode ===
+      'plan'
+    ) {
+      await apiRequest(
+        'addPlan',
+        {
+          data: {
+            front_id:
+              frontId,
 
-    const {
-      error
-    } =
-      await sb
-        .from('plan_log')
-        .insert({
-          front_id:
-            frontId,
+            plan_date:
+              $('logDate').value,
 
-          plan_date:
-            $('logDate').value,
-
-          planned_qty:
-            num(
-              $('logQty').value
-            ),
-
-          planned_people:
-            num(
-              $('logPeople').value
-            ),
-
-          comment:
-            $('logComment').value ||
-            null,
-
-          created_by:
-            currentUser.id
-        });
-
-    if (error) {
-
-      alert(
-        error.message
-      );
-
-      return;
-    }
-
-  } else {
-
-    const {
-      error
-    } =
-      await sb
-        .from('fact_log')
-        .insert({
-          front_id:
-            frontId,
-
-          fact_date:
-            $('logDate').value,
-
-          qty:
-            num(
-              $('logQty').value
-            ),
-
-          cumulative_qty:
-            $('logCum').value ===
-              ''
-              ?
-              null
-              :
+            planned_qty:
               num(
-                $('logCum').value
+                $('logQty').value
               ),
 
-          people:
-            num(
-              $('logPeople').value
-            ),
+            planned_people:
+              num(
+                $('logPeople').value
+              ),
 
-          comment:
-            $('logComment').value ||
-            null,
-
-          created_by:
-            currentUser.id
-        });
-
-    if (error) {
-
-      alert(
-        error.message
+            comment:
+              $('logComment').value ||
+              ''
+          }
+        }
       );
 
-      return;
-    }
-  }
+    } else {
+      await apiRequest(
+        'addFact',
+        {
+          data: {
+            front_id:
+              frontId,
 
-  $('logEditor')
-    .classList
-    .add('hidden');
+            fact_date:
+              $('logDate').value,
+
+            qty:
+              num(
+                $('logQty').value
+              ),
+
+            cumulative_qty:
+              $('logCum').value ===
+                ''
+                ? null
+                : num(
+                    $('logCum').value
+                  ),
+
+            people:
+              num(
+                $('logPeople').value
+              ),
+
+            comment:
+              $('logComment').value ||
+              ''
+          }
+        }
+      );
+    }
+
+    $('logEditor')
+      .classList
+      .add('hidden');
+
+    await reloadAll();
+
+  } catch (error) {
+    alert(
+      error.message
+    );
+  }
 }
 
 function resourceFiltered() {
-
   const from =
     $('rFrom').value;
 
@@ -3060,7 +3187,6 @@ function resourceFiltered() {
 }
 
 function renderResources() {
-
   initSelects();
 
   const rows =
@@ -3069,7 +3195,10 @@ function renderResources() {
   const sum =
     field =>
       rows.reduce(
-        (total, row) =>
+        (
+          total,
+          row
+        ) =>
           total +
           num(
             row[field]
@@ -3080,31 +3209,38 @@ function renderResources() {
   const daily =
     {};
 
-  rows.forEach(row => {
+  rows.forEach(
+    row => {
+      daily[
+        row.resource_date
+      ] =
+        (
+          daily[
+            row.resource_date
+          ] ||
+          0
+        ) +
 
-    daily[
-      row.resource_date
-    ] =
-      (
-        daily[
-          row.resource_date
-        ] ||
-        0
-      ) +
-
-      num(row.itr) +
-      num(row.workers) +
-      num(row.mechanizers);
-  });
+        num(row.itr) +
+        num(row.workers) +
+        num(row.mechanizers);
+    }
+  );
 
   $('rItr').textContent =
-    sum('itr');
+    sum(
+      'itr'
+    );
 
   $('rWorkers').textContent =
-    sum('workers');
+    sum(
+      'workers'
+    );
 
   $('rMech').textContent =
-    sum('mechanizers');
+    sum(
+      'mechanizers'
+    );
 
   $('rTotalPeople').textContent =
     sum('itr') +
@@ -3114,7 +3250,9 @@ function renderResources() {
   $('rPeak').textContent =
     Math.max(
       0,
-      ...Object.values(daily)
+      ...Object.values(
+        daily
+      )
     );
 
   $('rEquipDays').textContent =
@@ -3128,7 +3266,10 @@ function renderResources() {
     .innerHTML =
       rows
         .sort(
-          (a, b) =>
+          (
+            a,
+            b
+          ) =>
             String(
               b.resource_date
             )
@@ -3200,9 +3341,7 @@ function renderResources() {
 }
 
 async function saveResource() {
-
   const payload = {
-
     resource_date:
       $('reDate').value,
 
@@ -3223,7 +3362,7 @@ async function saveResource() {
         $('reWorkers').value
       ),
 
-    mechanizers:
+    operators:
       num(
         $('reMech').value
       ),
@@ -3239,39 +3378,32 @@ async function saveResource() {
 
     comment:
       $('reComment').value ||
-      null,
-
-    created_by:
-      currentUser.id
+      ''
   };
 
-  const {
-    error
-  } =
-    await sb
-      .from(
-        'resource_log'
-      )
-      .insert(
-        payload
-      );
+  try {
+    await apiRequest(
+      'addResource',
+      {
+        data:
+          payload
+      }
+    );
 
-  if (error) {
+    $('resourceEditor')
+      .classList
+      .add('hidden');
 
+    await reloadAll();
+
+  } catch (error) {
     alert(
       error.message
     );
-
-    return;
   }
-
-  $('resourceEditor')
-    .classList
-    .add('hidden');
 }
 
 function renderMilestones() {
-
   $('milestoneRows')
     .innerHTML =
       state.milestones
@@ -3332,20 +3464,20 @@ function renderMilestones() {
     .querySelectorAll(
       '.editMs'
     )
-    .forEach(button => {
-
-      button.onclick =
-        () =>
-          openMilestone(
-            button.dataset.id
-          );
-    });
+    .forEach(
+      button => {
+        button.onclick =
+          () =>
+            openMilestone(
+              button.dataset.id
+            );
+      }
+    );
 }
 
 function openMilestone(
   id = null
 ) {
-
   editingMilestoneId =
     id;
 
@@ -3353,7 +3485,8 @@ function openMilestone(
     state.milestones
       .find(
         item =>
-          item.id === id
+          item.id ===
+          id
       ) ||
     {};
 
@@ -3401,8 +3534,10 @@ function openMilestone(
 }
 
 async function saveMilestone() {
-
   const payload = {
+    id:
+      editingMilestoneId ||
+      undefined,
 
     building_id:
       $('msBuilding').value ||
@@ -3434,17 +3569,12 @@ async function saveMilestone() {
 
     comment:
       $('msComment').value ||
-      null,
-
-    updated_at:
-      new Date()
-        .toISOString()
+      null
   };
 
   if (
     !payload.title
   ) {
-
     alert(
       'Укажи наименование ключевой даты'
     );
@@ -3452,51 +3582,32 @@ async function saveMilestone() {
     return;
   }
 
-  let error;
-
-  if (
-    editingMilestoneId
-  ) {
-
-    ({
-      error
-    } =
-      await sb
-        .from('milestones')
-        .update(payload)
-        .eq(
-          'id',
-          editingMilestoneId
-        )
+  try {
+    await apiRequest(
+      'saveMilestone',
+      {
+        data:
+          payload
+      }
     );
 
-  } else {
+    $('milestoneEditor')
+      .classList
+      .add('hidden');
 
-    ({
-      error
-    } =
-      await sb
-        .from('milestones')
-        .insert(payload)
-    );
-  }
+    editingMilestoneId =
+      null;
 
-  if (error) {
+    await reloadAll();
 
+  } catch (error) {
     alert(
       error.message
     );
-
-    return;
   }
-
-  $('milestoneEditor')
-    .classList
-    .add('hidden');
 }
 
 function reportFronts() {
-
   const buildingId =
     $('repBuilding').value;
 
@@ -3547,7 +3658,6 @@ function reportFronts() {
 }
 
 function buildReport() {
-
   initSelects();
 
   const buildingId =
@@ -3601,7 +3711,6 @@ function buildReport() {
   if (
     $('repIncludePlanFact').checked
   ) {
-
     const plan =
       state.planLog
         .filter(
@@ -3614,7 +3723,10 @@ function buildReport() {
             )
         )
         .reduce(
-          (sum, row) =>
+          (
+            sum,
+            row
+          ) =>
             sum +
             num(
               row.planned_qty
@@ -3634,7 +3746,10 @@ function buildReport() {
             )
         )
         .reduce(
-          (sum, row) =>
+          (
+            sum,
+            row
+          ) =>
             sum +
             num(
               row.qty
@@ -3672,7 +3787,6 @@ function buildReport() {
   if (
     $('repIncludeResources').checked
   ) {
-
     const resources =
       state.resourceLog
         .filter(
@@ -3699,7 +3813,10 @@ function buildReport() {
     const people =
       resources
         .reduce(
-          (sum, row) =>
+          (
+            sum,
+            row
+          ) =>
             sum +
             num(row.itr) +
             num(row.workers) +
@@ -3710,7 +3827,10 @@ function buildReport() {
     const equipment =
       resources
         .reduce(
-          (sum, row) =>
+          (
+            sum,
+            row
+          ) =>
             sum +
             num(
               row.equipment_qty
@@ -3743,7 +3863,6 @@ function buildReport() {
   if (
     $('repIncludeMilestones').checked
   ) {
-
     const milestones =
       state.milestones
         .filter(
@@ -3820,7 +3939,6 @@ function buildReport() {
   if (
     $('repIncludeWorks').checked
   ) {
-
     html +=
       `
         <div class="report-section">
@@ -3895,11 +4013,9 @@ function buildReport() {
 }
 
 function downloadPdf() {
-
   buildReport();
 
   const options = {
-
     margin: 8,
 
     filename:
@@ -3923,7 +4039,9 @@ function downloadPdf() {
   };
 
   html2pdf()
-    .set(options)
+    .set(
+      options
+    )
     .from(
       $('reportArea')
     )
@@ -3933,7 +4051,6 @@ function downloadPdf() {
 async function readImportFile(
   event
 ) {
-
   const file =
     event.target.files[0];
 
@@ -3978,12 +4095,10 @@ async function readImportFile(
 
   const headers =
     importRows[0]
-      ?
-      Object.keys(
-        importRows[0]
-      )
-      :
-      [];
+      ? Object.keys(
+          importRows[0]
+        )
+      : [];
 
   $('importHead')
     .innerHTML =
@@ -4025,8 +4140,9 @@ async function readImportFile(
       !importRows.length;
 }
 
-function normalizeDate(value) {
-
+function normalizeDate(
+  value
+) {
   if (!value) {
     return null;
   }
@@ -4034,14 +4150,18 @@ function normalizeDate(value) {
   if (
     value instanceof Date
   ) {
-
     return value
       .toISOString()
-      .slice(0, 10);
+      .slice(
+        0,
+        10
+      );
   }
 
   const string =
-    String(value)
+    String(
+      value
+    )
       .trim();
 
   const match =
@@ -4050,15 +4170,12 @@ function normalizeDate(value) {
     );
 
   if (match) {
-
     const year =
       match[3].length ===
         2
-        ?
-        '20' +
-        match[3]
-        :
-        match[3];
+        ? '20' +
+          match[3]
+        : match[3];
 
     return (
       year +
@@ -4079,9 +4196,10 @@ function normalizeDate(value) {
 
   if (
     /^\d{4}-\d{2}-\d{2}$/
-      .test(string)
+      .test(
+        string
+      )
   ) {
-
     return string;
   }
 
@@ -4092,62 +4210,69 @@ async function ensureNamed(
   table,
   name
 ) {
-
   if (!name) {
     return null;
   }
 
   const list =
-    state[
-      table ===
-        'buildings'
-        ?
-        'buildings'
-        :
-      table ===
-        'works'
-        ?
-        'works'
-        :
-        'organizations'
-    ];
+    table ===
+      'buildings'
+      ? state.buildings
+      :
+    table ===
+      'works'
+      ? state.works
+      :
+      state.organizations;
 
   const existing =
     list.find(
       item =>
-        item.name === name
+        item.name ===
+        name
     );
 
   if (existing) {
-
     return existing.id;
   }
 
-  const {
-    data,
-    error
-  } =
-    await sb
-      .from(table)
-      .insert({
-        name
-      })
-      .select()
-      .single();
+  const action =
+    table ===
+      'buildings'
+      ? 'addBuilding'
+      :
+    table ===
+      'works'
+      ? 'addWork'
+      :
+      'addOrganization';
 
-  if (error) {
-    throw error;
+  const result =
+    await apiRequest(
+      action,
+      {
+        data: {
+          name
+        }
+      }
+    );
+
+  const item =
+    result.building ||
+    result.work ||
+    result.organization;
+
+  if (item) {
+    list.push(
+      item
+    );
   }
 
-  list.push(
-    data
-  );
-
-  return data.id;
+  return item?.id ||
+    null;
 }
 
 async function commitImport() {
-
   if (
     !importRows.length
   ) {
@@ -4163,11 +4288,18 @@ async function commitImport() {
         profile?.role
       )
   ) {
-
     alert(
-      'Импорт структуры доступен администратору или планировщику.'
+      'Импорт доступен администратору или планировщику.'
     );
 
+    return;
+  }
+
+  if (
+    !confirm(
+      `Импортировать ${importRows.length} строк в общую базу?`
+    )
+  ) {
     return;
   }
 
@@ -4176,349 +4308,53 @@ async function commitImport() {
       true;
 
   try {
+    const file =
+      $('importFile')
+        .files?.[0];
 
-    let created = 0;
-    let updated = 0;
+    const response =
+      await apiRequest(
+        'importBatch',
+        {
+          fileName:
+            file?.name ||
+            '',
 
-    for (
-      const row
-      of importRows
-    ) {
+          source:
+            'ACONS Planning',
 
-      const building =
-        String(
-          row['Здание'] ||
-          ''
-        )
-          .trim();
-
-      const work =
-        String(
-          row['Работа'] ||
-          ''
-        )
-          .trim();
-
-      if (
-        !building ||
-        !work
-      ) {
-
-        continue;
-      }
-
-      const buildingId =
-        await ensureNamed(
-          'buildings',
-          building
-        );
-
-      const workId =
-        await ensureNamed(
-          'works',
-          work
-        );
-
-      const organizationId =
-        await ensureNamed(
-          'organizations',
-          String(
-            row['Организация'] ||
-            ''
-          )
-            .trim()
-        );
-
-      const structurePayload = {
-
-        building_id:
-          buildingId,
-
-        block_name:
-          String(
-            row['Блок'] ||
-            ''
-          )
-            .trim() ||
-          null,
-
-        floor_no:
-          row['Этаж'] ===
-            ''
-            ?
-            null
-            :
-            num(
-              row['Этаж']
-            ),
-
-        capture_name:
-          String(
-            row['Захватка'] ||
-            ''
-          )
-            .trim() ||
-          null,
-
-        axis_name:
-          String(
-            row['Ось'] ||
-            ''
-          )
-            .trim() ||
-          null,
-
-        side_name:
-          String(
-            row['Сторона'] ||
-            ''
-          )
-            .trim() ||
-          null,
-
-        zone_name:
-          String(
-            row['Зона'] ||
-            ''
-          )
-            .trim() ||
-          null,
-
-        room_number:
-          String(
-            row['Номер помещения'] ||
-            ''
-          )
-            .trim() ||
-          null,
-
-        room_name:
-          String(
-            row['Название помещения'] ||
-            ''
-          )
-            .trim() ||
-          null,
-
-        equipment_name:
-          String(
-            row['Оборудование'] ||
-            ''
-          )
-            .trim() ||
-          null
-      };
-
-      let query =
-        sb
-          .from('structures')
-          .select('*')
-          .eq(
-            'building_id',
-            buildingId
-          );
-
-      for (
-        const [
-          field,
-          value
-        ]
-        of Object.entries(
-          structurePayload
-        )
-      ) {
-
-        if (
-          field ===
-          'building_id'
-        ) {
-          continue;
+          rows:
+            importRows
         }
+      );
 
-        query =
-          value === null
-            ?
-            query.is(
-              field,
-              null
-            )
-            :
-            query.eq(
-              field,
-              value
-            );
-      }
-
-      const {
-        data: found
-      } =
-        await query
-          .limit(1);
-
-      let structureId =
-        found?.[0]?.id;
-
-      if (
-        !structureId
-      ) {
-
-        const insert =
-          await sb
-            .from('structures')
-            .insert(
-              structurePayload
-            )
-            .select()
-            .single();
-
-        if (
-          insert.error
-        ) {
-          throw insert.error;
-        }
-
-        structureId =
-          insert.data.id;
-      }
-
-      const frontPayload = {
-
-        structure_id:
-          structureId,
-
-        work_id:
-          workId,
-
-        organization_id:
-          organizationId,
-
-        contract_start:
-          normalizeDate(
-            row['Договорное начало']
-          ),
-
-        contract_end:
-          normalizeDate(
-            row['Договорное окончание']
-          ),
-
-        baseline_start:
-          normalizeDate(
-            row['Базовое начало']
-          ),
-
-        baseline_end:
-          normalizeDate(
-            row['Базовое окончание']
-          ),
-
-        plan_start:
-          normalizeDate(
-            row['Рабочее начало']
-          ),
-
-        plan_end:
-          normalizeDate(
-            row['Рабочее окончание']
-          ),
-
-        total_qty:
-          row['Общий объем'] ===
-            ''
-            ?
-            null
-            :
-            num(
-              row['Общий объем']
-            ),
-
-        unit:
-          String(
-            row['Ед. изм.'] ||
-            ''
-          )
-            .trim() ||
-          null
-      };
-
-      const existing =
-        await sb
-          .from('fronts')
-          .select('id')
-          .eq(
-            'structure_id',
-            structureId
-          )
-          .eq(
-            'work_id',
-            workId
-          )
-          .maybeSingle();
-
-      if (
-        existing.data?.id
-      ) {
-
-        const update =
-          await sb
-            .from('fronts')
-            .update(
-              frontPayload
-            )
-            .eq(
-              'id',
-              existing.data.id
-            );
-
-        if (
-          update.error
-        ) {
-          throw update.error;
-        }
-
-        updated++;
-
-      } else {
-
-        const insert =
-          await sb
-            .from('fronts')
-            .insert(
-              frontPayload
-            );
-
-        if (
-          insert.error
-        ) {
-          throw insert.error;
-        }
-
-        created++;
-      }
-    }
+    const result =
+      response.result;
 
     $('importInfo')
       .textContent =
-        `Импорт завершен. Создано фронтов: ${created}, обновлено: ${updated}.`;
+        `Импорт завершён. Прочитано: ${result.read}, создано: ${result.created}, обновлено: ${result.updated}, не распознано: ${result.unmatched}, конфликтов: ${result.conflicts}.`;
+
+    if (
+      result.errors?.length
+    ) {
+      console.table(
+        result.errors
+      );
+    }
 
     importRows =
       [];
 
-    $('commitImportBtn')
-      .disabled =
-        true;
-
     await reloadAll();
 
   } catch (error) {
-
     alert(
       'Ошибка импорта: ' +
       error.message
     );
 
   } finally {
-
     $('commitImportBtn')
       .disabled =
         false;
@@ -4526,12 +4362,14 @@ async function commitImport() {
 }
 
 function renderHistory() {
-
   $('historyRows')
     .innerHTML =
       [...state.history]
         .sort(
-          (a, b) =>
+          (
+            a,
+            b
+          ) =>
             String(
               b.changed_at
             )
@@ -4545,64 +4383,64 @@ function renderHistory() {
           0,
           500
         )
-        .map(history => {
+        .map(
+          history => {
+            const user =
+              state.users
+                .find(
+                  item =>
+                    item.id ===
+                    history.changed_by
+                );
 
-          const user =
-            state.users
-              .find(
-                item =>
-                  item.id ===
-                  history.changed_by
-              );
+            return `
+              <tr>
 
-          return `
-            <tr>
-
-              <td>
-                ${
-                  new Date(
-                    history.changed_at
-                  )
-                    .toLocaleString(
-                      'ru-RU'
+                <td>
+                  ${
+                    new Date(
+                      history.changed_at
                     )
-                }
-              </td>
+                      .toLocaleString(
+                        'ru-RU'
+                      )
+                  }
+                </td>
 
-              <td>
-                ${
-                  esc(
-                    user?.email ||
-                    history.changed_by ||
-                    ''
-                  )
-                }
-              </td>
+                <td>
+                  ${
+                    esc(
+                      user?.email ||
+                      history.changed_by ||
+                      ''
+                    )
+                  }
+                </td>
 
-              <td>
-                ${esc(history.entity_type)}
-              </td>
+                <td>
+                  ${esc(history.entity_type)}
+                </td>
 
-              <td>
-                ${esc(history.field_name)}
-              </td>
+                <td>
+                  ${esc(history.field_name)}
+                </td>
 
-              <td>
-                ${esc(history.old_value)}
-              </td>
+                <td>
+                  ${esc(history.old_value)}
+                </td>
 
-              <td>
-                ${esc(history.new_value)}
-              </td>
+                <td>
+                  ${esc(history.new_value)}
+                </td>
 
-            </tr>
-          `;
-        })
+              </tr>
+            `;
+          }
+        )
         .join('');
 }
 
 function renderSettings() {
-
   initSelects();
 
   $('buildingList')
@@ -4670,56 +4508,79 @@ async function addSimple(
   table,
   name
 ) {
-
   if (!name) {
     return;
   }
 
-  const {
-    error
-  } =
-    await sb
-      .from(table)
-      .insert({
-        name
-      });
+  const actions = {
+    buildings:
+      'addBuilding',
 
-  if (error) {
+    works:
+      'addWork',
 
+    organizations:
+      'addOrganization'
+  };
+
+  const action =
+    actions[table];
+
+  if (!action) {
     alert(
-      error.message
+      'Неизвестный справочник.'
     );
 
     return;
   }
 
-  if (
-    table ===
-    'buildings'
-  ) {
-    $('newBuilding').value =
-      '';
-  }
+  try {
+    await apiRequest(
+      action,
+      {
+        data: {
+          name
+        }
+      }
+    );
 
-  if (
-    table ===
-    'works'
-  ) {
-    $('newWork').value =
-      '';
-  }
+    if (
+      table ===
+      'buildings'
+    ) {
+      $('newBuilding')
+        .value =
+          '';
+    }
 
-  if (
-    table ===
-    'organizations'
-  ) {
-    $('newOrg').value =
-      '';
+    if (
+      table ===
+      'works'
+    ) {
+      $('newWork')
+        .value =
+          '';
+    }
+
+    if (
+      table ===
+      'organizations'
+    ) {
+      $('newOrg')
+        .value =
+          '';
+    }
+
+    await reloadAll();
+
+  } catch (error) {
+    alert(
+      error.message
+    );
   }
 }
 
 async function addCustomField() {
-
   const name =
     $('cfName')
       .value
@@ -4735,57 +4596,66 @@ async function addCustomField() {
   const options =
     type ===
       'select'
-      ?
-      $('cfOptions')
-        .value
-        .split(';')
-        .map(
-          value =>
-            value.trim()
-        )
-        .filter(Boolean)
-      :
-      [];
+      ? $('cfOptions')
+          .value
+          .split(';')
+          .map(
+            value =>
+              value.trim()
+          )
+          .filter(Boolean)
+      : [];
 
-  const {
-    error
-  } =
-    await sb
-      .from(
-        'custom_fields'
-      )
-      .insert({
-        name,
+  try {
+    await apiRequest(
+      'addCustomField',
+      {
+        data: {
+          name,
 
-        scope:
-          $('cfScope').value,
+          scope:
+            $('cfScope').value,
 
-        field_type:
-          type,
+          field_type:
+            type,
 
-        options
-      });
+          options,
 
-  if (error) {
+          show_in_matrix:
+            true
+        }
+      }
+    );
 
+    $('cfName').value =
+      '';
+
+    $('cfOptions').value =
+      '';
+
+    await reloadAll();
+
+  } catch (error) {
     alert(
       error.message
     );
-
-    return;
   }
-
-  $('cfName').value =
-    '';
-
-  $('cfOptions').value =
-    '';
 }
 
 async function addStructure() {
+  const workIds =
+    $('sWorkMode').value ===
+      'all'
+      ? state.works
+          .map(
+            work =>
+              work.id
+          )
+      : [
+          $('sWork').value
+        ];
 
   const payload = {
-
     building_id:
       $('sBuilding').value,
 
@@ -4796,12 +4666,10 @@ async function addStructure() {
     floor_no:
       $('sFloor').value ===
         ''
-        ?
-        null
-        :
-        num(
-          $('sFloor').value
-        ),
+        ? null
+        : num(
+            $('sFloor').value
+          ),
 
     capture_name:
       $('sCapture').value ||
@@ -4829,74 +4697,31 @@ async function addStructure() {
 
     equipment_name:
       $('sEquipment').value ||
-      null
+      null,
+
+    work_ids:
+      workIds
   };
 
-  const {
-    data,
-    error
-  } =
-    await sb
-      .from(
-        'structures'
-      )
-      .insert(
-        payload
-      )
-      .select()
-      .single();
-
-  if (error) {
-
-    alert(
-      error.message
+  try {
+    await apiRequest(
+      'addStructure',
+      {
+        data:
+          payload
+      }
     );
 
-    return;
-  }
+    await reloadAll();
 
-  const workIds =
-    $('sWorkMode').value ===
-      'all'
-      ?
-      state.works
-        .map(
-          work =>
-            work.id
-        )
-      :
-      [
-        $('sWork').value
-      ];
-
-  const rows =
-    workIds
-      .map(
-        work_id => ({
-          structure_id:
-            data.id,
-
-          work_id
-        })
-      );
-
-  const insert =
-    await sb
-      .from('fronts')
-      .insert(rows);
-
-  if (
-    insert.error
-  ) {
-
+  } catch (error) {
     alert(
-      insert.error.message
+      error.message
     );
   }
 }
 
 function renderAll() {
-
   initSelects();
 
   renderDashboard();
@@ -4918,20 +4743,21 @@ function renderAll() {
   buildReport();
 }
 
-document.addEventListener(
-  'DOMContentLoaded',
-  () => {
+document
+  .addEventListener(
+    'DOMContentLoaded',
+    () => {
+      init()
+        .catch(
+          error => {
+            console.error(
+              error
+            );
 
-    init()
-      .catch(error => {
-
-        console.error(
-          error
+            showBootError(
+              error.message
+            );
+          }
         );
-
-        showBootError(
-          error.message
-        );
-      });
-  }
-);
+    }
+  );
