@@ -3,23 +3,38 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ACONS Planning — локальная версия</title>
+
+  <title>ACONS Planning</title>
+
   <link rel="stylesheet" href="style.css">
+
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
+
 <body>
 
 <header class="topbar no-print">
-  <div>
+
+  <div class="brand">
     <h1>ACONS Planning</h1>
-    <p>Локальная рабочая база · резервные копии · сравнение версий · PDF</p>
+
+    <p>
+      Локальная рабочая база · шахматки · графики · план / факт · ресурсы · PDF
+    </p>
   </div>
 
   <div class="top-actions">
-    <button id="backupBtn" class="btn primary">Сохранить проект</button>
+
+    <button
+      id="backupBtn"
+      class="btn primary"
+    >
+      Сохранить проект
+    </button>
 
     <label class="btn">
       Загрузить проект
+
       <input
         id="restoreInput"
         type="file"
@@ -30,6 +45,7 @@
 
     <label class="btn">
       Сравнить проект
+
       <input
         id="compareInput"
         type="file"
@@ -38,30 +54,110 @@
       >
     </label>
 
-    <button id="pdfBtn" class="btn">Сохранить PDF</button>
+    <button
+      id="pdfBtn"
+      class="btn"
+    >
+      Сохранить PDF
+    </button>
+
   </div>
+
 </header>
 
-<div id="backupNotice" class="backup-strip no-print"></div>
+<div
+  id="backupNotice"
+  class="backup-strip no-print"
+></div>
 
 <main class="container">
 
   <nav class="tabs no-print">
-    <button class="tab active" data-tab="dashboard">Сводка</button>
-    <button class="tab" data-tab="matrix">Шахматка</button>
-    <button class="tab" data-tab="gantt">Гант</button>
-    <button class="tab" data-tab="planfact">План / факт</button>
-    <button class="tab" data-tab="resources">Ресурсы</button>
-    <button class="tab" data-tab="milestones">Ключевые даты</button>
-    <button class="tab" data-tab="demolition">Демонтаж</button>
-    <button class="tab" data-tab="import">Импорт</button>
-    <button class="tab" data-tab="history">История</button>
-    <button class="tab" data-tab="settings">Настройки</button>
+
+    <button
+      class="tab active"
+      data-tab="dashboard"
+    >
+      Сводка
+    </button>
+
+    <button
+      class="tab"
+      data-tab="matrix"
+    >
+      Шахматка
+    </button>
+
+    <button
+      class="tab"
+      data-tab="gantt"
+    >
+      Гант
+    </button>
+
+    <button
+      class="tab"
+      data-tab="planfact"
+    >
+      План / факт
+    </button>
+
+    <button
+      class="tab"
+      data-tab="resources"
+    >
+      Ресурсы
+    </button>
+
+    <button
+      class="tab"
+      data-tab="milestones"
+    >
+      Ключевые даты
+    </button>
+
+    <button
+      class="tab"
+      data-tab="demolition"
+    >
+      Демонтаж
+    </button>
+
+    <button
+      class="tab"
+      data-tab="import"
+    >
+      Импорт
+    </button>
+
+    <button
+      class="tab"
+      data-tab="history"
+    >
+      История
+    </button>
+
+    <button
+      class="tab"
+      data-tab="settings"
+    >
+      Настройки
+    </button>
+
   </nav>
 
-  <section id="tab-dashboard" class="panel">
+
+  <!-- ========================= -->
+  <!-- СВОДКА -->
+  <!-- ========================= -->
+
+  <section
+    id="tab-dashboard"
+    class="panel"
+  >
 
     <section class="stats">
+
       <div class="stat">
         <span>Фронтов</span>
         <strong id="dTotal">0</strong>
@@ -91,80 +187,240 @@
         <span>Ограничения</span>
         <strong id="dRisk">0</strong>
       </div>
+
     </section>
 
+
     <section class="grid2">
+
       <div class="card">
         <h2>Критичные фронты</h2>
+
         <div id="dCritical"></div>
       </div>
 
+
       <div class="card">
         <h2>Текущие ресурсы</h2>
+
         <div id="dResources"></div>
       </div>
+
     </section>
 
   </section>
 
-  <section id="tab-matrix" class="panel hidden">
 
-    <section class="card toolbar no-print">
+  <!-- ========================= -->
+  <!-- ШАХМАТКА -->
+  <!-- ========================= -->
 
-      <div class="field">
-        <label>Здание</label>
-        <select id="mfBuilding"></select>
+  <section
+    id="tab-matrix"
+    class="panel hidden"
+  >
+
+    <section class="card view-toolbar no-print">
+
+      <div class="view-toolbar-main">
+
+        <div class="field view-select-field">
+          <label>Представление</label>
+
+          <select id="viewSelect"></select>
+        </div>
+
+
+        <button
+          id="newViewBtn"
+          class="btn primary"
+        >
+          + Новая
+        </button>
+
+
+        <button
+          id="duplicateViewBtn"
+          class="btn"
+        >
+          Дублировать
+        </button>
+
+
+        <button
+          id="configureViewBtn"
+          class="btn"
+        >
+          Настроить
+        </button>
+
+
+        <button
+          id="saveViewBtn"
+          class="btn"
+        >
+          Сохранить изменения вида
+        </button>
+
+
+        <button
+          id="defaultViewBtn"
+          class="btn"
+        >
+          По умолчанию
+        </button>
+
+
+        <button
+          id="deleteViewBtn"
+          class="btn danger-lite"
+        >
+          Удалить
+        </button>
+
       </div>
 
-      <div class="field">
-        <label>Блок</label>
-        <select id="mfBlock"></select>
-      </div>
 
-      <div class="field">
-        <label>Этаж</label>
-        <select id="mfFloor"></select>
-      </div>
+      <div class="view-description">
 
-      <div class="field">
-        <label>Работа</label>
-        <select id="mfWork"></select>
-      </div>
+        <span id="viewModeBadge" class="badge"></span>
 
-      <div class="field">
-        <label>Организация</label>
-        <select id="mfOrg"></select>
-      </div>
+        <span id="viewDescription" class="muted"></span>
 
-      <div class="field">
-        <label>Статус</label>
-        <select id="mfStatus">
-          <option value="all">Все статусы</option>
-          <option>Не начато</option>
-          <option>Фронт готов</option>
-          <option>В работе</option>
-          <option>Завершено</option>
-          <option>Приостановлено</option>
-          <option>Ограничение</option>
-        </select>
       </div>
-
-      <button id="newFrontBtn" class="btn primary align-end">
-        Добавить фронт
-      </button>
 
     </section>
 
-    <section class="card table-wrap">
-      <table>
-        <thead id="matrixHead"></thead>
-        <tbody id="matrixBody"></tbody>
-      </table>
+
+    <section class="card quick-filters no-print">
+
+      <div class="quick-filter-head">
+
+        <div>
+          <h2>Быстрые фильтры</h2>
+
+          <p>
+            Эти фильтры временные и не меняют сохранённую шахматку,
+            пока не нажата кнопка «Сохранить изменения вида».
+          </p>
+        </div>
+
+        <button
+          id="resetQuickFiltersBtn"
+          class="btn"
+        >
+          Сбросить фильтры
+        </button>
+
+      </div>
+
+
+      <div class="toolbar">
+
+        <div class="field">
+          <label>Здание</label>
+          <select id="mfBuilding"></select>
+        </div>
+
+
+        <div class="field">
+          <label>Блок</label>
+          <select id="mfBlock"></select>
+        </div>
+
+
+        <div class="field">
+          <label>Этаж</label>
+          <select id="mfFloor"></select>
+        </div>
+
+
+        <div class="field">
+          <label>Захватка</label>
+          <select id="mfCapture"></select>
+        </div>
+
+
+        <div class="field">
+          <label>Ось</label>
+          <select id="mfAxis"></select>
+        </div>
+
+
+        <div class="field">
+          <label>Сторона</label>
+          <select id="mfSide"></select>
+        </div>
+
+
+        <div class="field">
+          <label>Зона</label>
+          <select id="mfZone"></select>
+        </div>
+
+
+        <div class="field">
+          <label>Организация</label>
+          <select id="mfOrg"></select>
+        </div>
+
+
+        <div class="field">
+          <label>Статус</label>
+
+          <select id="mfStatus">
+
+            <option value="all">Все статусы</option>
+            <option>Не начато</option>
+            <option>Фронт готов</option>
+            <option>В работе</option>
+            <option>Завершено</option>
+            <option>Приостановлено</option>
+            <option>Ограничение</option>
+
+          </select>
+
+        </div>
+
+
+        <button
+          id="newFrontBtn"
+          class="btn primary align-end"
+        >
+          Добавить фронт
+        </button>
+
+      </div>
+
+    </section>
+
+
+    <section
+      id="matrixInfo"
+      class="matrix-info no-print"
+    ></section>
+
+
+    <section class="card matrix-card">
+
+      <div
+        id="matrixContainer"
+        class="table-wrap matrix-wrap"
+      ></div>
+
     </section>
 
   </section>
 
-  <section id="tab-gantt" class="panel hidden">
+
+  <!-- ========================= -->
+  <!-- ГАНТ -->
+  <!-- ========================= -->
+
+  <section
+    id="tab-gantt"
+    class="panel hidden"
+  >
 
     <section class="card toolbar no-print">
 
@@ -173,23 +429,47 @@
         <select id="gBuilding"></select>
       </div>
 
+
       <div class="field">
         <label>Работа</label>
         <select id="gWork"></select>
       </div>
 
+
       <div class="field">
         <label>Слой</label>
+
         <select id="gMode">
-          <option value="contract">Договорный</option>
-          <option value="baseline">Базовый</option>
-          <option value="plan" selected>Рабочий</option>
-          <option value="fact">Фактический</option>
-          <option value="forecast">Прогнозный</option>
+
+          <option value="contract">
+            Договорный
+          </option>
+
+          <option value="baseline">
+            Базовый
+          </option>
+
+          <option
+            value="plan"
+            selected
+          >
+            Рабочий
+          </option>
+
+          <option value="fact">
+            Фактический
+          </option>
+
+          <option value="forecast">
+            Прогнозный
+          </option>
+
         </select>
+
       </div>
 
     </section>
+
 
     <section class="card">
       <div id="gantt"></div>
@@ -197,7 +477,15 @@
 
   </section>
 
-  <section id="tab-planfact" class="panel hidden">
+
+  <!-- ========================= -->
+  <!-- ПЛАН / ФАКТ -->
+  <!-- ========================= -->
+
+  <section
+    id="tab-planfact"
+    class="panel hidden"
+  >
 
     <section class="card toolbar no-print">
 
@@ -206,30 +494,42 @@
         <input id="pfFrom" type="date">
       </div>
 
+
       <div class="field">
         <label>По</label>
         <input id="pfTo" type="date">
       </div>
+
 
       <div class="field">
         <label>Здание</label>
         <select id="pfBuilding"></select>
       </div>
 
+
       <div class="field">
         <label>Работа</label>
         <select id="pfWork"></select>
       </div>
 
-      <button id="newPlanRow" class="btn align-end">
+
+      <button
+        id="newPlanRow"
+        class="btn align-end"
+      >
         + План
       </button>
 
-      <button id="newFactRow" class="btn primary align-end">
+
+      <button
+        id="newFactRow"
+        class="btn primary align-end"
+      >
         + Факт
       </button>
 
     </section>
+
 
     <section class="stats">
 
@@ -265,46 +565,66 @@
 
     </section>
 
+
     <section class="grid2">
 
       <div class="card table-wrap">
+
         <h2>План</h2>
 
         <table>
+
           <thead>
             <tr>
               <th>Дата</th>
               <th>Фронт</th>
-              <th>Объем</th>
+              <th>Объём</th>
               <th>Люди</th>
             </tr>
           </thead>
+
           <tbody id="planRows"></tbody>
+
         </table>
+
       </div>
 
+
       <div class="card table-wrap">
+
         <h2>Факт</h2>
 
         <table>
+
           <thead>
             <tr>
               <th>Дата</th>
               <th>Фронт</th>
-              <th>Объем</th>
+              <th>Объём</th>
               <th>Накоп.</th>
               <th>Люди</th>
             </tr>
           </thead>
+
           <tbody id="factRows"></tbody>
+
         </table>
+
       </div>
 
     </section>
 
   </section>
 
-  <section id="tab-resources" class="panel hidden">
+
+  <!-- ========================= -->
+  <!-- РЕСУРСЫ -->
+  <!-- ========================= -->
+
+  <section
+    id="tab-resources"
+    class="panel hidden"
+  >
 
     <section class="card toolbar no-print">
 
@@ -313,26 +633,34 @@
         <input id="rFrom" type="date">
       </div>
 
+
       <div class="field">
         <label>По</label>
         <input id="rTo" type="date">
       </div>
+
 
       <div class="field">
         <label>Организация</label>
         <select id="rOrg"></select>
       </div>
 
+
       <div class="field">
         <label>Здание</label>
         <select id="rBuilding"></select>
       </div>
 
-      <button id="newResourceBtn" class="btn primary align-end">
+
+      <button
+        id="newResourceBtn"
+        class="btn primary align-end"
+      >
         Добавить ресурсы
       </button>
 
     </section>
+
 
     <section class="stats">
 
@@ -368,9 +696,13 @@
 
     </section>
 
+
     <section class="card table-wrap">
+
       <table>
+
         <thead>
+
           <tr>
             <th>Дата</th>
             <th>Организация</th>
@@ -382,23 +714,43 @@
             <th>Кол.</th>
             <th>Комментарий</th>
           </tr>
+
         </thead>
+
         <tbody id="resourceRows"></tbody>
+
       </table>
+
     </section>
 
   </section>
 
-  <section id="tab-milestones" class="panel hidden">
+
+  <!-- ========================= -->
+  <!-- КЛЮЧЕВЫЕ ДАТЫ -->
+  <!-- ========================= -->
+
+  <section
+    id="tab-milestones"
+    class="panel hidden"
+  >
 
     <section class="card no-print">
-      <button id="newMilestoneBtn" class="btn primary">
+
+      <button
+        id="newMilestoneBtn"
+        class="btn primary"
+      >
         Добавить ключевую дату
       </button>
+
     </section>
 
+
     <section class="card table-wrap">
+
       <table>
+
         <thead>
           <tr>
             <th>Здание</th>
@@ -410,17 +762,31 @@
             <th>Статус</th>
           </tr>
         </thead>
+
         <tbody id="milestoneRows"></tbody>
+
       </table>
+
     </section>
 
   </section>
 
-  <section id="tab-demolition" class="panel hidden">
+
+  <!-- ========================= -->
+  <!-- ДЕМОНТАЖ -->
+  <!-- ========================= -->
+
+  <section
+    id="tab-demolition"
+    class="panel hidden"
+  >
 
     <section class="card table-wrap">
+
       <table>
+
         <thead>
+
           <tr>
             <th>Объект</th>
             <th>Статус</th>
@@ -429,30 +795,48 @@
             <th>Факт</th>
             <th>Комментарий</th>
           </tr>
+
         </thead>
+
         <tbody id="demolitionRows"></tbody>
+
       </table>
+
     </section>
 
   </section>
 
-  <section id="tab-import" class="panel hidden">
+
+  <!-- ========================= -->
+  <!-- ИМПОРТ -->
+  <!-- ========================= -->
+
+  <section
+    id="tab-import"
+    class="panel hidden"
+  >
 
     <section class="card no-print">
-      <h2>Импорт накопительного итога из Excel / CSV</h2>
+
+      <h2>
+        Импорт Excel / CSV
+      </h2>
 
       <p class="muted">
         Минимально нужны колонки «Здание» и «Работа».
-        Поддерживаются: Блок, Этаж, Захватка, Ось, Сторона,
-        Зона, Организация, Общий объем, Накопительный итог,
-        Статус, даты.
+        Дополнительно поддерживаются:
+        Блок, Этаж, Захватка, Ось, Сторона, Зона,
+        Организация, Общий объём, Накопительный итог,
+        Статус и даты.
       </p>
+
 
       <input
         id="importFile"
         type="file"
         accept=".xlsx,.xls,.csv"
       >
+
 
       <button
         id="commitImportBtn"
@@ -462,47 +846,80 @@
         Импортировать в проект
       </button>
 
+
       <div
         id="importInfo"
         class="notice hidden"
       ></div>
+
     </section>
 
+
     <section class="card table-wrap">
+
       <table>
+
         <thead id="importHead"></thead>
+
         <tbody id="importBody"></tbody>
+
       </table>
+
     </section>
 
   </section>
 
-  <section id="tab-history" class="panel hidden">
+
+  <!-- ========================= -->
+  <!-- ИСТОРИЯ -->
+  <!-- ========================= -->
+
+  <section
+    id="tab-history"
+    class="panel hidden"
+  >
 
     <section class="card table-wrap">
+
       <table>
+
         <thead>
+
           <tr>
             <th>Дата</th>
             <th>Действие</th>
             <th>Сущность</th>
             <th>Описание</th>
           </tr>
+
         </thead>
+
         <tbody id="historyRows"></tbody>
+
       </table>
+
     </section>
 
   </section>
 
-  <section id="tab-settings" class="panel hidden">
+
+  <!-- ========================= -->
+  <!-- НАСТРОЙКИ -->
+  <!-- ========================= -->
+
+  <section
+    id="tab-settings"
+    class="panel hidden"
+  >
 
     <section class="grid3">
 
       <div class="card">
+
         <h2>Здания</h2>
 
         <div class="inline-add">
+
           <input
             id="newBuilding"
             placeholder="Новое здание"
@@ -514,18 +931,23 @@
           >
             Добавить
           </button>
+
         </div>
 
         <div
           id="buildingList"
           class="list"
         ></div>
+
       </div>
 
+
       <div class="card">
+
         <h2>Виды работ</h2>
 
         <div class="inline-add">
+
           <input
             id="newWork"
             placeholder="Новый вид работ"
@@ -537,18 +959,23 @@
           >
             Добавить
           </button>
+
         </div>
 
         <div
           id="workList"
           class="list"
         ></div>
+
       </div>
 
+
       <div class="card">
+
         <h2>Организации</h2>
 
         <div class="inline-add">
+
           <input
             id="newOrg"
             placeholder="Организация"
@@ -560,15 +987,30 @@
           >
             Добавить
           </button>
+
         </div>
 
         <div
           id="orgList"
           class="list"
         ></div>
+
       </div>
 
     </section>
+
+
+    <section class="card">
+
+      <h2>Сохранённые шахматки</h2>
+
+      <div
+        id="viewsList"
+        class="list"
+      ></div>
+
+    </section>
+
 
     <section class="card">
 
@@ -576,13 +1018,16 @@
 
       <div id="projectMeta"></div>
 
+
       <div class="editor-actions no-print">
+
         <button
           id="clearProjectBtn"
           class="btn danger"
         >
           Очистить рабочие данные
         </button>
+
       </div>
 
     </section>
@@ -591,14 +1036,23 @@
 
 </main>
 
+
+<!-- ========================= -->
+<!-- УНИВЕРСАЛЬНОЕ ОКНО -->
+<!-- ========================= -->
+
 <div
   id="modal"
   class="modal hidden no-print"
 >
+
   <div class="modal-card">
 
     <div class="modal-head">
-      <h2 id="modalTitle">Редактор</h2>
+
+      <h2 id="modalTitle">
+        Редактор
+      </h2>
 
       <button
         id="modalClose"
@@ -606,12 +1060,15 @@
       >
         ×
       </button>
+
     </div>
 
     <div id="modalBody"></div>
 
   </div>
+
 </div>
+
 
 <script src="app.js"></script>
 
