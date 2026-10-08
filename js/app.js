@@ -2,8 +2,54 @@
 
 /* =========================================================
    LIV PLANNING
-   Главный запуск модульной версии приложения
+   Главный запуск приложения
+
+   Этот файл:
+   - сразу подключает переключение вкладок;
+   - запускает IndexedDB отдельно;
+   - не блокирует интерфейс, если один модуль дал ошибку;
+   - связывает Ресурсы, Организации, Импорт;
+   - управляет резервной копией и модальным окном.
    ========================================================= */
+
+
+/* =========================================================
+   БЕЗОПАСНЫЙ ВЫЗОВ ФУНКЦИИ
+   ========================================================= */
+
+LIV.safeCall = function (
+  functionName,
+  ...args
+) {
+
+  try {
+
+    const fn =
+      LIV[
+        functionName
+      ];
+
+
+    if (
+      typeof fn ===
+      'function'
+    ) {
+      return fn(
+        ...args
+      );
+    }
+
+  } catch (error) {
+
+    console.error(
+      `Ошибка в ${functionName}:`,
+      error
+    );
+  }
+
+
+  return null;
+};
 
 
 /* =========================================================
@@ -38,20 +84,18 @@ LIV.openModal = function (
     !modalTitle ||
     !modalBody
   ) {
-    console.warn(
-      'Модальное окно не найдено в index.html'
-    );
-
     return;
   }
 
 
   modalTitle.textContent =
-    title || 'Редактор';
+    title ||
+    'Редактор';
 
 
   modalBody.innerHTML =
-    html || '';
+    html ||
+    '';
 
 
   modal.classList.remove(
@@ -78,26 +122,39 @@ LIV.closeModal = function () {
   );
 
 
-  const body =
+  const modalBody =
     LIV.$(
       'modalBody'
     );
 
 
-  if (body) {
-    body.innerHTML =
+  if (
+    modalBody
+  ) {
+    modalBody.innerHTML =
       '';
   }
 };
 
 
 /* =========================================================
-   ПЕРЕКЛЮЧЕНИЕ ОСНОВНЫХ ВКЛАДОК
+   ОСНОВНЫЕ ВКЛАДКИ
    ========================================================= */
 
 LIV.switchTab = function (
   tabName
 ) {
+
+  if (
+    !tabName
+  ) {
+    return;
+  }
+
+
+  /* -------------------------------------------------------
+     КНОПКИ
+     ------------------------------------------------------- */
 
   document
     .querySelectorAll(
@@ -115,6 +172,10 @@ LIV.switchTab = function (
     );
 
 
+  /* -------------------------------------------------------
+     СЕКЦИИ
+     ------------------------------------------------------- */
+
   document
     .querySelectorAll(
       '.panel'
@@ -129,28 +190,66 @@ LIV.switchTab = function (
     );
 
 
-  LIV.$(
-    `tab-${tabName}`
-  )
-    ?.classList
-    .remove(
-      'hidden'
+  const target =
+    LIV.$(
+      `tab-${tabName}`
     );
 
 
-  LIV.renderTab(
-    tabName
+  if (
+    !target
+  ) {
+
+    console.warn(
+      `Вкладка tab-${tabName} не найдена`
+    );
+
+    return;
+  }
+
+
+  target.classList.remove(
+    'hidden'
   );
+
+
+  /* -------------------------------------------------------
+     ОТРИСОВКА ОТКРЫТОЙ ВКЛАДКИ
+
+     Ошибка одного модуля не должна ломать
+     само переключение вкладок.
+     ------------------------------------------------------- */
+
+  try {
+
+    LIV.renderTab(
+      tabName
+    );
+
+  } catch (error) {
+
+    console.error(
+      `Ошибка отрисовки вкладки ${tabName}:`,
+      error
+    );
+  }
 };
 
 
 /* =========================================================
-   ОТРИСОВКА ВКЛАДКИ
+   ОТРИСОВКА КОНКРЕТНОЙ ВКЛАДКИ
    ========================================================= */
 
 LIV.renderTab = function (
   tabName
 ) {
+
+  if (
+    !LIV.project
+  ) {
+    return;
+  }
+
 
   switch (
     tabName
@@ -158,60 +257,75 @@ LIV.renderTab = function (
 
     case 'dashboard':
 
-      LIV.renderDashboard();
+      LIV.safeCall(
+        'renderDashboard'
+      );
 
       break;
 
 
     case 'resources':
 
-      if (
-        typeof LIV.renderResources ===
-        'function'
-      ) {
-        LIV.renderResources();
-      }
+      LIV.safeCall(
+        'renderResources'
+      );
 
       break;
 
 
     case 'organizations':
 
-      if (
-        typeof LIV.renderOrganizations ===
-        'function'
-      ) {
-        LIV.renderOrganizations();
-      }
+      LIV.safeCall(
+        'renderOrganizations'
+      );
 
       break;
 
 
     case 'history':
 
-      LIV.renderHistory();
+      LIV.safeCall(
+        'renderHistory'
+      );
 
       break;
 
 
     case 'settings':
 
-      LIV.renderSystemInfo();
+      LIV.safeCall(
+        'renderSystemInfo'
+      );
+
+      break;
+
+
+    /*
+       Шахматка, Гант, План/факт,
+       Ключевые даты, Номерные элементы,
+       Демонтаж пока представлены
+       временными секциями index.html.
+
+       Поэтому здесь им пока
+       не требуется отдельный render.
+    */
+
+    case 'matrix':
+    case 'gantt':
+    case 'planfact':
+    case 'milestones':
+    case 'elements':
+    case 'demolition':
+    case 'import':
 
       break;
 
 
     default:
 
-      /*
-         Остальные старые модули пока
-         продолжают жить в старом app.js.
-
-         Новый модульный app.js пока
-         их не переписывает.
-      */
-
-      break;
+      console.warn(
+        `Неизвестная вкладка: ${tabName}`
+      );
   }
 };
 
@@ -230,13 +344,19 @@ LIV.renderDashboard = function () {
 
 
   const fronts =
-    LIV.project.fronts ||
-    [];
+    Array.isArray(
+      LIV.project.fronts
+    )
+      ? LIV.project.fronts
+      : [];
 
 
   const resources =
-    LIV.project.resources ||
-    [];
+    Array.isArray(
+      LIV.project.resources
+    )
+      ? LIV.project.resources
+      : [];
 
 
   const today =
@@ -244,14 +364,20 @@ LIV.renderDashboard = function () {
 
 
   const normalizedStatus =
-    value =>
-      LIV.normKey(
+    function (
+      value
+    ) {
+
+      return LIV.normKey(
         value
       );
+    };
 
 
   const isDone =
-    front => {
+    function (
+      front
+    ) {
 
       const status =
         normalizedStatus(
@@ -274,13 +400,15 @@ LIV.renderDashboard = function () {
 
 
   const isAccepted =
-    front => {
+    function (
+      front
+    ) {
 
       const status =
         normalizedStatus(
           front.acceptanceStatus ||
           front.statusAcceptance ||
-          front.status
+          ''
         );
 
 
@@ -299,7 +427,9 @@ LIV.renderDashboard = function () {
 
 
   const isWork =
-    front => {
+    function (
+      front
+    ) {
 
       const status =
         normalizedStatus(
@@ -319,16 +449,20 @@ LIV.renderDashboard = function () {
 
 
   const isLate =
-    front => {
+    function (
+      front
+    ) {
 
       if (
-        isDone(front)
+        isDone(
+          front
+        )
       ) {
         return false;
       }
 
 
-      const target =
+      const end =
         front.planEnd ||
         front.baselineEnd ||
         front.contractEnd ||
@@ -336,15 +470,17 @@ LIV.renderDashboard = function () {
 
 
       return (
-        target &&
-        target <
+        end &&
+        end <
         today
       );
     };
 
 
   const hasConstraint =
-    front => {
+    function (
+      front
+    ) {
 
       if (
         front.constraint ||
@@ -361,19 +497,23 @@ LIV.renderDashboard = function () {
         []
       )
         .some(
-          constraint =>
-            String(
-              constraint.frontId ||
-              ''
-            ) ===
-            String(
-              front.id ||
-              ''
-            ) &&
-            LIV.normKey(
-              constraint.status
-            ) !==
-              'закрыто'
+          constraint => {
+
+            return (
+              String(
+                constraint.frontId ||
+                ''
+              ) ===
+                String(
+                  front.id ||
+                  ''
+                ) &&
+              LIV.normKey(
+                constraint.status
+              ) !==
+                'закрыто'
+            );
+          }
         );
     };
 
@@ -460,16 +600,20 @@ LIV.renderDashboard = function () {
   }
 
 
-  /* -------------------------------------------------------
+  /* =======================================================
      КРИТИЧНЫЕ ФРОНТЫ
-     ------------------------------------------------------- */
+     ======================================================= */
 
   const critical =
     fronts
       .filter(
         front =>
-          isLate(front) ||
-          hasConstraint(front)
+          isLate(
+            front
+          ) ||
+          hasConstraint(
+            front
+          )
       )
       .slice(
         0,
@@ -477,27 +621,29 @@ LIV.renderDashboard = function () {
       );
 
 
-  if (
+  const criticalContainer =
     LIV.$(
       'dCritical'
-    )
+    );
+
+
+  if (
+    criticalContainer
   ) {
 
     if (
       !critical.length
     ) {
-      LIV.$(
-        'dCritical'
-      ).innerHTML = `
+
+      criticalContainer.innerHTML = `
         <div class="muted">
           Критичные фронты не найдены.
         </div>
       `;
+
     } else {
 
-      LIV.$(
-        'dCritical'
-      ).innerHTML =
+      criticalContainer.innerHTML =
         critical
           .map(
             front => {
@@ -537,12 +683,9 @@ LIV.renderDashboard = function () {
   }
 
 
-  /* -------------------------------------------------------
+  /* =======================================================
      ТЕКУЩИЕ РЕСУРСЫ
-
-     Берем последнюю дату, по которой
-     вообще есть ресурсный отчет.
-     ------------------------------------------------------- */
+     ======================================================= */
 
   const resourceDates =
     LIV.unique(
@@ -551,14 +694,20 @@ LIV.renderDashboard = function () {
           row =>
             row.date
         )
-        .filter(Boolean)
+        .filter(
+          Boolean
+        )
     )
       .sort();
 
 
   const latestDate =
-    resourceDates.at(-1) ||
-    null;
+    resourceDates.length
+      ? resourceDates[
+          resourceDates.length -
+          1
+        ]
+      : null;
 
 
   const latestRows =
@@ -576,20 +725,34 @@ LIV.renderDashboard = function () {
       (
         total,
         row
-      ) =>
-        total +
-        (
+      ) => {
+
+        if (
           typeof LIV.getResourcePeopleTotal ===
           'function'
-            ? LIV.getResourcePeopleTotal(
-                row
-              )
-            : (
-                LIV.num(row.itr) +
-                LIV.num(row.workers) +
-                LIV.num(row.mechanizers)
-              )
-        ),
+        ) {
+          return (
+            total +
+            LIV.getResourcePeopleTotal(
+              row
+            )
+          );
+        }
+
+
+        return (
+          total +
+          LIV.num(
+            row.itr
+          ) +
+          LIV.num(
+            row.workers
+          ) +
+          LIV.num(
+            row.mechanizers
+          )
+        );
+      },
       0
     );
 
@@ -608,35 +771,49 @@ LIV.renderDashboard = function () {
     );
 
 
+  const resourceContainer =
+    LIV.$(
+      'dResources'
+    );
+
+
   if (
-    LIV.$(
-      'dResources'
-    )
+    resourceContainer
   ) {
-    LIV.$(
-      'dResources'
-    ).innerHTML = `
+
+    resourceContainer.innerHTML = `
       ${
         latestDate
           ? `
             <div class="muted">
-              Данные на ${LIV.ruDate(latestDate)}
+              Данные на
+              ${LIV.ruDate(
+                latestDate
+              )}
             </div>
           `
-          : ''
+          : `
+            <div class="muted">
+              Данные ресурсов пока отсутствуют.
+            </div>
+          `
       }
 
-      <div style="margin-top: 10px;">
+      <div style="margin-top:10px;">
         <strong>
           Людей:
-          ${LIV.roundInt(peopleTotal)}
+          ${LIV.roundInt(
+            peopleTotal
+          )}
         </strong>
       </div>
 
-      <div style="margin-top: 6px;">
+      <div style="margin-top:6px;">
         <strong>
           Техники:
-          ${LIV.roundInt(equipmentTotal)}
+          ${LIV.roundInt(
+            equipmentTotal
+          )}
         </strong>
       </div>
     `;
@@ -656,14 +833,20 @@ LIV.renderHistory = function () {
     );
 
 
-  if (!body) {
+  if (
+    !body ||
+    !LIV.project
+  ) {
     return;
   }
 
 
   const history =
-    LIV.project.history ||
-    [];
+    Array.isArray(
+      LIV.project.history
+    )
+      ? LIV.project.history
+      : [];
 
 
   body.innerHTML =
@@ -683,7 +866,7 @@ LIV.renderHistory = function () {
             item.at
           ) {
 
-            const parsed =
+            const value =
               new Date(
                 item.at
               );
@@ -691,11 +874,11 @@ LIV.renderHistory = function () {
 
             if (
               !Number.isNaN(
-                parsed.getTime()
+                value.getTime()
               )
             ) {
               date =
-                parsed.toLocaleString(
+                value.toLocaleString(
                   'ru-RU'
                 );
             }
@@ -706,7 +889,9 @@ LIV.renderHistory = function () {
             <tr>
 
               <td>
-                ${LIV.esc(date)}
+                ${LIV.esc(
+                  date
+                )}
               </td>
 
               <td>
@@ -750,13 +935,16 @@ LIV.renderSystemInfo = function () {
     );
 
 
-  if (!container) {
+  if (
+    !container
+  ) {
     return;
   }
 
 
   const lastBackup =
-    LIV.project.meta
+    LIV.project
+      ?.meta
       ?.lastBackupAt;
 
 
@@ -768,7 +956,7 @@ LIV.renderSystemInfo = function () {
     lastBackup
   ) {
 
-    const parsed =
+    const date =
       new Date(
         lastBackup
       );
@@ -776,11 +964,11 @@ LIV.renderSystemInfo = function () {
 
     if (
       !Number.isNaN(
-        parsed.getTime()
+        date.getTime()
       )
     ) {
       lastBackupText =
-        parsed.toLocaleString(
+        date.toLocaleString(
           'ru-RU'
         );
     }
@@ -791,7 +979,6 @@ LIV.renderSystemInfo = function () {
     <div class="form-grid">
 
       <div>
-
         <div class="muted">
           Название
         </div>
@@ -799,12 +986,10 @@ LIV.renderSystemInfo = function () {
         <strong>
           LIV Planning
         </strong>
-
       </div>
 
 
       <div>
-
         <div class="muted">
           Назначение
         </div>
@@ -813,12 +998,10 @@ LIV.renderSystemInfo = function () {
           Система производственного планирования
           и контроля строительства
         </strong>
-
       </div>
 
 
       <div>
-
         <div class="muted">
           Структура данных
         </div>
@@ -828,12 +1011,10 @@ LIV.renderSystemInfo = function () {
             LIV.SCHEMA_VERSION
           )}
         </strong>
-
       </div>
 
 
       <div>
-
         <div class="muted">
           Локальная база
         </div>
@@ -843,12 +1024,10 @@ LIV.renderSystemInfo = function () {
             LIV.DB_NAME
           )}
         </strong>
-
       </div>
 
 
       <div>
-
         <div class="muted">
           Версия IndexedDB
         </div>
@@ -856,12 +1035,10 @@ LIV.renderSystemInfo = function () {
         <strong>
           ${LIV.DB_VERSION}
         </strong>
-
       </div>
 
 
       <div>
-
         <div class="muted">
           Последняя резервная копия
         </div>
@@ -871,7 +1048,6 @@ LIV.renderSystemInfo = function () {
             lastBackupText
           )}
         </strong>
-
       </div>
 
     </div>
@@ -886,16 +1062,17 @@ LIV.renderSystemInfo = function () {
 LIV.downloadBlob = function (
   content,
   filename,
-  type
+  type =
+    'application/octet-stream'
 ) {
 
   const blob =
     new Blob(
-      [content],
+      [
+        content
+      ],
       {
-        type:
-          type ||
-          'application/octet-stream'
+        type
       }
     );
 
@@ -933,9 +1110,11 @@ LIV.downloadBlob = function (
 
   setTimeout(
     () => {
+
       URL.revokeObjectURL(
         url
       );
+
     },
     1000
   );
@@ -943,7 +1122,7 @@ LIV.downloadBlob = function (
 
 
 /* =========================================================
-   РЕЗЕРВНАЯ КОПИЯ ПРОЕКТА В JSON
+   СОХРАНЕНИЕ ПРОЕКТА В JSON
    ========================================================= */
 
 LIV.exportProjectBackup = async function () {
@@ -951,15 +1130,39 @@ LIV.exportProjectBackup = async function () {
   if (
     !LIV.project
   ) {
+    alert(
+      'Проект еще не загружен.'
+    );
+
     return;
   }
+
+
+  LIV.project.meta =
+    LIV.project.meta ||
+    {};
 
 
   LIV.project.meta.lastBackupAt =
     LIV.nowIso();
 
 
-  await LIV.saveProject();
+  try {
+
+    if (
+      typeof LIV.saveProject ===
+      'function'
+    ) {
+      await LIV.saveProject();
+    }
+
+  } catch (error) {
+
+    console.error(
+      'Ошибка сохранения отметки резервной копии:',
+      error
+    );
+  }
 
 
   const stamp =
@@ -990,20 +1193,18 @@ LIV.exportProjectBackup = async function () {
 
 
 /* =========================================================
-   ВОССТАНОВЛЕНИЕ ПРОЕКТА ИЗ JSON
+   ЗАГРУЗКА ПРОЕКТА ИЗ JSON
    ========================================================= */
 
 LIV.restoreProjectFromFile = async function (
   file
 ) {
 
-  if (!file) {
+  if (
+    !file
+  ) {
     return;
   }
-
-
-  const text =
-    await file.text();
 
 
   let data;
@@ -1013,7 +1214,7 @@ LIV.restoreProjectFromFile = async function (
 
     data =
       JSON.parse(
-        text
+        await file.text()
       );
 
   } catch (error) {
@@ -1033,7 +1234,7 @@ LIV.restoreProjectFromFile = async function (
   ) {
 
     alert(
-      'Файл не похож на резервную копию проекта.'
+      'Выбранный файл не похож на резервную копию LIV Planning.'
     );
 
     return;
@@ -1042,56 +1243,96 @@ LIV.restoreProjectFromFile = async function (
 
   const approved =
     confirm(
-      'Загрузить этот проект?\n\n' +
-      'Перед заменой текущего проекта будет создана ' +
+      'Загрузить выбранный проект?\n\n' +
+      'Перед заменой текущих данных будет создана ' +
       'локальная резервная копия.'
     );
 
 
-  if (!approved) {
+  if (
+    !approved
+  ) {
     return;
   }
 
 
-  await LIV.createLocalBackup(
-    'pre-restore'
-  );
+  try {
+
+    if (
+      typeof LIV.createLocalBackup ===
+      'function' &&
+      LIV.project
+    ) {
+      await LIV.createLocalBackup(
+        'pre-restore'
+      );
+    }
 
 
-  LIV.project =
-    LIV.normalizeProject(
-      data
+    LIV.project =
+      LIV.normalizeProject(
+        data
+      );
+
+
+    LIV.log(
+      'Восстановление проекта',
+      'Проект',
+      file.name ||
+      'JSON'
     );
 
 
-  LIV.log(
-    'Восстановление проекта',
-    'Проект',
-    file.name || 'JSON'
-  );
+    await LIV.saveProject();
 
 
-  await LIV.saveProject();
+    LIV.refreshAll();
 
 
-  LIV.refreshAll();
+    alert(
+      'Проект загружен.'
+    );
+
+  } catch (error) {
+
+    console.error(
+      error
+    );
 
 
-  alert(
-    'Проект загружен.'
-  );
+    alert(
+      'Не удалось загрузить проект.\n\n' +
+      (
+        error?.message ||
+        String(error)
+      )
+    );
+  }
 };
 
 
 /* =========================================================
-   СРАВНЕНИЕ С ДРУГОЙ КОПИЕЙ
+   СРАВНЕНИЕ ПРОЕКТОВ
    ========================================================= */
 
 LIV.compareProjectWithFile = async function (
   file
 ) {
 
-  if (!file) {
+  if (
+    !file
+  ) {
+    return;
+  }
+
+
+  if (
+    !LIV.project
+  ) {
+    alert(
+      'Текущий проект еще не загружен.'
+    );
+
     return;
   }
 
@@ -1106,6 +1347,12 @@ LIV.compareProjectWithFile = async function (
         await file.text()
       );
 
+
+    other =
+      LIV.normalizeProject(
+        other
+      );
+
   } catch (error) {
 
     alert(
@@ -1114,16 +1361,6 @@ LIV.compareProjectWithFile = async function (
 
     return;
   }
-
-
-  other =
-    LIV.normalizeProject(
-      other
-    );
-
-
-  const current =
-    LIV.project;
 
 
   const sections = [
@@ -1186,62 +1423,69 @@ LIV.compareProjectWithFile = async function (
 
 
   const rows =
-    sections.map(
-      section => {
+    sections
+      .map(
+        section => {
 
-        const currentCount =
-          (
-            current[
-              section.key
-            ] ||
-            []
-          ).length;
-
-
-        const otherCount =
-          (
-            other[
-              section.key
-            ] ||
-            []
-          ).length;
+          const currentCount =
+            Array.isArray(
+              LIV.project[
+                section.key
+              ]
+            )
+              ? LIV.project[
+                  section.key
+                ].length
+              : 0;
 
 
-        const difference =
-          currentCount -
-          otherCount;
+          const otherCount =
+            Array.isArray(
+              other[
+                section.key
+              ]
+            )
+              ? other[
+                  section.key
+                ].length
+              : 0;
 
 
-        return `
-          <tr>
+          const difference =
+            currentCount -
+            otherCount;
 
-            <td>
-              ${LIV.esc(
-                section.name
-              )}
-            </td>
 
-            <td>
-              ${currentCount}
-            </td>
+          return `
+            <tr>
 
-            <td>
-              ${otherCount}
-            </td>
+              <td>
+                ${LIV.esc(
+                  section.name
+                )}
+              </td>
 
-            <td>
-              ${
-                difference > 0
-                  ? '+'
-                  : ''
-              }${difference}
-            </td>
+              <td>
+                ${currentCount}
+              </td>
 
-          </tr>
-        `;
-      }
-    )
-    .join('');
+              <td>
+                ${otherCount}
+              </td>
+
+              <td>
+                ${
+                  difference > 0
+                    ? '+'
+                    : ''
+                }${difference}
+              </td>
+
+            </tr>
+          `;
+        }
+      )
+      .join('');
 
 
   LIV.openModal(
@@ -1253,9 +1497,7 @@ LIV.compareProjectWithFile = async function (
         <table>
 
           <thead>
-
             <tr>
-
               <th>
                 Раздел
               </th>
@@ -1271,9 +1513,7 @@ LIV.compareProjectWithFile = async function (
               <th>
                 Разница
               </th>
-
             </tr>
-
           </thead>
 
           <tbody>
@@ -1283,12 +1523,6 @@ LIV.compareProjectWithFile = async function (
         </table>
 
       </div>
-
-      <p class="muted">
-        Это базовое сравнение количества записей.
-        Подробное сравнение версий будет вынесено
-        в отдельный модуль истории.
-      </p>
     `
   );
 };
@@ -1305,53 +1539,158 @@ LIV.printCurrentView = function () {
 
 
 /* =========================================================
+   УСТАНОВКА ДАТ РЕСУРСОВ
+   ========================================================= */
+
+LIV.setInitialResourceDates = function () {
+
+  if (
+    !LIV.project
+  ) {
+    return;
+  }
+
+
+  const rows =
+    Array.isArray(
+      LIV.project.resources
+    )
+      ? LIV.project.resources
+      : [];
+
+
+  const dates =
+    LIV.unique(
+      rows
+        .map(
+          row =>
+            row.date
+        )
+        .filter(
+          Boolean
+        )
+    )
+      .sort();
+
+
+  const firstDate =
+    dates.length
+      ? dates[0]
+      : LIV.today();
+
+
+  const lastDate =
+    dates.length
+      ? dates[
+          dates.length -
+          1
+        ]
+      : LIV.today();
+
+
+  const from =
+    LIV.$(
+      'resourceFrom'
+    );
+
+
+  const to =
+    LIV.$(
+      'resourceTo'
+    );
+
+
+  const daily =
+    LIV.$(
+      'resourceDailyDate'
+    );
+
+
+  if (
+    from &&
+    !from.value
+  ) {
+    from.value =
+      firstDate;
+  }
+
+
+  if (
+    to &&
+    !to.value
+  ) {
+    to.value =
+      lastDate;
+  }
+
+
+  if (
+    daily &&
+    !daily.value
+  ) {
+    daily.value =
+      lastDate;
+  }
+};
+
+
+/* =========================================================
    ОБЩАЯ ПЕРЕРИСОВКА
    ========================================================= */
 
 LIV.refreshAll = function () {
 
   if (
-    typeof LIV.refreshResourceFilters ===
-    'function'
+    !LIV.project
   ) {
-    LIV.refreshResourceFilters();
+    return;
   }
 
 
-  LIV.renderDashboard();
+  LIV.safeCall(
+    'refreshResourceFilters'
+  );
 
 
-  if (
-    typeof LIV.renderResources ===
-    'function'
-  ) {
-    LIV.renderResources();
-  }
+  LIV.safeCall(
+    'renderDashboard'
+  );
 
 
-  if (
-    typeof LIV.renderOrganizations ===
-    'function'
-  ) {
-    LIV.renderOrganizations();
-  }
+  LIV.safeCall(
+    'renderResources'
+  );
 
 
-  LIV.renderHistory();
+  LIV.safeCall(
+    'renderOrganizations'
+  );
 
 
-  LIV.renderSystemInfo();
+  LIV.safeCall(
+    'renderHistory'
+  );
+
+
+  LIV.safeCall(
+    'renderSystemInfo'
+  );
 };
 
 
 /* =========================================================
-   ОБЩИЕ СОБЫТИЯ
+   ПРИВЯЗКА ОСНОВНЫХ КНОПОК
+
+   ВАЖНО:
+   ЭТО ДЕЛАЕТСЯ ДО ЗАГРУЗКИ INDEXEDDB.
+   ПОЭТОМУ ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК РАБОТАЕТ
+   ДАЖЕ ЕСЛИ БАЗА ИЛИ ОДИН МОДУЛЬ ДАЛ ОШИБКУ.
    ========================================================= */
 
 LIV.bindGlobalEvents = function () {
 
   /* -------------------------------------------------------
-     ОСНОВНЫЕ ВКЛАДКИ
+     ВКЛАДКИ
      ------------------------------------------------------- */
 
   document
@@ -1361,47 +1700,62 @@ LIV.bindGlobalEvents = function () {
     .forEach(
       button => {
 
-        button.addEventListener(
-          'click',
-          () => {
+        button.onclick =
+          function () {
+
+            const tabName =
+              this.dataset.tab;
+
 
             LIV.switchTab(
-              button.dataset.tab
+              tabName
             );
-          }
-        );
+          };
       }
     );
 
 
   /* -------------------------------------------------------
-     МОДАЛЬНОЕ ОКНО
+     ЗАКРЫТИЕ МОДАЛЬНОГО ОКНА
      ------------------------------------------------------- */
 
-  LIV.$(
-    'modalClose'
-  )
-    ?.addEventListener(
-      'click',
-      LIV.closeModal
+  const closeButton =
+    LIV.$(
+      'modalClose'
     );
 
 
-  LIV.$(
-    'modal'
-  )
-    ?.addEventListener(
-      'click',
-      event => {
+  if (
+    closeButton
+  ) {
+    closeButton.onclick =
+      LIV.closeModal;
+  }
+
+
+  const modal =
+    LIV.$(
+      'modal'
+    );
+
+
+  if (
+    modal
+  ) {
+
+    modal.onclick =
+      function (
+        event
+      ) {
 
         if (
-          event.target.id ===
-          'modal'
+          event.target ===
+          modal
         ) {
           LIV.closeModal();
         }
-      }
-    );
+      };
+  }
 
 
   document.addEventListener(
@@ -1419,28 +1773,41 @@ LIV.bindGlobalEvents = function () {
 
 
   /* -------------------------------------------------------
-     СОХРАНИТЬ ПРОЕКТ
+     РЕЗЕРВНАЯ КОПИЯ
      ------------------------------------------------------- */
 
-  LIV.$(
-    'backupBtn'
-  )
-    ?.addEventListener(
-      'click',
-      LIV.exportProjectBackup
+  const backup =
+    LIV.$(
+      'backupBtn'
     );
 
 
+  if (
+    backup
+  ) {
+    backup.onclick =
+      LIV.exportProjectBackup;
+  }
+
+
   /* -------------------------------------------------------
-     ЗАГРУЗИТЬ ПРОЕКТ
+     ЗАГРУЗКА ПРОЕКТА
      ------------------------------------------------------- */
 
-  LIV.$(
-    'restoreInput'
-  )
-    ?.addEventListener(
-      'change',
-      async event => {
+  const restore =
+    LIV.$(
+      'restoreInput'
+    );
+
+
+  if (
+    restore
+  ) {
+
+    restore.onchange =
+      async function (
+        event
+      ) {
 
         const file =
           event.target
@@ -1454,20 +1821,28 @@ LIV.bindGlobalEvents = function () {
 
         event.target.value =
           '';
-      }
-    );
+      };
+  }
 
 
   /* -------------------------------------------------------
-     СРАВНИТЬ
+     СРАВНЕНИЕ
      ------------------------------------------------------- */
 
-  LIV.$(
-    'compareInput'
-  )
-    ?.addEventListener(
-      'change',
-      async event => {
+  const compare =
+    LIV.$(
+      'compareInput'
+    );
+
+
+  if (
+    compare
+  ) {
+
+    compare.onchange =
+      async function (
+        event
+      ) {
 
         const file =
           event.target
@@ -1481,221 +1856,229 @@ LIV.bindGlobalEvents = function () {
 
         event.target.value =
           '';
-      }
-    );
+      };
+  }
 
 
   /* -------------------------------------------------------
      PDF
      ------------------------------------------------------- */
 
-  LIV.$(
-    'pdfBtn'
-  )
-    ?.addEventListener(
-      'click',
-      LIV.printCurrentView
-    );
-};
-
-
-/* =========================================================
-   ПЕРВИЧНЫЕ ДАТЫ РЕСУРСОВ
-   ========================================================= */
-
-LIV.setInitialResourceDates = function () {
-
-  const rows =
-    LIV.project.resources ||
-    [];
-
-
-  const dates =
-    LIV.unique(
-      rows
-        .map(
-          row =>
-            row.date
-        )
-        .filter(Boolean)
-    )
-      .sort();
-
-
-  let from =
-    dates[0] ||
-    LIV.today();
-
-
-  let to =
-    dates.at(-1) ||
-    LIV.today();
-
-
-  /*
-     Если в базе уже есть большой исторический период,
-     не меняем его автоматически потом.
-     Это только первичная установка полей.
-  */
-
-  const fromInput =
+  const pdf =
     LIV.$(
-      'resourceFrom'
-    );
-
-
-  const toInput =
-    LIV.$(
-      'resourceTo'
-    );
-
-
-  const dailyInput =
-    LIV.$(
-      'resourceDailyDate'
+      'pdfBtn'
     );
 
 
   if (
-    fromInput &&
-    !fromInput.value
+    pdf
   ) {
-    fromInput.value =
-      from;
-  }
-
-
-  if (
-    toInput &&
-    !toInput.value
-  ) {
-    toInput.value =
-      to;
-  }
-
-
-  if (
-    dailyInput &&
-    !dailyInput.value
-  ) {
-    dailyInput.value =
-      to;
+    pdf.onclick =
+      LIV.printCurrentView;
   }
 };
 
 
 /* =========================================================
-   ЗАПУСК LIV PLANNING
+   ПРИВЯЗКА МОДУЛЕЙ
    ========================================================= */
 
-LIV.start = async function () {
+LIV.bindModules = function () {
+
+  LIV.safeCall(
+    'bindResourceEvents'
+  );
+
+
+  LIV.safeCall(
+    'bindOrganizationEvents'
+  );
+
+
+  LIV.safeCall(
+    'bindImportEvents'
+  );
+};
+
+
+/* =========================================================
+   АВАРИЙНОЕ СОЗДАНИЕ ПУСТОГО ПРОЕКТА
+
+   Используется только если загрузка IndexedDB дала ошибку.
+   Саму базу при этом НЕ очищаем.
+   ========================================================= */
+
+LIV.createRuntimeFallbackProject = function () {
 
   try {
 
-    /* ---------------------------------------------
-       1. Загружаем проект из старой базы IndexedDB
-       --------------------------------------------- */
+    LIV.project =
+      LIV.emptyProject();
+
+  } catch (error) {
+
+    console.error(
+      'Не удалось создать резервный проект в памяти:',
+      error
+    );
+
+
+    LIV.project = {
+      schemaVersion:
+        '2.3.0',
+
+      meta: {
+        projectName:
+          'LIV Planning'
+      },
+
+      buildings: [],
+      organizations: [],
+      works: [],
+      structures: [],
+      fronts: [],
+      planLog: [],
+      factLog: [],
+      resources: [],
+      resourcePlans: [],
+      milestones: [],
+      numberedElements: [],
+      demolition: [],
+      contracts: [],
+      constraints: [],
+      diagrams: [],
+      diagramMarks: [],
+      scheduleVersions: [],
+      customFields: [],
+      views: [],
+      importProfiles: [],
+      importHistory: [],
+      history: []
+    };
+  }
+};
+
+
+/* =========================================================
+   ЗАПУСК ДАННЫХ
+   ========================================================= */
+
+LIV.initializeData = async function () {
+
+  try {
 
     await LIV.loadProject();
 
 
-    /* ---------------------------------------------
-       2. Устанавливаем даты
-       --------------------------------------------- */
-
-    LIV.setInitialResourceDates();
-
-
-    /* ---------------------------------------------
-       3. Создаем универсальные фильтры ресурсов
-       --------------------------------------------- */
-
-    if (
-      typeof LIV.initResourceFilters ===
-      'function'
-    ) {
-      LIV.initResourceFilters();
-    }
-
-
-    /* ---------------------------------------------
-       4. Подключаем события модулей
-       --------------------------------------------- */
-
-    LIV.bindGlobalEvents();
-
-
-    if (
-      typeof LIV.bindResourceEvents ===
-      'function'
-    ) {
-      LIV.bindResourceEvents();
-    }
-
-
-    if (
-      typeof LIV.bindOrganizationEvents ===
-      'function'
-    ) {
-      LIV.bindOrganizationEvents();
-    }
-
-
-    if (
-      typeof LIV.bindImportEvents ===
-      'function'
-    ) {
-      LIV.bindImportEvents();
-    }
-
-
-    /* ---------------------------------------------
-       5. Первая отрисовка
-       --------------------------------------------- */
-
-    LIV.refreshAll();
-
-
-    /* ---------------------------------------------
-       6. Открываем сводку
-       --------------------------------------------- */
-
-    LIV.switchTab(
-      'dashboard'
-    );
-
-
     console.log(
-      `LIV Planning ${LIV.SCHEMA_VERSION} запущен`
+      'LIV Planning: проект загружен',
+      LIV.project
     );
 
   } catch (error) {
 
     console.error(
-      'Ошибка запуска LIV Planning:',
+      'Ошибка загрузки IndexedDB:',
       error
     );
 
 
-    alert(
-      'LIV Planning не удалось запустить.\n\n' +
-      (
-        error?.message ||
-        String(error)
-      )
+    /*
+       ВАЖНО:
+       НЕ удаляем IndexedDB.
+       НЕ повышаем и НЕ понижаем ее версию.
+       Просто даем интерфейсу возможность работать.
+    */
+
+    LIV.createRuntimeFallbackProject();
+
+
+    console.warn(
+      'LIV Planning запущен с временным пустым проектом в памяти. ' +
+      'Исходная IndexedDB не изменена.'
     );
   }
+
+
+  LIV.setInitialResourceDates();
+
+
+  try {
+
+    LIV.initResourceFilters();
+
+  } catch (error) {
+
+    console.error(
+      'Ошибка создания фильтров ресурсов:',
+      error
+    );
+  }
+
+
+  LIV.bindModules();
+
+
+  LIV.refreshAll();
+
+
+  LIV.switchTab(
+    'dashboard'
+  );
 };
 
 
 /* =========================================================
-   ЗАПУСК ПОСЛЕ ЗАГРУЗКИ HTML
+   ОСНОВНОЙ ЗАПУСК
    ========================================================= */
 
-document.addEventListener(
-  'DOMContentLoaded',
-  () => {
+LIV.start = function () {
 
-    LIV.start();
-  }
-);
+  /*
+     Сначала включаем интерфейс.
+     Кнопки вкладок после этого уже должны работать.
+  */
+
+  LIV.bindGlobalEvents();
+
+
+  /*
+     Затем отдельно загружаем данные.
+     Ошибка IndexedDB уже не способна
+     отключить навигацию.
+  */
+
+  LIV.initializeData()
+    .catch(
+      error => {
+
+        console.error(
+          'Критическая ошибка инициализации:',
+          error
+        );
+      }
+    );
+};
+
+
+/* =========================================================
+   ЗАПУСК ПОСЛЕ ГОТОВНОСТИ DOM
+   ========================================================= */
+
+if (
+  document.readyState ===
+  'loading'
+) {
+
+  document.addEventListener(
+    'DOMContentLoaded',
+    LIV.start,
+    {
+      once: true
+    }
+  );
+
+} else {
+
+  LIV.start();
+}
