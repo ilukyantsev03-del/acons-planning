@@ -6160,6 +6160,29 @@ const FIELD_DEFS = {
       'количество людей'
     ]
   },
+  peopleQty: {
+  label:
+    'Количество человек',
+
+  aliases: [
+    'количество человек',
+    'кол-во человек',
+    'кол во человек',
+    'численность человек'
+  ]
+},
+
+specialization: {
+  label:
+    'Специализация',
+
+  aliases: [
+    'специализация',
+    'категория персонала',
+    'категория работников',
+    'вид персонала'
+  ]
+},
 
   itr: {
     label:
@@ -6321,17 +6344,19 @@ const MODE_FIELDS = {
   ],
 
   resources: [
-    'date',
-    'organization',
-    'building',
-    'work',
-    'itr',
-    'workers',
-    'mechanizers',
-    'equipmentType',
-    'equipmentQty',
-    'comment'
-  ],
+  'date',
+  'organization',
+  'building',
+  'work',
+  'peopleQty',
+  'specialization',
+  'itr',
+  'workers',
+  'mechanizers',
+  'equipmentType',
+  'equipmentQty',
+  'comment'
+],
 
   elements: [
     'elementType',
@@ -6610,11 +6635,11 @@ function detectImportMode(
       .join(' | ');
 
   if (
-    /итр|механизатор|количество техники|рабочие/.test(text) &&
-    /дата/.test(text)
-  ) {
-    return 'resources';
-  }
+  /итр|механизатор|количество техники|рабочие|количество человек|специализация/.test(text) &&
+  /дата/.test(text)
+) {
+  return 'resources';
+}
 
   if (
     /порядковый номер|номер сваи|номер анкера|тип элемента/.test(text)
@@ -8606,189 +8631,298 @@ async function commitImport() {
        РЕСУРСЫ
        ----------------------------------------- */
 
+   if (
+  importDetectedMode ===
+  'resources'
+) {
+
+  const date =
+    normDate(
+      mappedValue(
+        row,
+        'date'
+      )
+    );
+
+  const organizationName =
+    normText(
+      mappedValue(
+        row,
+        'organization'
+      )
+    );
+
+  const buildingName =
+    normText(
+      mappedValue(
+        row,
+        'building'
+      )
+    );
+
+  const workName =
+    normText(
+      mappedValue(
+        row,
+        'work'
+      )
+    );
+
+  const organization =
+    organizationName
+      ? ensureNamed(
+          project.organizations,
+          'ORG',
+          organizationName
+        )
+      : null;
+
+  const building =
+    buildingName
+      ? ensureNamed(
+          project.buildings,
+          'BLD',
+          buildingName
+        )
+      : null;
+
+  const work =
+    workName
+      ? ensureNamed(
+          project.works,
+          'WRK',
+          workName
+        )
+      : null;
+
+
+  /*
+    ДВА ПОДДЕРЖИВАЕМЫХ ФОРМАТА:
+
+    1. Отдельные колонки:
+       ИТР | Рабочие | Механизаторы
+
+    2. Твой фактический формат:
+       Количество человек | Специализация
+  */
+
+  let itr =
+    num(
+      mappedValue(
+        row,
+        'itr'
+      )
+    );
+
+  let workers =
+    num(
+      mappedValue(
+        row,
+        'workers'
+      )
+    );
+
+  let mechanizers =
+    num(
+      mappedValue(
+        row,
+        'mechanizers'
+      )
+    );
+
+  const peopleQty =
+    num(
+      mappedValue(
+        row,
+        'peopleQty'
+      )
+    );
+
+  const specialization =
+    normText(
+      mappedValue(
+        row,
+        'specialization'
+      )
+    );
+
+  const specializationKey =
+    normKey(
+      specialization
+    );
+
+
+  if (
+    peopleQty > 0
+  ) {
+
     if (
-      importDetectedMode ===
-      'resources'
+      specializationKey === 'итр' ||
+      specializationKey.includes(
+        'инженерно техничес'
+      )
     ) {
 
-      const date =
-        normDate(
-          mappedValue(
-            row,
-            'date'
-          )
-        );
+      itr +=
+        peopleQty;
 
-      const organizationName =
-        normText(
-          mappedValue(
-            row,
-            'organization'
-          )
-        );
+    } else if (
+      specializationKey.includes(
+        'механизатор'
+      ) ||
+      specializationKey.includes(
+        'машинист'
+      )
+    ) {
 
-      const buildingName =
-        normText(
-          mappedValue(
-            row,
-            'building'
-          )
-        );
+      mechanizers +=
+        peopleQty;
 
-      const workName =
-        normText(
-          mappedValue(
-            row,
-            'work'
-          )
-        );
+    } else if (
+      specializationKey.includes(
+        'рабоч'
+      )
+    ) {
 
-      const organization =
-        organizationName
-          ? ensureNamed(
-              project.organizations,
-              'ORG',
-              organizationName
-            )
-          : null;
-
-      const building =
-        buildingName
-          ? ensureNamed(
-              project.buildings,
-              'BLD',
-              buildingName
-            )
-          : null;
-
-      const work =
-        workName
-          ? ensureNamed(
-              project.works,
-              'WRK',
-              workName
-            )
-          : null;
-
-      const resource = {
-
-        id:
-          uid('R'),
-
-        date,
-
-        organizationId:
-          organization?.id ||
-          '',
-
-        buildingId:
-          building?.id ||
-          '',
-
-        workId:
-          work?.id ||
-          '',
-
-        frontId:
-          '',
-
-        itr:
-          num(
-            mappedValue(
-              row,
-              'itr'
-            )
-          ),
-
-        workers:
-          num(
-            mappedValue(
-              row,
-              'workers'
-            )
-          ),
-
-        mechanizers:
-          num(
-            mappedValue(
-              row,
-              'mechanizers'
-            )
-          ),
-
-        equipmentType:
-          normText(
-            mappedValue(
-              row,
-              'equipmentType'
-            )
-          ),
-
-        equipmentQty:
-          num(
-            mappedValue(
-              row,
-              'equipmentQty'
-            )
-          ),
-
-        comment:
-          normText(
-            mappedValue(
-              row,
-              'comment'
-            )
-          ),
-
-        createdAt:
-          nowIso(),
-
-        source: {
-          batchId,
-          ...importSource(
-            item
-          )
-        }
-      };
-
-      const fingerprint =
-        [
-          resource.date,
-          resource.organizationId,
-          resource.buildingId,
-          resource.workId,
-          resource.itr,
-          resource.workers,
-          resource.mechanizers,
-          resource.equipmentType,
-          resource.equipmentQty,
-          resource.comment
-        ].join('|');
-
-      if (
-        project.resources
-          .some(
-            existing =>
-              existing.importFingerprint ===
-              fingerprint
-          )
-      ) {
-
-        skipped++;
-
-        continue;
-      }
-
-      resource.importFingerprint =
-        fingerprint;
-
-      project.resources.push(
-        resource
-      );
-
-      appended++;
+      workers +=
+        peopleQty;
     }
+  }
 
+
+  const resource = {
+
+    id:
+      uid('R'),
+
+    date,
+
+    organizationId:
+      organization?.id ||
+      '',
+
+    buildingId:
+      building?.id ||
+      '',
+
+    workId:
+      work?.id ||
+      '',
+
+    frontId:
+      '',
+
+    itr,
+
+    workers,
+
+    mechanizers,
+
+    specialization,
+
+    peopleQty,
+
+    equipmentType:
+      normText(
+        mappedValue(
+          row,
+          'equipmentType'
+        )
+      ),
+
+    equipmentQty:
+      num(
+        mappedValue(
+          row,
+          'equipmentQty'
+        )
+      ),
+
+    comment:
+      normText(
+        mappedValue(
+          row,
+          'comment'
+        )
+      ),
+
+    createdAt:
+      nowIso(),
+
+    source: {
+      batchId,
+      ...importSource(
+        item
+      )
+    }
+  };
+
+
+  /*
+    Не записываем полностью пустые строки ресурсов.
+  */
+
+  const hasPeople =
+    resource.itr > 0 ||
+    resource.workers > 0 ||
+    resource.mechanizers > 0;
+
+  const hasEquipment =
+    resource.equipmentType ||
+    resource.equipmentQty > 0;
+
+  if (
+    !hasPeople &&
+    !hasEquipment
+  ) {
+
+    skipped++;
+
+    continue;
+  }
+
+
+  const fingerprint =
+    [
+      resource.date,
+      resource.organizationId,
+      resource.buildingId,
+      resource.workId,
+      resource.itr,
+      resource.workers,
+      resource.mechanizers,
+      resource.specialization,
+      resource.peopleQty,
+      resource.equipmentType,
+      resource.equipmentQty,
+      resource.comment
+    ].join('|');
+
+
+  if (
+    project.resources
+      .some(
+        existing =>
+          existing.importFingerprint ===
+          fingerprint
+      )
+  ) {
+
+    skipped++;
+
+    continue;
+  }
+
+
+  resource.importFingerprint =
+    fingerprint;
+
+  project.resources.push(
+    resource
+  );
+
+  appended++;
+}
 
     /* -----------------------------------------
        НОМЕРНЫЕ ЭЛЕМЕНТЫ
@@ -9120,16 +9254,42 @@ async function commitImport() {
   }
 
 
-  project.importHistory.unshift({
+ project.importHistory.unshift({
 
-    id:
-      batchId,
+  id:
+    batchId,
 
-    at:
-      nowIso(),
+  backupKey:
+    preImportBackupKey,
 
-    fileName:
-      importFileName,
+  at:
+    nowIso(),
+
+  fileName:
+    importFileName,
+
+  sheetName:
+    importSheetName,
+
+  mode:
+    importDetectedMode,
+
+  selected:
+    selected.length,
+
+  created,
+
+  updated,
+
+  appended,
+
+  skipped,
+
+  mapping:
+    clone(
+      importMapping
+    )
+});
 
     sheetName:
       importSheetName,
@@ -9189,7 +9349,124 @@ async function commitImport() {
   $('commitImportBtn').disabled =
     true;
 }
+async function rollbackLastImport() {
 
+  const lastImport =
+    project.importHistory?.[0];
+
+  if (
+    !lastImport
+  ) {
+
+    alert(
+      'В истории проекта нет импортов для отмены.'
+    );
+
+    return;
+  }
+
+
+  if (
+    !lastImport.backupKey
+  ) {
+
+    alert(
+      'Этот импорт был сделан до появления функции автоматического отката.\n\n' +
+      'Для него безопасный автоматический откат пока недоступен.'
+    );
+
+    return;
+  }
+
+
+  const backup =
+    await dbGetKey(
+      lastImport.backupKey
+    );
+
+
+  if (
+    !backup
+  ) {
+
+    alert(
+      'Защитная копия перед импортом не найдена.'
+    );
+
+    return;
+  }
+
+
+  const text =
+    `Отменить последний импорт?\n\n` +
+    `Файл: ${lastImport.fileName || '—'}\n` +
+    `Лист: ${lastImport.sheetName || '—'}\n` +
+    `Дата: ${
+      lastImport.at
+        ? new Date(
+            lastImport.at
+          ).toLocaleString(
+            'ru-RU'
+          )
+        : '—'
+    }\n\n` +
+    `Проект вернется ровно в состояние до этого импорта.`;
+
+  if (
+    !confirm(
+      text
+    )
+  ) {
+    return;
+  }
+
+
+  /*
+    Сохраняем и текущее состояние,
+    чтобы даже сам откат можно было восстановить.
+  */
+
+  await dbPutKey(
+    clone(project),
+    `before-rollback-${Date.now()}`
+  );
+
+
+  project =
+    normalizeProject(
+      backup
+    );
+
+
+  log(
+    'Отмена импорта',
+    'Проект',
+    `Восстановлено состояние до импорта ${lastImport.fileName || ''}`
+  );
+
+
+  await saveProject();
+
+  renderAll();
+
+
+  $('importInfo')
+    .classList
+    .remove(
+      'hidden'
+    );
+
+  $('importInfo').className =
+    'notice good';
+
+  $('importInfo').textContent =
+    'Последний импорт отменен. Проект восстановлен из защитной копии.';
+
+
+  alert(
+    'Последний импорт отменен.'
+  );
+}
 
 /* =========================================================
    ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК
@@ -9557,6 +9834,8 @@ function bindUi() {
 
   $('commitImportBtn').onclick =
     commitImport;
+  $('rollbackImportBtn').onclick =
+  rollbackLastImport;
 
 
   $('clearProjectBtn').onclick =
@@ -9570,10 +9849,13 @@ function bindUi() {
         return;
       }
 
-      await dbPutKey(
-        project,
-        `pre-clear-${Date.now()}`
-      );
+      const preImportBackupKey =
+  `pre-import-${Date.now()}`;
+
+await dbPutKey(
+  clone(project),
+  preImportBackupKey
+);
 
       const fresh =
         emptyProject();
