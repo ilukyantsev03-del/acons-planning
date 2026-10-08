@@ -3,7 +3,7 @@
 const $ = id => document.getElementById(id);
 
 const DB_NAME = 'acons_planning_local';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE = 'project';
 const PROJECT_KEY = 'main';
 
