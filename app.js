@@ -1,790 +1,249 @@
 'use strict';
 
+const $ = id => document.getElementById(id);
 
-const $ = id =>
-  document.getElementById(
-    id
-  );
+const DB_NAME = 'acons_planning_local';
+const DB_VERSION = 1;
+const STORE = 'project';
+const PROJECT_KEY = 'main';
 
+const SCHEMA_VERSION = '2.0.0';
 
-const DB_NAME =
-  'acons_planning_v3';
-
-
-const DB_VERSION =
-  1;
-
-
-const STORE =
-  'project';
-
-
-const KEY =
-  'main';
-
-
-const SCHEMA_VERSION =
-  '3.0.0';
-
-
-
-const DEFAULT_STATUSES = [
-
-  {
-    id:
-      'STS-NOT',
-
-    name:
-      'Не начато',
-
-    color:
-      '#e5e7eb',
-
-    group:
-      'production'
-  },
-
-
-  {
-    id:
-      'STS-READY',
-
-    name:
-      'Фронт готов',
-
-    color:
-      '#dbeafe',
-
-    group:
-      'production'
-  },
-
-
-  {
-    id:
-      'STS-WORK',
-
-    name:
-      'В работе',
-
-    color:
-      '#fef3c7',
-
-    group:
-      'production'
-  },
-
-
-  {
-    id:
-      'STS-DONE',
-
-    name:
-      'Выполнено',
-
-    color:
-      '#dcfce7',
-
-    group:
-      'production'
-  },
-
-
-  {
-    id:
-      'STS-HOLD',
-
-    name:
-      'Приостановлено',
-
-    color:
-      '#ede9fe',
-
-    group:
-      'production'
-  },
-
-
-  {
-    id:
-      'STS-RISK',
-
-    name:
-      'Ограничение',
-
-    color:
-      '#fee2e2',
-
-    group:
-      'production'
-  }
-
+const STATUS_LIST = [
+  'Не начато',
+  'Фронт готов',
+  'В работе',
+  'Завершено',
+  'Приостановлено',
+  'Ограничение'
 ];
 
-
-
-const DEFAULT_ACCEPTANCE = [
-
-  {
-    id:
-      'ACC-NO',
-
-    name:
-      'Не предъявлено',
-
-    color:
-      '#f3f4f6'
-  },
-
-
-  {
-    id:
-      'ACC-READY',
-
-    name:
-      'Готово к передаче',
-
-    color:
-      '#cffafe'
-  },
-
-
-  {
-    id:
-      'ACC-PRESENTED',
-
-    name:
-      'Предъявлено',
-
-    color:
-      '#ccfbf1'
-  },
-
-
-  {
-    id:
-      'ACC-INSPECTED',
-
-    name:
-      'Освидетельствовано',
-
-    color:
-      '#bbf7d0'
-  },
-
-
-  {
-    id:
-      'ACC-ACCEPTED',
-
-    name:
-      'Принято',
-
-    color:
-      '#86efac'
-  }
-
+const ELEMENT_STATUS_LIST = [
+  'Не начато',
+  'В работе',
+  'Выполнено',
+  'Освидетельствовано',
+  'Принято',
+  'Ограничение'
 ];
 
-
-
-const DIMENSIONS = {
-
-  building:
-    'Здание',
-
-  block:
-    'Блок',
-
-  floor:
-    'Этаж',
-
-  capture:
-    'Захватка',
-
-  axis:
-    'Ось',
-
-  side:
-    'Сторона',
-
-  zone:
-    'Зона',
-
-  roomNo:
-    '№ помещения',
-
-  roomName:
-    'Помещение',
-
-  organization:
-    'Организация'
-
-};
-
-
-
-const FIELD_LABELS = {
-
-  work:
-    'Работа',
-
-  organization:
-    'Организация',
-
-  contract:
-    'Договор',
-
-  status:
-    'Статус работ',
-
-  acceptance:
-    'Статус сдачи',
-
-  unit:
-    'Ед. изм.',
-
-  totalQty:
-    'Общий объём',
-
-  doneQty:
-    'Выполнено',
-
-  percent:
-    '% выполнения',
-
-
-  contractStart:
-    'Договорное начало',
-
-  contractEnd:
-    'Договорное окончание',
-
-
-  baselineStart:
-    'Базовое начало',
-
-  baselineEnd:
-    'Базовое окончание',
-
-
-  planStart:
-    'Плановое начало',
-
-  planEnd:
-    'Плановое окончание',
-
-
-  factStart:
-    'Фактическое начало',
-
-  factEnd:
-    'Фактическое окончание',
-
-
-  forecastStart:
-    'Прогнозное начало',
-
-  forecastEnd:
-    'Прогнозное окончание',
-
-
-  variancePlan:
-    'Отклонение от плана',
-
-  varianceContract:
-    'Отклонение от договора',
-
-
-  responsible:
-    'Ответственный',
-
-  constraint:
-    'Ограничение',
-
-  comment:
-    'Комментарий'
-
-};
-
-
-
-const CELL_MODES = {
-
-  production:
-    'Статус работ',
-
-  acceptance:
-    'Статус сдачи',
-
-  percent:
-    '% выполнения',
-
-  qty:
-    'Факт / объём',
-
-  variancePlan:
-    'Отклонение от плана',
-
-  varianceContract:
-    'Отклонение от договора',
-
-  endDate:
-    'Дата окончания'
-
-};
-
-
-
-const GANTT_LAYERS = [
-
-  [
-    'contract',
-    'Договор'
-  ],
-
-  [
-    'baseline',
-    'База'
-  ],
-
-  [
-    'plan',
-    'План'
-  ],
-
-  [
-    'fact',
-    'Факт'
-  ],
-
-  [
-    'forecast',
-    'Прогноз'
-  ]
-
+const BUILDINGS = [
+  'Главный корпус',
+  'Грязелечебница',
+  'Ресторан с банкетным залом',
+  'КПП',
+  'ДЭС',
+  'ТП-2',
+  'ТП-3',
+  'ТП-4',
+  'РТП. Хладоцентр',
+  'Котельная',
+  'РЧВ',
+  'Подпорные стены благоустройства',
+  'Аэрарий'
 ];
 
+const WORKS = [
+  ['Кладка наружных стен', 'АР', 'м²'],
+  ['Вертикальное армирование', 'КР', 'т'],
+  ['Штукатурка', 'АР', 'м²'],
+  ['Гидроизоляция балконов', 'АР', 'м²'],
+  ['Передача фронта', 'Организация работ', 'шт.']
+];
 
+const DEMOLITION = [
+  "Склад (ангар) литера Д'",
+  "Нежилое здание, Корпус №10 литера Д",
+  "Нежилое здание, Корпус №9 литера Г",
+  "Нежилое здание №11 литера Е",
+  "Демонтаж «фонтана с оленем»",
+  "Аэрарий",
+  "Нежилое здание Корпус №12 литера З",
+  "Нежилое здание Корпус №1 литера Б",
+  "Котельная литера Ф'",
+  "Склад литера Б', 90:25:020102:170",
+  "Коттедж 1 литера Ш'",
+  "Парники",
+  "Коммунальная столовая литера Ц",
+  "Управление (бытовые помещения) литера Р",
+  "Теплица в ООПТ",
+  "Сауна литера Л'",
+  "Склад",
+  "Кладовая / Аккумуляторная литера Т'",
+  "Гараж литера Ж'",
+  "Гараж литера С'",
+  "Нежилое здание КТП / Диспетчерская литера П'",
+  "Нежилое здание, Корпус №4 литера В",
+  "Библиотека литера Ю",
+  "Нежилое здание Корпус №32 литера И",
+  "Спортивная площадка",
+  "Нежилое здание (Коттедж 3) литера Ц'",
+  "Приемная, спортзал литера Т (ЛФК)",
+  "Прачечная литера А (ОКН)",
+  "Нежилое здание литера У' (Склад ген.подрядчика)",
+  "Офис, нежилое здание литера Ф (штаб тех.заказчика)",
+  "Нежилое здание Корпус №35 литера Л (штаб ген.подрядчика)",
+  "Нежилое здание, Корпус №34 литера К (ООПТ)"
+];
 
-let db =
-  null;
+let db = null;
+let project = null;
 
+let compareIncoming = null;
+let compareItems = [];
 
-let project =
-  null;
-
-
-let activeTab =
-  'dashboard';
-
-
-let currentViewId =
-  null;
-
-
-let compareIncoming =
-  null;
-
-
+let importWorkbook = null;
+let importFileName = '';
+let importSheetName = '';
+let importMatrix = [];
+let importHeaders = [];
+let importRawRows = [];
+let importRows = [];
+let importMapping = {};
+let importDetectedMode = 'fronts';
+let importMappingMode = '';
 
 const uid = prefix =>
-  `${prefix}-${crypto.randomUUID()}`;
-
-
-const nowIso = () =>
-  new Date()
-    .toISOString();
-
+  prefix + '-' + crypto.randomUUID();
 
 const today = () =>
-  nowIso()
-    .slice(
-      0,
-      10
-    );
+  new Date().toISOString().slice(0, 10);
 
+const nowIso = () =>
+  new Date().toISOString();
 
-const esc = value =>
-  String(
-    value ??
-    ''
-  )
-    .replace(
-      /[&<>"']/g,
-      character =>
-        ({
-          '&':
-            '&amp;',
-
-          '<':
-            '&lt;',
-
-          '>':
-            '&gt;',
-
-          '"':
-            '&quot;',
-
-          "'":
-            '&#039;'
-        })[character]
-    );
-
+const clone = value =>
+  JSON.parse(JSON.stringify(value));
 
 const num = value =>
   Number(
-    String(
-      value ??
-      0
-    )
-      .replace(
-        /\s/g,
-        ''
-      )
-      .replace(
-        ',',
-        '.'
-      )
-  ) ||
-  0;
-
+    String(value ?? 0)
+      .replace(/\s/g, '')
+      .replace(',', '.')
+  ) || 0;
 
 const fmt = value =>
-  Math.round(
-    num(
-      value
-    ) *
-    100
-  ) /
-  100;
+  Math.round(num(value) * 100) / 100;
 
-
-const clone = value =>
-  structuredClone(
-    value
-  );
-
-
-const byId = (
-  list,
-  id
-) =>
-  (
-    list ||
-    []
-  )
-    .find(
-      item =>
-        String(
-          item.id
-        ) ===
-        String(
-          id
-        )
+const esc = value =>
+  String(value ?? '')
+    .replace(
+      /[&<>"']/g,
+      char => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+      })[char]
     );
 
-
-const nameById = (
-  list,
-  id
-) =>
-  byId(
-    list,
-    id
-  )
-    ?.name ||
-  '';
-
-
-const dateDiff = (
-  first,
-  second
-) => {
-
-  if (
-    !first ||
-    !second
-  ) {
-    return null;
-  }
-
-
-  return Math.round(
-    (
-      Date.parse(
-        second
-      ) -
-      Date.parse(
-        first
+const uniq = array =>
+  [
+    ...new Set(
+      array.filter(
+        value =>
+          value !== '' &&
+          value !== null &&
+          value !== undefined
       )
-    ) /
-    86400000
+    )
+  ];
+
+const byId = (list, id) =>
+  (list || []).find(
+    item =>
+      String(item.id) === String(id)
   );
 
-};
+const nameById = (list, id) =>
+  byId(list, id)?.name || '';
 
+const diffDays = (a, b) =>
+  a && b
+    ? Math.round(
+        (
+          Date.parse(b) -
+          Date.parse(a)
+        ) / 86400000
+      )
+    : null;
+
+const normText = value =>
+  String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const normKey = value =>
+  normText(value)
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/[№#]/g, 'номер')
+    .replace(/[()]/g, ' ')
+    .replace(/[._/\\-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const sameText = (a, b) =>
+  normKey(a) === normKey(b);
+
+
+function normalizeStatus(value) {
+
+  const text = normKey(value);
+
+  if (!text) {
+    return '';
+  }
+
+  if (
+    /заверш|оконч|выполн/.test(text)
+  ) {
+    return 'Завершено';
+  }
+
+  if (
+    /начат|в работе|производ/.test(text)
+  ) {
+    return 'В работе';
+  }
+
+  if (
+    /фронт готов|готово к старт/.test(text)
+  ) {
+    return 'Фронт готов';
+  }
+
+  if (
+    /приостанов|останов/.test(text)
+  ) {
+    return 'Приостановлено';
+  }
+
+  if (
+    /огранич|блокир/.test(text)
+  ) {
+    return 'Ограничение';
+  }
+
+  if (
+    /не начат/.test(text)
+  ) {
+    return 'Не начато';
+  }
+
+  return normText(value);
+}
 
 
 function emptyProject() {
 
-
-  const units = [
-
-    {
-      id:
-        'U-M2',
-
-      name:
-        'м²',
-
-      active:
-        true
-    },
-
-
-    {
-      id:
-        'U-M',
-
-      name:
-        'м.п.',
-
-      active:
-        true
-    },
-
-
-    {
-      id:
-        'U-M3',
-
-      name:
-        'м³',
-
-      active:
-        true
-    },
-
-
-    {
-      id:
-        'U-T',
-
-      name:
-        'т',
-
-      active:
-        true
-    },
-
-
-    {
-      id:
-        'U-PC',
-
-      name:
-        'шт.',
-
-      active:
-        true
-    },
-
-
-    {
-      id:
-        'U-SET',
-
-      name:
-        'компл.',
-
-      active:
-        true
-    }
-
-  ];
-
-
-
-  const buildings = [
-
-    'Главный корпус',
-
-    'Грязелечебница',
-
-    'Ресторан с банкетным залом',
-
-    'КПП',
-
-    'ДЭС',
-
-    'ТП-2',
-
-    'ТП-3',
-
-    'ТП-4',
-
-    'РТП. Хладоцентр',
-
-    'Котельная',
-
-    'РЧВ',
-
-    'Аэрарий'
-
-  ]
-    .map(
-      (
-        name,
-        index
-      ) => ({
-
-        id:
-          `BLD-${String(index + 1).padStart(3, '0')}`,
-
-        name,
-
-        active:
-          true
-
-      })
-    );
-
-
-
-  const works = [
-
-    [
-      'Кладка наружных стен',
-      'U-M2',
-      'Количественный'
-    ],
-
-    [
-      'Штукатурка',
-      'U-M2',
-      'Количественный'
-    ],
-
-    [
-      'Гидроизоляция',
-      'U-M2',
-      'Количественный'
-    ],
-
-    [
-      'Кронштейны НВФ',
-      'U-PC',
-      'Комбинированный'
-    ],
-
-    [
-      'Передача фронта',
-      'U-PC',
-      'Статусный'
-    ]
-
-  ]
-    .map(
-      (
-        row,
-        index
-      ) => ({
-
-        id:
-          `WRK-${String(index + 1).padStart(3, '0')}`,
-
-        name:
-          row[0],
-
-        unitId:
-          row[1],
-
-        controlType:
-          row[2],
-
-        active:
-          true,
-
-        section:
-          ''
-
-      })
-    );
-
-
-
-  const view = {
-
-    id:
-      'VIEW-DEFAULT',
-
-    name:
-      'Основная шахматка',
-
-    type:
-      'matrix',
-
-    rows: [
-
-      'building',
-
-      'block',
-
-      'floor',
-
-      'side'
-
-    ],
-
-    workIds:
-      works
-        .map(
-          work =>
-            work.id
-        ),
-
-    visibleFields: [
-
-      'status',
-
-      'acceptance',
-
-      'percent',
-
-      'planEnd',
-
-      'factEnd',
-
-      'forecastEnd'
-
-    ],
-
-    cellMode:
-      'production',
-
-    filters:
-      {},
-
-    isDefault:
-      true,
-
-    updatedAt:
-      nowIso()
-
-  };
-
-
-
   return {
-
 
     schemaVersion:
       SCHEMA_VERSION,
 
-
     meta: {
-
       projectName:
         'ACONS Planning',
 
@@ -797,152 +256,147 @@ function emptyProject() {
       lastBackupAt:
         null,
 
-      defaultViewId:
-        view.id
-
+      lastMigrationAt:
+        null
     },
 
-
-    buildings,
-
-
-    organizations:
-      [],
-
-
-    units,
-
-
-    works,
-
-
-    contracts:
-      [],
-
-
-    structures:
-      [],
-
-
-    fronts:
-      [],
-
-
-    planLog:
-      [],
-
-
-    factLog:
-      [],
-
-
-    resources:
-      [],
-
-
-    milestones:
-      [],
-
-
-    constraints:
-      [],
-
-
-    handovers:
-      [],
-
-
-    dependencies:
-      [],
-
-
-    calendars:
-      [],
-
-
-    scheduleVersions:
-      [],
-
-
-    statuses:
-      clone(
-        DEFAULT_STATUSES
-      ),
-
-
-    acceptanceStatuses:
-      clone(
-        DEFAULT_ACCEPTANCE
-      ),
-
-
-    equipmentTypes:
-      [],
-
-
-    constraintTypes: [
-
-      'РД',
-
-      'Материал',
-
-      'Фронт',
-
-      'Смежники',
-
-      'Заказчик',
-
-      'Технология',
-
-      'Финансирование',
-
-      'Другое'
-
-    ]
-      .map(
-        (
-          name,
-          index
-        ) => ({
-
+    buildings:
+      BUILDINGS.map(
+        (name, index) => ({
           id:
-            `CT-${index + 1}`,
+            `BLD-${String(index + 1)
+              .padStart(3, '0')}`,
 
           name,
 
           active:
-            true
+            true,
 
+          sort:
+            index + 1
         })
       ),
 
-
-    views: [
-      view
-    ],
-
-
-    reportTemplates:
+    organizations:
       [],
 
+    works:
+      WORKS.map(
+        (row, index) => ({
+          id:
+            `WRK-${String(index + 1)
+              .padStart(3, '0')}`,
+
+          name:
+            row[0],
+
+          section:
+            row[1],
+
+          unit:
+            row[2],
+
+          active:
+            true,
+
+          sort:
+            index + 1
+        })
+      ),
+
+    structures:
+      [],
+
+    fronts:
+      [],
+
+    planLog:
+      [],
+
+    factLog:
+      [],
+
+    resources:
+      [],
+
+    milestones:
+      [],
+
+    customFields:
+      [],
+
+    views:
+      [],
 
     history:
-      []
+      [],
 
+    numberedElements:
+      [],
+
+    importHistory:
+      [],
+
+    contracts:
+      [],
+
+    constraints:
+      [],
+
+    diagrams:
+      [],
+
+    diagramMarks:
+      [],
+
+    scheduleVersions:
+      [],
+
+    importProfiles:
+      [],
+
+    demolition:
+      DEMOLITION.map(
+        (name, index) => ({
+          id:
+            `DEM-${String(index + 1)
+              .padStart(3, '0')}`,
+
+          name,
+
+          status:
+            'Не начато',
+
+          planStart:
+            '',
+
+          planEnd:
+            '',
+
+          factStart:
+            '',
+
+          factEnd:
+            '',
+
+          forecastEnd:
+            '',
+
+          comment:
+            '',
+
+          active:
+            true
+        })
+      )
   };
-
 }
-
 
 
 async function openDb() {
 
   return new Promise(
-    (
-      resolve,
-      reject
-    ) => {
-
+    (resolve, reject) => {
 
       const request =
         indexedDB.open(
@@ -950,32 +404,21 @@ async function openDb() {
           DB_VERSION
         );
 
-
       request.onupgradeneeded =
         event => {
-
 
           const database =
             event.target.result;
 
-
           if (
-            !database
-              .objectStoreNames
-              .contains(
-                STORE
-              )
+            !database.objectStoreNames
+              .contains(STORE)
           ) {
-
-            database
-              .createObjectStore(
-                STORE
-              );
-
+            database.createObjectStore(
+              STORE
+            );
           }
-
         };
-
 
       request.onsuccess =
         event =>
@@ -983,74 +426,57 @@ async function openDb() {
             event.target.result
           );
 
-
       request.onerror =
         () =>
           reject(
             request.error
           );
-
     }
   );
-
 }
 
 
-
-async function dbGet() {
+async function dbGetKey(
+  key = PROJECT_KEY
+) {
 
   return new Promise(
-    (
-      resolve,
-      reject
-    ) => {
+    (resolve, reject) => {
 
+      const transaction =
+        db.transaction(
+          STORE,
+          'readonly'
+        );
 
       const request =
-        db
-          .transaction(
-            STORE,
-            'readonly'
-          )
-          .objectStore(
-            STORE
-          )
-          .get(
-            KEY
-          );
-
+        transaction
+          .objectStore(STORE)
+          .get(key);
 
       request.onsuccess =
         () =>
           resolve(
-            request.result ||
-            null
+            request.result || null
           );
-
 
       request.onerror =
         () =>
           reject(
             request.error
           );
-
     }
   );
-
 }
 
 
-
-async function dbPut(
-  value
+async function dbPutKey(
+  value,
+  key = PROJECT_KEY
 ) {
 
   return new Promise(
-    (
-      resolve,
-      reject
-    ) => {
-
+    (resolve, reject) => {
 
       const transaction =
         db.transaction(
@@ -1058,33 +484,25 @@ async function dbPut(
           'readwrite'
         );
 
-
       transaction
-        .objectStore(
-          STORE
-        )
+        .objectStore(STORE)
         .put(
           value,
-          KEY
+          key
         );
-
 
       transaction.oncomplete =
         () =>
           resolve();
-
 
       transaction.onerror =
         () =>
           reject(
             transaction.error
           );
-
     }
   );
-
 }
-
 
 
 async function saveProject() {
@@ -1092,30 +510,27 @@ async function saveProject() {
   project.meta.updatedAt =
     nowIso();
 
+  project.schemaVersion =
+    SCHEMA_VERSION;
 
-  await dbPut(
+  await dbPutKey(
     project
   );
 
-
   renderBackupNotice();
-
 }
-
 
 
 function log(
   action,
   entity,
-  description
+  description,
+  details = {}
 ) {
 
   project.history.unshift({
-
     id:
-      uid(
-        'H'
-      ),
+      uid('H'),
 
     at:
       nowIso(),
@@ -1124,298 +539,231 @@ function log(
 
     entity,
 
-    description
+    description,
 
+    details
   });
 
-
   project.history =
-    project.history
-      .slice(
-        0,
-        10000
-      );
-
+    project.history.slice(
+      0,
+      10000
+    );
 }
 
 
-
-function normalizeProject(
-  source
-) {
-
+function normalizeProject(data) {
 
   const base =
     emptyProject();
 
-
   const result = {
-
     ...base,
-
-    ...source,
-
-
-    meta: {
-
-      ...base.meta,
-
-      ...(
-        source.meta ||
-        {}
-      )
-
-    }
-
+    ...(data || {})
   };
 
+  result.meta = {
+    ...base.meta,
+    ...((data || {}).meta || {})
+  };
 
-
-  [
-
+  const arrayFields = [
     'buildings',
-
     'organizations',
-
-    'units',
-
     'works',
-
-    'contracts',
-
     'structures',
-
     'fronts',
-
     'planLog',
-
     'factLog',
-
     'resources',
-
     'milestones',
-
-    'constraints',
-
-    'handovers',
-
-    'dependencies',
-
-    'calendars',
-
-    'scheduleVersions',
-
-    'statuses',
-
-    'acceptanceStatuses',
-
-    'equipmentTypes',
-
-    'constraintTypes',
-
+    'customFields',
     'views',
+    'history',
+    'numberedElements',
+    'importHistory',
+    'contracts',
+    'constraints',
+    'diagrams',
+    'diagramMarks',
+    'scheduleVersions',
+    'importProfiles',
+    'demolition'
+  ];
 
-    'reportTemplates',
+  for (
+    const field
+    of arrayFields
+  ) {
 
-    'history'
+    if (
+      Array.isArray(
+        data?.[field]
+      )
+    ) {
+      result[field] =
+        data[field];
+    }
+  }
 
-  ]
-    .forEach(
-      key => {
+  result.fronts =
+    result.fronts.map(
+      front => ({
+        active:
+          true,
 
-        result[key] =
-          Array.isArray(
-            source[key]
-          )
-            ? source[key]
-            : base[key];
-
-      }
+        ...front
+      })
     );
 
+  result.numberedElements =
+    result.numberedElements.map(
+      item => ({
+        active:
+          true,
 
-  if (
-    result.views.length ===
-    0
-  ) {
+        uniqueScope:
+          'context',
 
-    result.views =
-      base.views;
-
-  }
-
-
-  if (
-    !byId(
-      result.views,
-      result.meta.defaultViewId
-    )
-  ) {
-
-    result.meta.defaultViewId =
-      result.views[0].id;
-
-  }
-
+        ...item
+      })
+    );
 
   result.schemaVersion =
     SCHEMA_VERSION;
 
-
   return result;
-
 }
 
 
-
-function activeItems(
-  list
+async function migrateIfNeeded(
+  rawProject
 ) {
 
-  return (
-    list ||
-    []
-  )
-    .filter(
-      item =>
-        item.active !==
-        false
+  if (!rawProject) {
+    return emptyProject();
+  }
+
+  const oldVersion =
+    rawProject.schemaVersion ||
+    '0.0.0';
+
+  if (
+    oldVersion ===
+    SCHEMA_VERSION
+  ) {
+    return normalizeProject(
+      rawProject
+    );
+  }
+
+  const backupKey =
+    `migration-backup-${Date.now()}`;
+
+  await dbPutKey(
+    rawProject,
+    backupKey
+  );
+
+  const migrated =
+    normalizeProject(
+      rawProject
     );
 
+  migrated.meta.lastMigrationAt =
+    nowIso();
+
+  migrated.meta.migrationFrom =
+    oldVersion;
+
+  migrated.meta.migrationBackupKey =
+    backupKey;
+
+  migrated.history =
+    migrated.history || [];
+
+  migrated.history.unshift({
+    id:
+      uid('H'),
+
+    at:
+      nowIso(),
+
+    action:
+      'Миграция',
+
+    entity:
+      'Проект',
+
+    description:
+      `Структура обновлена ${oldVersion} → ${SCHEMA_VERSION}. Создана локальная защитная копия.`
+  });
+
+  return migrated;
 }
 
 
-
-function fillSelect(
-  element,
-  items,
-  allLabel = 'Все'
+function download(
+  name,
+  text,
+  type = 'application/json'
 ) {
 
-
-  if (
-    !element
-  ) {
-    return;
-  }
-
-
-  const current =
-    element.value;
-
-
-  element.innerHTML =
-    '';
-
-
-  if (
-    allLabel !==
-    null
-  ) {
-
-
-    const option =
-      document.createElement(
-        'option'
-      );
-
-
-    option.value =
-      'all';
-
-
-    option.textContent =
-      allLabel;
-
-
-    element.appendChild(
-      option
+  const blob =
+    new Blob(
+      [text],
+      { type }
     );
 
-  }
-
-
-  items
-    .forEach(
-      item => {
-
-
-        const option =
-          document.createElement(
-            'option'
-          );
-
-
-        option.value =
-          String(
-            item.id ??
-            item
-          );
-
-
-        option.textContent =
-          String(
-            item.name ??
-            item
-          );
-
-
-        element.appendChild(
-          option
-        );
-
-      }
+  const url =
+    URL.createObjectURL(
+      blob
     );
 
+  const link =
+    document.createElement(
+      'a'
+    );
 
-  if (
-    [
-      ...element.options
-    ]
-      .some(
-        option =>
-          option.value ===
-          current
-      )
-  ) {
+  link.href =
+    url;
 
-    element.value =
-      current;
+  link.download =
+    name;
 
-  }
+  document.body
+    .appendChild(link);
 
+  link.click();
+
+  link.remove();
+
+  setTimeout(
+    () =>
+      URL.revokeObjectURL(
+        url
+      ),
+    1000
+  );
 }
 
 
+function hydrateFront(front) {
 
-function hydrateFront(
-  front
-) {
-
+  if (!front) {
+    return {};
+  }
 
   const structure =
     byId(
       project.structures,
       front.structureId
-    ) ||
-    {};
-
-
-  const work =
-    byId(
-      project.works,
-      front.workId
-    ) ||
-    {};
-
+    ) || {};
 
   return {
-
     ...front,
 
-
     structure,
-
 
     building:
       nameById(
@@ -1423,51 +771,11 @@ function hydrateFront(
         structure.buildingId
       ),
 
-
-    block:
-      structure.block ||
-      '',
-
-
-    floor:
-      structure.floor ??
-      '',
-
-
-    capture:
-      structure.capture ||
-      '',
-
-
-    axis:
-      structure.axis ||
-      '',
-
-
-    side:
-      structure.side ||
-      '',
-
-
-    zone:
-      structure.zone ||
-      '',
-
-
-    roomNo:
-      structure.roomNo ||
-      '',
-
-
-    roomName:
-      structure.roomName ||
-      '',
-
-
     work:
-      work.name ||
-      '',
-
+      nameById(
+        project.works,
+        front.workId
+      ),
 
     organization:
       nameById(
@@ -1475,2346 +783,740 @@ function hydrateFront(
         front.organizationId
       ),
 
+    block:
+      structure.block || '',
 
-    contract:
-      nameById(
-        project.contracts,
-        front.contractId
-      ),
+    floor:
+      structure.floor ?? '',
 
+    capture:
+      structure.capture || '',
 
-    unit:
-      nameById(
-        project.units,
-        front.unitId ||
-        work.unitId
-      ),
+    axis:
+      structure.axis || '',
 
+    side:
+      structure.side || '',
 
-    statusName:
-      nameById(
-        project.statuses,
-        front.statusId
-      ),
+    zone:
+      structure.zone || '',
 
+    roomNo:
+      structure.roomNo || '',
 
-    acceptanceName:
-      nameById(
-        project.acceptanceStatuses,
-        front.acceptanceStatusId
-      )
-
+    roomName:
+      structure.roomName || ''
   };
-
 }
 
 
+function frontLabel(front) {
 
-function frontLabel(
-  front
-) {
-
-
-  if (
-    !front
-  ) {
-    return '';
+  if (!front) {
+    return '—';
   }
 
-
-  const item =
-    hydrateFront(
-      front
-    );
-
+  const hydrated =
+    hydrateFront(front);
 
   return [
+    hydrated.building,
 
-    item.building,
+    hydrated.block,
 
-    item.block,
-
-    item.floor !== ''
-      ? `${item.floor} эт.`
+    hydrated.floor !== ''
+      ? `${hydrated.floor} эт.`
       : '',
 
-    item.side,
+    hydrated.capture
+      ? `захв. ${hydrated.capture}`
+      : '',
 
-    item.zone,
+    hydrated.axis
+      ? `ось ${hydrated.axis}`
+      : '',
 
-    item.work
+    hydrated.side,
 
+    hydrated.zone,
+
+    hydrated.roomNo
+      ? `пом. ${hydrated.roomNo}`
+      : '',
+
+    hydrated.work
   ]
+    .filter(Boolean)
+    .join(' / ');
+}
+
+
+function activeFronts() {
+
+  return project.fronts
     .filter(
-      Boolean
-    )
-    .join(
-      ' / '
+      front =>
+        front.active !== false
     );
-
 }
 
 
-
-function statusColor(
-  id
+function fill(
+  element,
+  items,
+  allLabel
 ) {
 
-  return byId(
-    project.statuses,
-    id
-  )
-    ?.color ||
-  '#f3f4f6';
-
-}
-
-
-
-function acceptanceColor(
-  id
-) {
-
-  return byId(
-    project.acceptanceStatuses,
-    id
-  )
-    ?.color ||
-  '#f3f4f6';
-
-}
-
-
-
-function varianceInfo(
-  front,
-  base = 'plan'
-) {
-
-
-  const item =
-    hydrateFront(
-      front
-    );
-
-
-  const target =
-    base ===
-    'contract'
-      ? item.contractEnd
-      : item.planEnd;
-
-
-  const actual =
-    item.factEnd ||
-    item.forecastEnd;
-
-
-  if (
-    !target ||
-    !actual
-  ) {
-
-    return {
-
-      days:
-        null,
-
-      label:
-        '—',
-
-      level:
-        'none'
-
-    };
-
+  if (!element) {
+    return;
   }
 
+  const currentValue =
+    element.value;
 
-  const days =
-    dateDiff(
-      target,
-      actual
-    );
-
-
-  let level =
-    'ok';
-
+  element.innerHTML =
+    '';
 
   if (
-    days > 0 &&
-    days <= 3
+    allLabel !== undefined
   ) {
 
-    level =
-      'warn';
+    const option =
+      document.createElement(
+        'option'
+      );
 
+    option.value =
+      'all';
+
+    option.textContent =
+      allLabel;
+
+    element.appendChild(
+      option
+    );
   }
 
+  items.forEach(
+    item => {
 
-  if (
-    days > 3 &&
-    days <= 7
-  ) {
+      const option =
+        document.createElement(
+          'option'
+        );
 
-    level =
-      'bad';
+      option.value =
+        String(
+          item.id ?? item
+        );
 
-  }
+      option.textContent =
+        String(
+          item.name ?? item
+        );
 
-
-  if (
-    days > 7
-  ) {
-
-    level =
-      'critical';
-
-  }
-
-
-  return {
-
-    days,
-
-    label:
-      days > 0
-        ? `+${days} дн.`
-        : `${days} дн.`,
-
-    level
-
-  };
-
-}
-
-
-
-function levelColor(
-  level
-) {
-
-  return ({
-
-    ok:
-      '#dcfce7',
-
-    warn:
-      '#fef3c7',
-
-    bad:
-      '#fed7aa',
-
-    critical:
-      '#fecaca',
-
-    none:
-      '#f3f4f6'
-
-  })[level];
-
-}
-
-
-
-function initSelectors() {
-
-
-  const buildings =
-    activeItems(
-      project.buildings
-    );
-
-
-  const works =
-    activeItems(
-      project.works
-    );
-
-
-  const organizations =
-    activeItems(
-      project.organizations
-    );
-
-
-  const contracts =
-    activeItems(
-      project.contracts
-    );
-
-
-
-  [
-
-    'matrixBuilding',
-
-    'gBuilding',
-
-    'pfBuilding',
-
-    'rBuilding',
-
-    'msBuilding'
-
-  ]
-    .forEach(
-      id =>
-        fillSelect(
-          $(id),
-          buildings,
-          'Все здания'
-        )
-    );
-
-
-
-  [
-
-    'gWork',
-
-    'pfWork'
-
-  ]
-    .forEach(
-      id =>
-        fillSelect(
-          $(id),
-          works,
-          'Все работы'
-        )
-    );
-
-
-
-  [
-
-    'matrixOrg',
-
-    'rOrg',
-
-    'msOrg'
-
-  ]
-    .forEach(
-      id =>
-        fillSelect(
-          $(id),
-          organizations,
-          'Все организации'
-        )
-    );
-
-
-  fillSelect(
-    $('msContract'),
-    contracts,
-    'Все договоры'
+      element.appendChild(
+        option
+      );
+    }
   );
 
+  if (
+    [...element.options]
+      .some(
+        option =>
+          option.value ===
+          currentValue
+      )
+  ) {
+    element.value =
+      currentValue;
+  }
 }
 
+
+function initSelects() {
+
+  const buildings =
+    project.buildings
+      .filter(
+        item =>
+          item.active !== false
+      );
+
+  const works =
+    project.works
+      .filter(
+        item =>
+          item.active !== false
+      );
+
+  const organizations =
+    project.organizations
+      .filter(
+        item =>
+          item.active !== false
+      );
+
+  [
+    'mfBuilding',
+    'gBuilding',
+    'pfBuilding',
+    'rBuilding',
+    'elBuilding'
+  ].forEach(
+    id =>
+      fill(
+        $(id),
+        buildings,
+        'Все здания'
+      )
+  );
+
+  [
+    'mfWork',
+    'gWork',
+    'pfWork'
+  ].forEach(
+    id =>
+      fill(
+        $(id),
+        works,
+        'Все работы'
+      )
+  );
+
+  [
+    'mfOrg',
+    'rOrg'
+  ].forEach(
+    id =>
+      fill(
+        $(id),
+        organizations,
+        'Все организации'
+      )
+  );
+
+  const elementTypes =
+    uniq(
+      project.numberedElements
+        .map(
+          item =>
+            item.elementType
+        )
+    )
+      .sort()
+      .map(
+        name => ({
+          id:
+            name,
+
+          name
+        })
+      );
+
+  fill(
+    $('elType'),
+    elementTypes,
+    'Все типы'
+  );
+
+  updateMatrixDependent();
+}
+
+
+function updateMatrixDependent() {
+
+  const buildingId =
+    $('mfBuilding').value;
+
+  const structures =
+    project.structures
+      .filter(
+        structure =>
+          buildingId === 'all' ||
+          structure.buildingId ===
+            buildingId
+      );
+
+  fill(
+    $('mfBlock'),
+
+    uniq(
+      structures.map(
+        item =>
+          item.block
+      )
+    ).map(
+      name => ({
+        id:
+          name,
+
+        name
+      })
+    ),
+
+    'Все блоки'
+  );
+
+  fill(
+    $('mfFloor'),
+
+    uniq(
+      structures.map(
+        item =>
+          item.floor
+      )
+    )
+      .sort(
+        (a, b) =>
+          num(a) - num(b)
+      )
+      .map(
+        name => ({
+          id:
+            name,
+
+          name
+        })
+      ),
+
+    'Все этажи'
+  );
+}
+
+
+function renderAll() {
+
+  initSelects();
+
+  renderDashboard();
+
+  renderMatrix();
+
+  renderGantt();
+
+  renderPlanFact();
+
+  renderResources();
+
+  renderMilestones();
+
+  renderElements();
+
+  renderDemolition();
+
+  renderHistory();
+
+  renderSettings();
+}
 
 
 function renderDashboard() {
 
-
   const fronts =
-    project.fronts
+    activeFronts()
       .map(
         hydrateFront
       );
 
+  $('dTotal').textContent =
+    fronts.length;
 
-  const latePlan =
-    fronts
-      .filter(
-        front =>
-          varianceInfo(
-            front,
-            'plan'
-          )
-            .days >
-          0
-      )
-      .length;
+  $('dWork').textContent =
+    fronts.filter(
+      front =>
+        front.status ===
+        'В работе'
+    ).length;
 
+  $('dDone').textContent =
+    fronts.filter(
+      front =>
+        front.status ===
+          'Завершено' ||
+        front.completed
+    ).length;
 
-  const lateContract =
-    fronts
-      .filter(
-        front =>
-          varianceInfo(
-            front,
-            'contract'
-          )
-            .days >
-          0
-      )
-      .length;
+  $('dAccepted').textContent =
+    fronts.filter(
+      front =>
+        front.accepted
+    ).length;
 
+  $('dLate').textContent =
+    fronts.filter(
+      front =>
+        front.contractEnd &&
+        !front.accepted &&
+        front.contractEnd <
+          today()
+    ).length;
 
-  const done =
-    fronts
-      .filter(
-        front =>
-          front.statusName ===
-          'Выполнено'
-      )
-      .length;
-
-
-  const accepted =
-    fronts
-      .filter(
-        front =>
-          front.acceptanceName ===
-          'Принято'
-      )
-      .length;
-
-
-  const risks =
-    project.constraints
-      .filter(
-        item =>
-          item.status !==
-          'Снято'
-      )
-      .length;
-
-
-  $('dTotal')
-    .textContent =
-      fronts.length;
-
-
-  $('dDone')
-    .textContent =
-      done;
-
-
-  $('dAccepted')
-    .textContent =
-      accepted;
-
-
-  $('dLatePlan')
-    .textContent =
-      latePlan;
-
-
-  $('dLateContract')
-    .textContent =
-      lateContract;
-
-
-  $('dRisk')
-    .textContent =
-      risks;
-
-
-
-  const attention =
-    [];
-
-
-  fronts
-    .forEach(
-      front => {
-
-
-        if (
-          front.totalQty > 0 &&
-          front.doneQty >=
-          front.totalQty &&
-          !front.factEnd
-        ) {
-
-          attention.push(
-            `${frontLabel(front)} — 100%, но нет фактического окончания`
-          );
-
-        }
-
-
-        if (
-          front.factStart &&
-          !front.planStart
-        ) {
-
-          attention.push(
-            `${frontLabel(front)} — есть факт, но нет планового начала`
-          );
-
-        }
-
-
-        if (
-          front.planStart &&
-          front.planEnd &&
-          front.planEnd <
-          front.planStart
-        ) {
-
-          attention.push(
-            `${frontLabel(front)} — плановое окончание раньше начала`
-          );
-
-        }
-
-      }
-    );
-
-
-  project.milestones
-    .forEach(
-      milestone => {
-
-
-        if (
-          !milestone.contractId
-        ) {
-
-          attention.push(
-            `КД ${milestone.number || ''} ${milestone.title || ''} — нет договора`
-          );
-
-        }
-
-      }
-    );
-
-
-  $('dAttention')
-    .innerHTML =
-      attention
-        .slice(
-          0,
-          20
+  $('dRisk').textContent =
+    fronts.filter(
+      front =>
+        [
+          'Ограничение',
+          'Приостановлено'
+        ].includes(
+          front.status
         )
-        .map(
-          text =>
-            `
-              <div class="item">
+    ).length;
 
-                <span>
-                  ${esc(text)}
-                </span>
-
-              </div>
-            `
-        )
-        .join(
-          ''
-        ) ||
-      `
-        <div class="muted">
-          Нет замечаний по качеству данных
-        </div>
-      `;
-
-
-  $('dMilestones')
-    .innerHTML =
-      project.milestones
-        .filter(
-          item =>
-            !item.factDate
-        )
-        .sort(
+  const critical =
+    fronts
+      .filter(
+        front =>
           (
-            first,
-            second
-          ) =>
-            (
-              first.contractDate ||
-              '9999'
-            )
-              .localeCompare(
-                second.contractDate ||
-                '9999'
-              )
-        )
-        .slice(
-          0,
-          10
-        )
-        .map(
-          milestone =>
-            `
-              <div class="item">
-
-                <span>
-                  КД ${esc(milestone.number || '')}
-                  ·
-                  ${esc(milestone.title || '')}
-                </span>
-
-                <strong>
-                  ${esc(milestone.contractDate || '—')}
-                </strong>
-
-              </div>
-            `
-        )
-        .join(
-          ''
-        ) ||
-      `
-        <div class="muted">
-          Нет открытых ключевых дат
-        </div>
-      `;
-
-}
-
-
-
-function currentView() {
-
-
-  if (
-    !currentViewId
-  ) {
-
-    currentViewId =
-      project.meta.defaultViewId;
-
-  }
-
-
-  return byId(
-    project.views,
-    currentViewId
-  ) ||
-  project.views[0];
-
-}
-
-
-
-function renderViews() {
-
-
-  fillSelect(
-    $('viewSelect'),
-    project.views,
-    null
-  );
-
-
-  $('viewSelect')
-    .value =
-      currentView().id;
-
-
-  $('viewBadge')
-    .textContent =
-      currentView().type ===
-      'matrix'
-        ? 'Шахматка'
-        : 'Таблица';
-
-}
-
-
-
-function frontMatchesView(
-  front,
-  view
-) {
-
-
-  const structure =
-    front.structure ||
-    {};
-
-
-  const filters =
-    view.filters ||
-    {};
-
-
-  const allows = (
-    list,
-    value
-  ) =>
-    !list?.length ||
-    list
-      .map(
-        String
-      )
-      .includes(
-        String(
-          value
-        )
-      );
-
-
-  if (
-    !allows(
-      filters.buildingIds,
-      structure.buildingId
-    ) ||
-    !allows(
-      filters.organizationIds,
-      front.organizationId
-    ) ||
-    !allows(
-      filters.statusIds,
-      front.statusId
-    ) ||
-    !allows(
-      filters.acceptanceIds,
-      front.acceptanceStatusId
-    )
-  ) {
-
-    return false;
-
-  }
-
-
-  if (
-    view.workIds?.length &&
-    !view.workIds
-      .includes(
-        front.workId
-      )
-  ) {
-
-    return false;
-
-  }
-
-
-  const quickBuilding =
-    $('matrixBuilding')
-      ?.value ||
-    'all';
-
-
-  const quickOrg =
-    $('matrixOrg')
-      ?.value ||
-    'all';
-
-
-  if (
-    quickBuilding !==
-    'all' &&
-    structure.buildingId !==
-    quickBuilding
-  ) {
-
-    return false;
-
-  }
-
-
-  if (
-    quickOrg !==
-    'all' &&
-    front.organizationId !==
-    quickOrg
-  ) {
-
-    return false;
-
-  }
-
-
-  return true;
-
-}
-
-
-
-function dimensionValue(
-  front,
-  key
-) {
-
-  return ({
-
-    building:
-      front.building,
-
-    block:
-      front.block,
-
-    floor:
-      front.floor,
-
-    capture:
-      front.capture,
-
-    axis:
-      front.axis,
-
-    side:
-      front.side,
-
-    zone:
-      front.zone,
-
-    roomNo:
-      front.roomNo,
-
-    roomName:
-      front.roomName,
-
-    organization:
-      front.organization
-
-  })[key] ??
-  '';
-
-}
-
-
-
-function cellValue(
-  front,
-  mode
-) {
-
-
-  if (
-    !front
-  ) {
-
-    return {
-
-      main:
-        '—',
-
-      sub:
-        '',
-
-      bg:
-        '#f9fafb'
-
-    };
-
-  }
-
-
-  if (
-    mode ===
-    'acceptance'
-  ) {
-
-    return {
-
-      main:
-        front.acceptanceName ||
-        'Не предъявлено',
-
-      sub:
-        '',
-
-      bg:
-        acceptanceColor(
-          front.acceptanceStatusId
-        )
-
-    };
-
-  }
-
-
-  if (
-    mode ===
-    'percent'
-  ) {
-
-
-    const percent =
-      front.totalQty
-        ? Math.round(
-            num(
-              front.doneQty
-            ) /
-            num(
-              front.totalQty
-            ) *
-            100
+            front.contractEnd &&
+            !front.accepted &&
+            front.contractEnd <
+              today()
+          ) ||
+          [
+            'Ограничение',
+            'Приостановлено'
+          ].includes(
+            front.status
           )
-        : 0;
-
-
-    return {
-
-      main:
-        `${percent}%`,
-
-      sub:
-        `${fmt(front.doneQty)} / ${fmt(front.totalQty)} ${front.unit || ''}`,
-
-      bg:
-        statusColor(
-          front.statusId
-        )
-
-    };
-
-  }
-
-
-  if (
-    mode ===
-    'qty'
-  ) {
-
-    return {
-
-      main:
-        `${fmt(front.doneQty)} / ${fmt(front.totalQty)}`,
-
-      sub:
-        front.unit ||
-        '',
-
-      bg:
-        statusColor(
-          front.statusId
-        )
-
-    };
-
-  }
-
-
-  if (
-    mode ===
-    'variancePlan'
-  ) {
-
-
-    const variance =
-      varianceInfo(
-        front,
-        'plan'
-      );
-
-
-    return {
-
-      main:
-        variance.label,
-
-      sub:
-        'к плану',
-
-      bg:
-        levelColor(
-          variance.level
-        )
-
-    };
-
-  }
-
-
-  if (
-    mode ===
-    'varianceContract'
-  ) {
-
-
-    const variance =
-      varianceInfo(
-        front,
-        'contract'
-      );
-
-
-    return {
-
-      main:
-        variance.label,
-
-      sub:
-        'к договору',
-
-      bg:
-        levelColor(
-          variance.level
-        )
-
-    };
-
-  }
-
-
-  if (
-    mode ===
-    'endDate'
-  ) {
-
-    return {
-
-      main:
-        front.factEnd ||
-        front.forecastEnd ||
-        front.planEnd ||
-        front.contractEnd ||
-        '—',
-
-      sub:
-        front.statusName ||
-        '',
-
-      bg:
-        statusColor(
-          front.statusId
-        )
-
-    };
-
-  }
-
-
-  return {
-
-    main:
-      front.statusName ||
-      'Не начато',
-
-    sub:
-      front.acceptanceName ||
-      '',
-
-    bg:
-      statusColor(
-        front.statusId
       )
+      .slice(
+        0,
+        20
+      );
 
-  };
+  $('dCritical').innerHTML =
+    critical
+      .map(
+        front =>
+          `
+            <div class="item">
+              <span>
+                ${esc(
+                  frontLabel(
+                    front
+                  )
+                )}
+              </span>
 
+              <strong>
+                ${esc(
+                  front.status
+                )}
+              </strong>
+            </div>
+          `
+      )
+      .join('') ||
+    '<div class="muted">Нет критичных фронтов</div>';
+
+  const lastDate =
+    [...project.resources]
+      .sort(
+        (a, b) =>
+          String(a.date)
+            .localeCompare(
+              String(b.date)
+            )
+      )
+      .slice(-1)[0]
+      ?.date;
+
+  const resources =
+    project.resources
+      .filter(
+        row =>
+          row.date ===
+          lastDate
+      );
+
+  const people =
+    resources.reduce(
+      (sum, row) =>
+        sum +
+        num(row.itr) +
+        num(row.workers) +
+        num(row.mechanizers),
+      0
+    );
+
+  const equipment =
+    resources.reduce(
+      (sum, row) =>
+        sum +
+        num(
+          row.equipmentQty
+        ),
+      0
+    );
+
+  $('dResources').innerHTML =
+    lastDate
+      ? `
+          <div class="item">
+            <span>Дата</span>
+            <strong>${lastDate}</strong>
+          </div>
+
+          <div class="item">
+            <span>Людей</span>
+            <strong>${people}</strong>
+          </div>
+
+          <div class="item">
+            <span>Техники</span>
+            <strong>${equipment}</strong>
+          </div>
+        `
+      : '<div class="muted">Нет данных</div>';
 }
 
+
+function matrixFiltered() {
+
+  return activeFronts()
+    .map(
+      hydrateFront
+    )
+    .filter(
+      front =>
+
+        (
+          $('mfBuilding').value ===
+            'all' ||
+
+          front.structure
+            .buildingId ===
+            $('mfBuilding').value
+        ) &&
+
+        (
+          $('mfBlock').value ===
+            'all' ||
+
+          front.block ===
+            $('mfBlock').value
+        ) &&
+
+        (
+          $('mfFloor').value ===
+            'all' ||
+
+          String(
+            front.floor
+          ) ===
+            $('mfFloor').value
+        ) &&
+
+        (
+          $('mfWork').value ===
+            'all' ||
+
+          front.workId ===
+            $('mfWork').value
+        ) &&
+
+        (
+          $('mfOrg').value ===
+            'all' ||
+
+          front.organizationId ===
+            $('mfOrg').value
+        ) &&
+
+        (
+          $('mfStatus').value ===
+            'all' ||
+
+          front.status ===
+            $('mfStatus').value
+        )
+    );
+}
+
+
+function statusRowClass(
+  status
+) {
+
+  if (
+    status ===
+    'Завершено'
+  ) {
+    return 's-done';
+  }
+
+  if (
+    status ===
+    'В работе'
+  ) {
+    return 's-work';
+  }
+
+  if (
+    status ===
+    'Ограничение'
+  ) {
+    return 's-risk';
+  }
+
+  if (
+    status ===
+    'Фронт готов'
+  ) {
+    return 's-ready';
+  }
+
+  if (
+    status ===
+    'Приостановлено'
+  ) {
+    return 's-pause';
+  }
+
+  return '';
+}
 
 
 function renderMatrix() {
 
+  updateMatrixDependent();
 
-  const view =
-    currentView();
+  $('matrixHead').innerHTML =
+    `
+      <tr>
+        <th>Здание</th>
+        <th>Блок</th>
+        <th>Этаж</th>
+        <th>Захватка</th>
+        <th>Ось</th>
+        <th>Сторона</th>
+        <th>Зона</th>
+        <th>Работа</th>
+        <th>Организация</th>
+        <th>Статус</th>
+        <th>Объем</th>
+        <th>Выполнено</th>
+        <th></th>
+      </tr>
+    `;
 
-
-  const fronts =
-    project.fronts
+  $('matrixBody').innerHTML =
+    matrixFiltered()
       .map(
-        hydrateFront
-      )
-      .filter(
         front =>
-          frontMatchesView(
-            front,
-            view
-          )
-      );
-
-
-  $('matrixInfo')
-    .textContent =
-      `${view.name} · фронтов ${fronts.length} · цвет: ${CELL_MODES[view.cellMode] || view.cellMode}`;
-
-
-  if (
-    view.type ===
-    'table'
-  ) {
-
-    renderMatrixTable(
-      fronts,
-      view
-    );
-
-    return;
-
-  }
-
-
-  const works =
-    (
-      view.workIds?.length
-        ? view.workIds
-            .map(
-              id =>
-                byId(
-                  project.works,
-                  id
-                )
-            )
-            .filter(
-              Boolean
-            )
-        : activeItems(
-            project.works
-          )
-    );
-
-
-  const groups =
-    new Map();
-
-
-  fronts
-    .forEach(
-      front => {
-
-
-        const key =
-          (
-            view.rows ||
-            []
-          )
-            .map(
-              field =>
-                String(
-                  dimensionValue(
-                    front,
-                    field
-                  )
-                )
-            )
-            .join(
-              '|||'
-            );
-
-
-        if (
-          !groups.has(
-            key
-          )
-        ) {
-
-          groups.set(
-            key,
-            {
-
-              sample:
-                front,
-
-              fronts:
-                []
-
-            }
-          );
-
-        }
-
-
-        groups
-          .get(
-            key
-          )
-          .fronts
-          .push(
-            front
-          );
-
-      }
-    );
-
-
-  const rowHeaders =
-    (
-      view.rows ||
-      []
-    )
-      .map(
-        key =>
           `
-            <th>
-              ${esc(DIMENSIONS[key] || key)}
-            </th>
-          `
-      )
-      .join(
-        ''
-      );
+            <tr class="${statusRowClass(
+              front.status
+            )}">
 
+              <td>${esc(front.building)}</td>
+              <td>${esc(front.block)}</td>
+              <td>${esc(front.floor)}</td>
+              <td>${esc(front.capture)}</td>
+              <td>${esc(front.axis)}</td>
+              <td>${esc(front.side)}</td>
+              <td>${esc(front.zone)}</td>
+              <td>${esc(front.work)}</td>
+              <td>${esc(front.organization)}</td>
 
-  const workHeaders =
-    works
-      .map(
-        work =>
-          `
-            <th>
-              ${esc(work.name)}
-            </th>
-          `
-      )
-      .join(
-        ''
-      );
+              <td>
+                <span class="badge">
+                  ${esc(front.status)}
+                </span>
+              </td>
 
+              <td>
+                ${fmt(front.totalQty)}
+                ${esc(front.unit || '')}
+              </td>
 
-  const body =
-    [
-      ...groups.values()
-    ]
-      .map(
-        group => {
+              <td>
+                ${fmt(front.doneQty)}
+                ${esc(front.unit || '')}
+              </td>
 
+              <td>
+                <button
+                  class="row-btn"
+                  data-edit-front="${front.id}">
+                  Открыть
+                </button>
+              </td>
 
-          const left =
-            (
-              view.rows ||
-              []
-            )
-              .map(
-                field =>
-                  `
-                    <td class="matrix-label">
-                      ${esc(dimensionValue(group.sample,field))}
-                    </td>
-                  `
-              )
-              .join(
-                ''
-              );
-
-
-          const right =
-            works
-              .map(
-                work => {
-
-
-                  const front =
-                    group.fronts
-                      .find(
-                        item =>
-                          item.workId ===
-                          work.id
-                      );
-
-
-                  const cell =
-                    cellValue(
-                      front,
-                      view.cellMode
-                    );
-
-
-                  return `
-                    <td
-                      ${
-                        front
-                          ? `data-front-id="${front.id}"`
-                          : ''
-                      }
-                      class="matrix-cell"
-                      style="background:${cell.bg}"
-                    >
-
-                      <b>
-                        ${esc(cell.main)}
-                      </b>
-
-                      ${
-                        cell.sub
-                          ? `
-                            <small>
-                              ${esc(cell.sub)}
-                            </small>
-                          `
-                          : ''
-                      }
-
-                    </td>
-                  `;
-
-                }
-              )
-              .join(
-                ''
-              );
-
-
-          return `
-            <tr>
-              ${left}
-              ${right}
             </tr>
-          `;
-
-        }
-      )
-      .join(
-        ''
-      );
-
-
-  $('matrixContainer')
-    .innerHTML =
-      body
-        ? `
-          <table class="matrix-table">
-
-            <thead>
-
-              <tr>
-                ${rowHeaders}
-                ${workHeaders}
-              </tr>
-
-            </thead>
-
-            <tbody>
-              ${body}
-            </tbody>
-
-          </table>
-        `
-        : `
-          <div class="empty-state">
-            Нет данных по выбранному представлению
-          </div>
-        `;
-
-
-  bindFrontOpeners();
-
-}
-
-
-
-function renderMatrixTable(
-  fronts,
-  view
-) {
-
-
-  const fields =
-    view.visibleFields?.length
-      ? view.visibleFields
-      : [
-
-          'status',
-
-          'acceptance',
-
-          'planEnd',
-
-          'factEnd',
-
-          'forecastEnd'
-
-        ];
-
-
-  const heads =
-    (
-      view.rows ||
-      []
-    )
-      .map(
-        key =>
-          `
-            <th>
-              ${esc(DIMENSIONS[key] || key)}
-            </th>
           `
       )
-      .join(
-        ''
-      ) +
-
-    fields
-      .map(
-        field =>
-          `
-            <th>
-              ${esc(FIELD_LABELS[field] || field)}
-            </th>
-          `
-      )
-      .join(
-        ''
-      );
-
-
-  const rows =
-    fronts
-      .map(
-        front => {
-
-
-          const dimensions =
-            (
-              view.rows ||
-              []
-            )
-              .map(
-                key =>
-                  `
-                    <td>
-                      ${esc(dimensionValue(front,key))}
-                    </td>
-                  `
-              )
-              .join(
-                ''
-              );
-
-
-          const cells =
-            fields
-              .map(
-                field =>
-                  `
-                    <td>
-                      ${esc(fieldDisplay(front,field))}
-                    </td>
-                  `
-              )
-              .join(
-                ''
-              );
-
-
-          return `
-            <tr data-front-id="${front.id}">
-              ${dimensions}
-              ${cells}
-            </tr>
-          `;
-
-        }
-      )
-      .join(
-        ''
-      );
-
-
-  $('matrixContainer')
-    .innerHTML =
-      `
-        <table>
-
-          <thead>
-
-            <tr>
-              ${heads}
-            </tr>
-
-          </thead>
-
-          <tbody>
-            ${rows}
-          </tbody>
-
-        </table>
-      `;
-
-
-  bindFrontOpeners();
-
-}
-
-
-
-function fieldDisplay(
-  front,
-  key
-) {
-
-
-  const values = {
-
-
-    work:
-      front.work,
-
-
-    organization:
-      front.organization,
-
-
-    contract:
-      front.contract,
-
-
-    status:
-      front.statusName,
-
-
-    acceptance:
-      front.acceptanceName,
-
-
-    unit:
-      front.unit,
-
-
-    totalQty:
-      fmt(
-        front.totalQty
-      ),
-
-
-    doneQty:
-      fmt(
-        front.doneQty
-      ),
-
-
-    percent:
-      front.totalQty
-        ? `${Math.round(num(front.doneQty) / num(front.totalQty) * 100)}%`
-        : '0%',
-
-
-    contractStart:
-      front.contractStart,
-
-
-    contractEnd:
-      front.contractEnd,
-
-
-    baselineStart:
-      front.baselineStart,
-
-
-    baselineEnd:
-      front.baselineEnd,
-
-
-    planStart:
-      front.planStart,
-
-
-    planEnd:
-      front.planEnd,
-
-
-    factStart:
-      front.factStart,
-
-
-    factEnd:
-      front.factEnd,
-
-
-    forecastStart:
-      front.forecastStart,
-
-
-    forecastEnd:
-      front.forecastEnd,
-
-
-    variancePlan:
-      varianceInfo(
-        front,
-        'plan'
-      )
-        .label,
-
-
-    varianceContract:
-      varianceInfo(
-        front,
-        'contract'
-      )
-        .label,
-
-
-    responsible:
-      front.responsible,
-
-
-    constraint:
-      front.constraint,
-
-
-    comment:
-      front.comment
-
-
-  };
-
-
-  return values[key] ??
-  '';
-
-}
-
-
-
-function bindFrontOpeners() {
-
+      .join('');
 
   document
     .querySelectorAll(
-      '[data-front-id]'
+      '[data-edit-front]'
     )
     .forEach(
-      element =>
-        element.onclick =
+      button =>
+        button.onclick =
           () =>
             openFrontEditor(
-              element.dataset.frontId
+              button.dataset.editFront
             )
     );
-
 }
 
 
-
-function openViewEditor(
-  view = null
+function openModal(
+  title,
+  html
 ) {
 
+  $('modalTitle').textContent =
+    title;
 
-  const isNew =
-    !view;
+  $('modalBody').innerHTML =
+    html;
 
-
-  const current =
-    clone(
-      view ||
-      {
-
-        id:
-          uid(
-            'VIEW'
-          ),
-
-        name:
-          'Новая шахматка',
-
-        type:
-          'matrix',
-
-        rows: [
-
-          'building',
-
-          'block',
-
-          'floor'
-
-        ],
-
-        workIds:
-          activeItems(
-            project.works
-          )
-            .map(
-              item =>
-                item.id
-            ),
-
-        visibleFields: [
-
-          'status',
-
-          'acceptance',
-
-          'planEnd',
-
-          'factEnd',
-
-          'forecastEnd'
-
-        ],
-
-        cellMode:
-          'production',
-
-        filters:
-          {},
-
-        isDefault:
-          false
-
-      }
+  $('modal')
+    .classList
+    .remove(
+      'hidden'
     );
-
-
-
-  const dimensions =
-    Object.entries(
-      DIMENSIONS
-    )
-      .map(
-        (
-          [
-            key,
-            label
-          ]
-        ) =>
-          `
-            <label class="check">
-
-              <input
-                type="checkbox"
-                data-vrow="${key}"
-                ${
-                  current.rows
-                    .includes(
-                      key
-                    )
-                    ? 'checked'
-                    : ''
-                }
-              >
-
-              ${esc(label)}
-
-            </label>
-          `
-      )
-      .join(
-        ''
-      );
-
-
-
-  const works =
-    activeItems(
-      project.works
-    )
-      .map(
-        work =>
-          `
-            <label class="check">
-
-              <input
-                type="checkbox"
-                data-vwork="${work.id}"
-                ${
-                  current.workIds
-                    .includes(
-                      work.id
-                    )
-                    ? 'checked'
-                    : ''
-                }
-              >
-
-              ${esc(work.name)}
-
-            </label>
-          `
-      )
-      .join(
-        ''
-      );
-
-
-
-  const fields =
-    Object.entries(
-      FIELD_LABELS
-    )
-      .map(
-        (
-          [
-            key,
-            label
-          ]
-        ) =>
-          `
-            <label class="check">
-
-              <input
-                type="checkbox"
-                data-vfield="${key}"
-                ${
-                  current.visibleFields
-                    .includes(
-                      key
-                    )
-                    ? 'checked'
-                    : ''
-                }
-              >
-
-              ${esc(label)}
-
-            </label>
-          `
-      )
-      .join(
-        ''
-      );
-
-
-
-  const modes =
-    Object.entries(
-      CELL_MODES
-    )
-      .map(
-        (
-          [
-            key,
-            label
-          ]
-        ) =>
-          `
-            <option
-              value="${key}"
-              ${
-                current.cellMode ===
-                key
-                  ? 'selected'
-                  : ''
-              }
-            >
-              ${esc(label)}
-            </option>
-          `
-      )
-      .join(
-        ''
-      );
-
-
-
-  openModal(
-    isNew
-      ? 'Новая шахматка'
-      : 'Настройка представления',
-
-    `
-
-      <div class="form-grid">
-
-
-        <div class="field">
-
-          <label>
-            Название
-          </label>
-
-          <input
-            id="vName"
-            value="${esc(current.name)}"
-          >
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Тип
-          </label>
-
-          <select id="vType">
-
-            <option
-              value="matrix"
-              ${
-                current.type ===
-                'matrix'
-                  ? 'selected'
-                  : ''
-              }
-            >
-              Шахматка
-            </option>
-
-            <option
-              value="table"
-              ${
-                current.type ===
-                'table'
-                  ? 'selected'
-                  : ''
-              }
-            >
-              Таблица
-            </option>
-
-          </select>
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Цвет / содержимое ячейки
-          </label>
-
-          <select id="vCellMode">
-            ${modes}
-          </select>
-
-        </div>
-
-
-      </div>
-
-
-      <div class="grid3">
-
-
-        <div class="config-box">
-
-          <h3>
-            Строки
-          </h3>
-
-          <div class="check-list">
-            ${dimensions}
-          </div>
-
-        </div>
-
-
-        <div class="config-box">
-
-          <h3>
-            Работы-колонки
-          </h3>
-
-          <div class="check-list">
-            ${works}
-          </div>
-
-        </div>
-
-
-        <div class="config-box">
-
-          <h3>
-            Поля таблицы
-          </h3>
-
-          <div class="check-list">
-            ${fields}
-          </div>
-
-        </div>
-
-
-      </div>
-
-
-      <div class="editor-actions">
-
-        <button
-          id="vSave"
-          class="btn primary"
-        >
-          Сохранить
-        </button>
-
-      </div>
-
-    `
-  );
-
-
-
-  $('vSave')
-    .onclick =
-      async () => {
-
-
-        current.name =
-          $('vName')
-            .value
-            .trim() ||
-          'Без названия';
-
-
-        current.type =
-          $('vType')
-            .value;
-
-
-        current.cellMode =
-          $('vCellMode')
-            .value;
-
-
-        current.rows =
-          [
-            ...document
-              .querySelectorAll(
-                '[data-vrow]:checked'
-              )
-          ]
-            .map(
-              element =>
-                element.dataset.vrow
-            );
-
-
-        current.workIds =
-          [
-            ...document
-              .querySelectorAll(
-                '[data-vwork]:checked'
-              )
-          ]
-            .map(
-              element =>
-                element.dataset.vwork
-            );
-
-
-        current.visibleFields =
-          [
-            ...document
-              .querySelectorAll(
-                '[data-vfield]:checked'
-              )
-          ]
-            .map(
-              element =>
-                element.dataset.vfield
-            );
-
-
-        current.updatedAt =
-          nowIso();
-
-
-        if (
-          !current.rows.length
-        ) {
-
-          alert(
-            'Выберите хотя бы одно поле строк'
-          );
-
-          return;
-
-        }
-
-
-        if (
-          isNew
-        ) {
-
-          project.views
-            .push(
-              current
-            );
-
-        } else {
-
-
-          const index =
-            project.views
-              .findIndex(
-                item =>
-                  item.id ===
-                  current.id
-              );
-
-
-          project.views[index] =
-            current;
-
-        }
-
-
-        currentViewId =
-          current.id;
-
-
-        log(
-          isNew
-            ? 'Создано'
-            : 'Изменено',
-
-          'Представление',
-
-          current.name
-        );
-
-
-        await saveProject();
-
-
-        closeModal();
-
-
-        renderAll();
-
-      };
-
 }
 
 
+function closeModal() {
 
-async function duplicateView() {
-
-
-  const source =
-    clone(
-      currentView()
+  $('modal')
+    .classList
+    .add(
+      'hidden'
     );
 
-
-  source.id =
-    uid(
-      'VIEW'
-    );
-
-
-  source.name +=
-    ' — копия';
-
-
-  source.isDefault =
-    false;
-
-
-  project.views
-    .push(
-      source
-    );
-
-
-  currentViewId =
-    source.id;
-
-
-  await saveProject();
-
-
-  renderAll();
-
+  $('modalBody').innerHTML =
+    '';
 }
 
 
-
-async function deleteView() {
-
-
-  if (
-    project.views.length <=
-    1
-  ) {
-
-    alert(
-      'Нельзя удалить единственное представление'
-    );
-
-    return;
-
-  }
-
-
-  const view =
-    currentView();
-
-
-  if (
-    !confirm(
-      `Удалить «${view.name}»?`
-    )
-  ) {
-
-    return;
-
-  }
-
-
-  project.views =
-    project.views
-      .filter(
-        item =>
-          item.id !==
-          view.id
-      );
-
-
-  if (
-    project.meta.defaultViewId ===
-    view.id
-  ) {
-
-    project.meta.defaultViewId =
-      project.views[0].id;
-
-  }
-
-
-  currentViewId =
-    project.meta.defaultViewId;
-
-
-  await saveProject();
-
-
-  renderAll();
-
-}
-
-
-
-async function setDefaultView() {
-
-
-  project.meta.defaultViewId =
-    currentView().id;
-
-
-  project.views
-    .forEach(
-      view =>
-        view.isDefault =
-          view.id ===
-          project.meta.defaultViewId
-    );
-
-
-  await saveProject();
-
-
-  renderAll();
-
-}
-
-
-
-function cap(
-  value
-) {
-
-  return value
-    .charAt(
-      0
-    )
-    .toUpperCase() +
-  value
-    .slice(
-      1
-    );
-
-}
-
-
-
-function datePair(
-  label,
-  prefix,
-  front
+function options(
+  list,
+  value,
+  allowBlank = false
 ) {
 
   return `
-    <div class="date-pair">
-
-      <b>
-        ${label}
-      </b>
-
-      <label>
-
-        Начало
-
-        <input
-          id="f${cap(prefix)}Start"
-          type="date"
-          value="${front[`${prefix}Start`] || ''}"
-        >
-
-      </label>
-
-      <label>
-
-        Окончание
-
-        <input
-          id="f${cap(prefix)}End"
-          type="date"
-          value="${front[`${prefix}End`] || ''}"
-        >
-
-      </label>
-
-    </div>
-  `;
-
-}
-
-
-
-function openFrontEditor(
-  id = null
-) {
-
-
-  const front =
-    id
-      ? byId(
-          project.fronts,
-          id
-        )
-      : {
-
-          statusId:
-            project.statuses[0]
-              ?.id ||
-            '',
-
-          acceptanceStatusId:
-            project.acceptanceStatuses[0]
-              ?.id ||
-            ''
-
-        };
-
-
-  const structure =
-    front.structureId
-      ? byId(
-          project.structures,
-          front.structureId
-        ) ||
-        {}
-      : {};
-
-
-  const options = (
-    list,
-    selected,
-    blank = '—'
-  ) => {
-
-
-    let html =
-      '';
-
-
-    if (
-      blank !==
-      null
-    ) {
-
-      html +=
-        `
-          <option value="">
-            ${blank}
-          </option>
-        `;
-
+    ${
+      allowBlank
+        ? '<option value="">—</option>'
+        : ''
     }
 
-
-    html +=
-      activeItems(
-        list
-      )
+    ${
+      list
+        .filter(
+          item =>
+            item.active !== false
+        )
         .map(
           item =>
             `
@@ -3822,462 +1524,454 @@ function openFrontEditor(
                 value="${item.id}"
                 ${
                   String(item.id) ===
-                  String(selected)
+                  String(value)
                     ? 'selected'
                     : ''
-                }
-              >
+                }>
                 ${esc(item.name)}
               </option>
             `
         )
-        .join(
-          ''
-        );
+        .join('')
+    }
+  `;
+}
 
 
-    return html;
+function frontForm(
+  front = {}
+) {
 
-  };
+  const structure =
+    front.id
+      ? byId(
+          project.structures,
+          front.structureId
+        ) || {}
+      : {};
+
+  return `
+    <div class="form-grid">
+
+      <div class="field">
+        <label>Здание</label>
+
+        <select id="eBuilding">
+          ${options(
+            project.buildings,
+            structure.buildingId
+          )}
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Блок</label>
+        <input
+          id="eBlock"
+          value="${esc(
+            structure.block || ''
+          )}">
+      </div>
+
+      <div class="field">
+        <label>Этаж</label>
+        <input
+          id="eFloor"
+          value="${esc(
+            structure.floor ?? ''
+          )}">
+      </div>
+
+      <div class="field">
+        <label>Захватка</label>
+        <input
+          id="eCapture"
+          value="${esc(
+            structure.capture || ''
+          )}">
+      </div>
+
+      <div class="field">
+        <label>Ось</label>
+        <input
+          id="eAxis"
+          value="${esc(
+            structure.axis || ''
+          )}">
+      </div>
+
+      <div class="field">
+        <label>Сторона</label>
+        <input
+          id="eSide"
+          value="${esc(
+            structure.side || ''
+          )}">
+      </div>
+
+      <div class="field">
+        <label>Зона</label>
+        <input
+          id="eZone"
+          value="${esc(
+            structure.zone || ''
+          )}">
+      </div>
+
+      <div class="field">
+        <label>№ помещения</label>
+        <input
+          id="eRoomNo"
+          value="${esc(
+            structure.roomNo || ''
+          )}">
+      </div>
+
+      <div class="field">
+        <label>Помещение</label>
+        <input
+          id="eRoomName"
+          value="${esc(
+            structure.roomName || ''
+          )}">
+      </div>
+
+      <div class="field">
+        <label>Вид работы</label>
+
+        <select id="eWork">
+          ${options(
+            project.works,
+            front.workId
+          )}
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Организация</label>
+
+        <select id="eOrg">
+          ${options(
+            project.organizations,
+            front.organizationId,
+            true
+          )}
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Ответственный</label>
+
+        <input
+          id="eResponsible"
+          value="${esc(
+            front.responsible || ''
+          )}">
+      </div>
+
+      <div class="field">
+        <label>Статус</label>
+
+        <select id="eStatus">
+
+          ${
+            STATUS_LIST.map(
+              status =>
+                `
+                  <option
+                    ${
+                      status ===
+                      (
+                        front.status ||
+                        'Не начато'
+                      )
+                        ? 'selected'
+                        : ''
+                    }>
+                    ${status}
+                  </option>
+                `
+            ).join('')
+          }
+
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Ед. изм.</label>
+
+        <input
+          id="eUnit"
+          value="${esc(
+            front.unit || ''
+          )}">
+      </div>
+
+      <div class="field">
+        <label>Общий объем</label>
+
+        <input
+          id="eTotal"
+          type="number"
+          step="any"
+          value="${front.totalQty ?? ''}">
+      </div>
+
+      <div class="field">
+        <label>Накопительно выполнено</label>
+
+        <input
+          id="eDone"
+          type="number"
+          step="any"
+          value="${front.doneQty ?? ''}">
+      </div>
+
+      <div class="field">
+        <label>Договор начало</label>
+
+        <input
+          id="eContractStart"
+          type="date"
+          value="${front.contractStart || ''}">
+      </div>
+
+      <div class="field">
+        <label>Договор окончание</label>
+
+        <input
+          id="eContractEnd"
+          type="date"
+          value="${front.contractEnd || ''}">
+      </div>
+
+      <div class="field">
+        <label>База начало</label>
+
+        <input
+          id="eBaselineStart"
+          type="date"
+          value="${front.baselineStart || ''}">
+      </div>
+
+      <div class="field">
+        <label>База окончание</label>
+
+        <input
+          id="eBaselineEnd"
+          type="date"
+          value="${front.baselineEnd || ''}">
+      </div>
+
+      <div class="field">
+        <label>Рабочий план начало</label>
+
+        <input
+          id="ePlanStart"
+          type="date"
+          value="${front.planStart || ''}">
+      </div>
+
+      <div class="field">
+        <label>Рабочий план окончание</label>
+
+        <input
+          id="ePlanEnd"
+          type="date"
+          value="${front.planEnd || ''}">
+      </div>
+
+      <div class="field">
+        <label>Факт начало</label>
+
+        <input
+          id="eFactStart"
+          type="date"
+          value="${front.factStart || ''}">
+      </div>
+
+      <div class="field">
+        <label>Факт окончание</label>
+
+        <input
+          id="eFactEnd"
+          type="date"
+          value="${front.factEnd || ''}">
+      </div>
+
+      <div class="field">
+        <label>Прогноз окончание</label>
+
+        <input
+          id="eForecastEnd"
+          type="date"
+          value="${front.forecastEnd || ''}">
+      </div>
+
+    </div>
+
+    <div class="field">
+      <label>Ограничение</label>
+
+      <textarea id="eConstraint">${esc(
+        front.constraint || ''
+      )}</textarea>
+    </div>
+
+    <div class="field">
+      <label>Комментарий / факт</label>
+
+      <textarea id="eComment">${esc(
+        front.comment || ''
+      )}</textarea>
+    </div>
+
+    <div class="editor-actions">
+
+      <button
+        id="deleteFront"
+        class="btn danger"
+        ${
+          front.id
+            ? ''
+            : 'style="display:none"'
+        }>
+        Архивировать
+      </button>
+
+      <button
+        id="saveFront"
+        class="btn primary">
+        Сохранить
+      </button>
+
+    </div>
+  `;
+}
 
 
-  const statusOptions =
-    project.statuses
-      .map(
-        status =>
-          `
-            <option
-              value="${status.id}"
-              ${
-                status.id ===
-                front.statusId
-                  ? 'selected'
-                  : ''
-              }
-            >
-              ${esc(status.name)}
-            </option>
-          `
-      )
-      .join(
-        ''
-      );
+function openFrontEditor(
+  id = null
+) {
 
-
-  const acceptanceOptions =
-    project.acceptanceStatuses
-      .map(
-        status =>
-          `
-            <option
-              value="${status.id}"
-              ${
-                status.id ===
-                front.acceptanceStatusId
-                  ? 'selected'
-                  : ''
-              }
-            >
-              ${esc(status.name)}
-            </option>
-          `
-      )
-      .join(
-        ''
-      );
-
-
+  const front =
+    id
+      ? byId(
+          project.fronts,
+          id
+        )
+      : {};
 
   openModal(
     id
       ? 'Карточка фронта'
       : 'Новый фронт',
 
-    `
-
-      <div class="section-title">
-        Структура
-      </div>
-
-
-      <div class="form-grid">
-
-
-        <div class="field">
-
-          <label>
-            Здание
-          </label>
-
-          <select id="fBuilding">
-            ${options(project.buildings,structure.buildingId,null)}
-          </select>
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Блок
-          </label>
-
-          <input
-            id="fBlock"
-            value="${esc(structure.block || '')}"
-          >
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Этаж
-          </label>
-
-          <input
-            id="fFloor"
-            value="${esc(structure.floor ?? '')}"
-          >
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Захватка
-          </label>
-
-          <input
-            id="fCapture"
-            value="${esc(structure.capture || '')}"
-          >
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Ось
-          </label>
-
-          <input
-            id="fAxis"
-            value="${esc(structure.axis || '')}"
-          >
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Сторона
-          </label>
-
-          <input
-            id="fSide"
-            value="${esc(structure.side || '')}"
-          >
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Зона
-          </label>
-
-          <input
-            id="fZone"
-            value="${esc(structure.zone || '')}"
-          >
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            № помещения
-          </label>
-
-          <input
-            id="fRoomNo"
-            value="${esc(structure.roomNo || '')}"
-          >
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Помещение
-          </label>
-
-          <input
-            id="fRoomName"
-            value="${esc(structure.roomName || '')}"
-          >
-
-        </div>
-
-
-      </div>
-
-
-
-      <div class="section-title">
-        Работа
-      </div>
-
-
-      <div class="form-grid">
-
-
-        <div class="field">
-
-          <label>
-            Вид работы
-          </label>
-
-          <select id="fWork">
-            ${options(project.works,front.workId,null)}
-          </select>
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Организация
-          </label>
-
-          <select id="fOrg">
-            ${options(project.organizations,front.organizationId)}
-          </select>
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Договор
-          </label>
-
-          <select id="fContract">
-            ${options(project.contracts,front.contractId)}
-          </select>
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Ответственный
-          </label>
-
-          <input
-            id="fResp"
-            value="${esc(front.responsible || '')}"
-          >
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Статус работ
-          </label>
-
-          <select id="fStatus">
-            ${statusOptions}
-          </select>
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Статус сдачи
-          </label>
-
-          <select id="fAcceptance">
-            ${acceptanceOptions}
-          </select>
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Единица
-          </label>
-
-          <select id="fUnit">
-            ${options(project.units,front.unitId)}
-          </select>
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Общий объём
-          </label>
-
-          <input
-            id="fTotal"
-            type="number"
-            step="any"
-            value="${front.totalQty ?? ''}"
-          >
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Выполнено
-          </label>
-
-          <input
-            id="fDone"
-            type="number"
-            step="any"
-            value="${front.doneQty ?? ''}"
-          >
-
-        </div>
-
-
-      </div>
-
-
-
-      <div class="section-title">
-        Сроки
-      </div>
-
-
-      <div class="date-grid">
-
-        ${datePair('Договор','contract',front)}
-
-        ${datePair('База','baseline',front)}
-
-        ${datePair('План','plan',front)}
-
-        ${datePair('Факт','fact',front)}
-
-        ${datePair('Прогноз','forecast',front)}
-
-      </div>
-
-
-
-      <div class="form-grid">
-
-
-        <div class="field span-2">
-
-          <label>
-            Ограничение / примечание
-          </label>
-
-          <textarea id="fConstraint">${esc(front.constraint || '')}</textarea>
-
-        </div>
-
-
-        <div class="field span-2">
-
-          <label>
-            Комментарий
-          </label>
-
-          <textarea id="fComment">${esc(front.comment || '')}</textarea>
-
-        </div>
-
-
-      </div>
-
-
-
-      <div class="editor-actions">
-
-
-        ${
-          id
-            ? `
-              <button
-                id="fDelete"
-                class="btn danger"
-              >
-                Удалить
-              </button>
-            `
-            : ''
-        }
-
-
-        <button
-          id="fSave"
-          class="btn primary"
-        >
-          Сохранить
-        </button>
-
-
-      </div>
-
-    `
+    frontForm(
+      front
+    )
   );
 
+  $('saveFront').onclick =
+    () =>
+      saveFrontFromModal(
+        id
+      );
 
-  $('fSave')
-    .onclick =
+  if (id) {
+    $('deleteFront').onclick =
       () =>
-        saveFront(
+        archiveFront(
           id
         );
-
-
-  if (
-    id
-  ) {
-
-    $('fDelete')
-      .onclick =
-        () =>
-          deleteFront(
-            id
-          );
-
   }
-
 }
 
 
-
-async function saveFront(
+async function saveFrontFromModal(
   id
 ) {
 
+  const buildingId =
+    $('eBuilding').value;
+
+  let structure =
+    id
+      ? byId(
+          project.structures,
+
+          byId(
+            project.fronts,
+            id
+          )?.structureId
+        )
+      : null;
+
+  if (!structure) {
+
+    structure = {
+      id:
+        uid('STR'),
+
+      buildingId
+    };
+
+    project.structures.push(
+      structure
+    );
+  }
+
+  Object.assign(
+    structure,
+    {
+      buildingId,
+
+      block:
+        $('eBlock')
+          .value
+          .trim(),
+
+      floor:
+        $('eFloor')
+          .value
+          .trim(),
+
+      capture:
+        $('eCapture')
+          .value
+          .trim(),
+
+      axis:
+        $('eAxis')
+          .value
+          .trim(),
+
+      side:
+        $('eSide')
+          .value
+          .trim(),
+
+      zone:
+        $('eZone')
+          .value
+          .trim(),
+
+      roomNo:
+        $('eRoomNo')
+          .value
+          .trim(),
+
+      roomName:
+        $('eRoomName')
+          .value
+          .trim()
+    }
+  );
+
+  structure.signature =
+    structureSignature(
+      structure
+    );
 
   let front =
     id
@@ -4286,236 +1980,112 @@ async function saveFront(
           id
         )
       : {
-
           id:
-            uid(
-              'F'
-            ),
+            uid('F'),
+
+          structureId:
+            structure.id,
 
           createdAt:
-            nowIso()
+            nowIso(),
 
+          active:
+            true
         };
-
-
-  let structure =
-    id
-      ? byId(
-          project.structures,
-          front.structureId
-        )
-      : null;
-
-
-  if (
-    !structure
-  ) {
-
-    structure = {
-
-      id:
-        uid(
-          'STR'
-        )
-
-    };
-
-
-    project.structures
-      .push(
-        structure
-      );
-
-
-    front.structureId =
-      structure.id;
-
-  }
-
-
-  Object.assign(
-    structure,
-    {
-
-      buildingId:
-        $('fBuilding')
-          .value,
-
-
-      block:
-        $('fBlock')
-          .value
-          .trim(),
-
-
-      floor:
-        $('fFloor')
-          .value ===
-          ''
-          ? ''
-          : num(
-              $('fFloor')
-                .value
-            ),
-
-
-      capture:
-        $('fCapture')
-          .value
-          .trim(),
-
-
-      axis:
-        $('fAxis')
-          .value
-          .trim(),
-
-
-      side:
-        $('fSide')
-          .value
-          .trim(),
-
-
-      zone:
-        $('fZone')
-          .value
-          .trim(),
-
-
-      roomNo:
-        $('fRoomNo')
-          .value
-          .trim(),
-
-
-      roomName:
-        $('fRoomName')
-          .value
-          .trim()
-
-    }
-  );
-
 
   Object.assign(
     front,
     {
+      active:
+        true,
+
+      structureId:
+        structure.id,
 
       workId:
-        $('fWork')
-          .value,
-
+        $('eWork').value,
 
       organizationId:
-        $('fOrg')
-          .value,
-
-
-      contractId:
-        $('fContract')
-          .value,
-
+        $('eOrg').value,
 
       responsible:
-        $('fResp')
+        $('eResponsible')
           .value
           .trim(),
 
+      status:
+        $('eStatus').value,
 
-      statusId:
-        $('fStatus')
-          .value,
-
-
-      acceptanceStatusId:
-        $('fAcceptance')
-          .value,
-
-
-      unitId:
-        $('fUnit')
-          .value,
-
+      unit:
+        $('eUnit')
+          .value
+          .trim(),
 
       totalQty:
         num(
-          $('fTotal')
-            .value
+          $('eTotal').value
         ),
-
 
       doneQty:
         num(
-          $('fDone')
-            .value
+          $('eDone').value
         ),
 
+      contractStart:
+        $('eContractStart').value,
+
+      contractEnd:
+        $('eContractEnd').value,
+
+      baselineStart:
+        $('eBaselineStart').value,
+
+      baselineEnd:
+        $('eBaselineEnd').value,
+
+      planStart:
+        $('ePlanStart').value,
+
+      planEnd:
+        $('ePlanEnd').value,
+
+      factStart:
+        $('eFactStart').value,
+
+      factEnd:
+        $('eFactEnd').value,
+
+      forecastEnd:
+        $('eForecastEnd').value,
 
       constraint:
-        $('fConstraint')
+        $('eConstraint')
           .value
           .trim(),
-
 
       comment:
-        $('fComment')
+        $('eComment')
           .value
           .trim(),
 
+      completed:
+        $('eStatus').value ===
+          'Завершено',
+
+      accepted:
+        front.accepted ||
+        false,
 
       updatedAt:
         nowIso()
-
     }
   );
 
-
-  [
-
-    'contract',
-
-    'baseline',
-
-    'plan',
-
-    'fact',
-
-    'forecast'
-
-  ]
-    .forEach(
-      prefix => {
-
-
-        front[`${prefix}Start`] =
-          $(
-            `f${cap(prefix)}Start`
-          )
-            .value;
-
-
-        front[`${prefix}End`] =
-          $(
-            `f${cap(prefix)}End`
-          )
-            .value;
-
-      }
+  if (!id) {
+    project.fronts.push(
+      front
     );
-
-
-  if (
-    !id
-  ) {
-
-    project.fronts
-      .push(
-        front
-      );
-
   }
-
 
   log(
     id
@@ -4529,128 +2099,126 @@ async function saveFront(
     )
   );
 
-
   await saveProject();
-
 
   closeModal();
 
-
   renderAll();
-
 }
 
 
-
-async function deleteFront(
+async function archiveFront(
   id
 ) {
 
-
   if (
     !confirm(
-      'Удалить фронт и связанные план/факт записи?'
+      'Архивировать фронт? История плана и факта останется в базе.'
     )
   ) {
-
     return;
-
   }
 
+  const front =
+    byId(
+      project.fronts,
+      id
+    );
 
-  project.fronts =
-    project.fronts
-      .filter(
-        item =>
-          item.id !==
-          id
-      );
+  if (!front) {
+    return;
+  }
 
+  front.active =
+    false;
 
-  project.planLog =
-    project.planLog
-      .filter(
-        item =>
-          item.frontId !==
-          id
-      );
+  front.archivedAt =
+    nowIso();
 
-
-  project.factLog =
-    project.factLog
-      .filter(
-        item =>
-          item.frontId !==
-          id
-      );
-
-
-  project.constraints =
-    project.constraints
-      .filter(
-        item =>
-          item.frontId !==
-          id
-      );
-
+  log(
+    'Архивировано',
+    'Фронт',
+    frontLabel(front)
+  );
 
   await saveProject();
 
-
   closeModal();
 
-
   renderAll();
-
 }
 
 
-
-function ganttDates(
+function modeDates(
   front,
-  layer
+  mode
 ) {
 
+  if (
+    mode ===
+    'contract'
+  ) {
+    return [
+      front.contractStart,
+      front.contractEnd
+    ];
+  }
+
+  if (
+    mode ===
+    'baseline'
+  ) {
+    return [
+      front.baselineStart,
+      front.baselineEnd
+    ];
+  }
+
+  if (
+    mode ===
+    'fact'
+  ) {
+    return [
+      front.factStart,
+
+      front.factEnd ||
+      front.factStart
+    ];
+  }
+
+  if (
+    mode ===
+    'forecast'
+  ) {
+    return [
+      front.planStart ||
+      front.factStart,
+
+      front.forecastEnd ||
+      front.planEnd
+    ];
+  }
+
   return [
-
-    front[`${layer}Start`],
-
-    front[`${layer}End`]
-
+    front.planStart,
+    front.planEnd
   ];
-
 }
-
 
 
 function renderGantt() {
 
-
-  const layers =
-    [
-      ...document
-        .querySelectorAll(
-          '[data-g-layer]:checked'
-        )
-    ]
-      .map(
-        element =>
-          element.dataset.gLayer
-      );
-
-
   const buildingId =
-    $('gBuilding')
-      .value;
-
+    $('gBuilding').value;
 
   const workId =
-    $('gWork')
-      .value;
+    $('gWork').value;
 
+  const mode =
+    $('gMode').value;
 
-  const fronts =
-    project.fronts
+  const items =
+    activeFronts()
       .map(
         hydrateFront
       )
@@ -4658,275 +2226,153 @@ function renderGantt() {
         front =>
           (
             buildingId ===
-            'all' ||
-            front.structure.buildingId ===
-            buildingId
+              'all' ||
+            front.structure
+              .buildingId ===
+              buildingId
           ) &&
           (
             workId ===
-            'all' ||
+              'all' ||
             front.workId ===
-            workId
+              workId
           )
+      )
+      .map(
+        front => ({
+          front,
+
+          dates:
+            modeDates(
+              front,
+              mode
+            )
+        })
+      )
+      .filter(
+        item =>
+          item.dates[0] &&
+          item.dates[1]
       );
 
+  if (!items.length) {
 
-  const dated =
-    [];
-
-
-  fronts
-    .forEach(
-      front => {
-
-
-        layers
-          .forEach(
-            layer => {
-
-
-              const [
-                start,
-                end
-              ] =
-                ganttDates(
-                  front,
-                  layer
-                );
-
-
-              if (
-                start &&
-                end
-              ) {
-
-                dated.push({
-
-                  front,
-
-                  layer,
-
-                  start,
-
-                  end
-
-                });
-
-              }
-
-            }
-          );
-
-      }
-    );
-
-
-  if (
-    !dated.length
-  ) {
-
-    $('gantt')
-      .innerHTML =
-        `
-          <div class="empty-state">
-            Нет дат для выбранных слоёв
-          </div>
-        `;
+    $('gantt').innerHTML =
+      '<div class="muted">Нет заполненных дат для выбранного слоя.</div>';
 
     return;
-
   }
 
-
-  const minimum =
-    dated
+  const min =
+    items
       .map(
         item =>
-          item.start
+          item.dates[0]
       )
       .sort()[0];
 
-
-  const maximum =
-    dated
+  const max =
+    items
       .map(
         item =>
-          item.end
+          item.dates[1]
       )
       .sort()
-      .slice(
-        -1
-      )[0];
+      .slice(-1)[0];
 
-
-  const span =
+  const total =
     Math.max(
       1,
-      dateDiff(
-        minimum,
-        maximum
-      ) +
-      1
+      diffDays(
+        min,
+        max
+      ) + 1
     );
 
+  $('gantt').innerHTML =
+    items
+      .map(
+        item => {
 
-  const grouped =
-    new Map();
+          const left =
+            diffDays(
+              min,
+              item.dates[0]
+            ) /
+            total *
+            100;
 
+          const width =
+            Math.max(
+              1,
 
-  dated
-    .forEach(
-      item => {
+              (
+                diffDays(
+                  item.dates[0],
+                  item.dates[1]
+                ) + 1
+              ) /
+              total *
+              100
+            );
 
+          return `
+            <div class="gantt-row">
 
-        if (
-          !grouped.has(
-            item.front.id
-          )
-        ) {
+              <div class="gantt-name">
 
-          grouped.set(
-            item.front.id,
-            []
-          );
+                <b>
+                  ${esc(
+                    item.front.work
+                  )}
+                </b>
 
-        }
+                <br>
 
+                <small>
+                  ${esc(
+                    frontLabel(
+                      item.front
+                    )
+                  )}
+                </small>
 
-        grouped
-          .get(
-            item.front.id
-          )
-          .push(
-            item
-          );
+              </div>
 
-      }
-    );
+              <div class="gantt-line">
 
+                <div
+                  class="gantt-bar"
+                  style="left:${left}%;width:${width}%">
 
-  $('gantt')
-    .innerHTML =
-      [
-        ...grouped.values()
-      ]
-        .map(
-          items => {
+                  ${item.dates[0]}
+                  →
+                  ${item.dates[1]}
 
-
-            const front =
-              items[0].front;
-
-
-            const bars =
-              items
-                .map(
-                  item => {
-
-
-                    const left =
-                      dateDiff(
-                        minimum,
-                        item.start
-                      ) /
-                      span *
-                      100;
-
-
-                    const width =
-                      Math.max(
-                        1,
-                        (
-                          dateDiff(
-                            item.start,
-                            item.end
-                          ) +
-                          1
-                        ) /
-                        span *
-                        100
-                      );
-
-
-                    const label =
-                      GANTT_LAYERS
-                        .find(
-                          row =>
-                            row[0] ===
-                            item.layer
-                        )
-                        ?.[1] ||
-                      item.layer;
-
-
-                    return `
-                      <div
-                        class="gantt-bar layer-${item.layer}"
-                        style="
-                          left:${left}%;
-                          width:${width}%;
-                        "
-                        title="${esc(label)}: ${item.start} — ${item.end}"
-                      ></div>
-                    `;
-
-                  }
-                )
-                .join(
-                  ''
-                );
-
-
-            return `
-              <div class="gantt-row">
-
-                <div class="gantt-name">
-
-                  <b>
-                    ${esc(front.work)}
-                  </b>
-
-                  <small>
-                    ${esc(frontLabel(front))}
-                  </small>
-
-                </div>
-
-                <div class="gantt-line">
-                  ${bars}
                 </div>
 
               </div>
-            `;
 
-          }
-        )
-        .join(
-          ''
-        );
-
+            </div>
+          `;
+        }
+      )
+      .join('');
 }
-
 
 
 function pfFrontIds() {
 
-
   const buildingId =
-    $('pfBuilding')
-      .value;
-
+    $('pfBuilding').value;
 
   const workId =
-    $('pfWork')
-      .value;
-
+    $('pfWork').value;
 
   return new Set(
-    project.fronts
+    activeFronts()
       .filter(
         front => {
-
 
           const structure =
             byId(
@@ -4934,23 +2380,18 @@ function pfFrontIds() {
               front.structureId
             );
 
-
           return (
-            (
-              buildingId ===
-                'all' ||
-              structure
-                ?.buildingId ===
-                buildingId
-            ) &&
-            (
-              workId ===
-                'all' ||
-              front.workId ===
-                workId
-            )
+            buildingId ===
+              'all' ||
+            structure?.buildingId ===
+              buildingId
+          ) &&
+          (
+            workId ===
+              'all' ||
+            front.workId ===
+              workId
           );
-
         }
       )
       .map(
@@ -4958,1474 +2399,1011 @@ function pfFrontIds() {
           front.id
       )
   );
-
 }
-
 
 
 function renderPlanFact() {
 
-
   const ids =
     pfFrontIds();
 
-
   const from =
-    $('pfFrom')
-      .value;
-
+    $('pfFrom').value;
 
   const to =
-    $('pfTo')
-      .value;
-
-
-  const inPeriod =
-    row =>
-      ids.has(
-        row.frontId
-      ) &&
-      (
-        !from ||
-        row.date >=
-          from
-      ) &&
-      (
-        !to ||
-        row.date <=
-          to
-      );
-
+    $('pfTo').value;
 
   const plan =
     project.planLog
       .filter(
-        inPeriod
+        row =>
+          ids.has(
+            row.frontId
+          ) &&
+          (
+            !from ||
+            row.date >= from
+          ) &&
+          (
+            !to ||
+            row.date <= to
+          )
       );
-
 
   const fact =
     project.factLog
       .filter(
-        inPeriod
+        row =>
+          ids.has(
+            row.frontId
+          ) &&
+          (
+            !from ||
+            row.date >= from
+          ) &&
+          (
+            !to ||
+            row.date <= to
+          )
       );
 
+  const planPeriod =
+    plan.reduce(
+      (sum, row) =>
+        sum +
+        num(row.qty),
+      0
+    );
 
-  const planTotal =
+  const factPeriod =
+    fact.reduce(
+      (sum, row) =>
+        sum +
+        num(row.qty),
+      0
+    );
+
+  const planCumulative =
+    project.planLog
+      .filter(
+        row =>
+          ids.has(
+            row.frontId
+          ) &&
+          (
+            !to ||
+            row.date <= to
+          )
+      )
+      .reduce(
+        (sum, row) =>
+          sum +
+          num(row.qty),
+        0
+      );
+
+  const factCumulative =
+    project.factLog
+      .filter(
+        row =>
+          ids.has(
+            row.frontId
+          ) &&
+          (
+            !to ||
+            row.date <= to
+          )
+      )
+      .reduce(
+        (sum, row) =>
+          sum +
+          num(row.qty),
+        0
+      );
+
+  const total =
+    activeFronts()
+      .filter(
+        front =>
+          ids.has(
+            front.id
+          )
+      )
+      .reduce(
+        (sum, front) =>
+          sum +
+          num(
+            front.totalQty
+          ),
+        0
+      );
+
+  $('pfPlanPeriod').textContent =
+    fmt(
+      planPeriod
+    );
+
+  $('pfFactPeriod').textContent =
+    fmt(
+      factPeriod
+    );
+
+  $('pfVarPeriod').textContent =
+    fmt(
+      factPeriod -
+      planPeriod
+    );
+
+  $('pfPlanCum').textContent =
+    fmt(
+      planCumulative
+    );
+
+  $('pfFactCum').textContent =
+    fmt(
+      factCumulative
+    );
+
+  $('pfPp').textContent =
+    fmt(
+      total
+        ? (
+            factCumulative /
+              total -
+            planCumulative /
+              total
+          ) * 100
+        : 0
+    );
+
+  $('planRows').innerHTML =
     plan
-      .reduce(
-        (
-          sum,
-          row
-        ) =>
-          sum +
-          num(
-            row.qty
-          ),
-        0
-      );
+      .sort(
+        (a, b) =>
+          b.date.localeCompare(
+            a.date
+          )
+      )
+      .map(
+        row =>
+          `
+            <tr>
+              <td>${row.date}</td>
 
+              <td>
+                ${esc(
+                  frontLabel(
+                    byId(
+                      project.fronts,
+                      row.frontId
+                    )
+                  )
+                )}
+              </td>
 
-  const factTotal =
+              <td>
+                ${fmt(row.qty)}
+              </td>
+
+              <td>
+                ${fmt(row.people)}
+              </td>
+            </tr>
+          `
+      )
+      .join('');
+
+  $('factRows').innerHTML =
     fact
-      .reduce(
-        (
-          sum,
-          row
-        ) =>
-          sum +
-          num(
-            row.qty
-          ),
-        0
-      );
+      .sort(
+        (a, b) =>
+          b.date.localeCompare(
+            a.date
+          )
+      )
+      .map(
+        row =>
+          `
+            <tr>
+              <td>${row.date}</td>
 
+              <td>
+                ${esc(
+                  frontLabel(
+                    byId(
+                      project.fronts,
+                      row.frontId
+                    )
+                  )
+                )}
+              </td>
 
-  $('pfPlan')
-    .textContent =
-      fmt(
-        planTotal
-      );
+              <td>
+                ${fmt(row.qty)}
+              </td>
 
+              <td>
+                ${fmt(
+                  row.cumulative
+                )}
+              </td>
 
-  $('pfFact')
-    .textContent =
-      fmt(
-        factTotal
-      );
-
-
-  $('pfVar')
-    .textContent =
-      fmt(
-        factTotal -
-        planTotal
-      );
-
-
-  $('planRows')
-    .innerHTML =
-      plan
-        .map(
-          row =>
-            `
-              <tr>
-
-                <td>
-                  ${row.date}
-                </td>
-
-                <td>
-                  ${esc(frontLabel(byId(project.fronts,row.frontId)))}
-                </td>
-
-                <td>
-                  ${fmt(row.qty)}
-                </td>
-
-                <td>
-                  ${fmt(row.people)}
-                </td>
-
-              </tr>
-            `
-        )
-        .join(
-          ''
-        );
-
-
-  $('factRows')
-    .innerHTML =
-      fact
-        .map(
-          row =>
-            `
-              <tr>
-
-                <td>
-                  ${row.date}
-                </td>
-
-                <td>
-                  ${esc(frontLabel(byId(project.fronts,row.frontId)))}
-                </td>
-
-                <td>
-                  ${fmt(row.qty)}
-                </td>
-
-                <td>
-                  ${fmt(row.people)}
-                </td>
-
-              </tr>
-            `
-        )
-        .join(
-          ''
-        );
-
+              <td>
+                ${fmt(row.people)}
+              </td>
+            </tr>
+          `
+      )
+      .join('');
 }
 
 
-
 function openLogEditor(
-  type
+  mode
 ) {
 
-
-  const options =
-    project.fronts
+  const frontOptions =
+    activeFronts()
       .map(
         front =>
           `
             <option value="${front.id}">
-              ${esc(frontLabel(front))}
+              ${esc(
+                frontLabel(front)
+              )}
             </option>
           `
       )
-      .join(
-        ''
-      );
-
+      .join('');
 
   openModal(
-    type ===
-    'plan'
+    mode === 'plan'
       ? 'Добавить план'
       : 'Добавить факт',
 
     `
-
       <div class="form-grid">
 
-
-        <div class="field span-2">
-
-          <label>
-            Фронт
-          </label>
+        <div class="field">
+          <label>Фронт</label>
 
           <select id="lFront">
-            ${options}
+            ${frontOptions}
           </select>
-
         </div>
 
-
         <div class="field">
-
-          <label>
-            Дата
-          </label>
+          <label>Дата</label>
 
           <input
             id="lDate"
             type="date"
-            value="${today()}"
-          >
-
+            value="${today()}">
         </div>
 
-
         <div class="field">
-
-          <label>
-            Объём
-          </label>
+          <label>Объем</label>
 
           <input
             id="lQty"
             type="number"
-            step="any"
-          >
-
+            step="any">
         </div>
 
-
         <div class="field">
-
-          <label>
-            Люди
-          </label>
+          <label>Люди</label>
 
           <input
             id="lPeople"
-            type="number"
-          >
-
+            type="number">
         </div>
 
+        ${
+          mode === 'fact'
+            ? `
+                <div class="field">
+                  <label>
+                    Накопительный итог
+                    (если пусто — посчитается)
+                  </label>
 
-        <div class="field span-2">
-
-          <label>
-            Комментарий
-          </label>
-
-          <textarea id="lComment"></textarea>
-
-        </div>
-
+                  <input
+                    id="lCum"
+                    type="number"
+                    step="any">
+                </div>
+              `
+            : ''
+        }
 
       </div>
 
+      <div class="field">
+        <label>Комментарий</label>
+        <textarea id="lComment"></textarea>
+      </div>
 
       <div class="editor-actions">
 
         <button
           id="lSave"
-          class="btn primary"
-        >
+          class="btn primary">
           Сохранить
         </button>
 
       </div>
-
     `
   );
 
-
-  $('lSave')
-    .onclick =
-      () =>
-        saveLog(
-          type
-        );
-
+  $('lSave').onclick =
+    () =>
+      saveLog(
+        mode
+      );
 }
 
 
-
 async function saveLog(
-  type
+  mode
 ) {
 
+  const frontId =
+    $('lFront').value;
 
-  const row = {
+  const date =
+    $('lDate').value;
 
-    id:
-      uid(
-        type ===
-        'plan'
-          ? 'P'
-          : 'FCT'
-      ),
+  const qty =
+    num(
+      $('lQty').value
+    );
 
-    frontId:
-      $('lFront')
-        .value,
+  const people =
+    num(
+      $('lPeople').value
+    );
 
-    date:
-      $('lDate')
-        .value,
-
-    qty:
-      num(
-        $('lQty')
-          .value
-      ),
-
-    people:
-      num(
-        $('lPeople')
-          .value
-      ),
-
-    comment:
-      $('lComment')
-        .value
-        .trim(),
-
-    createdAt:
-      nowIso()
-
-  };
-
+  const comment =
+    $('lComment')
+      .value
+      .trim();
 
   if (
-    type ===
+    !frontId ||
+    !date
+  ) {
+
+    alert(
+      'Укажи фронт и дату.'
+    );
+
+    return;
+  }
+
+  if (
+    mode ===
     'plan'
   ) {
 
-    project.planLog
-      .push(
-        row
-      );
+    project.planLog.push({
+      id:
+        uid('P'),
+
+      frontId,
+
+      date,
+
+      qty,
+
+      people,
+
+      comment,
+
+      createdAt:
+        nowIso()
+    });
+
+    log(
+      'Добавлено',
+      'План',
+      `${date} · ${frontLabel(
+        byId(
+          project.fronts,
+          frontId
+        )
+      )} · ${qty}`
+    );
 
   } else {
 
+    const previous =
+      project.factLog
+        .filter(
+          row =>
+            row.frontId ===
+              frontId &&
+            row.date <=
+              date
+        )
+        .reduce(
+          (sum, row) =>
+            sum +
+            num(row.qty),
+          0
+        );
 
-    project.factLog
-      .push(
-        row
-      );
+    const cumulative =
+      $('lCum').value === ''
+        ? previous + qty
+        : num(
+            $('lCum').value
+          );
 
+    project.factLog.push({
+      id:
+        uid('FCT'),
+
+      frontId,
+
+      date,
+
+      qty,
+
+      cumulative,
+
+      people,
+
+      comment,
+
+      createdAt:
+        nowIso()
+    });
 
     const front =
       byId(
         project.fronts,
-        row.frontId
+        frontId
       );
 
+    front.doneQty =
+      Math.max(
+        num(front.doneQty),
+        cumulative
+      );
 
     if (
-      front
+      !front.factStart ||
+      date <
+        front.factStart
     ) {
-
-
-      front.doneQty =
-        project.factLog
-          .filter(
-            item =>
-              item.frontId ===
-              front.id
-          )
-          .reduce(
-            (
-              sum,
-              item
-            ) =>
-              sum +
-              num(
-                item.qty
-              ),
-            0
-          );
-
-
-      if (
-        !front.factStart
-      ) {
-
-        front.factStart =
-          row.date;
-
-      }
-
+      front.factStart =
+        date;
     }
 
+    front.updatedAt =
+      nowIso();
+
+    log(
+      'Добавлено',
+      'Факт',
+      `${date} · ${frontLabel(front)} · ${qty}`
+    );
   }
-
-
-  log(
-    'Добавлено',
-
-    type ===
-    'plan'
-      ? 'План'
-      : 'Факт',
-
-    `${row.date} · ${frontLabel(byId(project.fronts,row.frontId))}`
-  );
-
 
   await saveProject();
 
-
   closeModal();
 
-
   renderAll();
-
 }
 
+
+function resourceFiltered() {
+
+  const from =
+    $('rFrom').value;
+
+  const to =
+    $('rTo').value;
+
+  const organizationId =
+    $('rOrg').value;
+
+  const buildingId =
+    $('rBuilding').value;
+
+  return project.resources
+    .filter(
+      row =>
+        (
+          !from ||
+          row.date >=
+            from
+        ) &&
+        (
+          !to ||
+          row.date <=
+            to
+        ) &&
+        (
+          organizationId ===
+            'all' ||
+          row.organizationId ===
+            organizationId
+        ) &&
+        (
+          buildingId ===
+            'all' ||
+          row.buildingId ===
+            buildingId
+        )
+    );
+}
 
 
 function renderResources() {
 
-
-  const buildingId =
-    $('rBuilding')
-      .value;
-
-
-  const organizationId =
-    $('rOrg')
-      .value;
-
-
-  const from =
-    $('rFrom')
-      .value;
-
-
-  const to =
-    $('rTo')
-      .value;
-
-
   const rows =
-    project.resources
-      .filter(
-        row =>
-          (
-            buildingId ===
-              'all' ||
-            row.buildingId ===
-              buildingId
-          ) &&
-          (
-            organizationId ===
-              'all' ||
-            row.organizationId ===
-              organizationId
-          ) &&
-          (
-            !from ||
-            row.date >=
-              from
-          ) &&
-          (
-            !to ||
-            row.date <=
-              to
-          )
-      );
-
+    resourceFiltered();
 
   const sum =
     field =>
-      rows
-        .reduce(
-          (
-            total,
-            row
-          ) =>
-            total +
-            num(
-              row[field]
-            ),
+      rows.reduce(
+        (total, row) =>
+          total +
+          num(
+            row[field]
+          ),
+        0
+      );
+
+  const daily =
+    {};
+
+  rows.forEach(
+    row => {
+
+      daily[row.date] =
+        (
+          daily[row.date] ||
           0
-        );
+        ) +
+        num(row.itr) +
+        num(row.workers) +
+        num(row.mechanizers);
+    }
+  );
 
+  $('rItr').textContent =
+    sum('itr');
 
-  $('rItr')
-    .textContent =
-      sum(
-        'itr'
-      );
+  $('rWorkers').textContent =
+    sum('workers');
 
+  $('rMech').textContent =
+    sum('mechanizers');
 
-  $('rWorkers')
-    .textContent =
-      sum(
-        'workers'
-      );
+  $('rTotalPeople').textContent =
+    sum('itr') +
+    sum('workers') +
+    sum('mechanizers');
 
+  $('rPeak').textContent =
+    Math.max(
+      0,
+      ...Object.values(
+        daily
+      )
+    );
 
-  $('rMech')
-    .textContent =
-      sum(
-        'mechanizers'
-      );
+  $('rEquipDays').textContent =
+    sum(
+      'equipmentQty'
+    );
 
+  $('resourceRows').innerHTML =
+    rows
+      .sort(
+        (a, b) =>
+          b.date.localeCompare(
+            a.date
+          )
+      )
+      .map(
+        row =>
+          `
+            <tr>
 
-  $('resourceRows')
-    .innerHTML =
-      rows
-        .map(
-          row =>
-            `
-              <tr>
+              <td>
+                ${row.date}
+              </td>
 
-                <td>
-                  ${row.date}
-                </td>
+              <td>
+                ${esc(
+                  nameById(
+                    project.organizations,
+                    row.organizationId
+                  ) || '—'
+                )}
+              </td>
 
-                <td>
-                  ${esc(nameById(project.organizations,row.organizationId))}
-                </td>
+              <td>
+                ${esc(
+                  nameById(
+                    project.buildings,
+                    row.buildingId
+                  ) || '—'
+                )}
+              </td>
 
-                <td>
-                  ${esc(nameById(project.buildings,row.buildingId))}
-                </td>
+              <td>
+                ${esc(
+                  nameById(
+                    project.works,
+                    row.workId
+                  ) || '—'
+                )}
+              </td>
 
-                <td>
-                  ${row.itr}
-                </td>
+              <td>
+                ${esc(
+                  row.frontId
+                    ? frontLabel(
+                        byId(
+                          project.fronts,
+                          row.frontId
+                        )
+                      )
+                    : '—'
+                )}
+              </td>
 
-                <td>
-                  ${row.workers}
-                </td>
+              <td>${row.itr}</td>
+              <td>${row.workers}</td>
+              <td>${row.mechanizers}</td>
 
-                <td>
-                  ${row.mechanizers}
-                </td>
+              <td>
+                ${esc(
+                  row.equipmentType ||
+                  ''
+                )}
+              </td>
 
-                <td>
-                  ${esc(row.equipmentType || '')}
-                </td>
+              <td>
+                ${row.equipmentQty}
+              </td>
 
-                <td>
-                  ${row.equipmentQty || 0}
-                </td>
+              <td>
+                ${esc(
+                  row.comment ||
+                  ''
+                )}
+              </td>
 
-                <td>
-                  ${esc(row.comment || '')}
-                </td>
-
-              </tr>
-            `
-        )
-        .join(
-          ''
-        );
-
+            </tr>
+          `
+      )
+      .join('');
 }
-
 
 
 function openResourceEditor() {
 
-
-  const organizations =
-    activeItems(
-      project.organizations
-    )
+  const frontOptions =
+    activeFronts()
       .map(
-        item =>
+        front =>
           `
-            <option value="${item.id}">
-              ${esc(item.name)}
+            <option value="${front.id}">
+              ${esc(
+                frontLabel(front)
+              )}
             </option>
           `
       )
-      .join(
-        ''
-      );
-
-
-  const buildings =
-    activeItems(
-      project.buildings
-    )
-      .map(
-        item =>
-          `
-            <option value="${item.id}">
-              ${esc(item.name)}
-            </option>
-          `
-      )
-      .join(
-        ''
-      );
-
+      .join('');
 
   openModal(
-    'Ресурсы',
+    'Добавить ресурсы',
 
     `
-
       <div class="form-grid">
 
-
         <div class="field">
-
-          <label>
-            Дата
-          </label>
+          <label>Дата</label>
 
           <input
             id="rrDate"
             type="date"
-            value="${today()}"
-          >
-
+            value="${today()}">
         </div>
 
-
         <div class="field">
-
-          <label>
-            Организация
-          </label>
+          <label>Организация</label>
 
           <select id="rrOrg">
-            ${organizations}
+            ${options(
+              project.organizations,
+              '',
+              true
+            )}
           </select>
-
         </div>
 
-
         <div class="field">
-
           <label>
-            Здание
+            Здание (необязательно)
           </label>
 
           <select id="rrBuilding">
-            ${buildings}
+            ${options(
+              project.buildings,
+              '',
+              true
+            )}
           </select>
-
         </div>
 
+        <div class="field">
+          <label>
+            Вид работ (необязательно)
+          </label>
+
+          <select id="rrWork">
+            ${options(
+              project.works,
+              '',
+              true
+            )}
+          </select>
+        </div>
 
         <div class="field">
-
           <label>
-            ИТР
+            Фронт (необязательно)
           </label>
+
+          <select id="rrFront">
+            <option value="">—</option>
+            ${frontOptions}
+          </select>
+        </div>
+
+        <div class="field">
+          <label>ИТР</label>
 
           <input
             id="rrItr"
-            type="number"
-          >
-
+            type="number">
         </div>
 
-
         <div class="field">
-
-          <label>
-            Рабочие
-          </label>
+          <label>Рабочие</label>
 
           <input
             id="rrWorkers"
-            type="number"
-          >
-
+            type="number">
         </div>
 
-
         <div class="field">
-
-          <label>
-            Механизаторы
-          </label>
+          <label>Механизаторы</label>
 
           <input
             id="rrMech"
-            type="number"
-          >
-
+            type="number">
         </div>
 
-
         <div class="field">
-
-          <label>
-            Техника
-          </label>
-
-          <input id="rrEq">
-
+          <label>Тип техники</label>
+          <input id="rrEqType">
         </div>
 
-
         <div class="field">
-
-          <label>
-            Количество
-          </label>
+          <label>Количество техники</label>
 
           <input
             id="rrEqQty"
-            type="number"
-          >
-
+            type="number">
         </div>
-
-
-        <div class="field span-2">
-
-          <label>
-            Комментарий
-          </label>
-
-          <textarea id="rrComment"></textarea>
-
-        </div>
-
 
       </div>
 
+      <div class="field">
+        <label>Комментарий</label>
+        <textarea id="rrComment"></textarea>
+      </div>
 
       <div class="editor-actions">
 
         <button
           id="rrSave"
-          class="btn primary"
-        >
+          class="btn primary">
           Сохранить
         </button>
 
       </div>
-
     `
   );
 
-
-  $('rrSave')
-    .onclick =
-      saveResource;
-
+  $('rrSave').onclick =
+    saveResource;
 }
-
 
 
 async function saveResource() {
 
+  const row = {
+    id:
+      uid('R'),
 
-  project.resources
-    .push({
+    date:
+      $('rrDate').value,
 
-      id:
-        uid(
-          'R'
-        ),
+    organizationId:
+      $('rrOrg').value,
 
-      date:
-        $('rrDate')
-          .value,
+    buildingId:
+      $('rrBuilding').value,
 
-      organizationId:
-        $('rrOrg')
-          .value,
+    workId:
+      $('rrWork').value,
 
-      buildingId:
-        $('rrBuilding')
-          .value,
+    frontId:
+      $('rrFront').value,
 
-      itr:
-        num(
-          $('rrItr')
-            .value
-        ),
+    itr:
+      num(
+        $('rrItr').value
+      ),
 
-      workers:
-        num(
-          $('rrWorkers')
-            .value
-        ),
+    workers:
+      num(
+        $('rrWorkers').value
+      ),
 
-      mechanizers:
-        num(
-          $('rrMech')
-            .value
-        ),
+    mechanizers:
+      num(
+        $('rrMech').value
+      ),
 
-      equipmentType:
-        $('rrEq')
-          .value
-          .trim(),
+    equipmentType:
+      $('rrEqType')
+        .value
+        .trim(),
 
-      equipmentQty:
-        num(
-          $('rrEqQty')
-            .value
-        ),
+    equipmentQty:
+      num(
+        $('rrEqQty').value
+      ),
 
-      comment:
-        $('rrComment')
-          .value
-          .trim()
+    comment:
+      $('rrComment')
+        .value
+        .trim(),
 
-    });
+    createdAt:
+      nowIso()
+  };
 
+  if (!row.date) {
 
-  await saveProject();
-
-
-  closeModal();
-
-
-  renderAll();
-
-}
-
-
-
-function renderContracts() {
-
-
-  $('contractRows')
-    .innerHTML =
-      project.contracts
-        .map(
-          contract =>
-            `
-              <tr data-contract-id="${contract.id}">
-
-                <td>
-                  ${esc(nameById(project.organizations,contract.organizationId))}
-                </td>
-
-                <td>
-                  ${esc(contract.number)}
-                </td>
-
-                <td>
-                  ${esc(contract.date)}
-                </td>
-
-                <td>
-                  ${esc(contract.subject || '')}
-                </td>
-
-                <td>
-                  ${esc(nameById(project.buildings,contract.buildingId))}
-                </td>
-
-                <td>
-                  ${esc(contract.startDate || '')}
-                </td>
-
-                <td>
-                  ${esc(contract.endDate || '')}
-                </td>
-
-              </tr>
-            `
-        )
-        .join(
-          ''
-        );
-
-
-  document
-    .querySelectorAll(
-      '[data-contract-id]'
-    )
-    .forEach(
-      element =>
-        element.onclick =
-          () =>
-            openContractEditor(
-              element.dataset.contractId
-            )
+    alert(
+      'Укажи дату.'
     );
 
-}
-
-
-
-function openContractEditor(
-  id = null
-) {
-
-
-  const contract =
-    id
-      ? byId(
-          project.contracts,
-          id
-        )
-      : {};
-
-
-  const organizations =
-    activeItems(
-      project.organizations
-    )
-      .map(
-        item =>
-          `
-            <option
-              value="${item.id}"
-              ${
-                item.id ===
-                contract.organizationId
-                  ? 'selected'
-                  : ''
-              }
-            >
-              ${esc(item.name)}
-            </option>
-          `
-      )
-      .join(
-        ''
-      );
-
-
-  const buildings =
-    activeItems(
-      project.buildings
-    )
-      .map(
-        item =>
-          `
-            <option
-              value="${item.id}"
-              ${
-                item.id ===
-                contract.buildingId
-                  ? 'selected'
-                  : ''
-              }
-            >
-              ${esc(item.name)}
-            </option>
-          `
-      )
-      .join(
-        ''
-      );
-
-
-  openModal(
-    id
-      ? 'Договор'
-      : 'Новый договор',
-
-    `
-
-      <div class="form-grid">
-
-
-        <div class="field">
-
-          <label>
-            Подрядчик
-          </label>
-
-          <select id="cOrg">
-
-            <option value="">
-              —
-            </option>
-
-            ${organizations}
-
-          </select>
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            № договора
-          </label>
-
-          <input
-            id="cNumber"
-            value="${esc(contract.number || '')}"
-          >
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Дата договора
-          </label>
-
-          <input
-            id="cDate"
-            type="date"
-            value="${contract.date || ''}"
-          >
-
-        </div>
-
-
-        <div class="field span-2">
-
-          <label>
-            Предмет
-          </label>
-
-          <input
-            id="cSubject"
-            value="${esc(contract.subject || '')}"
-          >
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Объект
-          </label>
-
-          <select id="cBld">
-
-            <option value="">
-              —
-            </option>
-
-            ${buildings}
-
-          </select>
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Начало
-          </label>
-
-          <input
-            id="cStart"
-            type="date"
-            value="${contract.startDate || ''}"
-          >
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Окончание
-          </label>
-
-          <input
-            id="cEnd"
-            type="date"
-            value="${contract.endDate || ''}"
-          >
-
-        </div>
-
-
-        <div class="field span-2">
-
-          <label>
-            Комментарий
-          </label>
-
-          <textarea id="cComment">${esc(contract.comment || '')}</textarea>
-
-        </div>
-
-
-      </div>
-
-
-      <div class="editor-actions">
-
-
-        ${
-          id
-            ? `
-              <button
-                id="cDelete"
-                class="btn danger"
-              >
-                Удалить
-              </button>
-            `
-            : ''
-        }
-
-
-        <button
-          id="cSave"
-          class="btn primary"
-        >
-          Сохранить
-        </button>
-
-
-      </div>
-
-    `
-  );
-
-
-  $('cSave')
-    .onclick =
-      () =>
-        saveContract(
-          id
-        );
-
-
-  if (
-    id
-  ) {
-
-    $('cDelete')
-      .onclick =
-        () =>
-          deleteEntity(
-            'contracts',
-            id,
-            'Договор'
-          );
-
+    return;
   }
 
-}
-
-
-
-async function saveContract(
-  id
-) {
-
-
-  let contract =
-    id
-      ? byId(
-          project.contracts,
-          id
-        )
-      : {
-
-          id:
-            uid(
-              'CON'
-            ),
-
-          active:
-            true
-
-        };
-
-
-  Object.assign(
-    contract,
-    {
-
-      organizationId:
-        $('cOrg')
-          .value,
-
-      number:
-        $('cNumber')
-          .value
-          .trim(),
-
-      date:
-        $('cDate')
-          .value,
-
-      subject:
-        $('cSubject')
-          .value
-          .trim(),
-
-      buildingId:
-        $('cBld')
-          .value,
-
-      startDate:
-        $('cStart')
-          .value,
-
-      endDate:
-        $('cEnd')
-          .value,
-
-      comment:
-        $('cComment')
-          .value
-          .trim()
-
-    }
+  project.resources.push(
+    row
   );
 
-
-  if (
-    !id
-  ) {
-
-    project.contracts
-      .push(
-        contract
-      );
-
-  }
-
+  log(
+    'Добавлено',
+    'Ресурсы',
+    `${row.date} · ${
+      nameById(
+        project.organizations,
+        row.organizationId
+      ) ||
+      'без организации'
+    }`
+  );
 
   await saveProject();
 
-
   closeModal();
 
-
   renderAll();
-
 }
-
 
 
 function renderMilestones() {
 
-
-  const filterBuilding =
-    $('msBuilding')
-      ?.value ||
-    'all';
-
-
-  const filterOrganization =
-    $('msOrg')
-      ?.value ||
-    'all';
-
-
-  const filterContract =
-    $('msContract')
-      ?.value ||
-    'all';
-
-
-  const rows =
+  $('milestoneRows').innerHTML =
     project.milestones
-      .filter(
-        milestone => {
-
-
-          const contract =
-            byId(
-              project.contracts,
-              milestone.contractId
-            ) ||
-            {};
-
-
-          return (
-            (
-              filterContract ===
-                'all' ||
-              milestone.contractId ===
-                filterContract
-            ) &&
-            (
-              filterOrganization ===
-                'all' ||
-              contract.organizationId ===
-                filterOrganization
-            ) &&
-            (
-              filterBuilding ===
-                'all' ||
-              contract.buildingId ===
-                filterBuilding
-            )
-          );
-
-        }
-      )
       .map(
-        milestone => {
-
-
-          const contract =
-            byId(
-              project.contracts,
-              milestone.contractId
-            ) ||
-            {};
-
-
-          const actual =
-            milestone.factDate ||
-            milestone.forecastDate;
-
-
-          const difference =
-            milestone.contractDate &&
-            actual
-              ? dateDiff(
-                  milestone.contractDate,
-                  actual
-                )
-              : null;
-
-
-          let level =
-            'none';
-
-
-          if (
-            difference !==
-            null
-          ) {
-
-
-            if (
-              difference <=
-              0
-            ) {
-
-              level =
-                'ok';
-
-            } else if (
-              difference <=
-              3
-            ) {
-
-              level =
-                'warn';
-
-            } else if (
-              difference <=
-              7
-            ) {
-
-              level =
-                'bad';
-
-            } else {
-
-              level =
-                'critical';
-
-            }
-
-          }
-
-
-          return `
-            <tr data-ms-id="${milestone.id}">
+        milestone =>
+          `
+            <tr>
 
               <td>
-                ${esc(nameById(project.organizations,contract.organizationId))}
+                ${esc(
+                  nameById(
+                    project.buildings,
+                    milestone.buildingId
+                  )
+                )}
               </td>
 
               <td>
-                ${esc(contract.number || '')}
+                ${esc(
+                  milestone.title
+                )}
               </td>
 
               <td>
-                КД ${esc(milestone.number || '')}
-              </td>
-
-              <td>
-                ${esc(milestone.title || '')}
-              </td>
-
-              <td>
-                ${esc(milestone.contractDate || '')}
-              </td>
-
-              <td>
-                ${esc(milestone.planDate || '')}
-              </td>
-
-              <td>
-                ${esc(milestone.forecastDate || '')}
-              </td>
-
-              <td>
-                ${esc(milestone.factDate || '')}
-              </td>
-
-              <td
-                style="background:${levelColor(level)}"
-              >
                 ${
-                  difference ===
-                  null
-                    ? '—'
-                    : (
-                        difference > 0
-                          ? `+${difference} дн.`
-                          : `${difference} дн.`
-                      )
+                  milestone.contractDate ||
+                  '—'
                 }
               </td>
 
+              <td>
+                ${
+                  milestone.workDate ||
+                  '—'
+                }
+              </td>
+
+              <td>
+                ${
+                  milestone.forecastDate ||
+                  '—'
+                }
+              </td>
+
+              <td>
+                ${
+                  milestone.factDate ||
+                  '—'
+                }
+              </td>
+
+              <td>
+                <button
+                  class="row-btn"
+                  data-ms="${milestone.id}">
+                  ${esc(
+                    milestone.status ||
+                    ''
+                  )}
+                </button>
+              </td>
+
             </tr>
-          `;
-
-        }
+          `
       )
-      .join(
-        ''
-      );
-
-
-  $('milestoneRows')
-    .innerHTML =
-      rows;
-
+      .join('');
 
   document
     .querySelectorAll(
-      '[data-ms-id]'
+      '[data-ms]'
     )
     .forEach(
-      element =>
-        element.onclick =
+      button =>
+        button.onclick =
           () =>
             openMilestoneEditor(
-              element.dataset.msId
+              button.dataset.ms
             )
     );
-
 }
-
 
 
 function openMilestoneEditor(
   id = null
 ) {
-
 
   const milestone =
     id
@@ -6435,229 +3413,118 @@ function openMilestoneEditor(
         )
       : {};
 
-
-  const contracts =
-    activeItems(
-      project.contracts
-    )
-      .map(
-        contract =>
-          `
-            <option
-              value="${contract.id}"
-              ${
-                contract.id ===
-                milestone.contractId
-                  ? 'selected'
-                  : ''
-              }
-            >
-              ${esc(nameById(project.organizations,contract.organizationId))}
-              ·
-              ${esc(contract.number || 'без №')}
-              ·
-              ${esc(contract.date || '')}
-            </option>
-          `
-      )
-      .join(
-        ''
-      );
-
-
   openModal(
     id
       ? 'Ключевая дата'
       : 'Новая ключевая дата',
 
     `
-
       <div class="form-grid">
 
+        <div class="field">
+          <label>Здание</label>
 
-        <div class="field span-2">
-
-          <label>
-            Договор
-          </label>
-
-          <select id="mContract">
-
-            <option value="">
-              —
-            </option>
-
-            ${contracts}
-
+          <select id="mBuilding">
+            ${options(
+              project.buildings,
+              milestone.buildingId,
+              true
+            )}
           </select>
-
         </div>
-
 
         <div class="field">
-
-          <label>
-            № КД
-          </label>
-
-          <input
-            id="mNumber"
-            value="${esc(milestone.number || '')}"
-          >
-
-        </div>
-
-
-        <div class="field span-2">
-
-          <label>
-            Наименование
-          </label>
+          <label>Наименование</label>
 
           <input
             id="mTitle"
-            value="${esc(milestone.title || '')}"
-          >
-
+            value="${esc(
+              milestone.title ||
+              ''
+            )}">
         </div>
-
 
         <div class="field">
-
-          <label>
-            Договорная дата
-          </label>
+          <label>Статус</label>
 
           <input
-            id="mContractDate"
-            type="date"
-            value="${milestone.contractDate || ''}"
-          >
-
+            id="mStatus"
+            value="${esc(
+              milestone.status ||
+              'Не наступила'
+            )}">
         </div>
-
 
         <div class="field">
-
-          <label>
-            Плановая дата
-          </label>
+          <label>Договорная дата</label>
 
           <input
-            id="mPlanDate"
+            id="mContract"
             type="date"
-            value="${milestone.planDate || ''}"
-          >
-
+            value="${milestone.contractDate || ''}">
         </div>
-
 
         <div class="field">
-
-          <label>
-            Прогнозная дата
-          </label>
+          <label>Рабочая дата</label>
 
           <input
-            id="mForecastDate"
+            id="mWork"
             type="date"
-            value="${milestone.forecastDate || ''}"
-          >
-
+            value="${milestone.workDate || ''}">
         </div>
-
 
         <div class="field">
-
-          <label>
-            Фактическая дата
-          </label>
+          <label>Прогноз</label>
 
           <input
-            id="mFactDate"
+            id="mForecast"
             type="date"
-            value="${milestone.factDate || ''}"
-          >
-
+            value="${milestone.forecastDate || ''}">
         </div>
 
+        <div class="field">
+          <label>Факт</label>
 
-        <div class="field span-2">
-
-          <label>
-            Комментарий
-          </label>
-
-          <textarea id="mComment">${esc(milestone.comment || '')}</textarea>
-
+          <input
+            id="mFact"
+            type="date"
+            value="${milestone.factDate || ''}">
         </div>
-
 
       </div>
 
+      <div class="field">
+        <label>Комментарий</label>
+
+        <textarea id="mComment">${esc(
+          milestone.comment ||
+          ''
+        )}</textarea>
+      </div>
 
       <div class="editor-actions">
 
-
-        ${
-          id
-            ? `
-              <button
-                id="mDelete"
-                class="btn danger"
-              >
-                Удалить
-              </button>
-            `
-            : ''
-        }
-
-
         <button
           id="mSave"
-          class="btn primary"
-        >
+          class="btn primary">
           Сохранить
         </button>
 
-
       </div>
-
     `
   );
 
-
-  $('mSave')
-    .onclick =
-      () =>
-        saveMilestone(
-          id
-        );
-
-
-  if (
-    id
-  ) {
-
-    $('mDelete')
-      .onclick =
-        () =>
-          deleteEntity(
-            'milestones',
-            id,
-            'Ключевая дата'
-          );
-
-  }
-
+  $('mSave').onclick =
+    () =>
+      saveMilestone(
+        id
+      );
 }
-
 
 
 async function saveMilestone(
   id
 ) {
-
 
   let milestone =
     id
@@ -6666,1448 +3533,5712 @@ async function saveMilestone(
           id
         )
       : {
-
           id:
-            uid(
-              'MS'
-            )
+            uid('M'),
 
+          createdAt:
+            nowIso()
         };
-
 
   Object.assign(
     milestone,
     {
-
-      contractId:
-        $('mContract')
-          .value,
-
-      number:
-        $('mNumber')
-          .value
-          .trim(),
+      buildingId:
+        $('mBuilding').value,
 
       title:
         $('mTitle')
           .value
           .trim(),
 
-      contractDate:
-        $('mContractDate')
-          .value,
+      status:
+        $('mStatus')
+          .value
+          .trim(),
 
-      planDate:
-        $('mPlanDate')
-          .value,
+      contractDate:
+        $('mContract').value,
+
+      workDate:
+        $('mWork').value,
 
       forecastDate:
-        $('mForecastDate')
-          .value,
+        $('mForecast').value,
 
       factDate:
-        $('mFactDate')
-          .value,
+        $('mFact').value,
 
       comment:
         $('mComment')
           .value
-          .trim()
-
-    }
-  );
-
-
-  if (
-    !id
-  ) {
-
-    project.milestones
-      .push(
-        milestone
-      );
-
-  }
-
-
-  await saveProject();
-
-
-  closeModal();
-
-
-  renderAll();
-
-}
-
-
-
-function renderConstraints() {
-
-
-  $('constraintRows')
-    .innerHTML =
-      project.constraints
-        .map(
-          constraint =>
-            `
-              <tr data-constraint-id="${constraint.id}">
-
-                <td>
-                  ${esc(frontLabel(byId(project.fronts,constraint.frontId)))}
-                </td>
-
-                <td>
-                  ${esc(nameById(project.constraintTypes,constraint.typeId))}
-                </td>
-
-                <td>
-                  ${esc(constraint.openDate || '')}
-                </td>
-
-                <td>
-                  ${esc(constraint.planCloseDate || '')}
-                </td>
-
-                <td>
-                  ${esc(constraint.factCloseDate || '')}
-                </td>
-
-                <td>
-                  ${esc(constraint.responsible || '')}
-                </td>
-
-                <td>
-                  ${esc(constraint.status || 'Открыто')}
-                </td>
-
-                <td>
-                  ${esc(constraint.description || '')}
-                </td>
-
-              </tr>
-            `
-        )
-        .join(
-          ''
-        );
-
-
-  document
-    .querySelectorAll(
-      '[data-constraint-id]'
-    )
-    .forEach(
-      element =>
-        element.onclick =
-          () =>
-            openConstraintEditor(
-              element.dataset.constraintId
-            )
-    );
-
-}
-
-
-
-function openConstraintEditor(
-  id = null
-) {
-
-
-  const constraint =
-    id
-      ? byId(
-          project.constraints,
-          id
-        )
-      : {};
-
-
-  const fronts =
-    project.fronts
-      .map(
-        front =>
-          `
-            <option
-              value="${front.id}"
-              ${
-                front.id ===
-                constraint.frontId
-                  ? 'selected'
-                  : ''
-              }
-            >
-              ${esc(frontLabel(front))}
-            </option>
-          `
-      )
-      .join(
-        ''
-      );
-
-
-  const types =
-    project.constraintTypes
-      .map(
-        type =>
-          `
-            <option
-              value="${type.id}"
-              ${
-                type.id ===
-                constraint.typeId
-                  ? 'selected'
-                  : ''
-              }
-            >
-              ${esc(type.name)}
-            </option>
-          `
-      )
-      .join(
-        ''
-      );
-
-
-  openModal(
-    id
-      ? 'Ограничение'
-      : 'Новое ограничение',
-
-    `
-
-      <div class="form-grid">
-
-
-        <div class="field span-2">
-
-          <label>
-            Фронт
-          </label>
-
-          <select id="xFront">
-
-            <option value="">
-              —
-            </option>
-
-            ${fronts}
-
-          </select>
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Тип
-          </label>
-
-          <select id="xType">
-            ${types}
-          </select>
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Дата возникновения
-          </label>
-
-          <input
-            id="xOpen"
-            type="date"
-            value="${constraint.openDate || today()}"
-          >
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            План снятия
-          </label>
-
-          <input
-            id="xPlan"
-            type="date"
-            value="${constraint.planCloseDate || ''}"
-          >
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Факт снятия
-          </label>
-
-          <input
-            id="xFact"
-            type="date"
-            value="${constraint.factCloseDate || ''}"
-          >
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Ответственный
-          </label>
-
-          <input
-            id="xResp"
-            value="${esc(constraint.responsible || '')}"
-          >
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Статус
-          </label>
-
-          <select id="xStatus">
-
-            <option
-              ${
-                constraint.status ===
-                'Открыто'
-                  ? 'selected'
-                  : ''
-              }
-            >
-              Открыто
-            </option>
-
-            <option
-              ${
-                constraint.status ===
-                'В работе'
-                  ? 'selected'
-                  : ''
-              }
-            >
-              В работе
-            </option>
-
-            <option
-              ${
-                constraint.status ===
-                'Снято'
-                  ? 'selected'
-                  : ''
-              }
-            >
-              Снято
-            </option>
-
-          </select>
-
-        </div>
-
-
-        <div class="field span-2">
-
-          <label>
-            Описание
-          </label>
-
-          <textarea id="xDesc">${esc(constraint.description || '')}</textarea>
-
-        </div>
-
-
-      </div>
-
-
-      <div class="editor-actions">
-
-
-        ${
-          id
-            ? `
-              <button
-                id="xDelete"
-                class="btn danger"
-              >
-                Удалить
-              </button>
-            `
-            : ''
-        }
-
-
-        <button
-          id="xSave"
-          class="btn primary"
-        >
-          Сохранить
-        </button>
-
-
-      </div>
-
-    `
-  );
-
-
-  $('xSave')
-    .onclick =
-      () =>
-        saveConstraint(
-          id
-        );
-
-
-  if (
-    id
-  ) {
-
-    $('xDelete')
-      .onclick =
-        () =>
-          deleteEntity(
-            'constraints',
-            id,
-            'Ограничение'
-          );
-
-  }
-
-}
-
-
-
-async function saveConstraint(
-  id
-) {
-
-
-  let constraint =
-    id
-      ? byId(
-          project.constraints,
-          id
-        )
-      : {
-
-          id:
-            uid(
-              'X'
-            )
-
-        };
-
-
-  Object.assign(
-    constraint,
-    {
-
-      frontId:
-        $('xFront')
-          .value,
-
-      typeId:
-        $('xType')
-          .value,
-
-      openDate:
-        $('xOpen')
-          .value,
-
-      planCloseDate:
-        $('xPlan')
-          .value,
-
-      factCloseDate:
-        $('xFact')
-          .value,
-
-      responsible:
-        $('xResp')
-          .value
           .trim(),
 
-      status:
-        $('xStatus')
-          .value,
-
-      description:
-        $('xDesc')
-          .value
-          .trim()
-
+      updatedAt:
+        nowIso()
     }
   );
 
-
   if (
-    !id
+    !milestone.title
   ) {
 
-    project.constraints
-      .push(
-        constraint
-      );
+    alert(
+      'Укажи наименование ключевой даты.'
+    );
 
+    return;
   }
 
+  if (!id) {
+    project.milestones.push(
+      milestone
+    );
+  }
+
+  log(
+    id
+      ? 'Изменено'
+      : 'Создано',
+
+    'Ключевая дата',
+
+    milestone.title
+  );
 
   await saveProject();
 
-
   closeModal();
 
-
   renderAll();
-
 }
 
 
-
-function isEntityUsed(
-  collection,
-  id
+function elementContextKey(
+  element
 ) {
 
+  const scope =
+    element.uniqueScope ||
+    'context';
 
-  if (
-    collection ===
-    'organizations'
-  ) {
-
-    return (
-      project.contracts
-        .some(
-          item =>
-            item.organizationId ===
-            id
-        ) ||
-      project.fronts
-        .some(
-          item =>
-            item.organizationId ===
-            id
-        ) ||
-      project.resources
-        .some(
-          item =>
-            item.organizationId ===
-            id
-        )
+  const type =
+    normKey(
+      element.elementType
     );
 
-  }
-
-
-  if (
-    collection ===
-    'works'
-  ) {
-
-    return project.fronts
-      .some(
-        item =>
-          item.workId ===
-          id
-      );
-
-  }
-
-
-  if (
-    collection ===
-    'units'
-  ) {
-
-    return (
-      project.works
-        .some(
-          item =>
-            item.unitId ===
-            id
-        ) ||
-      project.fronts
-        .some(
-          item =>
-            item.unitId ===
-            id
-        )
+  const number =
+    normKey(
+      element.elementNo
     );
 
-  }
-
-
   if (
-    collection ===
-    'buildings'
+    scope ===
+    'project'
   ) {
 
-    return (
-      project.structures
-        .some(
-          item =>
-            item.buildingId ===
-            id
-        ) ||
-      project.contracts
-        .some(
-          item =>
-            item.buildingId ===
-            id
-        )
-    );
-
+    return [
+      type,
+      number
+    ].join('|');
   }
-
 
   if (
-    collection ===
-    'contracts'
+    scope ===
+    'building'
   ) {
 
-    return (
-      project.fronts
-        .some(
-          item =>
-            item.contractId ===
-            id
-        ) ||
-      project.milestones
-        .some(
-          item =>
-            item.contractId ===
-            id
-        )
-    );
-
+    return [
+      type,
+      element.buildingId || '',
+      number
+    ].join('|');
   }
 
-
-  return false;
-
+  return [
+    type,
+    element.buildingId || '',
+    normKey(element.capture),
+    normKey(element.zone),
+    number
+  ].join('|');
 }
 
 
-
-async function deleteEntity(
-  collection,
-  id,
-  label
+function findElementDuplicate(
+  candidate,
+  excludeId = ''
 ) {
 
-
-  const used =
-    isEntityUsed(
-      collection,
-      id
+  const key =
+    elementContextKey(
+      candidate
     );
 
-
-  if (
-    used
-  ) {
-
-
-    if (
-      confirm(
-        `${label} используется в других данных.\n\nАрхивировать вместо удаления?`
-      )
-    ) {
-
-
-      const item =
-        byId(
-          project[collection],
-          id
-        );
+  return project.numberedElements
+    .find(
+      element =>
+        element.active !==
+          false &&
+        element.id !==
+          excludeId &&
+        elementContextKey(
+          element
+        ) === key
+    );
+}
 
 
-      if (
-        item
-      ) {
+function renderElements() {
 
-        item.active =
-          false;
+  const buildingId =
+    $('elBuilding').value;
 
-      }
+  const type =
+    $('elType').value;
 
+  const search =
+    normKey(
+      $('elSearch').value
+    );
 
-      await saveProject();
-
-
-      closeModal();
-
-
-      renderAll();
-
-    }
-
-
-    return;
-
-  }
-
-
-  if (
-    !confirm(
-      `Удалить: ${label}?`
-    )
-  ) {
-
-    return;
-
-  }
-
-
-  project[collection] =
-    project[collection]
+  const rows =
+    project.numberedElements
       .filter(
-        item =>
-          item.id !==
-          id
+        element =>
+          element.active !==
+            false &&
+          (
+            buildingId ===
+              'all' ||
+            element.buildingId ===
+              buildingId
+          ) &&
+          (
+            type ===
+              'all' ||
+            element.elementType ===
+              type
+          ) &&
+          (
+            !search ||
+            normKey(
+              element.elementNo
+            ).includes(
+              search
+            )
+          )
       );
 
+  $('elementRows').innerHTML =
+    rows
+      .map(
+        element =>
+          `
+            <tr>
 
-  await saveProject();
+              <td>
+                ${esc(
+                  element.elementType
+                )}
+              </td>
 
+              <td>
+                <b>
+                  ${esc(
+                    element.elementNo
+                  )}
+                </b>
+              </td>
 
-  closeModal();
+              <td>
+                ${esc(
+                  nameById(
+                    project.buildings,
+                    element.buildingId
+                  ) || '—'
+                )}
+              </td>
 
+              <td>
+                ${esc(
+                  element.capture ||
+                  '—'
+                )}
+              </td>
 
-  renderAll();
+              <td>
+                ${esc(
+                  element.zone ||
+                  '—'
+                )}
+              </td>
 
-}
+              <td>
+                ${esc(
+                  nameById(
+                    project.works,
+                    element.workId
+                  ) || '—'
+                )}
+              </td>
 
+              <td>
+                ${esc(
+                  element.status ||
+                  ''
+                )}
+              </td>
 
+              <td>
+                ${esc(
+                  element.comment ||
+                  ''
+                )}
+              </td>
 
-function renderDictionary(
-  collection,
-  target,
-  label,
-  fields
-) {
-
-
-  const list =
-    project[collection] ||
-    [];
-
-
-  $(target)
-    .innerHTML =
-      list
-        .map(
-          item =>
-            `
-              <div
-                class="
-                  item
-                  ${
-                    item.active ===
-                    false
-                      ? 'archived'
-                      : ''
-                  }
-                "
-              >
-
-                <span>
-
-                  ${esc(item.name || '')}
-
-                  ${
-                    item.active ===
-                    false
-                      ? `
-                        <small>
-                          (архив)
-                        </small>
-                      `
-                      : ''
-                  }
-
-                </span>
-
+              <td>
                 <button
                   class="row-btn"
-                  data-dict="${collection}"
-                  data-id="${item.id}"
-                >
-                  Редактировать
+                  data-el="${element.id}">
+                  Открыть
                 </button>
+              </td>
 
-              </div>
-            `
-        )
-        .join(
-          ''
-        ) ||
-      `
-        <div class="muted">
-          Пока пусто
-        </div>
-      `;
-
+            </tr>
+          `
+      )
+      .join('');
 
   document
     .querySelectorAll(
-      `[data-dict="${collection}"]`
+      '[data-el]'
     )
     .forEach(
       button =>
         button.onclick =
           () =>
-            openDictionaryEditor(
-              collection,
-              button.dataset.id,
-              label,
-              fields
+            openElementEditor(
+              button.dataset.el
             )
     );
-
 }
 
 
-
-function renderDictionaries() {
-
-
-  renderDictionary(
-    'buildings',
-    'dictBuildings',
-    'Здание',
-    [
-      'name'
-    ]
-  );
-
-
-  renderDictionary(
-    'organizations',
-    'dictOrganizations',
-    'Организация',
-    [
-      'name'
-    ]
-  );
-
-
-  renderDictionary(
-    'units',
-    'dictUnits',
-    'Единица',
-    [
-      'name'
-    ]
-  );
-
-
-  renderDictionary(
-    'works',
-    'dictWorks',
-    'Вид работы',
-    [
-
-      'name',
-
-      'section',
-
-      'controlType'
-
-    ]
-  );
-
-
-  renderDictionary(
-    'equipmentTypes',
-    'dictEquipment',
-    'Тип техники',
-    [
-      'name'
-    ]
-  );
-
-
-  renderDictionary(
-    'constraintTypes',
-    'dictConstraintTypes',
-    'Тип ограничения',
-    [
-      'name'
-    ]
-  );
-
-
-  renderDictionary(
-    'statuses',
-    'dictStatuses',
-    'Статус работ',
-    [
-
-      'name',
-
-      'color'
-
-    ]
-  );
-
-
-  renderDictionary(
-    'acceptanceStatuses',
-    'dictAcceptance',
-    'Статус сдачи',
-    [
-
-      'name',
-
-      'color'
-
-    ]
-  );
-
-}
-
-
-
-function openDictionaryEditor(
-  collection,
-  id = null,
-  label = 'Запись',
-  fields = [
-    'name'
-  ]
+function openElementEditor(
+  id = null
 ) {
 
-
-  const item =
+  const element =
     id
       ? byId(
-          project[collection],
+          project.numberedElements,
           id
         )
-      : {
-
-          id:
-            uid(
-              'D'
-            ),
-
-          active:
-            true
-
-        };
-
-
-  const html =
-    fields
-      .map(
-        field => {
-
-
-          if (
-            field ===
-            'color'
-          ) {
-
-            return `
-              <div class="field">
-
-                <label>
-                  Цвет
-                </label>
-
-                <input
-                  id="d_${field}"
-                  type="color"
-                  value="${esc(item[field] || '#e5e7eb')}"
-                >
-
-              </div>
-            `;
-
-          }
-
-
-          if (
-            field ===
-            'controlType'
-          ) {
-
-            return `
-              <div class="field">
-
-                <label>
-                  Тип контроля
-                </label>
-
-                <select id="d_${field}">
-
-                  ${
-                    [
-
-                      'Количественный',
-
-                      'Статусный',
-
-                      'Процентный',
-
-                      'Комбинированный'
-
-                    ]
-                      .map(
-                        value =>
-                          `
-                            <option
-                              ${
-                                item[field] ===
-                                value
-                                  ? 'selected'
-                                  : ''
-                              }
-                            >
-                              ${value}
-                            </option>
-                          `
-                      )
-                      .join(
-                        ''
-                      )
-                  }
-
-                </select>
-
-              </div>
-            `;
-
-          }
-
-
-          return `
-            <div class="field">
-
-              <label>
-
-                ${
-                  field ===
-                  'name'
-                    ? 'Наименование'
-                    : (
-                        field ===
-                        'section'
-                          ? 'Раздел'
-                          : field
-                      )
-                }
-
-              </label>
-
-              <input
-                id="d_${field}"
-                value="${esc(item[field] || '')}"
-              >
-
-            </div>
-          `;
-
-        }
-      )
-      .join(
-        ''
-      );
-
+      : {};
 
   openModal(
     id
-      ? `Редактировать: ${label}`
-      : `Добавить: ${label}`,
+      ? 'Номерной элемент'
+      : 'Новый номерной элемент',
 
     `
-
       <div class="form-grid">
-        ${html}
+
+        <div class="field">
+          <label>Тип элемента</label>
+
+          <input
+            id="neType"
+            value="${esc(
+              element.elementType ||
+              ''
+            )}"
+            placeholder="Свая / Анкер / Шпунт">
+        </div>
+
+        <div class="field">
+          <label>Номер</label>
+
+          <input
+            id="neNo"
+            value="${esc(
+              element.elementNo ||
+              ''
+            )}">
+        </div>
+
+        <div class="field">
+
+          <label>Область уникальности</label>
+
+          <select id="neScope">
+
+            <option
+              value="context"
+              ${
+                element.uniqueScope !==
+                  'project' &&
+                element.uniqueScope !==
+                  'building'
+                  ? 'selected'
+                  : ''
+              }>
+              Здание + захватка + зона
+            </option>
+
+            <option
+              value="building"
+              ${
+                element.uniqueScope ===
+                  'building'
+                  ? 'selected'
+                  : ''
+              }>
+              В пределах здания
+            </option>
+
+            <option
+              value="project"
+              ${
+                element.uniqueScope ===
+                  'project'
+                  ? 'selected'
+                  : ''
+              }>
+              По всему проекту
+            </option>
+
+          </select>
+
+        </div>
+
+        <div class="field">
+
+          <label>Здание</label>
+
+          <select id="neBuilding">
+            ${options(
+              project.buildings,
+              element.buildingId,
+              true
+            )}
+          </select>
+
+        </div>
+
+        <div class="field">
+          <label>Захватка</label>
+
+          <input
+            id="neCapture"
+            value="${esc(
+              element.capture ||
+              ''
+            )}">
+        </div>
+
+        <div class="field">
+          <label>Зона / ряд</label>
+
+          <input
+            id="neZone"
+            value="${esc(
+              element.zone ||
+              ''
+            )}">
+        </div>
+
+        <div class="field">
+
+          <label>Вид работ</label>
+
+          <select id="neWork">
+            ${options(
+              project.works,
+              element.workId,
+              true
+            )}
+          </select>
+
+        </div>
+
+        <div class="field">
+
+          <label>Статус</label>
+
+          <select id="neStatus">
+
+            ${
+              ELEMENT_STATUS_LIST
+                .map(
+                  status =>
+                    `
+                      <option
+                        ${
+                          status ===
+                          (
+                            element.status ||
+                            'Не начато'
+                          )
+                            ? 'selected'
+                            : ''
+                        }>
+                        ${status}
+                      </option>
+                    `
+                )
+                .join('')
+            }
+
+          </select>
+
+        </div>
+
+        <div class="field">
+
+          <label>
+            Фронт (необязательно)
+          </label>
+
+          <select id="neFront">
+
+            <option value="">
+              —
+            </option>
+
+            ${
+              activeFronts()
+                .map(
+                  front =>
+                    `
+                      <option
+                        value="${front.id}"
+                        ${
+                          front.id ===
+                          element.frontId
+                            ? 'selected'
+                            : ''
+                        }>
+                        ${esc(
+                          frontLabel(
+                            front
+                          )
+                        )}
+                      </option>
+                    `
+                )
+                .join('')
+            }
+
+          </select>
+
+        </div>
+
       </div>
 
+      <div class="field">
+        <label>Комментарий</label>
+
+        <textarea id="neComment">${esc(
+          element.comment ||
+          ''
+        )}</textarea>
+      </div>
 
       <div class="editor-actions">
 
-
-        ${
-          id
-            ? `
-              <button
-                id="dArchive"
-                class="btn"
-              >
-                Архивировать / вернуть
-              </button>
-
-              <button
-                id="dDelete"
-                class="btn danger"
-              >
-                Удалить
-              </button>
-            `
-            : ''
-        }
-
+        <button
+          id="neArchive"
+          class="btn danger"
+          ${
+            id
+              ? ''
+              : 'style="display:none"'
+          }>
+          Архивировать
+        </button>
 
         <button
-          id="dSave"
-          class="btn primary"
-        >
+          id="neSave"
+          class="btn primary">
           Сохранить
         </button>
 
-
       </div>
-
     `
   );
 
+  $('neSave').onclick =
+    () =>
+      saveElement(
+        id
+      );
 
-  $('dSave')
-    .onclick =
-      async () => {
+  if (id) {
 
-
-        fields
-          .forEach(
-            field =>
-              item[field] =
-                $(
-                  `d_${field}`
-                )
-                  .value
-                  .trim()
-          );
-
-
-        if (
-          !id
-        ) {
-
-          project[collection]
-            .push(
-              item
-            );
-
-        }
+    $('neArchive').onclick =
+      () =>
+        archiveElement(
+          id
+        );
+  }
+}
 
 
-        await saveProject();
+async function saveElement(
+  id
+) {
 
+  const candidate = {
 
-        closeModal();
+    id:
+      id ||
+      uid('EL'),
 
+    elementType:
+      $('neType')
+        .value
+        .trim(),
 
-        renderAll();
+    elementNo:
+      $('neNo')
+        .value
+        .trim(),
 
-      };
+    uniqueScope:
+      $('neScope').value,
 
+    buildingId:
+      $('neBuilding').value,
+
+    capture:
+      $('neCapture')
+        .value
+        .trim(),
+
+    zone:
+      $('neZone')
+        .value
+        .trim(),
+
+    workId:
+      $('neWork').value,
+
+    frontId:
+      $('neFront').value,
+
+    status:
+      $('neStatus').value,
+
+    comment:
+      $('neComment')
+        .value
+        .trim(),
+
+    active:
+      true
+  };
 
   if (
-    id
+    !candidate.elementType ||
+    !candidate.elementNo
   ) {
 
-
-    $('dArchive')
-      .onclick =
-        async () => {
-
-
-          item.active =
-            item.active ===
-            false
-              ? true
-              : false;
-
-
-          await saveProject();
-
-
-          closeModal();
-
-
-          renderAll();
-
-        };
-
-
-    $('dDelete')
-      .onclick =
-        () =>
-          deleteEntity(
-            collection,
-            id,
-            label
-          );
-
-  }
-
-}
-
-
-
-function renderVersions() {
-
-
-  $('versionRows')
-    .innerHTML =
-      project.scheduleVersions
-        .map(
-          version =>
-            `
-              <tr>
-
-                <td>
-                  ${
-                    new Date(
-                      version.createdAt
-                    )
-                      .toLocaleString(
-                        'ru-RU'
-                      )
-                  }
-                </td>
-
-                <td>
-                  ${esc(version.name)}
-                </td>
-
-                <td>
-                  ${version.fronts.length}
-                </td>
-
-              </tr>
-            `
-        )
-        .join(
-          ''
-        );
-
-}
-
-
-
-async function createScheduleVersion() {
-
-
-  const name =
-    prompt(
-      'Название снимка графика',
-      `Снимок ${new Date().toLocaleDateString('ru-RU')}`
+    alert(
+      'Укажи тип элемента и номер.'
     );
 
+    return;
+  }
+
+  const duplicate =
+    findElementDuplicate(
+      candidate,
+      id || ''
+    );
+
+  if (duplicate) {
+
+    alert(
+      `Такой номер уже существует.\n` +
+      `${duplicate.elementType} №${duplicate.elementNo}\n` +
+      `${nameById(
+        project.buildings,
+        duplicate.buildingId
+      ) || ''} ` +
+      `${duplicate.capture || ''} ` +
+      `${duplicate.zone || ''}`
+    );
+
+    return;
+  }
+
+  if (id) {
+
+    Object.assign(
+      byId(
+        project.numberedElements,
+        id
+      ),
+      candidate,
+      {
+        updatedAt:
+          nowIso()
+      }
+    );
+
+  } else {
+
+    candidate.createdAt =
+      nowIso();
+
+    project.numberedElements
+      .push(
+        candidate
+      );
+  }
+
+  log(
+    id
+      ? 'Изменено'
+      : 'Создано',
+
+    'Номерной элемент',
+
+    `${candidate.elementType} №${candidate.elementNo}`
+  );
+
+  await saveProject();
+
+  closeModal();
+
+  renderAll();
+}
+
+
+async function archiveElement(
+  id
+) {
 
   if (
-    !name
+    !confirm(
+      'Архивировать номерной элемент?'
+    )
   ) {
     return;
   }
 
+  const element =
+    byId(
+      project.numberedElements,
+      id
+    );
 
-  project.scheduleVersions
-    .unshift({
+  element.active =
+    false;
 
-      id:
-        uid(
-          'VER'
-        ),
+  element.archivedAt =
+    nowIso();
 
-      name,
-
-      createdAt:
-        nowIso(),
-
-      fronts:
-        project.fronts
-          .map(
-            front => ({
-
-              id:
-                front.id,
-
-              contractStart:
-                front.contractStart,
-
-              contractEnd:
-                front.contractEnd,
-
-              baselineStart:
-                front.baselineStart,
-
-              baselineEnd:
-                front.baselineEnd,
-
-              planStart:
-                front.planStart,
-
-              planEnd:
-                front.planEnd,
-
-              factStart:
-                front.factStart,
-
-              factEnd:
-                front.factEnd,
-
-              forecastStart:
-                front.forecastStart,
-
-              forecastEnd:
-                front.forecastEnd
-
-            })
-          )
-
-    });
-
+  log(
+    'Архивировано',
+    'Номерной элемент',
+    `${element.elementType} №${element.elementNo}`
+  );
 
   await saveProject();
 
+  closeModal();
 
-  renderVersions();
-
+  renderAll();
 }
 
 
+function renderDemolition() {
 
-function renderReports() {
+  $('demolitionRows').innerHTML =
+    project.demolition
+      .filter(
+        item =>
+          item.active !== false
+      )
+      .map(
+        item =>
+          `
+            <tr>
 
+              <td>
+                ${esc(item.name)}
+              </td>
 
-  $('reportInfo')
-    .innerHTML =
-      `
-        <div class="muted">
+              <td>
 
-          Кнопка «Сохранить PDF» печатает текущую открытую вкладку.
+                <select
+                  class="dem-status"
+                  data-dem="${item.id}">
 
-          <br><br>
+                  ${
+                    [
+                      'Не начато',
+                      'В работе',
+                      'Завершено',
+                      'Приостановлено',
+                      'Ограничение'
+                    ]
+                      .map(
+                        status =>
+                          `
+                            <option
+                              ${
+                                status ===
+                                item.status
+                                  ? 'selected'
+                                  : ''
+                              }>
+                              ${status}
+                            </option>
+                          `
+                      )
+                      .join('')
+                  }
 
-          Следующим этапом сюда добавим конструктор многоразделных
-          шаблонов отчётов, чтобы в один PDF собирать:
+                </select>
 
-          <br>
+              </td>
 
-          Сводку + КД + Гант + шахматку + план/факт + ресурсы + ограничения.
+              <td>
+                <input
+                  type="date"
+                  data-dem-plan="${item.id}"
+                  value="${item.planEnd || ''}">
+              </td>
 
-        </div>
-      `;
+              <td>
+                <input
+                  type="date"
+                  data-dem-forecast="${item.id}"
+                  value="${item.forecastEnd || ''}">
+              </td>
 
+              <td>
+                <input
+                  type="date"
+                  data-dem-fact="${item.id}"
+                  value="${item.factEnd || ''}">
+              </td>
+
+              <td>
+                <input
+                  data-dem-comment="${item.id}"
+                  value="${esc(
+                    item.comment ||
+                    ''
+                  )}">
+              </td>
+
+            </tr>
+          `
+      )
+      .join('');
+
+  document
+    .querySelectorAll(
+      '[data-dem]'
+    )
+    .forEach(
+      element =>
+        element.onchange =
+          () =>
+            saveDemolitionRow(
+              element.dataset.dem
+            )
+    );
+
+  document
+    .querySelectorAll(
+      '[data-dem-plan],' +
+      '[data-dem-forecast],' +
+      '[data-dem-fact],' +
+      '[data-dem-comment]'
+    )
+    .forEach(
+      element =>
+        element.onchange =
+          () =>
+            saveDemolitionRow(
+              element.dataset.demPlan ||
+              element.dataset.demForecast ||
+              element.dataset.demFact ||
+              element.dataset.demComment
+            )
+    );
 }
 
+
+async function saveDemolitionRow(
+  id
+) {
+
+  const item =
+    byId(
+      project.demolition,
+      id
+    );
+
+  if (!item) {
+    return;
+  }
+
+  item.status =
+    document.querySelector(
+      `[data-dem="${CSS.escape(id)}"]`
+    )?.value ||
+    item.status;
+
+  item.planEnd =
+    document.querySelector(
+      `[data-dem-plan="${CSS.escape(id)}"]`
+    )?.value ||
+    '';
+
+  item.forecastEnd =
+    document.querySelector(
+      `[data-dem-forecast="${CSS.escape(id)}"]`
+    )?.value ||
+    '';
+
+  item.factEnd =
+    document.querySelector(
+      `[data-dem-fact="${CSS.escape(id)}"]`
+    )?.value ||
+    '';
+
+  item.comment =
+    document.querySelector(
+      `[data-dem-comment="${CSS.escape(id)}"]`
+    )?.value ||
+    '';
+
+  item.updatedAt =
+    nowIso();
+
+  log(
+    'Изменено',
+    'Демонтаж',
+    item.name
+  );
+
+  await saveProject();
+}
 
 
 function renderHistory() {
 
+  $('historyRows').innerHTML =
+    project.history
+      .slice(
+        0,
+        1000
+      )
+      .map(
+        item =>
+          `
+            <tr>
 
-  $('historyRows')
-    .innerHTML =
-      project.history
-        .map(
-          item =>
-            `
-              <tr>
+              <td class="nowrap">
+                ${new Date(
+                  item.at
+                ).toLocaleString(
+                  'ru-RU'
+                )}
+              </td>
 
-                <td>
-                  ${
-                    new Date(
-                      item.at
-                    )
-                      .toLocaleString(
-                        'ru-RU'
-                      )
-                  }
-                </td>
+              <td>
+                ${esc(item.action)}
+              </td>
 
-                <td>
-                  ${esc(item.action)}
-                </td>
+              <td>
+                ${esc(item.entity)}
+              </td>
 
-                <td>
-                  ${esc(item.entity)}
-                </td>
+              <td>
+                ${esc(
+                  item.description
+                )}
+              </td>
 
-                <td>
-                  ${esc(item.description)}
-                </td>
-
-              </tr>
-            `
-        )
-        .join(
-          ''
-        );
-
+            </tr>
+          `
+      )
+      .join('');
 }
 
 
+function renderSettings() {
 
-function openModal(
-  title,
-  html
+  $('buildingList').innerHTML =
+    project.buildings
+      .map(
+        item =>
+          `
+            <div class="item">
+
+              <span>
+                ${esc(item.name)}
+              </span>
+
+              <small>
+                ${
+                  item.active === false
+                    ? 'архив'
+                    : 'активно'
+                }
+              </small>
+
+            </div>
+          `
+      )
+      .join('');
+
+  $('workList').innerHTML =
+    project.works
+      .map(
+        item =>
+          `
+            <div class="item">
+
+              <span>
+                ${esc(item.name)}
+                ${
+                  item.unit
+                    ? ` · ${esc(item.unit)}`
+                    : ''
+                }
+              </span>
+
+              <small>
+                ${
+                  item.active === false
+                    ? 'архив'
+                    : 'активно'
+                }
+              </small>
+
+            </div>
+          `
+      )
+      .join('');
+
+  $('orgList').innerHTML =
+    project.organizations
+      .map(
+        item =>
+          `
+            <div class="item">
+
+              <span>
+                ${esc(item.name)}
+              </span>
+
+              <small>
+                ${
+                  item.active === false
+                    ? 'архив'
+                    : 'активно'
+                }
+              </small>
+
+            </div>
+          `
+      )
+      .join('');
+
+  $('projectMeta').innerHTML =
+    `
+      <div class="item">
+        <span>Версия структуры</span>
+        <strong>${esc(project.schemaVersion)}</strong>
+      </div>
+
+      <div class="item">
+        <span>Последнее изменение</span>
+
+        <strong>
+          ${new Date(
+            project.meta.updatedAt
+          ).toLocaleString('ru-RU')}
+        </strong>
+      </div>
+
+      <div class="item">
+        <span>Последняя резервная копия</span>
+
+        <strong>
+          ${
+            project.meta.lastBackupAt
+              ? new Date(
+                  project.meta.lastBackupAt
+                ).toLocaleString(
+                  'ru-RU'
+                )
+              : 'не создавалась'
+          }
+        </strong>
+      </div>
+
+      <div class="item">
+        <span>Фронтов</span>
+        <strong>${activeFronts().length}</strong>
+      </div>
+
+      <div class="item">
+        <span>Записей факта</span>
+        <strong>${project.factLog.length}</strong>
+      </div>
+
+      <div class="item">
+        <span>Номерных элементов</span>
+
+        <strong>
+          ${
+            project.numberedElements
+              .filter(
+                item =>
+                  item.active !== false
+              )
+              .length
+          }
+        </strong>
+      </div>
+
+      <div class="item">
+        <span>Импортов</span>
+        <strong>${project.importHistory.length}</strong>
+      </div>
+    `;
+}
+
+
+async function addSimple(
+  type
 ) {
 
+  let input;
+  let list;
+  let prefix;
 
-  $('modalTitle')
-    .textContent =
-      title;
+  if (
+    type ===
+    'building'
+  ) {
+
+    input =
+      $('newBuilding');
+
+    list =
+      project.buildings;
+
+    prefix =
+      'BLD';
+  }
+
+  if (
+    type ===
+    'work'
+  ) {
+
+    input =
+      $('newWork');
+
+    list =
+      project.works;
+
+    prefix =
+      'WRK';
+  }
+
+  if (
+    type ===
+    'org'
+  ) {
+
+    input =
+      $('newOrg');
+
+    list =
+      project.organizations;
+
+    prefix =
+      'ORG';
+  }
+
+  const name =
+    input.value.trim();
+
+  if (!name) {
+    return;
+  }
+
+  if (
+    list.some(
+      item =>
+        sameText(
+          item.name,
+          name
+        )
+    )
+  ) {
+
+    alert(
+      'Такая запись уже есть.'
+    );
+
+    return;
+  }
+
+  list.push({
+    id:
+      uid(prefix),
+
+    name,
+
+    active:
+      true
+  });
+
+  input.value =
+    '';
+
+  log(
+    'Создано',
+    'Справочник',
+    name
+  );
+
+  await saveProject();
+
+  renderAll();
+}
 
 
-  $('modalBody')
-    .innerHTML =
-      html;
+async function exportBackup() {
+
+  project.meta.lastBackupAt =
+    nowIso();
+
+  await saveProject();
+
+  const payload = {
+    ...clone(project),
+
+    exportedAt:
+      nowIso(),
+
+    source:
+      'ACONS Planning local'
+  };
+
+  download(
+    `ACONS_Planning_${
+      new Date()
+        .toISOString()
+        .slice(0, 16)
+        .replace('T', '_')
+        .replace(':', '-')
+    }.json`,
+
+    JSON.stringify(
+      payload,
+      null,
+      2
+    )
+  );
+
+  renderAll();
+}
 
 
-  $('modal')
+function readJsonFile(
+  file
+) {
+
+  return file.text()
+    .then(
+      text =>
+        JSON.parse(
+          text
+        )
+    );
+}
+
+
+async function restoreProject(
+  file
+) {
+
+  try {
+
+    const data =
+      normalizeProject(
+        await readJsonFile(
+          file
+        )
+      );
+
+    if (
+      !confirm(
+        `Заменить текущий проект файлом?\n` +
+        `Фронтов в файле: ${data.fronts.length}\n` +
+        `Текущих фронтов: ${project.fronts.length}`
+      )
+    ) {
+      return;
+    }
+
+    await dbPutKey(
+      project,
+      `restore-backup-${Date.now()}`
+    );
+
+    project =
+      data;
+
+    log(
+      'Восстановлено',
+      'Проект',
+      `Загружена резервная копия ${file.name}`
+    );
+
+    await saveProject();
+
+    renderAll();
+
+    alert(
+      'Проект загружен.'
+    );
+
+  } catch (error) {
+
+    alert(
+      'Ошибка загрузки: ' +
+      error.message
+    );
+
+  } finally {
+
+    $('restoreInput').value =
+      '';
+  }
+}
+
+
+function compareCollections(
+  current,
+  incoming,
+  key = 'id'
+) {
+
+  const currentMap =
+    new Map(
+      (current || [])
+        .map(
+          item => [
+            String(
+              item[key]
+            ),
+            item
+          ]
+        )
+    );
+
+  const incomingMap =
+    new Map(
+      (incoming || [])
+        .map(
+          item => [
+            String(
+              item[key]
+            ),
+            item
+          ]
+        )
+    );
+
+  const added =
+    [];
+
+  const changed =
+    [];
+
+  const missing =
+    [];
+
+  for (
+    const [
+      id,
+      row
+    ]
+    of incomingMap
+  ) {
+
+    if (
+      !currentMap.has(id)
+    ) {
+
+      added.push(
+        row
+      );
+
+    } else if (
+      JSON.stringify(
+        currentMap.get(id)
+      ) !==
+      JSON.stringify(
+        row
+      )
+    ) {
+
+      changed.push({
+        before:
+          currentMap.get(id),
+
+        after:
+          row
+      });
+    }
+  }
+
+  for (
+    const [
+      id,
+      row
+    ]
+    of currentMap
+  ) {
+
+    if (
+      !incomingMap.has(id)
+    ) {
+
+      missing.push(
+        row
+      );
+    }
+  }
+
+  return {
+    added,
+    changed,
+    missing
+  };
+}
+
+
+function diffFields(
+  before,
+  after
+) {
+
+  const skip =
+    new Set([
+      'updatedAt',
+      'createdAt',
+      'exportedAt'
+    ]);
+
+  return uniq([
+    ...Object.keys(
+      before || {}
+    ),
+
+    ...Object.keys(
+      after || {}
+    )
+  ])
+    .filter(
+      key =>
+        !skip.has(key) &&
+        JSON.stringify(
+          before?.[key]
+        ) !==
+        JSON.stringify(
+          after?.[key]
+        )
+    )
+    .map(
+      key => ({
+        key,
+
+        before:
+          before?.[key],
+
+        after:
+          after?.[key]
+      })
+    );
+}
+
+
+function recordLabel(
+  key,
+  row
+) {
+
+  if (
+    key ===
+    'fronts'
+  ) {
+    return frontLabel(
+      row
+    );
+  }
+
+  if (
+    key ===
+    'factLog'
+  ) {
+
+    return (
+      `${row.date || ''} · ` +
+      frontLabel(
+        byId(
+          project.fronts,
+          row.frontId
+        ) ||
+        byId(
+          compareIncoming?.fronts || [],
+          row.frontId
+        )
+      )
+    );
+  }
+
+  if (
+    key ===
+    'planLog'
+  ) {
+
+    return (
+      `${row.date || ''} · ` +
+      frontLabel(
+        byId(
+          project.fronts,
+          row.frontId
+        ) ||
+        byId(
+          compareIncoming?.fronts || [],
+          row.frontId
+        )
+      )
+    );
+  }
+
+  if (
+    key ===
+    'resources'
+  ) {
+
+    return (
+      `${row.date || ''} · ` +
+      (
+        nameById(
+          project.organizations,
+          row.organizationId
+        ) ||
+        nameById(
+          compareIncoming?.organizations || [],
+          row.organizationId
+        ) ||
+        'Ресурсы'
+      )
+    );
+  }
+
+  if (
+    key ===
+    'milestones'
+  ) {
+
+    return (
+      row.title ||
+      row.id
+    );
+  }
+
+  if (
+    key ===
+    'numberedElements'
+  ) {
+
+    return (
+      `${row.elementType || 'Элемент'} ` +
+      `№${row.elementNo || ''}`
+    );
+  }
+
+  if (
+    key ===
+    'demolition'
+  ) {
+
+    return (
+      row.name ||
+      row.id
+    );
+  }
+
+  return (
+    row.name ||
+    row.title ||
+    row.id
+  );
+}
+
+
+function buildComparison(
+  incoming
+) {
+
+  const sets = [
+    ['fronts', 'Фронты'],
+    ['structures', 'Структуры'],
+    ['planLog', 'План'],
+    ['factLog', 'Факт'],
+    ['resources', 'Ресурсы'],
+    ['milestones', 'Ключевые даты'],
+    ['numberedElements', 'Номерные элементы'],
+    ['demolition', 'Демонтаж'],
+    ['buildings', 'Здания'],
+    ['works', 'Виды работ'],
+    ['organizations', 'Организации']
+  ];
+
+  compareItems =
+    [];
+
+  const summary =
+    [];
+
+  for (
+    const [
+      key,
+      label
+    ]
+    of sets
+  ) {
+
+    const comparison =
+      compareCollections(
+        project[key],
+        incoming[key],
+        'id'
+      );
+
+    comparison.added
+      .forEach(
+        row =>
+          compareItems.push({
+            token:
+              uid('CMP'),
+
+            key,
+
+            label,
+
+            type:
+              'added',
+
+            id:
+              row.id,
+
+            after:
+              row,
+
+            diffs:
+              []
+          })
+      );
+
+    comparison.changed
+      .forEach(
+        pair =>
+          compareItems.push({
+            token:
+              uid('CMP'),
+
+            key,
+
+            label,
+
+            type:
+              'changed',
+
+            id:
+              pair.after.id,
+
+            before:
+              pair.before,
+
+            after:
+              pair.after,
+
+            diffs:
+              diffFields(
+                pair.before,
+                pair.after
+              )
+          })
+      );
+
+    summary.push({
+      key,
+      label,
+      ...comparison
+    });
+  }
+
+  return summary;
+}
+
+
+async function compareProjectFile(
+  file
+) {
+
+  try {
+
+    compareIncoming =
+      normalizeProject(
+        await readJsonFile(
+          file
+        )
+      );
+
+    const comparison =
+      buildComparison(
+        compareIncoming
+      );
+
+    const totals =
+      comparison.reduce(
+        (result, section) => ({
+          added:
+            result.added +
+            section.added.length,
+
+          changed:
+            result.changed +
+            section.changed.length,
+
+          missing:
+            result.missing +
+            section.missing.length
+        }),
+        {
+          added:
+            0,
+
+          changed:
+            0,
+
+          missing:
+            0
+        }
+      );
+
+    const detail =
+      compareItems
+        .slice(
+          0,
+          500
+        )
+        .map(
+          item =>
+            `
+              <div class="compare-record">
+
+                <label>
+
+                  <input
+                    type="checkbox"
+                    data-cmp="${item.token}"
+                    checked>
+
+                  <span>
+
+                    <b>
+                      ${
+                        item.type ===
+                          'added'
+                          ? 'НОВОЕ'
+                          : 'ИЗМЕНЕНО'
+                      }
+                      ·
+                      ${esc(item.label)}
+                    </b>
+
+                    <br>
+
+                    ${esc(
+                      recordLabel(
+                        item.key,
+                        item.after
+                      )
+                    )}
+
+                  </span>
+
+                </label>
+
+                ${
+                  item.diffs.length
+                    ? `
+                        <small>
+                          ${
+                            item.diffs
+                              .slice(
+                                0,
+                                8
+                              )
+                              .map(
+                                diff =>
+                                  `${esc(diff.key)}: ` +
+                                  `${esc(String(diff.before ?? '—'))}` +
+                                  ` → ` +
+                                  `${esc(String(diff.after ?? '—'))}`
+                              )
+                              .join(' · ')
+                          }
+                        </small>
+                      `
+                    : ''
+                }
+
+              </div>
+            `
+        )
+        .join('');
+
+    openModal(
+      'Сравнение проекта',
+
+      `
+        <p>
+          <b>Файл:</b>
+          ${esc(file.name)}
+        </p>
+
+        <div class="compare-summary">
+
+          <div class="compare-box">
+            <span>Новых</span>
+            <h2>${totals.added}</h2>
+          </div>
+
+          <div class="compare-box">
+            <span>Изменено</span>
+            <h2>${totals.changed}</h2>
+          </div>
+
+          <div class="compare-box">
+            <span>Есть только у меня</span>
+            <h2>${totals.missing}</h2>
+          </div>
+
+        </div>
+
+        <div class="compare-details">
+
+          ${
+            detail ||
+            '<div class="muted">Различий для применения нет.</div>'
+          }
+
+          ${
+            compareItems.length > 500
+              ? `
+                  <div class="notice warn">
+                    Показаны первые 500 изменений.
+                  </div>
+                `
+              : ''
+          }
+
+        </div>
+
+        <p class="muted">
+          Отметь изменения, которые нужно принять.
+          Локальные записи, которых нет в файле коллеги,
+          не удаляются.
+        </p>
+
+        <div class="editor-actions">
+
+          <button
+            id="acceptSelectedCompare"
+            class="btn primary">
+            Принять отмеченные
+          </button>
+
+          <button
+            id="replaceCompare"
+            class="btn danger">
+            Заменить проект целиком
+          </button>
+
+        </div>
+      `
+    );
+
+    $('acceptSelectedCompare').onclick =
+      acceptSelectedCompared;
+
+    $('replaceCompare').onclick =
+      replaceCompared;
+
+  } catch (error) {
+
+    alert(
+      'Ошибка сравнения: ' +
+      error.message
+    );
+
+  } finally {
+
+    $('compareInput').value =
+      '';
+  }
+}
+
+
+async function acceptSelectedCompared() {
+
+  if (!compareIncoming) {
+    return;
+  }
+
+  const selected =
+    new Set(
+      [
+        ...document.querySelectorAll(
+          '[data-cmp]:checked'
+        )
+      ].map(
+        checkbox =>
+          checkbox.dataset.cmp
+      )
+    );
+
+  const chosen =
+    compareItems.filter(
+      item =>
+        selected.has(
+          item.token
+        )
+    );
+
+  for (
+    const item
+    of chosen
+  ) {
+
+    const list =
+      project[item.key];
+
+    const index =
+      list.findIndex(
+        row =>
+          String(row.id) ===
+          String(item.id)
+      );
+
+    if (
+      index >= 0
+    ) {
+
+      list[index] =
+        clone(
+          item.after
+        );
+
+    } else {
+
+      list.push(
+        clone(
+          item.after
+        )
+      );
+    }
+  }
+
+  log(
+    'Сравнение',
+    'Проект',
+    `Принято изменений: ${chosen.length}`
+  );
+
+  await saveProject();
+
+  compareIncoming =
+    null;
+
+  compareItems =
+    [];
+
+  closeModal();
+
+  renderAll();
+
+  alert(
+    `Принято изменений: ${chosen.length}`
+  );
+}
+
+
+async function replaceCompared() {
+
+  if (!compareIncoming) {
+    return;
+  }
+
+  if (
+    !confirm(
+      'Полностью заменить текущий проект версией из файла?'
+    )
+  ) {
+    return;
+  }
+
+  await dbPutKey(
+    project,
+    `compare-replace-backup-${Date.now()}`
+  );
+
+  project =
+    compareIncoming;
+
+  log(
+    'Заменено',
+    'Проект',
+    'Применена сравниваемая версия целиком'
+  );
+
+  await saveProject();
+
+  compareIncoming =
+    null;
+
+  compareItems =
+    [];
+
+  closeModal();
+
+  renderAll();
+}
+
+
+function renderBackupNotice() {
+
+  const last =
+    project?.meta
+      ?.lastBackupAt;
+
+  const migration =
+    ` · структура ${project?.schemaVersion || '—'}`;
+
+  if (!last) {
+
+    $('backupNotice').textContent =
+      'Резервная копия проекта еще не создавалась' +
+      migration;
+
+    return;
+  }
+
+  const days =
+    Math.floor(
+      (
+        Date.now() -
+        Date.parse(last)
+      ) /
+      86400000
+    );
+
+  $('backupNotice').textContent =
+    `Последняя резервная копия: ` +
+    `${new Date(last).toLocaleString('ru-RU')}` +
+    `${days >= 7 ? ' · рекомендуется создать новую копию' : ''}` +
+    migration;
+}
+
+
+/* =========================================================
+   ИМПОРТ
+   ========================================================= */
+
+
+function normDate(value) {
+
+  if (
+    value === null ||
+    value === undefined ||
+    value === ''
+  ) {
+    return '';
+  }
+
+  if (
+    value instanceof Date &&
+    !Number.isNaN(
+      value.getTime()
+    )
+  ) {
+
+    return (
+      `${value.getFullYear()}-` +
+      `${String(value.getMonth() + 1).padStart(2, '0')}-` +
+      `${String(value.getDate()).padStart(2, '0')}`
+    );
+  }
+
+  if (
+    typeof value ===
+      'number' &&
+    value > 20000 &&
+    value < 80000
+  ) {
+
+    const parsed =
+      XLSX.SSF.parse_date_code(
+        value
+      );
+
+    if (parsed) {
+
+      return (
+        `${parsed.y}-` +
+        `${String(parsed.m).padStart(2, '0')}-` +
+        `${String(parsed.d).padStart(2, '0')}`
+      );
+    }
+  }
+
+  const text =
+    normText(
+      value
+    );
+
+  let match =
+    text.match(
+      /^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})$/
+    );
+
+  if (match) {
+
+    const year =
+      match[3].length === 2
+        ? '20' + match[3]
+        : match[3];
+
+    return (
+      `${year}-` +
+      `${match[2].padStart(2, '0')}-` +
+      `${match[1].padStart(2, '0')}`
+    );
+  }
+
+  match =
+    text.match(
+      /^(\d{4})[.\/-](\d{1,2})[.\/-](\d{1,2})$/
+    );
+
+  if (match) {
+
+    return (
+      `${match[1]}-` +
+      `${match[2].padStart(2, '0')}-` +
+      `${match[3].padStart(2, '0')}`
+    );
+  }
+
+  return '';
+}
+
+
+function ensureNamed(
+  list,
+  prefix,
+  name,
+  extra = {}
+) {
+
+  const clean =
+    normText(
+      name
+    );
+
+  if (!clean) {
+    return null;
+  }
+
+  let item =
+    list.find(
+      row =>
+        sameText(
+          row.name,
+          clean
+        )
+    );
+
+  if (!item) {
+
+    item = {
+      id:
+        uid(prefix),
+
+      name:
+        clean,
+
+      active:
+        true,
+
+      ...extra
+    };
+
+    list.push(
+      item
+    );
+  }
+
+  return item;
+}
+
+
+function structureSignature(
+  structure
+) {
+
+  return [
+    structure.buildingId || '',
+    structure.block || '',
+    structure.floor ?? '',
+    structure.capture || '',
+    structure.axis || '',
+    structure.side || '',
+    structure.zone || '',
+    structure.roomNo || '',
+    structure.roomName || ''
+  ]
+    .map(
+      value =>
+        normKey(
+          value
+        )
+    )
+    .join('|');
+}
+
+
+function ensureStructure(
+  data
+) {
+
+  const candidate = {
+
+    buildingId:
+      data.buildingId || '',
+
+    block:
+      normText(
+        data.block
+      ),
+
+    floor:
+      normText(
+        data.floor
+      ),
+
+    capture:
+      normText(
+        data.capture
+      ),
+
+    axis:
+      normText(
+        data.axis
+      ),
+
+    side:
+      normText(
+        data.side
+      ),
+
+    zone:
+      normText(
+        data.zone
+      ),
+
+    roomNo:
+      normText(
+        data.roomNo
+      ),
+
+    roomName:
+      normText(
+        data.roomName
+      )
+  };
+
+  const signature =
+    structureSignature(
+      candidate
+    );
+
+  let structure =
+    project.structures
+      .find(
+        row =>
+          (
+            row.signature ||
+            structureSignature(
+              row
+            )
+          ) ===
+          signature
+      );
+
+  if (!structure) {
+
+    structure = {
+      id:
+        uid('STR'),
+
+      ...candidate,
+
+      signature
+    };
+
+    project.structures.push(
+      structure
+    );
+
+  } else if (
+    !structure.signature
+  ) {
+
+    structure.signature =
+      signature;
+  }
+
+  return structure;
+}
+
+
+const FIELD_DEFS = {
+
+  building: {
+    label:
+      'Здание',
+
+    aliases: [
+      'здание',
+      'объект',
+      'сооружение',
+      'корпус'
+    ]
+  },
+
+  block: {
+    label:
+      'Блок',
+
+    aliases: [
+      'блок',
+      'секция'
+    ]
+  },
+
+  floor: {
+    label:
+      'Этаж',
+
+    aliases: [
+      'этаж',
+      'уровень'
+    ]
+  },
+
+  capture: {
+    label:
+      'Захватка',
+
+    aliases: [
+      'захватка',
+      'номер захватки',
+      '№ захватки',
+      'блок/захватка',
+      'блок захватка'
+    ]
+  },
+
+  axis: {
+    label:
+      'Ось',
+
+    aliases: [
+      'ось',
+      'оси'
+    ]
+  },
+
+  side: {
+    label:
+      'Сторона',
+
+    aliases: [
+      'сторона',
+      'фасад',
+      'ось сторона'
+    ]
+  },
+
+  zone: {
+    label:
+      'Зона',
+
+    aliases: [
+      'зона',
+      'участок',
+      'ряд'
+    ]
+  },
+
+  roomNo: {
+    label:
+      '№ помещения',
+
+    aliases: [
+      '№ помещения',
+      'номер помещения',
+      'помещение №'
+    ]
+  },
+
+  roomName: {
+    label:
+      'Помещение',
+
+    aliases: [
+      'помещение',
+      'название помещения'
+    ]
+  },
+
+  work: {
+    label:
+      'Работа',
+
+    aliases: [
+      'работа',
+      'вид работы',
+      'наименование работы',
+      'название задачи',
+      'наименование задачи',
+      'вид работ'
+    ]
+  },
+
+  organization: {
+    label:
+      'Организация',
+
+    aliases: [
+      'организация',
+      'подрядчик',
+      'субподрядчик',
+      'исполнитель'
+    ]
+  },
+
+  status: {
+    label:
+      'Статус',
+
+    aliases: [
+      'статус',
+      'состояние'
+    ]
+  },
+
+  unit: {
+    label:
+      'Ед. изм.',
+
+    aliases: [
+      'ед. изм.',
+      'ед изм',
+      'единица измерения',
+      'единица'
+    ]
+  },
+
+  totalQty: {
+    label:
+      'Общий объем',
+
+    aliases: [
+      'общий объем',
+      'общий объём',
+      'объем',
+      'объём',
+      'всего'
+    ]
+  },
+
+  doneQty: {
+    label:
+      'Накопительный итог',
+
+    aliases: [
+      'накопительный итог',
+      'выполнено накопительно',
+      'накопительно',
+      'факт накопительно'
+    ]
+  },
+
+  contractStart: {
+    label:
+      'Договорное начало',
+
+    aliases: [
+      'договорное начало',
+      'начало договор',
+      'дата начала договор'
+    ]
+  },
+
+  contractEnd: {
+    label:
+      'Договорное окончание',
+
+    aliases: [
+      'договорное окончание',
+      'окончание договор',
+      'дата окончания договор'
+    ]
+  },
+
+  baselineStart: {
+    label:
+      'Базовое начало',
+
+    aliases: [
+      'базовое начало',
+      'начало база'
+    ]
+  },
+
+  baselineEnd: {
+    label:
+      'Базовое окончание',
+
+    aliases: [
+      'базовое окончание',
+      'окончание база'
+    ]
+  },
+
+  planStart: {
+    label:
+      'Рабочее/план начало',
+
+    aliases: [
+      'рабочее начало',
+      'начало план',
+      'план начало',
+      'дата начала',
+      'начало'
+    ]
+  },
+
+  planEnd: {
+    label:
+      'Рабочее/план окончание',
+
+    aliases: [
+      'рабочее окончание',
+      'окончание план',
+      'план окончание',
+      'дата окончания',
+      'окончание'
+    ]
+  },
+
+  factStart: {
+    label:
+      'Факт начало',
+
+    aliases: [
+      'начало факт',
+      'факт начало',
+      'фактическое начало',
+      'дата начала факт'
+    ]
+  },
+
+  factEnd: {
+    label:
+      'Факт окончание',
+
+    aliases: [
+      'окончание факт',
+      'факт окончание',
+      'фактическое окончание',
+      'дата окончания факт'
+    ]
+  },
+
+  forecastEnd: {
+    label:
+      'Прогноз окончание',
+
+    aliases: [
+      'прогнозное окончание',
+      'прогноз окончания',
+      'прогноз'
+    ]
+  },
+
+  date: {
+    label:
+      'Дата',
+
+    aliases: [
+      'дата',
+      'дата отчета',
+      'дата отчёта',
+      'отчетная дата',
+      'отчётная дата'
+    ]
+  },
+
+  qty: {
+    label:
+      'Факт за период',
+
+    aliases: [
+      'факт за период',
+      'выполнено за период',
+      'объем за день',
+      'объём за день',
+      'факт объем',
+      'факт объём',
+      'выполнено'
+    ]
+  },
+
+  cumulative: {
+    label:
+      'Накопительно',
+
+    aliases: [
+      'накопительно',
+      'накопительный итог',
+      'выполнено накопительно'
+    ]
+  },
+
+  people: {
+    label:
+      'Люди',
+
+    aliases: [
+      'люди',
+      'рабочие всего',
+      'численность',
+      'количество людей'
+    ]
+  },
+
+  itr: {
+    label:
+      'ИТР',
+
+    aliases: [
+      'итр',
+      'инженерно технические работники'
+    ]
+  },
+
+  workers: {
+    label:
+      'Рабочие',
+
+    aliases: [
+      'рабочие',
+      'рабочих'
+    ]
+  },
+
+  mechanizers: {
+    label:
+      'Механизаторы',
+
+    aliases: [
+      'механизаторы',
+      'машинисты'
+    ]
+  },
+
+  equipmentType: {
+    label:
+      'Тип техники',
+
+    aliases: [
+      'тип техники',
+      'техника',
+      'механизм',
+      'механизмы'
+    ]
+  },
+
+  equipmentQty: {
+    label:
+      'Количество техники',
+
+    aliases: [
+      'количество техники',
+      'кол во техники',
+      'кол. техники',
+      'техника количество'
+    ]
+  },
+
+  elementType: {
+    label:
+      'Тип элемента',
+
+    aliases: [
+      'тип элемента',
+      'элемент',
+      'вид элемента',
+      'тип сваи',
+      'тип анкера'
+    ]
+  },
+
+  elementNo: {
+    label:
+      'Номер элемента',
+
+    aliases: [
+      'номер элемента',
+      'порядковый номер',
+      '№ элемента',
+      'номер сваи',
+      '№ сваи',
+      'номер анкера',
+      '№ анкера',
+      'номер',
+      'порядковые номера'
+    ]
+  },
+
+  title: {
+    label:
+      'Наименование КД',
+
+    aliases: [
+      'ключевая дата',
+      'контрольная дата',
+      'наименование кд',
+      'формулировка',
+      'наименование'
+    ]
+  },
+
+  comment: {
+    label:
+      'Комментарий',
+
+    aliases: [
+      'комментарий',
+      'примечание',
+      'описание'
+    ]
+  }
+};
+
+
+const MODE_FIELDS = {
+
+  fronts: [
+    'building',
+    'block',
+    'floor',
+    'capture',
+    'axis',
+    'side',
+    'zone',
+    'roomNo',
+    'roomName',
+    'work',
+    'organization',
+    'status',
+    'unit',
+    'totalQty',
+    'doneQty',
+    'contractStart',
+    'contractEnd',
+    'baselineStart',
+    'baselineEnd',
+    'planStart',
+    'planEnd',
+    'factStart',
+    'factEnd',
+    'forecastEnd',
+    'comment'
+  ],
+
+  fact: [
+    'date',
+    'building',
+    'block',
+    'floor',
+    'capture',
+    'axis',
+    'side',
+    'zone',
+    'roomNo',
+    'work',
+    'organization',
+    'qty',
+    'cumulative',
+    'people',
+    'status',
+    'comment'
+  ],
+
+  resources: [
+    'date',
+    'organization',
+    'building',
+    'work',
+    'itr',
+    'workers',
+    'mechanizers',
+    'equipmentType',
+    'equipmentQty',
+    'comment'
+  ],
+
+  elements: [
+    'elementType',
+    'elementNo',
+    'building',
+    'capture',
+    'zone',
+    'work',
+    'status',
+    'comment'
+  ],
+
+  milestones: [
+    'title',
+    'building',
+    'contractEnd',
+    'planEnd',
+    'forecastEnd',
+    'factEnd',
+    'status',
+    'comment'
+  ]
+};
+
+
+const MODE_LABELS = {
+  fronts:
+    'Фронты / рабочий график',
+
+  fact:
+    'Факт выполненных работ',
+
+  resources:
+    'Ресурсы',
+
+  elements:
+    'Номерные элементы',
+
+  milestones:
+    'Ключевые даты'
+};
+
+
+function matchField(
+  header,
+  mode
+) {
+
+  const normalizedHeader =
+    normKey(
+      header
+    );
+
+  let best =
+    '';
+
+  let bestScore =
+    0;
+
+  for (
+    const key
+    of MODE_FIELDS[mode] || []
+  ) {
+
+    const definition =
+      FIELD_DEFS[key];
+
+    if (!definition) {
+      continue;
+    }
+
+    for (
+      const alias
+      of [
+        definition.label,
+        ...definition.aliases
+      ]
+    ) {
+
+      const normalizedAlias =
+        normKey(
+          alias
+        );
+
+      let score =
+        0;
+
+      if (
+        normalizedHeader ===
+        normalizedAlias
+      ) {
+
+        score =
+          100;
+
+      } else if (
+        normalizedHeader.includes(
+          normalizedAlias
+        ) ||
+        normalizedAlias.includes(
+          normalizedHeader
+        )
+      ) {
+
+        score =
+          Math.min(
+            normalizedHeader.length,
+            normalizedAlias.length
+          );
+      }
+
+      if (
+        score >
+        bestScore
+      ) {
+
+        best =
+          key;
+
+        bestScore =
+          score;
+      }
+    }
+  }
+
+  return bestScore >= 4
+    ? best
+    : '';
+}
+
+
+function headerScore(
+  row
+) {
+
+  let score =
+    0;
+
+  for (
+    const cell
+    of row || []
+  ) {
+
+    const normalized =
+      normKey(
+        cell
+      );
+
+    if (!normalized) {
+      continue;
+    }
+
+    for (
+      const definition
+      of Object.values(
+        FIELD_DEFS
+      )
+    ) {
+
+      const found =
+        [
+          definition.label,
+          ...definition.aliases
+        ]
+          .some(
+            alias =>
+              normKey(alias) ===
+              normalized
+          );
+
+      if (found) {
+
+        score++;
+
+        break;
+      }
+    }
+  }
+
+  return score;
+}
+
+
+function detectHeaderRow(
+  matrix
+) {
+
+  let best = {
+    index:
+      0,
+
+    score:
+      -1
+  };
+
+  for (
+    let index = 0;
+    index <
+      Math.min(
+        matrix.length,
+        35
+      );
+    index++
+  ) {
+
+    const score =
+      headerScore(
+        matrix[index]
+      );
+
+    if (
+      score >
+      best.score
+    ) {
+
+      best = {
+        index,
+        score
+      };
+    }
+  }
+
+  return best.index;
+}
+
+
+function uniqueHeaders(
+  row
+) {
+
+  const used =
+    new Map();
+
+  return (row || [])
+    .map(
+      (value, index) => {
+
+        let header =
+          normText(value) ||
+          `Колонка ${index + 1}`;
+
+        const number =
+          (
+            used.get(header) ||
+            0
+          ) + 1;
+
+        used.set(
+          header,
+          number
+        );
+
+        if (
+          number > 1
+        ) {
+
+          header =
+            `${header} (${number})`;
+        }
+
+        return header;
+      }
+    );
+}
+
+
+function detectImportMode(
+  headers
+) {
+
+  const text =
+    headers
+      .map(
+        normKey
+      )
+      .join(' | ');
+
+  if (
+    /итр|механизатор|количество техники|рабочие/.test(text) &&
+    /дата/.test(text)
+  ) {
+    return 'resources';
+  }
+
+  if (
+    /порядковый номер|номер сваи|номер анкера|тип элемента/.test(text)
+  ) {
+    return 'elements';
+  }
+
+  if (
+    /ключевая дата|контрольная дата|формулировка/.test(text)
+  ) {
+    return 'milestones';
+  }
+
+  if (
+    /факт за период|объем за день|выполнено за период/.test(text) &&
+    /дата/.test(text)
+  ) {
+    return 'fact';
+  }
+
+  return 'fronts';
+}
+
+
+function buildAutoMapping(
+  mode
+) {
+
+  const mapping =
+    {};
+
+  for (
+    const header
+    of importHeaders
+  ) {
+
+    const key =
+      matchField(
+        header,
+        mode
+      );
+
+    if (
+      key &&
+      !Object.values(mapping)
+        .includes(key)
+    ) {
+
+      mapping[header] =
+        key;
+
+    } else {
+
+      mapping[header] =
+        '';
+    }
+  }
+
+  return mapping;
+}
+
+
+function mappingOptions(
+  mode,
+  selected
+) {
+
+  return `
+    <option value="">
+      Не использовать
+    </option>
+
+    ${
+      (
+        MODE_FIELDS[mode] ||
+        []
+      )
+        .map(
+          key =>
+            `
+              <option
+                value="${key}"
+                ${
+                  key === selected
+                    ? 'selected'
+                    : ''
+                }>
+                ${
+                  esc(
+                    FIELD_DEFS[key]
+                      ?.label ||
+                    key
+                  )
+                }
+              </option>
+            `
+        )
+        .join('')
+    }
+  `;
+}
+
+
+function renderImportMapping() {
+
+  $('importMappingCard')
     .classList
     .remove(
       'hidden'
     );
 
+  $('importMapping').innerHTML =
+    importHeaders
+      .map(
+        (header, index) =>
+          `
+            <div class="mapping-item">
+
+              <b>
+                ${esc(header)}
+              </b>
+
+              <select
+                data-map-header="${index}">
+
+                ${mappingOptions(
+                  importDetectedMode,
+                  importMapping[header] ||
+                  ''
+                )}
+
+              </select>
+
+            </div>
+          `
+      )
+      .join('');
+
+  document
+    .querySelectorAll(
+      '[data-map-header]'
+    )
+    .forEach(
+      select =>
+        select.onchange =
+          () => {
+
+            const header =
+              importHeaders[
+                num(
+                  select.dataset
+                    .mapHeader
+                )
+              ];
+
+            const chosen =
+              select.value;
+
+            if (chosen) {
+
+              for (
+                const key
+                of Object.keys(
+                  importMapping
+                )
+              ) {
+
+                if (
+                  importMapping[key] ===
+                  chosen
+                ) {
+                  importMapping[key] =
+                    '';
+                }
+              }
+
+              importMapping[header] =
+                chosen;
+
+            } else {
+
+              importMapping[header] =
+                '';
+            }
+
+            renderImportMapping();
+          }
+    );
 }
 
 
+function mappedValue(
+  row,
+  key
+) {
 
-function closeModal() {
+  const header =
+    Object.keys(
+      importMapping
+    )
+      .find(
+        item =>
+          importMapping[item] ===
+          key
+      );
+
+  return header
+    ? row[header]
+    : '';
+}
 
 
-  $('modal')
+function applyFillDown(
+  rows,
+  mode
+) {
+
+  if (
+    !$('importFillDown').checked
+  ) {
+    return rows;
+  }
+
+  const keys =
+    mode === 'fronts'
+      ? [
+          'building',
+          'block',
+          'work'
+        ]
+      : mode === 'fact'
+        ? [
+            'building',
+            'block',
+            'work'
+          ]
+        : mode === 'elements'
+          ? [
+              'elementType',
+              'building'
+            ]
+          : mode === 'resources'
+            ? [
+                'organization',
+                'building'
+              ]
+            : [
+                'building',
+                'title'
+              ];
+
+  const last =
+    {};
+
+  return rows.map(
+    row => {
+
+      const output = {
+        ...row
+      };
+
+      for (
+        const key
+        of keys
+      ) {
+
+        const header =
+          Object.keys(
+            importMapping
+          )
+            .find(
+              item =>
+                importMapping[item] ===
+                key
+            );
+
+        if (!header) {
+          continue;
+        }
+
+        if (
+          normText(
+            output[header]
+          )
+        ) {
+
+          last[key] =
+            output[header];
+
+        } else if (
+          last[key] !==
+          undefined
+        ) {
+
+          output[header] =
+            last[key];
+        }
+      }
+
+      return output;
+    }
+  );
+}
+
+
+function importRowObject(
+  row,
+  index
+) {
+
+  return {
+    raw:
+      row,
+
+    rowNumber:
+      index + 1,
+
+    status:
+      '',
+
+    message:
+      '',
+
+    selected:
+      true,
+
+    action:
+      '',
+
+    resolved:
+      null
+  };
+}
+
+
+function findMatchingFrontByMapped(
+  row
+) {
+
+  const buildingName =
+    normText(
+      mappedValue(
+        row,
+        'building'
+      )
+    );
+
+  const workName =
+    normText(
+      mappedValue(
+        row,
+        'work'
+      )
+    );
+
+  if (
+    !buildingName ||
+    !workName
+  ) {
+    return null;
+  }
+
+  const building =
+    project.buildings
+      .find(
+        item =>
+          sameText(
+            item.name,
+            buildingName
+          )
+      );
+
+  const work =
+    project.works
+      .find(
+        item =>
+          sameText(
+            item.name,
+            workName
+          )
+      );
+
+  if (
+    !building ||
+    !work
+  ) {
+    return null;
+  }
+
+  const signature =
+    structureSignature({
+      buildingId:
+        building.id,
+
+      block:
+        mappedValue(
+          row,
+          'block'
+        ),
+
+      floor:
+        mappedValue(
+          row,
+          'floor'
+        ),
+
+      capture:
+        mappedValue(
+          row,
+          'capture'
+        ),
+
+      axis:
+        mappedValue(
+          row,
+          'axis'
+        ),
+
+      side:
+        mappedValue(
+          row,
+          'side'
+        ),
+
+      zone:
+        mappedValue(
+          row,
+          'zone'
+        ),
+
+      roomNo:
+        mappedValue(
+          row,
+          'roomNo'
+        ),
+
+      roomName:
+        mappedValue(
+          row,
+          'roomName'
+        )
+    });
+
+  const structure =
+    project.structures
+      .find(
+        item =>
+          (
+            item.signature ||
+            structureSignature(
+              item
+            )
+          ) ===
+          signature
+      );
+
+  if (!structure) {
+    return null;
+  }
+
+  return project.fronts
+    .find(
+      front =>
+        front.active !== false &&
+        front.structureId ===
+          structure.id &&
+        front.workId ===
+          work.id
+    ) ||
+    null;
+}
+
+
+function previewFrontRow(
+  item
+) {
+
+  const row =
+    item.raw;
+
+  const building =
+    normText(
+      mappedValue(
+        row,
+        'building'
+      )
+    );
+
+  const work =
+    normText(
+      mappedValue(
+        row,
+        'work'
+      )
+    );
+
+  if (
+    !building ||
+    !work
+  ) {
+
+    item.status =
+      'Ошибка';
+
+    item.message =
+      'Нужны «Здание» и «Работа»';
+
+    item.selected =
+      false;
+
+    return;
+  }
+
+  if (
+    /ключев|контрольн/.test(
+      normKey(work)
+    )
+  ) {
+
+    item.status =
+      'Похоже на КД';
+
+    item.message =
+      'Строка не будет импортирована как обычный фронт';
+
+    item.selected =
+      false;
+
+    item.action =
+      'milestone-candidate';
+
+    return;
+  }
+
+  const found =
+    findMatchingFrontByMapped(
+      row
+    );
+
+  item.action =
+    found
+      ? 'update'
+      : 'create';
+
+  item.status =
+    found
+      ? 'Обновление'
+      : 'Новый фронт';
+
+  item.message =
+    found
+      ? frontLabel(found)
+      : `${building} · ${work}`;
+
+  item.resolved =
+    found;
+}
+
+
+function previewFactRow(
+  item
+) {
+
+  const row =
+    item.raw;
+
+  const date =
+    normDate(
+      mappedValue(
+        row,
+        'date'
+      )
+    );
+
+  const work =
+    normText(
+      mappedValue(
+        row,
+        'work'
+      )
+    );
+
+  const building =
+    normText(
+      mappedValue(
+        row,
+        'building'
+      )
+    );
+
+  if (
+    !date ||
+    !work ||
+    !building
+  ) {
+
+    item.status =
+      'Ошибка';
+
+    item.message =
+      'Нужны дата, здание и работа';
+
+    item.selected =
+      false;
+
+    return;
+  }
+
+  const found =
+    findMatchingFrontByMapped(
+      row
+    );
+
+  item.action =
+    found
+      ? 'append'
+      : 'create-front-and-append';
+
+  item.status =
+    found
+      ? 'Добавить факт'
+      : 'Новый фронт + факт';
+
+  item.message =
+    found
+      ? frontLabel(found)
+      : `${building} · ${work}`;
+
+  item.resolved =
+    found;
+}
+
+
+function previewResourceRow(
+  item
+) {
+
+  const row =
+    item.raw;
+
+  const date =
+    normDate(
+      mappedValue(
+        row,
+        'date'
+      )
+    );
+
+  if (!date) {
+
+    item.status =
+      'Ошибка';
+
+    item.message =
+      'Не распознана дата';
+
+    item.selected =
+      false;
+
+    return;
+  }
+
+  item.action =
+    'append';
+
+  item.status =
+    'Добавить ресурсы';
+
+  item.message =
+    normText(
+      mappedValue(
+        row,
+        'organization'
+      )
+    ) ||
+    'Без организации';
+}
+
+
+function previewElementRow(
+  item
+) {
+
+  const row =
+    item.raw;
+
+  const type =
+    normText(
+      mappedValue(
+        row,
+        'elementType'
+      )
+    ) ||
+    normText(
+      mappedValue(
+        row,
+        'work'
+      )
+    );
+
+  const number =
+    normText(
+      mappedValue(
+        row,
+        'elementNo'
+      )
+    );
+
+  if (
+    !type ||
+    !number
+  ) {
+
+    item.status =
+      'Ошибка';
+
+    item.message =
+      'Нужны тип элемента и номер';
+
+    item.selected =
+      false;
+
+    return;
+  }
+
+  const buildingName =
+    normText(
+      mappedValue(
+        row,
+        'building'
+      )
+    );
+
+  const building =
+    project.buildings
+      .find(
+        value =>
+          sameText(
+            value.name,
+            buildingName
+          )
+      );
+
+  const candidate = {
+    elementType:
+      type,
+
+    elementNo:
+      number,
+
+    buildingId:
+      building?.id ||
+      '',
+
+    capture:
+      normText(
+        mappedValue(
+          row,
+          'capture'
+        )
+      ),
+
+    zone:
+      normText(
+        mappedValue(
+          row,
+          'zone'
+        )
+      ),
+
+    uniqueScope:
+      'context'
+  };
+
+  const duplicate =
+    findElementDuplicate(
+      candidate
+    );
+
+  if (duplicate) {
+
+    item.status =
+      'Дубль';
+
+    item.message =
+      `Уже есть: ${duplicate.elementType} №${duplicate.elementNo}`;
+
+    item.selected =
+      false;
+
+    item.action =
+      'duplicate';
+
+    return;
+  }
+
+  item.status =
+    'Новый элемент';
+
+  item.message =
+    `${type} №${number}`;
+
+  item.action =
+    'create';
+}
+
+
+function previewMilestoneRow(
+  item
+) {
+
+  const row =
+    item.raw;
+
+  const title =
+    normText(
+      mappedValue(
+        row,
+        'title'
+      )
+    ) ||
+    normText(
+      mappedValue(
+        row,
+        'work'
+      )
+    );
+
+  if (!title) {
+
+    item.status =
+      'Ошибка';
+
+    item.message =
+      'Не найдено наименование ключевой даты';
+
+    item.selected =
+      false;
+
+    return;
+  }
+
+  const buildingName =
+    normText(
+      mappedValue(
+        row,
+        'building'
+      )
+    );
+
+  const building =
+    project.buildings
+      .find(
+        value =>
+          sameText(
+            value.name,
+            buildingName
+          )
+      );
+
+  const contractDate =
+    normDate(
+      mappedValue(
+        row,
+        'contractEnd'
+      )
+    );
+
+  const found =
+    project.milestones
+      .find(
+        milestone =>
+          sameText(
+            milestone.title,
+            title
+          ) &&
+          (
+            !building ||
+            milestone.buildingId ===
+              building.id
+          ) &&
+          (
+            !contractDate ||
+            milestone.contractDate ===
+              contractDate
+          )
+      );
+
+  item.status =
+    found
+      ? 'Обновление'
+      : 'Новая КД';
+
+  item.message =
+    title;
+
+  item.action =
+    found
+      ? 'update'
+      : 'create';
+
+  item.resolved =
+    found;
+}
+
+
+function analyzeImport() {
+
+  if (
+    !importWorkbook ||
+    !importSheetName
+  ) {
+    return;
+  }
+
+  readSelectedSheet();
+
+  const requested =
+    $('importMode').value;
+
+  const nextMode =
+    requested === 'auto'
+      ? detectImportMode(
+          importHeaders
+        )
+      : requested;
+
+  if (
+    nextMode !==
+      importMappingMode ||
+    !Object.keys(
+      importMapping
+    ).length
+  ) {
+
+    importMapping =
+      buildAutoMapping(
+        nextMode
+      );
+
+    importMappingMode =
+      nextMode;
+  }
+
+  importDetectedMode =
+    nextMode;
+
+  renderImportMapping();
+
+  const filled =
+    applyFillDown(
+      importRawRows,
+      importDetectedMode
+    );
+
+  importRows =
+    filled.map(
+      (row, index) =>
+        importRowObject(
+          row,
+          index
+        )
+    );
+
+  for (
+    const item
+    of importRows
+  ) {
+
+    if (
+      importDetectedMode ===
+      'fronts'
+    ) {
+      previewFrontRow(item);
+    }
+
+    if (
+      importDetectedMode ===
+      'fact'
+    ) {
+      previewFactRow(item);
+    }
+
+    if (
+      importDetectedMode ===
+      'resources'
+    ) {
+      previewResourceRow(item);
+    }
+
+    if (
+      importDetectedMode ===
+      'elements'
+    ) {
+      previewElementRow(item);
+    }
+
+    if (
+      importDetectedMode ===
+      'milestones'
+    ) {
+      previewMilestoneRow(item);
+    }
+  }
+
+  renderImportPreview();
+}
+
+
+function renderImportPreview() {
+
+  const counts =
+    {};
+
+  importRows.forEach(
+    item => {
+
+      counts[item.status] =
+        (
+          counts[item.status] ||
+          0
+        ) + 1;
+    }
+  );
+
+  $('importInfo')
     .classList
-    .add(
+    .remove(
       'hidden'
     );
 
+  $('importInfo').className =
+    'notice';
 
-  $('modalBody')
-    .innerHTML =
-      '';
+  $('importInfo').textContent =
+    `Файл: ${importFileName}\n` +
+    `Лист: ${importSheetName}\n` +
+    `Режим: ${MODE_LABELS[importDetectedMode]}\n` +
+    `Строк после заголовка: ${importRows.length}\n` +
+    `${
+      Object.entries(counts)
+        .map(
+          ([key, value]) =>
+            `${key}: ${value}`
+        )
+        .join(' · ')
+    }`;
 
+  $('importHead').innerHTML =
+    '<tr>' +
+    '<th></th>' +
+    '<th>Строка</th>' +
+    '<th>Результат</th>' +
+    '<th>Что найдено</th>' +
+    importHeaders
+      .slice(
+        0,
+        10
+      )
+      .map(
+        header =>
+          `<th>${esc(header)}</th>`
+      )
+      .join('') +
+    '</tr>';
+
+  $('importBody').innerHTML =
+    importRows
+      .slice(
+        0,
+        200
+      )
+      .map(
+        (item, index) =>
+          `
+            <tr>
+
+              <td>
+                <input
+                  type="checkbox"
+                  data-import-row="${index}"
+                  ${item.selected ? 'checked' : ''}
+                  ${
+                    item.status === 'Ошибка' ||
+                    item.status === 'Дубль'
+                      ? 'disabled'
+                      : ''
+                  }>
+              </td>
+
+              <td>
+                ${item.rowNumber}
+              </td>
+
+              <td>
+
+                <span
+                  class="import-status ${
+                    item.status === 'Ошибка' ||
+                    item.status === 'Дубль'
+                      ? 'st-error'
+                      : item.status.includes('Обнов')
+                        ? 'st-update'
+                        : item.status.includes('Нов')
+                          ? 'st-new'
+                          : 'st-warn'
+                  }">
+
+                  ${esc(item.status)}
+
+                </span>
+
+              </td>
+
+              <td>
+                ${esc(item.message)}
+              </td>
+
+              ${
+                importHeaders
+                  .slice(
+                    0,
+                    10
+                  )
+                  .map(
+                    header =>
+                      `
+                        <td>
+                          ${esc(
+                            item.raw[header]
+                          )}
+                        </td>
+                      `
+                  )
+                  .join('')
+              }
+
+            </tr>
+          `
+      )
+      .join('');
+
+  document
+    .querySelectorAll(
+      '[data-import-row]'
+    )
+    .forEach(
+      checkbox =>
+        checkbox.onchange =
+          () => {
+
+            importRows[
+              num(
+                checkbox.dataset
+                  .importRow
+              )
+            ].selected =
+              checkbox.checked;
+          }
+    );
+
+  $('commitImportBtn').disabled =
+    !importRows.some(
+      item =>
+        item.selected &&
+        item.status !==
+          'Ошибка' &&
+        item.status !==
+          'Дубль'
+    );
 }
 
+
+async function readImportFile(
+  event
+) {
+
+  const file =
+    event.target.files[0];
+
+  if (!file) {
+    return;
+  }
+
+  try {
+
+    const data =
+      await file.arrayBuffer();
+
+    importWorkbook =
+      XLSX.read(
+        data,
+        {
+          type:
+            'array',
+
+          cellDates:
+            true,
+
+          cellNF:
+            false,
+
+          cellText:
+            false
+        }
+      );
+
+    importFileName =
+      file.name;
+
+    $('importSheet').innerHTML =
+      importWorkbook.SheetNames
+        .map(
+          name =>
+            `<option>${esc(name)}</option>`
+        )
+        .join('');
+
+    $('importSheet').disabled =
+      false;
+
+    importSheetName =
+      importWorkbook
+        .SheetNames[0] ||
+      '';
+
+    $('analyzeImportBtn').disabled =
+      !importSheetName;
+
+    $('commitImportBtn').disabled =
+      true;
+
+    importMapping =
+      {};
+
+    importMappingMode =
+      '';
+
+    importRows =
+      [];
+
+    $('importInfo')
+      .classList
+      .remove(
+        'hidden'
+      );
+
+    $('importInfo').textContent =
+      `Файл прочитан. ` +
+      `Листов: ${importWorkbook.SheetNames.length}. ` +
+      `Выбери лист и нажми «Анализировать».`;
+
+    readSelectedSheet();
+
+  } catch (error) {
+
+    alert(
+      'Ошибка чтения файла: ' +
+      error.message
+    );
+  }
+}
+
+
+function readSelectedSheet() {
+
+  if (!importWorkbook) {
+    return;
+  }
+
+  importSheetName =
+    $('importSheet').value ||
+    importWorkbook.SheetNames[0];
+
+  const sheet =
+    importWorkbook.Sheets[
+      importSheetName
+    ];
+
+  importMatrix =
+    XLSX.utils.sheet_to_json(
+      sheet,
+      {
+        header:
+          1,
+
+        defval:
+          '',
+
+        raw:
+          true,
+
+        blankrows:
+          false
+      }
+    );
+
+  const headerIndex =
+    detectHeaderRow(
+      importMatrix
+    );
+
+  importHeaders =
+    uniqueHeaders(
+      importMatrix[
+        headerIndex
+      ] || []
+    );
+
+  importRawRows =
+    importMatrix
+      .slice(
+        headerIndex + 1
+      )
+      .filter(
+        row =>
+          row.some(
+            value =>
+              normText(value) !==
+              ''
+          )
+      )
+      .map(
+        row =>
+          Object.fromEntries(
+            importHeaders.map(
+              (header, index) => [
+                header,
+                row[index] ?? ''
+              ]
+            )
+          )
+      );
+}
+
+
+function importSource(
+  item
+) {
+
+  return {
+    file:
+      importFileName,
+
+    sheet:
+      importSheetName,
+
+    row:
+      item.rowNumber,
+
+    importedAt:
+      nowIso()
+  };
+}
+
+
+function buildStructureDataFromRow(
+  row,
+  buildingId
+) {
+
+  return {
+
+    buildingId,
+
+    block:
+      mappedValue(
+        row,
+        'block'
+      ),
+
+    floor:
+      mappedValue(
+        row,
+        'floor'
+      ),
+
+    capture:
+      mappedValue(
+        row,
+        'capture'
+      ),
+
+    axis:
+      mappedValue(
+        row,
+        'axis'
+      ),
+
+    side:
+      mappedValue(
+        row,
+        'side'
+      ),
+
+    zone:
+      mappedValue(
+        row,
+        'zone'
+      ),
+
+    roomNo:
+      mappedValue(
+        row,
+        'roomNo'
+      ),
+
+    roomName:
+      mappedValue(
+        row,
+        'roomName'
+      )
+  };
+}
+
+
+function ensureFrontFromImport(
+  row
+) {
+
+  const building =
+    ensureNamed(
+      project.buildings,
+      'BLD',
+      mappedValue(
+        row,
+        'building'
+      )
+    );
+
+  const work =
+    ensureNamed(
+      project.works,
+      'WRK',
+      mappedValue(
+        row,
+        'work'
+      ),
+      {
+        unit:
+          normText(
+            mappedValue(
+              row,
+              'unit'
+            )
+          )
+      }
+    );
+
+  if (
+    !building ||
+    !work
+  ) {
+    return null;
+  }
+
+  const structure =
+    ensureStructure(
+      buildStructureDataFromRow(
+        row,
+        building.id
+      )
+    );
+
+  let front =
+    project.fronts
+      .find(
+        item =>
+          item.active !==
+            false &&
+          item.structureId ===
+            structure.id &&
+          item.workId ===
+            work.id
+      );
+
+  if (!front) {
+
+    front = {
+      id:
+        uid('F'),
+
+      active:
+        true,
+
+      structureId:
+        structure.id,
+
+      workId:
+        work.id,
+
+      status:
+        'Не начато',
+
+      createdAt:
+        nowIso()
+    };
+
+    project.fronts.push(
+      front
+    );
+  }
+
+  const organizationName =
+    normText(
+      mappedValue(
+        row,
+        'organization'
+      )
+    );
+
+  const organization =
+    organizationName
+      ? ensureNamed(
+          project.organizations,
+          'ORG',
+          organizationName
+        )
+      : null;
+
+  if (organization) {
+    front.organizationId =
+      organization.id;
+  }
+
+  const unit =
+    normText(
+      mappedValue(
+        row,
+        'unit'
+      )
+    );
+
+  if (unit) {
+    front.unit =
+      unit;
+  }
+
+  return front;
+}
+
+
+function assignIfPresent(
+  object,
+  key,
+  value,
+  converter = value => value
+) {
+
+  if (
+    value !== '' &&
+    value !== null &&
+    value !== undefined &&
+    normText(value) !== ''
+  ) {
+
+    object[key] =
+      converter(
+        value
+      );
+  }
+}
+
+
+async function commitImport() {
+
+  const selected =
+    importRows
+      .filter(
+        item =>
+          item.selected &&
+          item.status !==
+            'Ошибка' &&
+          item.status !==
+            'Дубль'
+      );
+
+  if (!selected.length) {
+    return;
+  }
+
+  if (
+    !confirm(
+      `Импортировать выбранные строки: ${selected.length}?\n` +
+      `Перед импортом система создаст локальную защитную копию.`
+    )
+  ) {
+    return;
+  }
+
+  await dbPutKey(
+    project,
+    `pre-import-${Date.now()}`
+  );
+
+  let created =
+    0;
+
+  let updated =
+    0;
+
+  let appended =
+    0;
+
+  let skipped =
+    0;
+
+  const batchId =
+    uid('IMP');
+
+
+  for (
+    const item
+    of selected
+  ) {
+
+    const row =
+      item.raw;
+
+
+    /* -----------------------------------------
+       ФРОНТЫ / РАБОЧИЙ ГРАФИК
+       ----------------------------------------- */
+
+    if (
+      importDetectedMode ===
+      'fronts'
+    ) {
+
+      const existed =
+        !!findMatchingFrontByMapped(
+          row
+        );
+
+      const front =
+        ensureFrontFromImport(
+          row
+        );
+
+      if (!front) {
+
+        skipped++;
+
+        continue;
+      }
+
+      assignIfPresent(
+        front,
+        'status',
+        mappedValue(
+          row,
+          'status'
+        ),
+        normalizeStatus
+      );
+
+      assignIfPresent(
+        front,
+        'totalQty',
+        mappedValue(
+          row,
+          'totalQty'
+        ),
+        num
+      );
+
+      assignIfPresent(
+        front,
+        'doneQty',
+        mappedValue(
+          row,
+          'doneQty'
+        ),
+        num
+      );
+
+      assignIfPresent(
+        front,
+        'contractStart',
+        mappedValue(
+          row,
+          'contractStart'
+        ),
+        normDate
+      );
+
+      assignIfPresent(
+        front,
+        'contractEnd',
+        mappedValue(
+          row,
+          'contractEnd'
+        ),
+        normDate
+      );
+
+      assignIfPresent(
+        front,
+        'baselineStart',
+        mappedValue(
+          row,
+          'baselineStart'
+        ),
+        normDate
+      );
+
+      assignIfPresent(
+        front,
+        'baselineEnd',
+        mappedValue(
+          row,
+          'baselineEnd'
+        ),
+        normDate
+      );
+
+      assignIfPresent(
+        front,
+        'planStart',
+        mappedValue(
+          row,
+          'planStart'
+        ),
+        normDate
+      );
+
+      assignIfPresent(
+        front,
+        'planEnd',
+        mappedValue(
+          row,
+          'planEnd'
+        ),
+        normDate
+      );
+
+      assignIfPresent(
+        front,
+        'factStart',
+        mappedValue(
+          row,
+          'factStart'
+        ),
+        normDate
+      );
+
+      assignIfPresent(
+        front,
+        'factEnd',
+        mappedValue(
+          row,
+          'factEnd'
+        ),
+        normDate
+      );
+
+      assignIfPresent(
+        front,
+        'forecastEnd',
+        mappedValue(
+          row,
+          'forecastEnd'
+        ),
+        normDate
+      );
+
+      assignIfPresent(
+        front,
+        'comment',
+        mappedValue(
+          row,
+          'comment'
+        ),
+        normText
+      );
+
+      assignIfPresent(
+        front,
+        'unit',
+        mappedValue(
+          row,
+          'unit'
+        ),
+        normText
+      );
+
+      front.completed =
+        front.status ===
+        'Завершено';
+
+      front.updatedAt =
+        nowIso();
+
+      front.lastImport = {
+        batchId,
+        ...importSource(
+          item
+        )
+      };
+
+      if (existed) {
+        updated++;
+      } else {
+        created++;
+      }
+    }
+
+
+    /* -----------------------------------------
+       ФАКТ
+       ----------------------------------------- */
+
+    if (
+      importDetectedMode ===
+      'fact'
+    ) {
+
+      const front =
+        ensureFrontFromImport(
+          row
+        );
+
+      if (!front) {
+
+        skipped++;
+
+        continue;
+      }
+
+      const date =
+        normDate(
+          mappedValue(
+            row,
+            'date'
+          )
+        );
+
+      const qty =
+        num(
+          mappedValue(
+            row,
+            'qty'
+          )
+        );
+
+      const people =
+        num(
+          mappedValue(
+            row,
+            'people'
+          )
+        );
+
+      const comment =
+        normText(
+          mappedValue(
+            row,
+            'comment'
+          )
+        );
+
+      const fingerprint =
+        [
+          front.id,
+          date,
+          qty,
+          people,
+          comment
+        ].join('|');
+
+      if (
+        project.factLog
+          .some(
+            fact =>
+              fact.importFingerprint ===
+              fingerprint
+          )
+      ) {
+
+        skipped++;
+
+        continue;
+      }
+
+      const cumulativeRaw =
+        mappedValue(
+          row,
+          'cumulative'
+        );
+
+      const cumulative =
+        normText(
+          cumulativeRaw
+        ) !== ''
+          ? num(
+              cumulativeRaw
+            )
+          : project.factLog
+              .filter(
+                fact =>
+                  fact.frontId ===
+                    front.id &&
+                  fact.date <=
+                    date
+              )
+              .reduce(
+                (sum, fact) =>
+                  sum +
+                  num(fact.qty),
+                0
+              ) +
+            qty;
+
+      project.factLog.push({
+        id:
+          uid('FCT'),
+
+        frontId:
+          front.id,
+
+        date,
+
+        qty,
+
+        cumulative,
+
+        people,
+
+        comment,
+
+        status:
+          normText(
+            mappedValue(
+              row,
+              'status'
+            )
+          ),
+
+        createdAt:
+          nowIso(),
+
+        importFingerprint:
+          fingerprint,
+
+        source: {
+          batchId,
+          ...importSource(
+            item
+          )
+        }
+      });
+
+      front.doneQty =
+        Math.max(
+          num(
+            front.doneQty
+          ),
+          cumulative
+        );
+
+      if (
+        !front.factStart ||
+        date <
+          front.factStart
+      ) {
+
+        front.factStart =
+          date;
+      }
+
+      assignIfPresent(
+        front,
+        'status',
+        mappedValue(
+          row,
+          'status'
+        ),
+        normalizeStatus
+      );
+
+      front.updatedAt =
+        nowIso();
+
+      appended++;
+    }
+
+
+    /* -----------------------------------------
+       РЕСУРСЫ
+       ----------------------------------------- */
+
+    if (
+      importDetectedMode ===
+      'resources'
+    ) {
+
+      const date =
+        normDate(
+          mappedValue(
+            row,
+            'date'
+          )
+        );
+
+      const organizationName =
+        normText(
+          mappedValue(
+            row,
+            'organization'
+          )
+        );
+
+      const buildingName =
+        normText(
+          mappedValue(
+            row,
+            'building'
+          )
+        );
+
+      const workName =
+        normText(
+          mappedValue(
+            row,
+            'work'
+          )
+        );
+
+      const organization =
+        organizationName
+          ? ensureNamed(
+              project.organizations,
+              'ORG',
+              organizationName
+            )
+          : null;
+
+      const building =
+        buildingName
+          ? ensureNamed(
+              project.buildings,
+              'BLD',
+              buildingName
+            )
+          : null;
+
+      const work =
+        workName
+          ? ensureNamed(
+              project.works,
+              'WRK',
+              workName
+            )
+          : null;
+
+      const resource = {
+
+        id:
+          uid('R'),
+
+        date,
+
+        organizationId:
+          organization?.id ||
+          '',
+
+        buildingId:
+          building?.id ||
+          '',
+
+        workId:
+          work?.id ||
+          '',
+
+        frontId:
+          '',
+
+        itr:
+          num(
+            mappedValue(
+              row,
+              'itr'
+            )
+          ),
+
+        workers:
+          num(
+            mappedValue(
+              row,
+              'workers'
+            )
+          ),
+
+        mechanizers:
+          num(
+            mappedValue(
+              row,
+              'mechanizers'
+            )
+          ),
+
+        equipmentType:
+          normText(
+            mappedValue(
+              row,
+              'equipmentType'
+            )
+          ),
+
+        equipmentQty:
+          num(
+            mappedValue(
+              row,
+              'equipmentQty'
+            )
+          ),
+
+        comment:
+          normText(
+            mappedValue(
+              row,
+              'comment'
+            )
+          ),
+
+        createdAt:
+          nowIso(),
+
+        source: {
+          batchId,
+          ...importSource(
+            item
+          )
+        }
+      };
+
+      const fingerprint =
+        [
+          resource.date,
+          resource.organizationId,
+          resource.buildingId,
+          resource.workId,
+          resource.itr,
+          resource.workers,
+          resource.mechanizers,
+          resource.equipmentType,
+          resource.equipmentQty,
+          resource.comment
+        ].join('|');
+
+      if (
+        project.resources
+          .some(
+            existing =>
+              existing.importFingerprint ===
+              fingerprint
+          )
+      ) {
+
+        skipped++;
+
+        continue;
+      }
+
+      resource.importFingerprint =
+        fingerprint;
+
+      project.resources.push(
+        resource
+      );
+
+      appended++;
+    }
+
+
+    /* -----------------------------------------
+       НОМЕРНЫЕ ЭЛЕМЕНТЫ
+       ----------------------------------------- */
+
+    if (
+      importDetectedMode ===
+      'elements'
+    ) {
+
+      const type =
+        normText(
+          mappedValue(
+            row,
+            'elementType'
+          )
+        ) ||
+        normText(
+          mappedValue(
+            row,
+            'work'
+          )
+        );
+
+      const number =
+        normText(
+          mappedValue(
+            row,
+            'elementNo'
+          )
+        );
+
+      const buildingName =
+        normText(
+          mappedValue(
+            row,
+            'building'
+          )
+        );
+
+      const workName =
+        normText(
+          mappedValue(
+            row,
+            'work'
+          )
+        );
+
+      const building =
+        buildingName
+          ? ensureNamed(
+              project.buildings,
+              'BLD',
+              buildingName
+            )
+          : null;
+
+      const work =
+        workName
+          ? ensureNamed(
+              project.works,
+              'WRK',
+              workName
+            )
+          : null;
+
+      const element = {
+
+        id:
+          uid('EL'),
+
+        elementType:
+          type,
+
+        elementNo:
+          number,
+
+        buildingId:
+          building?.id ||
+          '',
+
+        capture:
+          normText(
+            mappedValue(
+              row,
+              'capture'
+            )
+          ),
+
+        zone:
+          normText(
+            mappedValue(
+              row,
+              'zone'
+            )
+          ),
+
+        workId:
+          work?.id ||
+          '',
+
+        frontId:
+          '',
+
+        status:
+          normalizeStatus(
+            mappedValue(
+              row,
+              'status'
+            )
+          ) ||
+          'Не начато',
+
+        comment:
+          normText(
+            mappedValue(
+              row,
+              'comment'
+            )
+          ),
+
+        uniqueScope:
+          'context',
+
+        active:
+          true,
+
+        createdAt:
+          nowIso(),
+
+        source: {
+          batchId,
+          ...importSource(
+            item
+          )
+        }
+      };
+
+      if (
+        findElementDuplicate(
+          element
+        )
+      ) {
+
+        skipped++;
+
+        continue;
+      }
+
+      project.numberedElements
+        .push(
+          element
+        );
+
+      created++;
+    }
+
+
+    /* -----------------------------------------
+       КЛЮЧЕВЫЕ ДАТЫ
+       ----------------------------------------- */
+
+    if (
+      importDetectedMode ===
+      'milestones'
+    ) {
+
+      const title =
+        normText(
+          mappedValue(
+            row,
+            'title'
+          )
+        ) ||
+        normText(
+          mappedValue(
+            row,
+            'work'
+          )
+        );
+
+      const buildingName =
+        normText(
+          mappedValue(
+            row,
+            'building'
+          )
+        );
+
+      const building =
+        buildingName
+          ? ensureNamed(
+              project.buildings,
+              'BLD',
+              buildingName
+            )
+          : null;
+
+      const contractDate =
+        normDate(
+          mappedValue(
+            row,
+            'contractEnd'
+          )
+        );
+
+      let milestone =
+        project.milestones
+          .find(
+            item =>
+              sameText(
+                item.title,
+                title
+              ) &&
+              (
+                !building ||
+                item.buildingId ===
+                  building.id
+              ) &&
+              (
+                !contractDate ||
+                item.contractDate ===
+                  contractDate
+              )
+          );
+
+      const existed =
+        !!milestone;
+
+      if (!milestone) {
+
+        milestone = {
+          id:
+            uid('M'),
+
+          createdAt:
+            nowIso()
+        };
+
+        project.milestones
+          .push(
+            milestone
+          );
+      }
+
+      Object.assign(
+        milestone,
+        {
+          title,
+
+          buildingId:
+            building?.id ||
+            milestone.buildingId ||
+            '',
+
+          contractDate:
+            contractDate ||
+            milestone.contractDate ||
+            '',
+
+          workDate:
+            normDate(
+              mappedValue(
+                row,
+                'planEnd'
+              )
+            ) ||
+            milestone.workDate ||
+            '',
+
+          forecastDate:
+            normDate(
+              mappedValue(
+                row,
+                'forecastEnd'
+              )
+            ) ||
+            milestone.forecastDate ||
+            '',
+
+          factDate:
+            normDate(
+              mappedValue(
+                row,
+                'factEnd'
+              )
+            ) ||
+            milestone.factDate ||
+            '',
+
+          status:
+            normText(
+              mappedValue(
+                row,
+                'status'
+              )
+            ) ||
+            milestone.status ||
+            'Не наступила',
+
+          comment:
+            normText(
+              mappedValue(
+                row,
+                'comment'
+              )
+            ) ||
+            milestone.comment ||
+            '',
+
+          updatedAt:
+            nowIso(),
+
+          lastImport: {
+            batchId,
+            ...importSource(
+              item
+            )
+          }
+        }
+      );
+
+      if (existed) {
+        updated++;
+      } else {
+        created++;
+      }
+    }
+  }
+
+
+  project.importHistory.unshift({
+
+    id:
+      batchId,
+
+    at:
+      nowIso(),
+
+    fileName:
+      importFileName,
+
+    sheetName:
+      importSheetName,
+
+    mode:
+      importDetectedMode,
+
+    selected:
+      selected.length,
+
+    created,
+
+    updated,
+
+    appended,
+
+    skipped,
+
+    mapping:
+      clone(
+        importMapping
+      )
+  });
+
+
+  log(
+    'Импорт',
+    'Проект',
+
+    `${importFileName} / ${importSheetName}: ` +
+    `создано ${created}, ` +
+    `обновлено ${updated}, ` +
+    `добавлено в журналы ${appended}, ` +
+    `пропущено ${skipped}`,
+
+    {
+      batchId
+    }
+  );
+
+
+  await saveProject();
+
+  renderAll();
+
+
+  $('importInfo').className =
+    'notice good';
+
+  $('importInfo').textContent =
+    `Импорт завершен.\n` +
+    `Создано: ${created}\n` +
+    `Обновлено: ${updated}\n` +
+    `Добавлено в журналы: ${appended}\n` +
+    `Пропущено: ${skipped}`;
+
+  $('commitImportBtn').disabled =
+    true;
+}
+
+
+/* =========================================================
+   ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК
+   ========================================================= */
+
+
+function printCurrent() {
+
+  const active =
+    document.querySelector(
+      '.panel:not(.hidden)'
+    );
+
+  document
+    .querySelectorAll(
+      '.panel'
+    )
+    .forEach(
+      panel =>
+        panel.classList
+          .remove(
+            'print-active'
+          )
+    );
+
+  if (active) {
+
+    active.classList
+      .add(
+        'print-active'
+      );
+  }
+
+  window.print();
+
+  setTimeout(
+    () =>
+      active?.classList
+        .remove(
+          'print-active'
+        ),
+    500
+  );
+}
 
 
 function switchTab(
   name
 ) {
-
-
-  activeTab =
-    name;
-
 
   document
     .querySelectorAll(
@@ -8115,8 +9246,7 @@ function switchTab(
     )
     .forEach(
       button =>
-        button
-          .classList
+        button.classList
           .toggle(
             'active',
             button.dataset.tab ===
@@ -8124,630 +9254,95 @@ function switchTab(
           )
     );
 
-
   document
     .querySelectorAll(
       '.panel'
     )
     .forEach(
       panel =>
-        panel
-          .classList
+        panel.classList
           .add(
             'hidden'
           )
     );
 
-
-  $(
-    `tab-${name}`
-  )
+  $(`tab-${name}`)
     .classList
     .remove(
       'hidden'
     );
 
-
-  renderAll();
-
-}
-
-
-
-function printCurrent() {
-
-
-  document
-    .querySelectorAll(
-      '.panel'
-    )
-    .forEach(
-      panel =>
-        panel
-          .classList
-          .remove(
-            'print-active'
-          )
-    );
-
-
-  $(
-    `tab-${activeTab}`
-  )
-    .classList
-    .add(
-      'print-active'
-    );
-
-
-  window.print();
-
-
-  setTimeout(
-    () =>
-      $(
-        `tab-${activeTab}`
-      )
-        .classList
-        .remove(
-          'print-active'
-        ),
-    400
-  );
-
-}
-
-
-
-function renderBackupNotice() {
-
-
-  const last =
-    project
-      ?.meta
-      ?.lastBackupAt;
-
-
-  $('backupNotice')
-    .textContent =
-      last
-        ? `Последняя резервная копия: ${new Date(last).toLocaleString('ru-RU')}`
-        : 'Резервная копия ещё не создавалась';
-
-}
-
-
-
-function download(
-  name,
-  text,
-  type = 'application/json'
-) {
-
-
-  const blob =
-    new Blob(
-      [
-        text
-      ],
-      {
-        type
-      }
-    );
-
-
-  const url =
-    URL.createObjectURL(
-      blob
-    );
-
-
-  const link =
-    document.createElement(
-      'a'
-    );
-
-
-  link.href =
-    url;
-
-
-  link.download =
-    name;
-
-
-  link.click();
-
-
-  setTimeout(
-    () =>
-      URL.revokeObjectURL(
-        url
-      ),
-    1000
-  );
-
-}
-
-
-
-async function exportBackup() {
-
-
-  project.meta.lastBackupAt =
-    nowIso();
-
-
-  await saveProject();
-
-
-  download(
-    `ACONS_Planning_${nowIso().slice(0,16).replace('T','_').replace(':','-')}.json`,
-
-    JSON.stringify(
-      project,
-      null,
-      2
-    )
-  );
-
-
-  renderBackupNotice();
-
-}
-
-
-
-async function restoreFile(
-  file
-) {
-
-
-  try {
-
-
-    const data =
-      normalizeProject(
-        JSON.parse(
-          await file.text()
-        )
-      );
-
-
-    if (
-      !confirm(
-        'Полностью заменить текущий локальный проект файлом?'
-      )
-    ) {
-
-      return;
-
-    }
-
-
-    project =
-      data;
-
-
-    currentViewId =
-      project.meta.defaultViewId;
-
-
-    await saveProject();
-
-
-    renderAll();
-
-  } catch (
-    error
+  if (
+    name ===
+    'matrix'
   ) {
-
-
-    alert(
-      'Ошибка загрузки: ' +
-      error.message
-    );
-
+    renderMatrix();
   }
-
-
-  $('restoreInput')
-    .value =
-      '';
-
-}
-
-
-
-function compareProjectFile(
-  file
-) {
-
-
-  file.text()
-    .then(
-      text => {
-
-
-        compareIncoming =
-          normalizeProject(
-            JSON.parse(
-              text
-            )
-          );
-
-
-        const sections = [
-
-          'fronts',
-
-          'contracts',
-
-          'milestones',
-
-          'resources',
-
-          'views'
-
-        ];
-
-
-        const rows =
-          sections
-            .map(
-              key => {
-
-
-                const current =
-                  new Map(
-                    project[key]
-                      .map(
-                        item => [
-                          item.id,
-                          JSON.stringify(
-                            item
-                          )
-                        ]
-                      )
-                  );
-
-
-                const incoming =
-                  new Map(
-                    compareIncoming[key]
-                      .map(
-                        item => [
-                          item.id,
-                          JSON.stringify(
-                            item
-                          )
-                        ]
-                      )
-                  );
-
-
-                let added =
-                  0;
-
-
-                let changed =
-                  0;
-
-
-                let localOnly =
-                  0;
-
-
-                incoming
-                  .forEach(
-                    (
-                      value,
-                      id
-                    ) => {
-
-
-                      if (
-                        !current.has(
-                          id
-                        )
-                      ) {
-
-                        added++;
-
-                      } else if (
-                        current.get(
-                          id
-                        ) !==
-                        value
-                      ) {
-
-                        changed++;
-
-                      }
-
-                    }
-                  );
-
-
-                current
-                  .forEach(
-                    (
-                      value,
-                      id
-                    ) => {
-
-
-                      if (
-                        !incoming.has(
-                          id
-                        )
-                      ) {
-
-                        localOnly++;
-
-                      }
-
-                    }
-                  );
-
-
-                return `
-                  <tr>
-
-                    <td>
-                      ${key}
-                    </td>
-
-                    <td>
-                      ${added}
-                    </td>
-
-                    <td>
-                      ${changed}
-                    </td>
-
-                    <td>
-                      ${localOnly}
-                    </td>
-
-                  </tr>
-                `;
-
-              }
-            )
-            .join(
-              ''
-            );
-
-
-        openModal(
-          'Сравнение проекта',
-
-          `
-
-            <table>
-
-              <thead>
-
-                <tr>
-
-                  <th>
-                    Раздел
-                  </th>
-
-                  <th>
-                    Новые
-                  </th>
-
-                  <th>
-                    Изменено
-                  </th>
-
-                  <th>
-                    Только у меня
-                  </th>
-
-                </tr>
-
-              </thead>
-
-              <tbody>
-                ${rows}
-              </tbody>
-
-            </table>
-
-
-            <div class="notice">
-
-              Сейчас объединение выполняется по целым записям.
-
-              Следующим этапом сделаем поштучное принятие каждого
-              изменённого поля:
-
-              «Принять дату» / «Оставить мою».
-
-            </div>
-
-
-            <div class="editor-actions">
-
-              <button
-                id="mergeAll"
-                class="btn primary"
-              >
-                Объединить всё
-              </button>
-
-            </div>
-
-          `
-        );
-
-
-        $('mergeAll')
-          .onclick =
-            mergeAll;
-
-      }
-    );
-
-}
-
-
-
-async function mergeAll() {
-
 
   if (
-    !compareIncoming
+    name ===
+    'gantt'
   ) {
-    return;
+    renderGantt();
   }
 
+  if (
+    name ===
+    'planfact'
+  ) {
+    renderPlanFact();
+  }
 
-  [
+  if (
+    name ===
+    'resources'
+  ) {
+    renderResources();
+  }
 
-    'buildings',
+  if (
+    name ===
+    'milestones'
+  ) {
+    renderMilestones();
+  }
 
-    'organizations',
+  if (
+    name ===
+    'elements'
+  ) {
+    renderElements();
+  }
 
-    'units',
+  if (
+    name ===
+    'demolition'
+  ) {
+    renderDemolition();
+  }
 
-    'works',
+  if (
+    name ===
+    'history'
+  ) {
+    renderHistory();
+  }
 
-    'contracts',
-
-    'structures',
-
-    'fronts',
-
-    'planLog',
-
-    'factLog',
-
-    'resources',
-
-    'milestones',
-
-    'constraints',
-
-    'handovers',
-
-    'dependencies',
-
-    'calendars',
-
-    'scheduleVersions',
-
-    'statuses',
-
-    'acceptanceStatuses',
-
-    'equipmentTypes',
-
-    'constraintTypes',
-
-    'views'
-
-  ]
-    .forEach(
-      key => {
-
-
-        const map =
-          new Map(
-            project[key]
-              .map(
-                item => [
-                  item.id,
-                  item
-                ]
-              )
-          );
-
-
-        compareIncoming[key]
-          .forEach(
-            item =>
-              map.set(
-                item.id,
-                item
-              )
-          );
-
-
-        project[key] =
-          [
-            ...map.values()
-          ];
-
-      }
-    );
-
-
-  await saveProject();
-
-
-  closeModal();
-
-
-  renderAll();
-
+  if (
+    name ===
+    'settings'
+  ) {
+    renderSettings();
+  }
 }
 
 
-
-function renderAll() {
-
-
-  initSelectors();
-
-
-  renderDashboard();
-
-
-  renderViews();
-
-
-  renderMatrix();
-
-
-  renderGantt();
-
-
-  renderPlanFact();
-
-
-  renderResources();
-
-
-  renderContracts();
-
-
-  renderMilestones();
-
-
-  renderConstraints();
-
-
-  renderVersions();
-
-
-  renderReports();
-
-
-  renderHistory();
-
-
-  renderDictionaries();
-
-}
-
+/* =========================================================
+   СОБЫТИЯ
+   ========================================================= */
 
 
 function bindUi() {
-
 
   document
     .querySelectorAll(
@@ -8762,435 +9357,309 @@ function bindUi() {
             )
     );
 
+  $('modalClose').onclick =
+    closeModal;
 
-  $('modalClose')
-    .onclick =
-      closeModal;
+  $('modal').onclick =
+    event => {
 
-
-  $('modal')
-    .onclick =
-      event => {
-
-
-        if (
-          event.target ===
-          $('modal')
-        ) {
-
-          closeModal();
-
-        }
-
-      };
+      if (
+        event.target ===
+        $('modal')
+      ) {
+        closeModal();
+      }
+    };
 
 
-  $('backupBtn')
-    .onclick =
-      exportBackup;
+  [
+    'mfBuilding',
+    'mfBlock',
+    'mfFloor',
+    'mfWork',
+    'mfOrg',
+    'mfStatus'
+  ].forEach(
+    id =>
+      $(id).onchange =
+        renderMatrix
+  );
 
 
-  $('restoreInput')
-    .onchange =
-      event =>
-        event.target.files[0] &&
-        restoreFile(
+  [
+    'gBuilding',
+    'gWork',
+    'gMode'
+  ].forEach(
+    id =>
+      $(id).onchange =
+        renderGantt
+  );
+
+
+  [
+    'pfFrom',
+    'pfTo',
+    'pfBuilding',
+    'pfWork'
+  ].forEach(
+    id =>
+      $(id).onchange =
+        renderPlanFact
+  );
+
+
+  [
+    'rFrom',
+    'rTo',
+    'rOrg',
+    'rBuilding'
+  ].forEach(
+    id =>
+      $(id).onchange =
+        renderResources
+  );
+
+
+  [
+    'elBuilding',
+    'elType'
+  ].forEach(
+    id =>
+      $(id).onchange =
+        renderElements
+  );
+
+  $('elSearch').oninput =
+    renderElements;
+
+
+  $('newFrontBtn').onclick =
+    () =>
+      openFrontEditor();
+
+  $('newPlanRow').onclick =
+    () =>
+      openLogEditor(
+        'plan'
+      );
+
+  $('newFactRow').onclick =
+    () =>
+      openLogEditor(
+        'fact'
+      );
+
+  $('newResourceBtn').onclick =
+    openResourceEditor;
+
+  $('newMilestoneBtn').onclick =
+    () =>
+      openMilestoneEditor();
+
+  $('newElementBtn').onclick =
+    () =>
+      openElementEditor();
+
+
+  $('addBuildingBtn').onclick =
+    () =>
+      addSimple(
+        'building'
+      );
+
+  $('addWorkBtn').onclick =
+    () =>
+      addSimple(
+        'work'
+      );
+
+  $('addOrgBtn').onclick =
+    () =>
+      addSimple(
+        'org'
+      );
+
+
+  $('backupBtn').onclick =
+    exportBackup;
+
+  $('restoreInput').onchange =
+    event => {
+
+      if (
+        event.target.files[0]
+      ) {
+
+        restoreProject(
           event.target.files[0]
         );
+      }
+    };
 
+  $('compareInput').onchange =
+    event => {
 
-  $('compareInput')
-    .onchange =
-      event =>
-        event.target.files[0] &&
+      if (
+        event.target.files[0]
+      ) {
+
         compareProjectFile(
           event.target.files[0]
         );
+      }
+    };
 
+  $('pdfBtn').onclick =
+    printCurrent;
 
-  $('pdfBtn')
-    .onclick =
-      printCurrent;
 
+  $('importFile').onchange =
+    readImportFile;
 
 
-  $('viewSelect')
-    .onchange =
-      () => {
+  $('importSheet').onchange =
+    () => {
 
+      importSheetName =
+        $('importSheet').value;
 
-        currentViewId =
-          $('viewSelect')
-            .value;
+      importMapping =
+        {};
 
+      importMappingMode =
+        '';
 
-        renderMatrix();
+      readSelectedSheet();
 
-      };
+      $('commitImportBtn').disabled =
+        true;
+    };
 
 
-  $('newViewBtn')
-    .onclick =
-      () =>
-        openViewEditor();
+  $('importMode').onchange =
+    () => {
 
+      importMapping =
+        {};
 
-  $('editViewBtn')
-    .onclick =
-      () =>
-        openViewEditor(
-          currentView()
-        );
+      importMappingMode =
+        '';
 
+      $('commitImportBtn').disabled =
+        true;
+    };
 
-  $('duplicateViewBtn')
-    .onclick =
-      duplicateView;
 
+  $('analyzeImportBtn').onclick =
+    analyzeImport;
 
-  $('deleteViewBtn')
-    .onclick =
-      deleteView;
 
+  $('commitImportBtn').onclick =
+    commitImport;
 
-  $('defaultViewBtn')
-    .onclick =
-      setDefaultView;
 
+  $('clearProjectBtn').onclick =
+    async () => {
 
+      if (
+        !confirm(
+          'Очистить рабочие данные? Справочники зданий и видов работ останутся. Перед очисткой будет создана локальная защитная копия.'
+        )
+      ) {
+        return;
+      }
 
-  $('newFrontBtn')
-    .onclick =
-      () =>
-        openFrontEditor();
+      await dbPutKey(
+        project,
+        `pre-clear-${Date.now()}`
+      );
 
+      const fresh =
+        emptyProject();
 
-  $('newPlanBtn')
-    .onclick =
-      () =>
-        openLogEditor(
-          'plan'
-        );
+      fresh.organizations =
+        project.organizations;
 
+      fresh.buildings =
+        project.buildings;
 
-  $('newFactBtn')
-    .onclick =
-      () =>
-        openLogEditor(
-          'fact'
-        );
+      fresh.works =
+        project.works;
 
+      project =
+        fresh;
 
-  $('newResourceBtn')
-    .onclick =
-      openResourceEditor;
+      log(
+        'Очищено',
+        'Проект',
+        'Рабочие данные очищены'
+      );
 
+      await saveProject();
 
-  $('newContractBtn')
-    .onclick =
-      () =>
-        openContractEditor();
-
-
-  $('newMilestoneBtn')
-    .onclick =
-      () =>
-        openMilestoneEditor();
-
-
-  $('newConstraintBtn')
-    .onclick =
-      () =>
-        openConstraintEditor();
-
-
-  $('createVersionBtn')
-    .onclick =
-      createScheduleVersion;
-
-
-
-  [
-
-    'matrixBuilding',
-
-    'matrixOrg'
-
-  ]
-    .forEach(
-      id =>
-        $(id)
-          .onchange =
-            renderMatrix
-    );
-
-
-
-  [
-
-    'gBuilding',
-
-    'gWork'
-
-  ]
-    .forEach(
-      id =>
-        $(id)
-          .onchange =
-            renderGantt
-    );
-
-
-  document
-    .querySelectorAll(
-      '[data-g-layer]'
-    )
-    .forEach(
-      element =>
-        element.onchange =
-          renderGantt
-    );
-
-
-
-  [
-
-    'pfBuilding',
-
-    'pfWork',
-
-    'pfFrom',
-
-    'pfTo'
-
-  ]
-    .forEach(
-      id =>
-        $(id)
-          .onchange =
-            renderPlanFact
-    );
-
-
-
-  [
-
-    'rBuilding',
-
-    'rOrg',
-
-    'rFrom',
-
-    'rTo'
-
-  ]
-    .forEach(
-      id =>
-        $(id)
-          .onchange =
-            renderResources
-    );
-
-
-
-  [
-
-    'msBuilding',
-
-    'msOrg',
-
-    'msContract'
-
-  ]
-    .forEach(
-      id =>
-        $(id)
-          .onchange =
-            renderMilestones
-    );
-
-
-
-  $('addBuilding')
-    .onclick =
-      () =>
-        openDictionaryEditor(
-          'buildings',
-          null,
-          'Здание',
-          [
-            'name'
-          ]
-        );
-
-
-  $('addOrganization')
-    .onclick =
-      () =>
-        openDictionaryEditor(
-          'organizations',
-          null,
-          'Организация',
-          [
-            'name'
-          ]
-        );
-
-
-  $('addUnit')
-    .onclick =
-      () =>
-        openDictionaryEditor(
-          'units',
-          null,
-          'Единица',
-          [
-            'name'
-          ]
-        );
-
-
-  $('addWork')
-    .onclick =
-      () =>
-        openDictionaryEditor(
-          'works',
-          null,
-          'Вид работы',
-          [
-
-            'name',
-
-            'section',
-
-            'controlType'
-
-          ]
-        );
-
-
-  $('addEquipment')
-    .onclick =
-      () =>
-        openDictionaryEditor(
-          'equipmentTypes',
-          null,
-          'Тип техники',
-          [
-            'name'
-          ]
-        );
-
-
-  $('addConstraintType')
-    .onclick =
-      () =>
-        openDictionaryEditor(
-          'constraintTypes',
-          null,
-          'Тип ограничения',
-          [
-            'name'
-          ]
-        );
-
-
-  $('addStatus')
-    .onclick =
-      () =>
-        openDictionaryEditor(
-          'statuses',
-          null,
-          'Статус работ',
-          [
-
-            'name',
-
-            'color'
-
-          ]
-        );
-
-
-  $('addAcceptance')
-    .onclick =
-      () =>
-        openDictionaryEditor(
-          'acceptanceStatuses',
-          null,
-          'Статус сдачи',
-          [
-
-            'name',
-
-            'color'
-
-          ]
-        );
-
+      renderAll();
+    };
 }
 
+
+/* =========================================================
+   ЗАПУСК
+   ========================================================= */
 
 
 async function init() {
 
-
   db =
     await openDb();
 
+  const raw =
+    await dbGetKey();
 
   project =
-    normalizeProject(
-      await dbGet() ||
-      emptyProject()
+    await migrateIfNeeded(
+      raw
     );
 
+  if (
+    !raw ||
+    raw.schemaVersion !==
+      SCHEMA_VERSION
+  ) {
 
-  currentViewId =
-    project.meta.defaultViewId;
-
+    await saveProject();
+  }
 
   bindUi();
 
-
-  $('pfTo')
-    .value =
-      today();
-
-
-  $('rTo')
-    .value =
-      today();
-
-
-  await saveProject();
-
+  renderBackupNotice();
 
   renderAll();
 
+  $('pfTo').value =
+    today();
+
+  $('rTo').value =
+    today();
 }
 
 
+document.addEventListener(
+  'DOMContentLoaded',
 
-document
-  .addEventListener(
-    'DOMContentLoaded',
-    () =>
-      init()
-        .catch(
-          error => {
+  () =>
+    init()
+      .catch(
+        error => {
 
+          console.error(
+            error
+          );
 
-            console.error(
-              error
-            );
-
-
-            alert(
-              'Ошибка запуска: ' +
-              error.message
-            );
-
-          }
-        )
-  );
+          alert(
+            'Ошибка запуска: ' +
+            error.message
+          );
+        }
+      )
+);
