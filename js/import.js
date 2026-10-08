@@ -2,473 +2,15 @@
 
 /* =========================================================
    LIV PLANNING
-   Импорт Excel
+   ИМПОРТ EXCEL / CSV
    ========================================================= */
-
-LIV.importer = {
-  workbook: null,
-
-  fileName: '',
-
-  sheetName: '',
-
-  matrix: [],
-
-  headerRowIndex: -1,
-
-  headers: [],
-
-  rawRows: [],
-
-  mapping: {},
-
-  preview: [],
-
-  warnings: []
-};
 
 
 /* =========================================================
-   ПОЛЯ ИМПОРТА РЕСУРСОВ
+   ДАТЫ
    ========================================================= */
 
-LIV.RESOURCE_IMPORT_FIELDS = [
-  {
-    key: 'date',
-    label: 'Дата',
-    required: true
-  },
-
-  {
-    key: 'organizationName',
-    label: 'Организация',
-    required: true
-  },
-
-  {
-    key: 'peopleQty',
-    label: 'Количество человек',
-    required: false
-  },
-
-  {
-    key: 'specialization',
-    label: 'Специализация',
-    required: false
-  },
-
-  {
-    key: 'equipmentType',
-    label: 'Наименование техники',
-    required: false
-  },
-
-  {
-    key: 'equipmentQty',
-    label: 'Количество техники',
-    required: false
-  },
-
-  {
-    key: 'buildingName',
-    label: 'Здание',
-    required: false
-  },
-
-  {
-    key: 'workName',
-    label: 'Работа',
-    required: false
-  },
-
-  {
-    key: 'frontName',
-    label: 'Фронт',
-    required: false
-  },
-
-  {
-    key: 'comment',
-    label: 'Комментарий',
-    required: false
-  }
-];
-
-
-/* =========================================================
-   ВАРИАНТЫ НАЗВАНИЙ КОЛОНОК
-   ========================================================= */
-
-LIV.RESOURCE_IMPORT_ALIASES = {
-
-  date: [
-    'дата',
-    'дата отчета',
-    'дата отчёта',
-    'отчетная дата',
-    'отчётная дата'
-  ],
-
-
-  organizationName: [
-    'организация',
-    'наименование организации',
-    'подрядчик',
-    'субподрядчик',
-    'наименование подрядчика'
-  ],
-
-
-  peopleQty: [
-    'количество человек',
-    'кол во человек',
-    'кол-во человек',
-    'кол. человек',
-    'численность',
-    'количество сотрудников',
-    'всего человек',
-    'всего чел'
-  ],
-
-
-  specialization: [
-    'специализация',
-    'категория',
-    'категория персонала',
-    'вид персонала',
-    'должность',
-    'профессия'
-  ],
-
-
-  equipmentType: [
-    'наименование техники',
-    'техника',
-    'вид техники',
-    'тип техники',
-    'наименование строительной техники',
-    'строительная техника'
-  ],
-
-
-  equipmentQty: [
-    'количество техники',
-    'кол во техники',
-    'кол-во техники',
-    'кол. техники',
-    'техника количество',
-
-    'количество единиц техники',
-    'кол во единиц техники',
-    'кол-во единиц техники',
-
-    'количество ед',
-    'количество ед.',
-    'кол во ед',
-    'кол-во ед',
-    'кол-во ед.',
-
-    'количество, ед',
-    'количество, ед.',
-    'количество ед техники',
-    'количество единиц'
-  ],
-
-
-  buildingName: [
-    'здание',
-    'объект',
-    'сооружение',
-    'корпус'
-  ],
-
-
-  workName: [
-    'работа',
-    'вид работ',
-    'наименование работ',
-    'вид работы'
-  ],
-
-
-  frontName: [
-    'фронт',
-    'фронт работ',
-    'участок',
-    'зона работ'
-  ],
-
-
-  comment: [
-    'комментарий',
-    'примечание',
-    'комментарии',
-    'примечания'
-  ]
-};
-
-
-/* =========================================================
-   НОРМАЛИЗАЦИЯ ЗАГОЛОВКА
-   ========================================================= */
-
-LIV.normalizeImportHeader = function (value) {
-
-  return LIV.normKey(
-    String(
-      value ?? ''
-    )
-      .replace(/[,:;]/g, ' ')
-      .replace(/\s+/g, ' ')
-  );
-};
-
-
-/* =========================================================
-   ПОИСК СООТВЕТСТВИЯ ЗАГОЛОВКА
-   ========================================================= */
-
-LIV.headerMatchesAliases = function (
-  header,
-  aliases
-) {
-
-  const normalizedHeader =
-    LIV.normalizeImportHeader(
-      header
-    );
-
-
-  if (!normalizedHeader) {
-    return false;
-  }
-
-
-  return aliases.some(
-    alias => {
-
-      const normalizedAlias =
-        LIV.normalizeImportHeader(
-          alias
-        );
-
-
-      return (
-        normalizedHeader ===
-          normalizedAlias ||
-        normalizedHeader.includes(
-          normalizedAlias
-        )
-      );
-    }
-  );
-};
-
-
-/* =========================================================
-   АВТОМАТИЧЕСКОЕ ОПРЕДЕЛЕНИЕ КОЛОНКИ
-   ========================================================= */
-
-LIV.detectImportColumn = function (
-  headers,
-  aliases
-) {
-
-  /* Сначала ищем точное совпадение */
-
-  for (
-    let index = 0;
-    index < headers.length;
-    index += 1
-  ) {
-
-    const header =
-      LIV.normalizeImportHeader(
-        headers[index]
-      );
-
-
-    if (!header) {
-      continue;
-    }
-
-
-    const exact =
-      aliases.some(
-        alias =>
-          header ===
-          LIV.normalizeImportHeader(
-            alias
-          )
-      );
-
-
-    if (exact) {
-      return index;
-    }
-  }
-
-
-  /* Потом частичное */
-
-  for (
-    let index = 0;
-    index < headers.length;
-    index += 1
-  ) {
-
-    if (
-      LIV.headerMatchesAliases(
-        headers[index],
-        aliases
-      )
-    ) {
-      return index;
-    }
-  }
-
-
-  return -1;
-};
-
-
-/* =========================================================
-   ПОИСК СТРОКИ ЗАГОЛОВКОВ
-   ========================================================= */
-
-LIV.findImportHeaderRow = function (
-  matrix
-) {
-
-  let bestIndex =
-    -1;
-
-
-  let bestScore =
-    -1;
-
-
-  const limit =
-    Math.min(
-      matrix.length,
-      25
-    );
-
-
-  for (
-    let rowIndex = 0;
-    rowIndex < limit;
-    rowIndex += 1
-  ) {
-
-    const row =
-      matrix[rowIndex] ||
-      [];
-
-
-    let score =
-      0;
-
-
-    Object
-      .values(
-        LIV.RESOURCE_IMPORT_ALIASES
-      )
-      .forEach(
-        aliases => {
-
-          const found =
-            row.some(
-              cell =>
-                LIV.headerMatchesAliases(
-                  cell,
-                  aliases
-                )
-            );
-
-
-          if (found) {
-            score += 1;
-          }
-        }
-      );
-
-
-    if (
-      score >
-      bestScore
-    ) {
-      bestScore =
-        score;
-
-      bestIndex =
-        rowIndex;
-    }
-  }
-
-
-  /*
-     Минимально хотим увидеть хотя бы
-     дату + еще одно знакомое поле.
-  */
-
-  if (
-    bestScore <
-    2
-  ) {
-    return -1;
-  }
-
-
-  return bestIndex;
-};
-
-
-/* =========================================================
-   АВТОМАТИЧЕСКОЕ СОПОСТАВЛЕНИЕ
-   ========================================================= */
-
-LIV.autoDetectResourceMapping = function (
-  headers
-) {
-
-  const mapping =
-    {};
-
-
-  LIV.RESOURCE_IMPORT_FIELDS
-    .forEach(
-      field => {
-
-        const aliases =
-          LIV.RESOURCE_IMPORT_ALIASES[
-            field.key
-          ] ||
-          [];
-
-
-        mapping[
-          field.key
-        ] =
-          LIV.detectImportColumn(
-            headers,
-            aliases
-          );
-      }
-    );
-
-
-  return mapping;
-};
-
-
-/* =========================================================
-   ПРЕОБРАЗОВАНИЕ ДАТЫ EXCEL
-   ========================================================= */
-
-LIV.parseImportDate = function (
-  value
-) {
+function normDate(value) {
 
   if (
     value === null ||
@@ -485,901 +27,2006 @@ LIV.parseImportDate = function (
       value.getTime()
     )
   ) {
-    return value
-      .toISOString()
-      .slice(
-        0,
-        10
-      );
+
+    const y =
+      value.getFullYear();
+
+    const m =
+      String(
+        value.getMonth() + 1
+      )
+        .padStart(
+          2,
+          '0'
+        );
+
+    const d =
+      String(
+        value.getDate()
+      )
+        .padStart(
+          2,
+          '0'
+        );
+
+    return (
+      `${y}-${m}-${d}`
+    );
   }
 
-
-  /*
-     Серийный номер Excel.
-  */
 
   if (
     typeof value ===
       'number' &&
-    value > 1000 &&
-    typeof XLSX !==
-      'undefined' &&
-    XLSX.SSF
-      ?.parse_date_code
+    value >
+      20000 &&
+    value <
+      80000 &&
+    window.XLSX
   ) {
 
-    const decoded =
+    const parsed =
       XLSX.SSF
         .parse_date_code(
           value
         );
 
 
-    if (decoded) {
-
-      const year =
-        String(
-          decoded.y
-        )
-          .padStart(
-            4,
-            '0'
-          );
-
-
-      const month =
-        String(
-          decoded.m
-        )
-          .padStart(
-            2,
-            '0'
-          );
-
-
-      const day =
-        String(
-          decoded.d
-        )
-          .padStart(
-            2,
-            '0'
-          );
-
+    if (parsed) {
 
       return (
-        `${year}-${month}-${day}`
+        `${parsed.y}-` +
+        `${String(
+          parsed.m
+        )
+          .padStart(
+            2,
+            '0'
+          )}-` +
+        `${String(
+          parsed.d
+        )
+          .padStart(
+            2,
+            '0'
+          )}`
       );
     }
   }
 
 
   const text =
-    String(value)
-      .trim();
-
-
-  /*
-     2026-10-08
-  */
-
-  if (
-    /^\d{4}-\d{1,2}-\d{1,2}$/
-      .test(
-        text
-      )
-  ) {
-
-    const [
-      year,
-      month,
-      day
-    ] =
-      text.split('-');
-
-
-    return (
-      `${year.padStart(4, '0')}-` +
-      `${month.padStart(2, '0')}-` +
-      `${day.padStart(2, '0')}`
+    normText(
+      value
     );
-  }
 
 
-  /*
-     08.10.2026
-     08/10/2026
-  */
-
-  const russian =
+  let match =
     text.match(
-      /^(\d{1,2})[./](\d{1,2})[./](\d{2,4})$/
+      /^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})$/
     );
 
 
-  if (russian) {
+  if (match) {
 
-    let year =
-      russian[3];
-
-
-    if (
-      year.length ===
-      2
-    ) {
-      year =
-        `20${year}`;
-    }
-
-
-    const month =
-      russian[2]
-        .padStart(
-          2,
-          '0'
-        );
-
-
-    const day =
-      russian[1]
-        .padStart(
-          2,
-          '0'
-        );
+    const year =
+      match[3].length ===
+        2
+        ? `20${match[3]}`
+        : match[3];
 
 
     return (
-      `${year}-${month}-${day}`
+      `${year}-` +
+      `${match[2]
+        .padStart(
+          2,
+          '0'
+        )}-` +
+      `${match[1]
+        .padStart(
+          2,
+          '0'
+        )}`
     );
   }
 
 
-  const parsed =
-    new Date(
-      text
+  match =
+    text.match(
+      /^(\d{4})[.\/-](\d{1,2})[.\/-](\d{1,2})$/
     );
 
 
-  if (
-    !Number.isNaN(
-      parsed.getTime()
-    )
-  ) {
-    return parsed
-      .toISOString()
-      .slice(
-        0,
-        10
-      );
+  if (match) {
+
+    return (
+      `${match[1]}-` +
+      `${match[2]
+        .padStart(
+          2,
+          '0'
+        )}-` +
+      `${match[3]
+        .padStart(
+          2,
+          '0'
+        )}`
+    );
   }
 
 
   return '';
-};
+}
 
 
 /* =========================================================
-   ЧТЕНИЕ ЗНАЧЕНИЯ ПО СОПОСТАВЛЕНИЮ
+   СОЗДАНИЕ СПРАВОЧНИКОВ
    ========================================================= */
 
-LIV.getImportMappedValue = function (
-  row,
-  mapping,
-  key
-) {
-
-  const index =
-    mapping[key];
-
-
-  if (
-    index ===
-      undefined ||
-    index ===
-      null ||
-    Number(index) <
-      0
-  ) {
-    return '';
-  }
-
-
-  return (
-    row[
-      Number(index)
-    ] ??
-    ''
-  );
-};
-
-
-/* =========================================================
-   ОПРЕДЕЛЕНИЕ КАТЕГОРИИ ЛЮДЕЙ
-   ========================================================= */
-
-LIV.detectPeopleCategory = function (
-  specialization
-) {
-
-  const value =
-    LIV.normKey(
-      specialization
-    );
-
-
-  if (!value) {
-    return '';
-  }
-
-
-  if (
-    value.includes(
-      'итр'
-    ) ||
-    value.includes(
-      'инженерно техничес'
-    )
-  ) {
-    return 'itr';
-  }
-
-
-  if (
-    value.includes(
-      'механиз'
-    ) ||
-    value.includes(
-      'машинист'
-    )
-  ) {
-    return 'mechanizers';
-  }
-
-
-  if (
-    value.includes(
-      'подсоб'
-    ) ||
-    value.includes(
-      'рабоч'
-    ) ||
-    value.includes(
-      'монтаж'
-    ) ||
-    value.includes(
-      'бетон'
-    ) ||
-    value.includes(
-      'камен'
-    ) ||
-    value.includes(
-      'арматур'
-    )
-  ) {
-    return 'workers';
-  }
-
-
-  /*
-     Если специализация есть, но не распознана,
-     не будем молча относить ее к ИТР.
-     По умолчанию считаем производственным персоналом.
-  */
-
-  return 'workers';
-};
-
-
-/* =========================================================
-   СОЗДАНИЕ / ПОИСК СПРАВОЧНИКОВ
-   ========================================================= */
-
-LIV.ensureNamedImportItem = function (
-  collectionName,
+function ensureNamed(
+  list,
+  prefix,
   name,
-  prefix
+  extra =
+    {}
 ) {
 
-  const cleanName =
-    LIV.normText(
+  const clean =
+    normText(
       name
     );
 
 
-  if (!cleanName) {
-    return '';
+  if (!clean) {
+    return null;
   }
 
 
-  const collection =
-    LIV.project[
-      collectionName
-    ];
+  let item =
+    (
+      list ||
+      []
+    )
+      .find(
+        row =>
+          sameText(
+            row.name,
+            clean
+          )
+      );
 
 
-  const existing =
-    collection.find(
-      item =>
-        LIV.sameText(
-          item.name,
-          cleanName
-        )
+  if (!item) {
+
+    item = {
+
+      id:
+        uid(
+          prefix
+        ),
+
+      name:
+        clean,
+
+      active:
+        true,
+
+      ...extra
+    };
+
+
+    list.push(
+      item
     );
-
-
-  if (existing) {
-    return existing.id;
   }
 
 
-  const item = {
-    id:
-      LIV.uid(
-        prefix
-      ),
-
-    name:
-      cleanName,
-
-    active:
-      true,
-
-    createdAt:
-      LIV.nowIso(),
-
-    source:
-      'import'
-  };
+  return item;
+}
 
 
-  collection.push(
-    item
-  );
-
-
-  return item.id;
-};
-
-
-/* =========================================================
-   КЛЮЧ ИМПОРТИРОВАННОЙ СТРОКИ
-   ========================================================= */
-
-LIV.makeResourceImportKey = function (
-  row
+function ensureStructure(
+  data
 ) {
 
-  return [
-    LIV.normKey(
-      row.date
-    ),
+  const candidate = {
 
-    LIV.normKey(
-      row.organizationName
-    ),
+    buildingId:
+      data.buildingId ||
+      '',
 
-    LIV.normKey(
-      row.buildingName
-    ),
+    block:
+      normText(
+        data.block
+      ),
 
-    LIV.normKey(
-      row.workName
-    ),
+    floor:
+      normText(
+        data.floor
+      ),
 
-    LIV.normKey(
-      row.frontName
-    ),
+    capture:
+      normText(
+        data.capture
+      ),
 
-    LIV.normKey(
-      row.specialization
-    ),
+    axis:
+      normText(
+        data.axis
+      ),
 
-    LIV.normKey(
-      row.equipmentType
-    )
-  ]
-    .join('|');
-};
+    side:
+      normText(
+        data.side
+      ),
 
+    zone:
+      normText(
+        data.zone
+      ),
 
-/* =========================================================
-   ПРЕОБРАЗОВАНИЕ СТРОК EXCEL
-   ========================================================= */
+    roomNo:
+      normText(
+        data.roomNo
+      ),
 
-LIV.buildResourceImportPreview = function () {
-
-  const mapping =
-    LIV.importer.mapping;
-
-
-  const rows =
-    LIV.importer.rawRows;
-
-
-  const preview =
-    [];
-
-
-  const warnings =
-    [];
-
-
-  /*
-     Для объединенных ячеек Excel.
-     Значения групповых колонок протягиваем вниз.
-  */
-
-  const carry = {
-    date: '',
-    organizationName: '',
-    buildingName: '',
-    workName: '',
-    frontName: ''
+    roomName:
+      normText(
+        data.roomName
+      )
   };
 
 
-  rows.forEach(
+  const signature =
+    structureSignature(
+      candidate
+    );
+
+
+  let structure =
     (
-      sourceRow,
-      index
-    ) => {
-
-      let dateRaw =
-        LIV.getImportMappedValue(
-          sourceRow,
-          mapping,
-          'date'
-        );
-
-
-      let organizationName =
-        LIV.normText(
-          LIV.getImportMappedValue(
-            sourceRow,
-            mapping,
-            'organizationName'
-          )
-        );
-
-
-      let buildingName =
-        LIV.normText(
-          LIV.getImportMappedValue(
-            sourceRow,
-            mapping,
-            'buildingName'
-          )
-        );
-
-
-      let workName =
-        LIV.normText(
-          LIV.getImportMappedValue(
-            sourceRow,
-            mapping,
-            'workName'
-          )
-        );
-
-
-      let frontName =
-        LIV.normText(
-          LIV.getImportMappedValue(
-            sourceRow,
-            mapping,
-            'frontName'
-          )
-        );
-
-
-      if (
-        dateRaw !==
-        ''
-      ) {
-        carry.date =
-          dateRaw;
-      } else {
-        dateRaw =
-          carry.date;
-      }
-
-
-      if (
-        organizationName
-      ) {
-        carry.organizationName =
-          organizationName;
-      } else {
-        organizationName =
-          carry.organizationName;
-      }
-
-
-      if (
-        buildingName
-      ) {
-        carry.buildingName =
-          buildingName;
-      } else {
-        buildingName =
-          carry.buildingName;
-      }
-
-
-      if (
-        workName
-      ) {
-        carry.workName =
-          workName;
-      } else {
-        workName =
-          carry.workName;
-      }
-
-
-      if (
-        frontName
-      ) {
-        carry.frontName =
-          frontName;
-      } else {
-        frontName =
-          carry.frontName;
-      }
-
-
-      const date =
-        LIV.parseImportDate(
-          dateRaw
-        );
-
-
-      const peopleQtyRaw =
-        LIV.getImportMappedValue(
-          sourceRow,
-          mapping,
-          'peopleQty'
-        );
-
-
-      const specialization =
-        LIV.normText(
-          LIV.getImportMappedValue(
-            sourceRow,
-            mapping,
-            'specialization'
-          )
-        );
-
-
-      const equipmentType =
-        LIV.normText(
-          LIV.getImportMappedValue(
-            sourceRow,
-            mapping,
-            'equipmentType'
-          )
-        );
-
-
-      const equipmentQtyRaw =
-        LIV.getImportMappedValue(
-          sourceRow,
-          mapping,
-          'equipmentQty'
-        );
-
-
-      const comment =
-        LIV.normText(
-          LIV.getImportMappedValue(
-            sourceRow,
-            mapping,
-            'comment'
-          )
-        );
-
-
-      const peopleQty =
-        LIV.num(
-          peopleQtyRaw
-        );
-
-
-      const equipmentQty =
-        LIV.num(
-          equipmentQtyRaw
-        );
-
-
-      /*
-         Полностью пустую строку пропускаем.
-      */
-
-      const hasSomething =
-        date ||
-        organizationName ||
-        peopleQty ||
-        specialization ||
-        equipmentType ||
-        equipmentQty ||
-        comment;
-
-
-      if (!hasSomething) {
-        return;
-      }
-
-
-      const rowWarnings =
-        [];
-
-
-      if (!date) {
-        rowWarnings.push(
-          'Не определена дата'
-        );
-      }
-
-
-      if (!organizationName) {
-        rowWarnings.push(
-          'Не определена организация'
-        );
-      }
-
-
-      /*
-         КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ ТЕХНИКИ.
-
-         Если техника указана, но исходная ячейка
-         количества вообще пустая — мы НЕ делаем вид,
-         что техника равна нулю.
-      */
-
-      if (
-        equipmentType &&
-        (
-          equipmentQtyRaw ===
-            '' ||
-          equipmentQtyRaw ===
-            null ||
-          equipmentQtyRaw ===
-            undefined
-        )
-      ) {
-        rowWarnings.push(
-          'Есть техника, но отсутствует количество техники'
-        );
-      }
-
-
-      const category =
-        LIV.detectPeopleCategory(
-          specialization
-        );
-
-
-      let itr =
-        0;
-
-
-      let workers =
-        0;
-
-
-      let mechanizers =
-        0;
-
-
-      if (
-        category ===
-        'itr'
-      ) {
-        itr =
-          peopleQty;
-      }
-
-
-      if (
-        category ===
-        'workers'
-      ) {
-        workers =
-          peopleQty;
-      }
-
-
-      if (
-        category ===
-        'mechanizers'
-      ) {
-        mechanizers =
-          peopleQty;
-      }
-
-
-      const prepared = {
-        sourceRow:
-          LIV.importer
-            .headerRowIndex +
-          2 +
-          index,
-
-        date,
-
-        organizationName,
-
-        buildingName,
-
-        workName,
-
-        frontName,
-
-        peopleQty:
-          LIV.roundInt(
-            peopleQty
-          ),
-
-        specialization,
-
-        itr:
-          LIV.roundInt(
-            itr
-          ),
-
-        workers:
-          LIV.roundInt(
-            workers
-          ),
-
-        mechanizers:
-          LIV.roundInt(
-            mechanizers
-          ),
-
-        equipmentType,
-
-        equipmentQty:
-          LIV.roundInt(
-            equipmentQty
-          ),
-
-        comment,
-
-        warnings:
-          rowWarnings
-      };
-
-
-      prepared.importSourceKey =
-        LIV.makeResourceImportKey(
-          prepared
-        );
-
-
-      preview.push(
-        prepared
+      project.structures ||
+      []
+    )
+      .find(
+        row =>
+          (
+            row.signature ||
+            structureSignature(
+              row
+            )
+          ) ===
+          signature
       );
 
 
-      rowWarnings.forEach(
-        warning => {
+  if (!structure) {
 
-          warnings.push(
-            `Строка ${prepared.sourceRow}: ${warning}`
-          );
-        }
-      );
-    }
-  );
+    structure = {
 
+      id:
+        uid(
+          'STR'
+        ),
 
-  LIV.importer.preview =
-    preview;
+      ...candidate,
 
-
-  LIV.importer.warnings =
-    warnings;
+      signature
+    };
 
 
-  return preview;
+    project.structures.push(
+      structure
+    );
+
+  } else if (
+    !structure.signature
+  ) {
+
+    structure.signature =
+      signature;
+  }
+
+
+  return structure;
+}
+
+
+/* =========================================================
+   ОПИСАНИЕ ПОЛЕЙ
+   ========================================================= */
+
+const FIELD_DEFS = {
+
+  building: {
+
+    label:
+      'Здание',
+
+    aliases: [
+      'здание',
+      'объект',
+      'сооружение',
+      'корпус'
+    ]
+  },
+
+
+  block: {
+
+    label:
+      'Блок',
+
+    aliases: [
+      'блок',
+      'секция'
+    ]
+  },
+
+
+  floor: {
+
+    label:
+      'Этаж',
+
+    aliases: [
+      'этаж',
+      'уровень'
+    ]
+  },
+
+
+  capture: {
+
+    label:
+      'Захватка',
+
+    aliases: [
+      'захватка',
+      'номер захватки',
+      '№ захватки'
+    ]
+  },
+
+
+  axis: {
+
+    label:
+      'Ось',
+
+    aliases: [
+      'ось',
+      'оси'
+    ]
+  },
+
+
+  side: {
+
+    label:
+      'Сторона',
+
+    aliases: [
+      'сторона',
+      'фасад'
+    ]
+  },
+
+
+  zone: {
+
+    label:
+      'Зона',
+
+    aliases: [
+      'зона',
+      'участок',
+      'ряд'
+    ]
+  },
+
+
+  roomNo: {
+
+    label:
+      '№ помещения',
+
+    aliases: [
+      '№ помещения',
+      'номер помещения'
+    ]
+  },
+
+
+  roomName: {
+
+    label:
+      'Помещение',
+
+    aliases: [
+      'помещение',
+      'название помещения'
+    ]
+  },
+
+
+  work: {
+
+    label:
+      'Работа',
+
+    aliases: [
+      'работа',
+      'вид работы',
+      'вид работ',
+      'наименование работы',
+      'название задачи',
+      'наименование задачи'
+    ]
+  },
+
+
+  organization: {
+
+    label:
+      'Организация',
+
+    aliases: [
+      'организация',
+      'подрядчик',
+      'субподрядчик',
+      'исполнитель'
+    ]
+  },
+
+
+  status: {
+
+    label:
+      'Статус',
+
+    aliases: [
+      'статус',
+      'состояние'
+    ]
+  },
+
+
+  unit: {
+
+    label:
+      'Ед. изм.',
+
+    aliases: [
+      'ед. изм.',
+      'ед изм',
+      'единица измерения'
+    ]
+  },
+
+
+  totalQty: {
+
+    label:
+      'Общий объем',
+
+    aliases: [
+      'общий объем',
+      'общий объём',
+      'объем',
+      'объём'
+    ]
+  },
+
+
+  doneQty: {
+
+    label:
+      'Накопительный итог',
+
+    aliases: [
+      'накопительный итог',
+      'выполнено накопительно',
+      'накопительно'
+    ]
+  },
+
+
+  contractStart: {
+
+    label:
+      'Договорное начало',
+
+    aliases: [
+      'договорное начало',
+      'начало договор'
+    ]
+  },
+
+
+  contractEnd: {
+
+    label:
+      'Договорное окончание',
+
+    aliases: [
+      'договорное окончание',
+      'окончание договор',
+      'дата по договору'
+    ]
+  },
+
+
+  baselineStart: {
+
+    label:
+      'Базовое начало',
+
+    aliases: [
+      'базовое начало'
+    ]
+  },
+
+
+  baselineEnd: {
+
+    label:
+      'Базовое окончание',
+
+    aliases: [
+      'базовое окончание'
+    ]
+  },
+
+
+  planStart: {
+
+    label:
+      'План начало',
+
+    aliases: [
+      'рабочее начало',
+      'начало план',
+      'план начало',
+      'дата начала',
+      'начало'
+    ]
+  },
+
+
+  planEnd: {
+
+    label:
+      'План окончание',
+
+    aliases: [
+      'рабочее окончание',
+      'окончание план',
+      'план окончание',
+      'дата окончания',
+      'окончание'
+    ]
+  },
+
+
+  factStart: {
+
+    label:
+      'Факт начало',
+
+    aliases: [
+      'начало факт',
+      'факт начало',
+      'фактическое начало'
+    ]
+  },
+
+
+  factEnd: {
+
+    label:
+      'Факт окончание',
+
+    aliases: [
+      'окончание факт',
+      'факт окончание',
+      'фактическое окончание'
+    ]
+  },
+
+
+  forecastEnd: {
+
+    label:
+      'Прогноз окончание',
+
+    aliases: [
+      'прогнозное окончание',
+      'прогноз окончания',
+      'прогноз'
+    ]
+  },
+
+
+  date: {
+
+    label:
+      'Дата',
+
+    aliases: [
+      'дата',
+      'дата отчета',
+      'дата отчёта',
+      'отчетная дата',
+      'отчётная дата'
+    ]
+  },
+
+
+  qty: {
+
+    label:
+      'Факт за период',
+
+    aliases: [
+      'факт за период',
+      'выполнено за период',
+      'объем за день',
+      'объём за день',
+      'выполнено'
+    ]
+  },
+
+
+  cumulative: {
+
+    label:
+      'Накопительно',
+
+    aliases: [
+      'накопительно',
+      'накопительный итог',
+      'выполнено накопительно'
+    ]
+  },
+
+
+  people: {
+
+    label:
+      'Люди',
+
+    aliases: [
+      'люди',
+      'количество людей'
+    ]
+  },
+
+
+  peopleQty: {
+
+    label:
+      'Количество человек',
+
+    aliases: [
+      'количество человек',
+      'кол-во человек',
+      'кол во человек',
+      'численность человек',
+      'кол-во чел.',
+      'кол-во чел',
+      'численность',
+      'количество персонала'
+    ]
+  },
+
+
+  specialization: {
+
+    label:
+      'Специализация',
+
+    aliases: [
+      'специализация',
+      'категория персонала',
+      'категория работников',
+      'вид персонала',
+      'категория'
+    ]
+  },
+
+
+  itr: {
+
+    label:
+      'ИТР',
+
+    aliases: [
+      'итр',
+      'инженерно технические работники',
+      'инженерно-технические работники'
+    ]
+  },
+
+
+  workers: {
+
+    label:
+      'Подсобные рабочие',
+
+    aliases: [
+      'подсобные рабочие',
+      'рабочие',
+      'рабочих',
+      'рабочий персонал'
+    ]
+  },
+
+
+  mechanizers: {
+
+    label:
+      'Механизаторы',
+
+    aliases: [
+      'механизаторы',
+      'машинисты',
+      'механизатор'
+    ]
+  },
+
+
+  equipmentType: {
+
+    label:
+      'Наименование техники',
+
+    aliases: [
+      'наименование техники',
+      'тип техники',
+      'техника',
+      'механизм',
+      'механизмы',
+      'наименование механизма',
+      'вид техники'
+    ]
+  },
+
+
+  equipmentQty: {
+
+    label:
+      'Количество техники',
+
+    aliases: [
+      'количество техники',
+      'кол во техники',
+      'кол. техники',
+      'техника количество',
+      'количество, ед.',
+      'количество ед.',
+      'кол-во техники',
+      'количество единиц техники',
+      'кол-во, ед.',
+      'количество механизмов',
+      'кол-во механизмов',
+      'кол во механизмов',
+      'количество единиц',
+      'кол-во ед.',
+      'кол во ед',
+      'количество ед',
+      'количество машин',
+      'кол-во машин'
+    ]
+  },
+
+
+  elementType: {
+
+    label:
+      'Тип элемента',
+
+    aliases: [
+      'тип элемента',
+      'элемент',
+      'вид элемента'
+    ]
+  },
+
+
+  elementNo: {
+
+    label:
+      'Номер элемента',
+
+    aliases: [
+      'номер элемента',
+      'порядковый номер',
+      '№ элемента',
+      'номер сваи',
+      '№ сваи',
+      'номер анкера',
+      '№ анкера',
+      'номер',
+      'порядковые номера'
+    ]
+  },
+
+
+  title: {
+
+    label:
+      'Наименование КД',
+
+    aliases: [
+      'ключевая дата',
+      'контрольная дата',
+      'наименование кд',
+      'формулировка',
+      'наименование'
+    ]
+  },
+
+
+  comment: {
+
+    label:
+      'Комментарий',
+
+    aliases: [
+      'комментарий',
+      'примечание',
+      'описание'
+    ]
+  }
+};
+
+
+const MODE_FIELDS = {
+
+  fronts: [
+    'building',
+    'block',
+    'floor',
+    'capture',
+    'axis',
+    'side',
+    'zone',
+    'roomNo',
+    'roomName',
+    'work',
+    'organization',
+    'status',
+    'unit',
+    'totalQty',
+    'doneQty',
+    'contractStart',
+    'contractEnd',
+    'baselineStart',
+    'baselineEnd',
+    'planStart',
+    'planEnd',
+    'factStart',
+    'factEnd',
+    'forecastEnd',
+    'comment'
+  ],
+
+
+  fact: [
+    'date',
+    'building',
+    'block',
+    'floor',
+    'capture',
+    'axis',
+    'side',
+    'zone',
+    'roomNo',
+    'work',
+    'organization',
+    'qty',
+    'cumulative',
+    'people',
+    'status',
+    'comment'
+  ],
+
+
+  resources: [
+    'date',
+    'organization',
+    'building',
+    'work',
+    'peopleQty',
+    'specialization',
+    'itr',
+    'workers',
+    'mechanizers',
+    'equipmentType',
+    'equipmentQty',
+    'comment'
+  ],
+
+
+  elements: [
+    'elementType',
+    'elementNo',
+    'building',
+    'capture',
+    'zone',
+    'work',
+    'status',
+    'comment'
+  ],
+
+
+  milestones: [
+    'title',
+    'building',
+    'organization',
+    'contractEnd',
+    'planEnd',
+    'forecastEnd',
+    'factEnd',
+    'status',
+    'comment'
+  ]
+};
+
+
+const MODE_LABELS = {
+
+  fronts:
+    'Фронты / рабочий график',
+
+  fact:
+    'Факт выполненных работ',
+
+  resources:
+    'Ресурсы',
+
+  elements:
+    'Номерные элементы',
+
+  milestones:
+    'Ключевые даты'
 };
 
 
 /* =========================================================
-   ОТРИСОВКА СОПОСТАВЛЕНИЯ КОЛОНОК
+   ОПРЕДЕЛЕНИЕ КОЛОНОК
    ========================================================= */
 
-LIV.renderImportMapping = function () {
+function fieldMatchScore(
+  header,
+  alias
+) {
 
-  const container =
-    LIV.$(
-      'importMapping'
+  const h =
+    normKey(
+      header
     );
 
 
-  const card =
-    LIV.$(
-      'importMappingCard'
+  const a =
+    normKey(
+      alias
     );
 
 
   if (
-    !container ||
-    !card
+    !h ||
+    !a
+  ) {
+    return 0;
+  }
+
+
+  if (
+    h ===
+    a
+  ) {
+    return 100;
+  }
+
+
+  if (
+    h.startsWith(
+      a
+    ) ||
+    a.startsWith(
+      h
+    )
+  ) {
+    return 80;
+  }
+
+
+  if (
+    h.includes(
+      a
+    ) ||
+    a.includes(
+      h
+    )
+  ) {
+    return 60;
+  }
+
+
+  const hWords =
+    new Set(
+      h
+        .split(
+          ' '
+        )
+        .filter(
+          Boolean
+        )
+    );
+
+
+  const aWords =
+    a
+      .split(
+        ' '
+      )
+      .filter(
+        Boolean
+      );
+
+
+  const matched =
+    aWords
+      .filter(
+        word =>
+          hWords.has(
+            word
+          )
+      )
+      .length;
+
+
+  return aWords.length
+    ? Math.round(
+        (
+          matched /
+          aWords.length
+        ) *
+        50
+      )
+    : 0;
+}
+
+
+function matchField(
+  header,
+  mode
+) {
+
+  let best =
+    '';
+
+
+  let bestScore =
+    0;
+
+
+  for (
+    const key
+    of MODE_FIELDS[
+      mode
+    ] ||
+    []
+  ) {
+
+    const def =
+      FIELD_DEFS[
+        key
+      ];
+
+
+    if (!def) {
+      continue;
+    }
+
+
+    for (
+      const alias
+      of [
+        def.label,
+        ...(
+          def.aliases ||
+          []
+        )
+      ]
+    ) {
+
+      const score =
+        fieldMatchScore(
+          header,
+          alias
+        );
+
+
+      if (
+        score >
+        bestScore
+      ) {
+
+        best =
+          key;
+
+        bestScore =
+          score;
+      }
+    }
+  }
+
+
+  return bestScore >=
+    60
+    ? best
+    : '';
+}
+
+
+function buildAutoMapping(
+  mode
+) {
+
+  const mapping =
+    {};
+
+
+  const used =
+    new Set();
+
+
+  for (
+    const header
+    of importHeaders
+  ) {
+
+    const field =
+      matchField(
+        header,
+        mode
+      );
+
+
+    if (
+      field &&
+      !used.has(
+        field
+      )
+    ) {
+
+      mapping[
+        field
+      ] =
+        header;
+
+
+      used.add(
+        field
+      );
+    }
+  }
+
+
+  return mapping;
+}
+
+
+function mappedValue(
+  row,
+  field
+) {
+
+  const header =
+    importMapping[
+      field
+    ];
+
+
+  return header
+    ? row[
+        header
+      ]
+    : '';
+}
+
+
+function detectImportMode(
+  headers
+) {
+
+  const keys =
+    headers.map(
+      normKey
+    );
+
+
+  const has =
+    (
+      ...patterns
+    ) =>
+      keys.some(
+        key =>
+          patterns.some(
+            pattern =>
+              key.includes(
+                normKey(
+                  pattern
+                )
+              )
+          )
+      );
+
+
+  if (
+    has(
+      'специализация',
+      'категория персонала'
+    ) ||
+    has(
+      'наименование техники',
+      'количество техники',
+      'механизмы'
+    ) ||
+    has(
+      'количество человек'
+    )
+  ) {
+
+    return 'resources';
+  }
+
+
+  if (
+    has(
+      'номер сваи',
+      'номер анкера',
+      'тип элемента'
+    )
+  ) {
+
+    return 'elements';
+  }
+
+
+  if (
+    has(
+      'ключевая дата',
+      'контрольная дата',
+      'наименование кд'
+    )
+  ) {
+
+    return 'milestones';
+  }
+
+
+  if (
+    has(
+      'факт за период',
+      'выполнено за период',
+      'объем за день'
+    )
+  ) {
+
+    return 'fact';
+  }
+
+
+  return 'fronts';
+}
+
+
+/* =========================================================
+   ЧТЕНИЕ ФАЙЛА
+   ========================================================= */
+
+async function readImportFile(
+  event
+) {
+
+  const file =
+    event
+      ?.target
+      ?.files
+      ?.[0];
+
+
+  if (!file) {
+    return;
+  }
+
+
+  if (
+    typeof XLSX ===
+    'undefined'
+  ) {
+
+    alert(
+      'Библиотека Excel не загрузилась. Обнови страницу и попробуй еще раз.'
+    );
+
+    return;
+  }
+
+
+  importFileName =
+    file.name;
+
+
+  try {
+
+    const buffer =
+      await file.arrayBuffer();
+
+
+    importWorkbook =
+      XLSX.read(
+        buffer,
+        {
+
+          type:
+            'array',
+
+          cellDates:
+            true,
+
+          raw:
+            true
+        }
+      );
+
+
+    const sheetSelect =
+      $('importSheet');
+
+
+    sheetSelect.innerHTML =
+      '';
+
+
+    importWorkbook
+      .SheetNames
+      .forEach(
+        name => {
+
+          const option =
+            document.createElement(
+              'option'
+            );
+
+
+          option.value =
+            name;
+
+
+          option.textContent =
+            name;
+
+
+          sheetSelect.appendChild(
+            option
+          );
+        }
+      );
+
+
+    sheetSelect.disabled =
+      false;
+
+
+    importSheetName =
+      importWorkbook
+        .SheetNames[
+          0
+        ] ||
+      '';
+
+
+    sheetSelect.value =
+      importSheetName;
+
+
+    importMapping =
+      {};
+
+
+    importMappingMode =
+      '';
+
+
+    importRows =
+      [];
+
+
+    readSelectedSheet();
+
+
+    $('analyzeImportBtn')
+      .disabled =
+        !importRawRows.length;
+
+
+    $('commitImportBtn')
+      .disabled =
+        true;
+
+
+    $('importInfo')
+      .className =
+        'notice';
+
+
+    $('importInfo')
+      .classList
+      .remove(
+        'hidden'
+      );
+
+
+    $('importInfo')
+      .textContent =
+        `Файл загружен: ${importFileName}\n` +
+        `Лист: ${importSheetName}\n` +
+        `Строк найдено: ${importRawRows.length}\n` +
+        'Нажми «Анализировать».';
+
+  } catch (
+    error
+  ) {
+
+    console.error(
+      error
+    );
+
+
+    alert(
+      `Не удалось прочитать файл: ${error.message}`
+    );
+  }
+}
+
+
+function readSelectedSheet() {
+
+  if (
+    !importWorkbook
   ) {
     return;
   }
 
 
-  card.classList.remove(
-    'hidden'
+  importSheetName =
+    $('importSheet')
+      ?.value ||
+    importWorkbook
+      .SheetNames[
+        0
+      ] ||
+    '';
+
+
+  const sheet =
+    importWorkbook
+      .Sheets[
+        importSheetName
+      ];
+
+
+  if (!sheet) {
+
+    importHeaders =
+      [];
+
+
+    importRawRows =
+      [];
+
+
+    return;
+  }
+
+
+  const matrix =
+    XLSX.utils
+      .sheet_to_json(
+        sheet,
+        {
+
+          header:
+            1,
+
+          defval:
+            '',
+
+          raw:
+            true
+        }
+      );
+
+
+  const headerIndex =
+    findHeaderRow(
+      matrix
+    );
+
+
+  if (
+    headerIndex <
+    0
+  ) {
+
+    importHeaders =
+      [];
+
+
+    importRawRows =
+      [];
+
+
+    return;
+  }
+
+
+  importHeaders =
+    normalizeHeaders(
+      matrix[
+        headerIndex
+      ] ||
+      []
+    );
+
+
+  importRawRows =
+    matrix
+      .slice(
+        headerIndex +
+        1
+      )
+      .map(
+        (
+          values,
+          index
+        ) => {
+
+          const row = {
+
+            __sourceRow:
+              headerIndex +
+              index +
+              2
+          };
+
+
+          importHeaders
+            .forEach(
+              (
+                header,
+                i
+              ) => {
+
+                row[
+                  header
+                ] =
+                  values[
+                    i
+                  ] ??
+                  '';
+              }
+            );
+
+
+          return row;
+        }
+      )
+      .filter(
+        row =>
+          importHeaders
+            .some(
+              header =>
+                normText(
+                  row[
+                    header
+                  ]
+                ) !==
+                ''
+            )
+      );
+}
+
+
+function findHeaderRow(
+  matrix
+) {
+
+  const limit =
+    Math.min(
+      matrix.length,
+      40
+    );
+
+
+  let bestIndex =
+    -1;
+
+
+  let bestScore =
+    -1;
+
+
+  for (
+    let i =
+      0;
+    i <
+      limit;
+    i++
+  ) {
+
+    const row =
+      matrix[
+        i
+      ] ||
+      [];
+
+
+    const nonEmpty =
+      row
+        .filter(
+          value =>
+            normText(
+              value
+            ) !==
+            ''
+        )
+        .length;
+
+
+    if (
+      nonEmpty <
+      2
+    ) {
+      continue;
+    }
+
+
+    const textCells =
+      row
+        .filter(
+          value =>
+            typeof value ===
+              'string' &&
+            normText(
+              value
+            )
+        )
+        .length;
+
+
+    const score =
+      nonEmpty *
+      2 +
+      textCells;
+
+
+    if (
+      score >
+      bestScore
+    ) {
+
+      bestScore =
+        score;
+
+
+      bestIndex =
+        i;
+    }
+  }
+
+
+  return bestIndex;
+}
+
+
+function normalizeHeaders(
+  row
+) {
+
+  const used =
+    new Map();
+
+
+  return row.map(
+    (
+      value,
+      index
+    ) => {
+
+      let header =
+        normText(
+          value
+        ) ||
+        `Колонка ${index + 1}`;
+
+
+      const key =
+        normKey(
+          header
+        );
+
+
+      const count =
+        (
+          used.get(
+            key
+          ) ||
+          0
+        ) +
+        1;
+
+
+      used.set(
+        key,
+        count
+      );
+
+
+      if (
+        count >
+        1
+      ) {
+
+        header =
+          `${header} (${count})`;
+      }
+
+
+      return header;
+    }
   );
+}
+
+
+/* =========================================================
+   FILL DOWN
+   ========================================================= */
+
+function applyFillDown(
+  rows,
+  mode
+) {
+
+  if (
+    !$('importFillDown')
+      ?.checked
+  ) {
+
+    return rows.map(
+      row => ({
+        ...row
+      })
+    );
+  }
+
+
+  const fieldsByMode = {
+
+    fronts: [
+      'building',
+      'block',
+      'floor',
+      'capture',
+      'axis',
+      'side',
+      'zone',
+      'roomNo',
+      'roomName',
+      'work',
+      'organization'
+    ],
+
+    fact: [
+      'building',
+      'block',
+      'floor',
+      'capture',
+      'axis',
+      'side',
+      'zone',
+      'roomNo',
+      'work',
+      'organization'
+    ],
+
+    resources: [
+      'date',
+      'organization',
+      'building',
+      'work',
+      'specialization'
+    ],
+
+    elements: [
+      'elementType',
+      'building',
+      'capture',
+      'zone',
+      'work'
+    ],
+
+    milestones: [
+      'building',
+      'organization'
+    ]
+  };
 
 
   const headers =
-    LIV.importer.headers;
+    (
+      fieldsByMode[
+        mode
+      ] ||
+      []
+    )
+      .map(
+        field =>
+          importMapping[
+            field
+          ]
+      )
+      .filter(
+        Boolean
+      );
 
 
-  container.innerHTML =
-    LIV.RESOURCE_IMPORT_FIELDS
+  const last =
+    {};
+
+
+  return rows.map(
+    row => {
+
+      const copy = {
+        ...row
+      };
+
+
+      headers.forEach(
+        header => {
+
+          if (
+            normText(
+              copy[
+                header
+              ]
+            ) !==
+            ''
+          ) {
+
+            last[
+              header
+            ] =
+              copy[
+                header
+              ];
+
+          } else if (
+            Object.prototype
+              .hasOwnProperty
+              .call(
+                last,
+                header
+              )
+          ) {
+
+            copy[
+              header
+            ] =
+              last[
+                header
+              ];
+          }
+        }
+      );
+
+
+      return copy;
+    }
+  );
+}
+
+
+/* =========================================================
+   UI СОПОСТАВЛЕНИЯ
+   ========================================================= */
+
+function renderImportMapping() {
+
+  const card =
+    $('importMappingCard');
+
+
+  const box =
+    $('importMapping');
+
+
+  if (
+    !card ||
+    !box
+  ) {
+    return;
+  }
+
+
+  card.classList
+    .remove(
+      'hidden'
+    );
+
+
+  box.innerHTML =
+    (
+      MODE_FIELDS[
+        importModeResolved
+      ] ||
+      []
+    )
       .map(
         field => {
 
-          const selected =
-            LIV.importer.mapping[
-              field.key
+          const def =
+            FIELD_DEFS[
+              field
             ];
 
 
-          return `
-            <div class="field">
+          const current =
+            importMapping[
+              field
+            ] ||
+            '';
 
-              <label>
-                ${LIV.esc(
-                  field.label
+
+          return `
+            <div class="mapping-item">
+
+              <b>
+                ${esc(
+                  def.label
                 )}
-                ${
-                  field.required
-                    ? ' *'
-                    : ''
-                }
-              </label>
+              </b>
 
               <select
-                data-import-map="${LIV.esc(
-                  field.key
-                )}"
-              >
+                data-import-map="${field}">
 
-                <option value="-1">
-                  Не использовать
+                <option value="">
+                  — не использовать —
                 </option>
 
                 ${
-                  headers
+                  importHeaders
                     .map(
-                      (
-                        header,
-                        index
-                      ) => `
+                      header => `
                         <option
-                          value="${index}"
+                          value="${esc(
+                            header
+                          )}"
                           ${
-                            Number(
-                              selected
-                            ) ===
-                            index
+                            header ===
+                            current
                               ? 'selected'
                               : ''
-                          }
-                        >
-                          ${
-                            index + 1
-                          }. ${LIV.esc(
-                            header ||
-                            '(без названия)'
+                          }>
+                          ${esc(
+                            header
                           )}
                         </option>
                       `
@@ -1396,712 +2043,1696 @@ LIV.renderImportMapping = function () {
       .join('');
 
 
-  container
+  box
     .querySelectorAll(
       '[data-import-map]'
     )
     .forEach(
       select => {
 
-        select.addEventListener(
-          'change',
+        select.onchange =
           () => {
 
-            const key =
+            const field =
               select.dataset
                 .importMap;
 
 
-            LIV.importer.mapping[
-              key
-            ] =
-              Number(
-                select.value
-              );
+            if (
+              select.value
+            ) {
+
+              importMapping[
+                field
+              ] =
+                select.value;
+
+            } else {
+
+              delete importMapping[
+                field
+              ];
+            }
 
 
-            LIV.buildResourceImportPreview();
-
-
-            LIV.renderImportPreview();
-          }
-        );
+            $('commitImportBtn')
+              .disabled =
+                true;
+          };
       }
     );
-};
+}
 
 
 /* =========================================================
-   ТЕКСТ СОПОСТАВЛЕНИЯ
+   ПОИСК / СОЗДАНИЕ ФРОНТА
    ========================================================= */
 
-LIV.getImportMappingSummary = function () {
+function mappedStructureData(
+  row
+) {
 
-  const mapping =
-    LIV.importer.mapping;
-
-
-  const headers =
-    LIV.importer.headers;
-
-
-  const parts =
-    [];
-
-
-  LIV.RESOURCE_IMPORT_FIELDS
-    .forEach(
-      field => {
-
-        const index =
-          mapping[
-            field.key
-          ];
+  const buildingName =
+    normText(
+      mappedValue(
+        row,
+        'building'
+      )
+    );
 
 
-        const source =
-          Number(index) >=
-          0
-            ? headers[
-                Number(index)
-              ]
-            : 'не определено';
+  const building =
+    buildingName
+      ? ensureNamed(
+          project.buildings,
+          'BLD',
+          buildingName
+        )
+      : null;
 
 
-        parts.push(
-          `${field.label}: ${source}`
+  return {
+
+    buildingId:
+      building?.id ||
+      '',
+
+    block:
+      mappedValue(
+        row,
+        'block'
+      ),
+
+    floor:
+      mappedValue(
+        row,
+        'floor'
+      ),
+
+    capture:
+      mappedValue(
+        row,
+        'capture'
+      ),
+
+    axis:
+      mappedValue(
+        row,
+        'axis'
+      ),
+
+    side:
+      mappedValue(
+        row,
+        'side'
+      ),
+
+    zone:
+      mappedValue(
+        row,
+        'zone'
+      ),
+
+    roomNo:
+      mappedValue(
+        row,
+        'roomNo'
+      ),
+
+    roomName:
+      mappedValue(
+        row,
+        'roomName'
+      )
+  };
+}
+
+
+function findMatchingFrontByMapped(
+  row
+) {
+
+  const buildingName =
+    normText(
+      mappedValue(
+        row,
+        'building'
+      )
+    );
+
+
+  const workName =
+    normText(
+      mappedValue(
+        row,
+        'work'
+      )
+    );
+
+
+  const building =
+    (
+      project.buildings ||
+      []
+    )
+      .find(
+        item =>
+          sameText(
+            item.name,
+            buildingName
+          )
+      );
+
+
+  const work =
+    (
+      project.works ||
+      []
+    )
+      .find(
+        item =>
+          sameText(
+            item.name,
+            workName
+          )
+      );
+
+
+  if (
+    !building ||
+    !work
+  ) {
+    return null;
+  }
+
+
+  const candidate = {
+
+    buildingId:
+      building.id,
+
+    block:
+      mappedValue(
+        row,
+        'block'
+      ),
+
+    floor:
+      mappedValue(
+        row,
+        'floor'
+      ),
+
+    capture:
+      mappedValue(
+        row,
+        'capture'
+      ),
+
+    axis:
+      mappedValue(
+        row,
+        'axis'
+      ),
+
+    side:
+      mappedValue(
+        row,
+        'side'
+      ),
+
+    zone:
+      mappedValue(
+        row,
+        'zone'
+      ),
+
+    roomNo:
+      mappedValue(
+        row,
+        'roomNo'
+      ),
+
+    roomName:
+      mappedValue(
+        row,
+        'roomName'
+      )
+  };
+
+
+  const signature =
+    structureSignature(
+      candidate
+    );
+
+
+  return activeFronts()
+    .find(
+      front => {
+
+        const structure =
+          byId(
+            project.structures,
+            front.structureId
+          );
+
+
+        return (
+          front.workId ===
+            work.id &&
+          structure &&
+          (
+            structure.signature ||
+            structureSignature(
+              structure
+            )
+          ) ===
+            signature
         );
       }
+    ) ||
+    null;
+}
+
+
+function ensureFrontFromImport(
+  row
+) {
+
+  const buildingName =
+    normText(
+      mappedValue(
+        row,
+        'building'
+      )
     );
 
 
-  return parts;
-};
-
-
-/* =========================================================
-   ОТРИСОВКА ПРЕДПРОСМОТРА
-   ========================================================= */
-
-LIV.renderImportPreview = function () {
-
-  const head =
-    LIV.$(
-      'importHead'
-    );
-
-
-  const body =
-    LIV.$(
-      'importBody'
-    );
-
-
-  const info =
-    LIV.$(
-      'importInfo'
+  const workName =
+    normText(
+      mappedValue(
+        row,
+        'work'
+      )
     );
 
 
   if (
-    !head ||
-    !body ||
-    !info
+    !buildingName ||
+    !workName
   ) {
-    return;
+
+    return null;
   }
 
 
-  const preview =
-    LIV.importer.preview;
+  const existing =
+    findMatchingFrontByMapped(
+      row
+    );
 
 
-  head.innerHTML = `
-    <tr>
+  if (
+    existing
+  ) {
 
-      <th>
-        Строка Excel
-      </th>
-
-      <th>
-        Дата
-      </th>
-
-      <th>
-        Организация
-      </th>
-
-      <th>
-        Специализация
-      </th>
-
-      <th>
-        Кол. человек
-      </th>
-
-      <th>
-        ИТР
-      </th>
-
-      <th>
-        Рабочие
-      </th>
-
-      <th>
-        Механизаторы
-      </th>
-
-      <th>
-        Техника
-      </th>
-
-      <th>
-        Кол. техники
-      </th>
-
-      <th>
-        Проверка
-      </th>
-
-    </tr>
-  `;
+    return existing;
+  }
 
 
-  body.innerHTML =
-    preview
-      .slice(
-        0,
-        300
+  const building =
+    ensureNamed(
+      project.buildings,
+      'BLD',
+      buildingName
+    );
+
+
+  const work =
+    ensureNamed(
+      project.works,
+      'WRK',
+      workName
+    );
+
+
+  const organizationName =
+    normText(
+      mappedValue(
+        row,
+        'organization'
       )
-      .map(
-        row => `
-          <tr>
-
-            <td>
-              ${row.sourceRow}
-            </td>
-
-            <td>
-              ${LIV.esc(
-                LIV.ruDate(
-                  row.date
-                )
-              )}
-            </td>
-
-            <td>
-              ${LIV.esc(
-                row.organizationName
-              )}
-            </td>
-
-            <td>
-              ${LIV.esc(
-                row.specialization
-              )}
-            </td>
-
-            <td>
-              ${row.peopleQty}
-            </td>
-
-            <td>
-              ${row.itr}
-            </td>
-
-            <td>
-              ${row.workers}
-            </td>
-
-            <td>
-              ${row.mechanizers}
-            </td>
-
-            <td>
-              ${LIV.esc(
-                row.equipmentType
-              )}
-            </td>
-
-            <td>
-              ${
-                row.equipmentType &&
-                row.warnings.some(
-                  warning =>
-                    warning.includes(
-                      'количество техники'
-                    )
-                )
-                  ? '⚠'
-                  : row.equipmentQty
-              }
-            </td>
-
-            <td>
-              ${
-                row.warnings.length
-                  ? LIV.esc(
-                      row.warnings.join(
-                        '; '
-                      )
-                    )
-                  : 'OK'
-              }
-            </td>
-
-          </tr>
-        `
-      )
-      .join('');
+    );
 
 
-  const equipmentQtyIndex =
-    LIV.importer.mapping
-      .equipmentQty;
+  const organization =
+    organizationName
+      ? ensureNamed(
+          project.organizations,
+          'ORG',
+          organizationName
+        )
+      : null;
 
 
-  const equipmentQtyHeader =
-    Number(
-      equipmentQtyIndex
-    ) >= 0
-      ? LIV.importer.headers[
-          Number(
-            equipmentQtyIndex
-          )
-        ]
-      : 'НЕ ОПРЕДЕЛЕНА';
+  const structure =
+    ensureStructure({
+
+      ...mappedStructureData(
+        row
+      ),
+
+      buildingId:
+        building.id
+    });
 
 
-  const equipmentTypeIndex =
-    LIV.importer.mapping
-      .equipmentType;
+  const front = {
+
+    id:
+      uid(
+        'F'
+      ),
+
+    structureId:
+      structure.id,
+
+    workId:
+      work.id,
+
+    organizationId:
+      organization?.id ||
+      '',
+
+    status:
+      normalizeStatus(
+        mappedValue(
+          row,
+          'status'
+        )
+      ) ||
+      'Не начато',
+
+    unit:
+      normText(
+        mappedValue(
+          row,
+          'unit'
+        )
+      ),
+
+    totalQty:
+      num(
+        mappedValue(
+          row,
+          'totalQty'
+        )
+      ),
+
+    doneQty:
+      num(
+        mappedValue(
+          row,
+          'doneQty'
+        )
+      ),
+
+    contractStart:
+      normDate(
+        mappedValue(
+          row,
+          'contractStart'
+        )
+      ),
+
+    contractEnd:
+      normDate(
+        mappedValue(
+          row,
+          'contractEnd'
+        )
+      ),
+
+    baselineStart:
+      normDate(
+        mappedValue(
+          row,
+          'baselineStart'
+        )
+      ),
+
+    baselineEnd:
+      normDate(
+        mappedValue(
+          row,
+          'baselineEnd'
+        )
+      ),
+
+    planStart:
+      normDate(
+        mappedValue(
+          row,
+          'planStart'
+        )
+      ),
+
+    planEnd:
+      normDate(
+        mappedValue(
+          row,
+          'planEnd'
+        )
+      ),
+
+    factStart:
+      normDate(
+        mappedValue(
+          row,
+          'factStart'
+        )
+      ),
+
+    factEnd:
+      normDate(
+        mappedValue(
+          row,
+          'factEnd'
+        )
+      ),
+
+    forecastEnd:
+      normDate(
+        mappedValue(
+          row,
+          'forecastEnd'
+        )
+      ),
+
+    comment:
+      normText(
+        mappedValue(
+          row,
+          'comment'
+        )
+      ),
+
+    completed:
+      normalizeStatus(
+        mappedValue(
+          row,
+          'status'
+        )
+      ) ===
+      'Завершено',
+
+    accepted:
+      false,
+
+    active:
+      true,
+
+    createdAt:
+      nowIso(),
+
+    updatedAt:
+      nowIso()
+  };
 
 
-  const equipmentTypeHeader =
-    Number(
-      equipmentTypeIndex
-    ) >= 0
-      ? LIV.importer.headers[
-          Number(
-            equipmentTypeIndex
-          )
-        ]
-      : 'НЕ ОПРЕДЕЛЕНА';
-
-
-  info.classList.remove(
-    'hidden'
+  project.fronts.push(
+    front
   );
 
 
-  info.innerHTML = `
-    <strong>
-      Найдено строк: ${preview.length}
-    </strong>
-
-    <br>
-
-    Наименование техники:
-    <b>
-      ${LIV.esc(
-        equipmentTypeHeader
-      )}
-    </b>
-
-    <br>
-
-    Количество техники:
-    <b>
-      ${LIV.esc(
-        equipmentQtyHeader
-      )}
-    </b>
-
-    ${
-      LIV.importer.warnings.length
-        ? `
-          <br><br>
-
-          <b>
-            Предупреждений:
-            ${LIV.importer.warnings.length}
-          </b>
-        `
-        : ''
-    }
-  `;
-
-
-  /*
-     Если наименование техники нашли,
-     а количество техники вообще не нашли,
-     импорт блокируем.
-
-     Пользователь сначала вручную выбирает
-     правильную колонку.
-  */
-
-  const equipmentTypeMapped =
-    Number(
-      LIV.importer.mapping
-        .equipmentType
-    ) >= 0;
-
-
-  const equipmentQtyMapped =
-    Number(
-      LIV.importer.mapping
-        .equipmentQty
-    ) >= 0;
-
-
-  const commit =
-    LIV.$(
-      'commitImportBtn'
-    );
-
-
-  if (commit) {
-
-    const requiredOk =
-      Number(
-        LIV.importer.mapping
-          .date
-      ) >= 0 &&
-      Number(
-        LIV.importer.mapping
-          .organizationName
-      ) >= 0;
-
-
-    const equipmentOk =
-      !equipmentTypeMapped ||
-      equipmentQtyMapped;
-
-
-    commit.disabled =
-      !requiredOk ||
-      !equipmentOk ||
-      !preview.length;
-  }
-};
+  return front;
+}
 
 
 /* =========================================================
-   АНАЛИЗ ВЫБРАННОГО ЛИСТА
+   ПРЕДПРОСМОТР
    ========================================================= */
 
-LIV.analyzeResourceImport = function () {
-
-  if (
-    !LIV.importer.workbook
-  ) {
-    return;
-  }
-
-
-  const sheetName =
-    LIV.$(
-      'importSheet'
-    )?.value;
-
-
-  if (!sheetName) {
-    return;
-  }
-
-
-  const sheet =
-    LIV.importer
-      .workbook
-      .Sheets[
-        sheetName
-      ];
-
-
-  if (!sheet) {
-    return;
-  }
-
-
-  const matrix =
-    XLSX.utils
-      .sheet_to_json(
-        sheet,
-        {
-          header: 1,
-
-          defval: '',
-
-          raw: true,
-
-          blankrows: false
-        }
-      );
-
-
-  LIV.importer.sheetName =
-    sheetName;
-
-
-  LIV.importer.matrix =
-    matrix;
-
-
-  const headerRowIndex =
-    LIV.findImportHeaderRow(
-      matrix
-    );
-
-
-  if (
-    headerRowIndex <
-    0
-  ) {
-
-    alert(
-      'Не удалось автоматически определить строку заголовков.'
-    );
-
-    return;
-  }
-
-
-  LIV.importer.headerRowIndex =
-    headerRowIndex;
-
-
-  LIV.importer.headers =
-    (
-      matrix[
-        headerRowIndex
-      ] ||
-      []
-    )
-      .map(
-        value =>
-          LIV.normText(
-            value
-          )
-      );
-
-
-  LIV.importer.rawRows =
-    matrix.slice(
-      headerRowIndex +
-      1
-    );
-
-
-  LIV.importer.mapping =
-    LIV.autoDetectResourceMapping(
-      LIV.importer.headers
-    );
-
-
-  LIV.renderImportMapping();
-
-
-  LIV.buildResourceImportPreview();
-
-
-  LIV.renderImportPreview();
-};
-
-
-/* =========================================================
-   ЧТЕНИЕ ФАЙЛА EXCEL
-   ========================================================= */
-
-LIV.handleImportFile = async function (
-  file
+function resourcePreviewMessage(
+  raw
 ) {
 
-  if (!file) {
-    return;
+  const org =
+    normText(
+      mappedValue(
+        raw,
+        'organization'
+      )
+    ) ||
+    'Без организации';
+
+
+  const date =
+    normDate(
+      mappedValue(
+        raw,
+        'date'
+      )
+    );
+
+
+  const specialization =
+    normText(
+      mappedValue(
+        raw,
+        'specialization'
+      )
+    );
+
+
+  const peopleQty =
+    num(
+      mappedValue(
+        raw,
+        'peopleQty'
+      )
+    );
+
+
+  const eqType =
+    normText(
+      mappedValue(
+        raw,
+        'equipmentType'
+      )
+    );
+
+
+  const eqQty =
+    num(
+      mappedValue(
+        raw,
+        'equipmentQty'
+      )
+    );
+
+
+  const parts = [
+    org
+  ];
+
+
+  if (
+    date
+  ) {
+
+    parts.push(
+      ruDate(
+        date
+      )
+    );
   }
 
 
   if (
-    typeof XLSX ===
-    'undefined'
+    specialization ||
+    peopleQty
   ) {
-    alert(
-      'Библиотека Excel не загрузилась.'
-    );
 
+    parts.push(
+      `${specialization || 'Люди'}: ${roundInt(
+        peopleQty
+      )}`
+    );
+  }
+
+
+  if (
+    eqType ||
+    eqQty
+  ) {
+
+    parts.push(
+      `${eqType || 'Техника'}: ${roundInt(
+        eqQty
+      )}`
+    );
+  }
+
+
+  return parts.join(
+    ' · '
+  );
+}
+
+
+function previewImportRow(
+  raw,
+  index
+) {
+
+  const item = {
+
+    raw,
+
+    rowNumber:
+      raw.__sourceRow ||
+      index +
+      1,
+
+    status:
+      '',
+
+    message:
+      '',
+
+    selected:
+      true
+  };
+
+
+  if (
+    importModeResolved ===
+    'resources'
+  ) {
+
+    const date =
+      normDate(
+        mappedValue(
+          raw,
+          'date'
+        )
+      );
+
+
+    if (!date) {
+
+      item.status =
+        'Ошибка';
+
+
+      item.message =
+        'Не распознана дата';
+
+
+      item.selected =
+        false;
+
+
+      return item;
+    }
+
+
+    const hasPersonnelMapping =
+      Boolean(
+        importMapping
+          .peopleQty ||
+        importMapping
+          .itr ||
+        importMapping
+          .workers ||
+        importMapping
+          .mechanizers
+      );
+
+
+    const hasEquipmentMapping =
+      Boolean(
+        importMapping
+          .equipmentType ||
+        importMapping
+          .equipmentQty
+      );
+
+
+    if (
+      !hasPersonnelMapping &&
+      !hasEquipmentMapping
+    ) {
+
+      item.status =
+        'Ошибка';
+
+
+      item.message =
+        'Не найдены колонки людей или техники';
+
+
+      item.selected =
+        false;
+
+
+      return item;
+    }
+
+
+    if (
+      importMapping
+        .equipmentType &&
+      !importMapping
+        .equipmentQty
+    ) {
+
+      item.status =
+        'Предупреждение';
+
+
+      item.message =
+        `${resourcePreviewMessage(
+          raw
+        )} · не сопоставлено количество техники`;
+
+
+      return item;
+    }
+
+
+    item.status =
+      'Добавить ресурсы';
+
+
+    item.message =
+      resourcePreviewMessage(
+        raw
+      );
+
+
+    return item;
+  }
+
+
+  if (
+    importModeResolved ===
+    'fronts'
+  ) {
+
+    const building =
+      normText(
+        mappedValue(
+          raw,
+          'building'
+        )
+      );
+
+
+    const work =
+      normText(
+        mappedValue(
+          raw,
+          'work'
+        )
+      );
+
+
+    if (
+      !building ||
+      !work
+    ) {
+
+      item.status =
+        'Ошибка';
+
+
+      item.message =
+        'Нужны здание и работа';
+
+
+      item.selected =
+        false;
+
+    } else {
+
+      item.status =
+        findMatchingFrontByMapped(
+          raw
+        )
+          ? 'Обновление'
+          : 'Новый фронт';
+
+
+      item.message =
+        `${building} · ${work}`;
+    }
+
+
+    return item;
+  }
+
+
+  if (
+    importModeResolved ===
+    'fact'
+  ) {
+
+    const date =
+      normDate(
+        mappedValue(
+          raw,
+          'date'
+        )
+      );
+
+
+    if (!date) {
+
+      item.status =
+        'Ошибка';
+
+
+      item.message =
+        'Не распознана дата';
+
+
+      item.selected =
+        false;
+
+    } else {
+
+      item.status =
+        'Добавить факт';
+
+
+      item.message =
+        normText(
+          mappedValue(
+            raw,
+            'work'
+          )
+        ) ||
+        'Факт';
+    }
+
+
+    return item;
+  }
+
+
+  if (
+    importModeResolved ===
+    'elements'
+  ) {
+
+    const type =
+      normText(
+        mappedValue(
+          raw,
+          'elementType'
+        )
+      );
+
+
+    const number =
+      normText(
+        mappedValue(
+          raw,
+          'elementNo'
+        )
+      );
+
+
+    if (
+      !type ||
+      !number
+    ) {
+
+      item.status =
+        'Ошибка';
+
+
+      item.message =
+        'Нужны тип элемента и номер';
+
+
+      item.selected =
+        false;
+
+    } else {
+
+      item.status =
+        'Новый элемент';
+
+
+      item.message =
+        `${type} №${number}`;
+    }
+
+
+    return item;
+  }
+
+
+  if (
+    importModeResolved ===
+    'milestones'
+  ) {
+
+    const title =
+      normText(
+        mappedValue(
+          raw,
+          'title'
+        )
+      );
+
+
+    if (!title) {
+
+      item.status =
+        'Ошибка';
+
+
+      item.message =
+        'Не найдено наименование';
+
+
+      item.selected =
+        false;
+
+    } else {
+
+      item.status =
+        'КД';
+
+
+      item.message =
+        title;
+    }
+
+
+    return item;
+  }
+
+
+  item.status =
+    'Ошибка';
+
+
+  item.message =
+    'Неизвестный режим импорта';
+
+
+  item.selected =
+    false;
+
+
+  return item;
+}
+
+
+function analyzeImport() {
+
+  if (
+    !importWorkbook
+  ) {
     return;
   }
 
 
-  const buffer =
-    await file.arrayBuffer();
+  readSelectedSheet();
 
 
-  const workbook =
-    XLSX.read(
-      buffer,
-      {
-        type:
-          'array',
+  const requested =
+    $('importMode')
+      .value;
 
-        cellDates:
-          true
+
+  const nextMode =
+    requested ===
+      'auto'
+      ? detectImportMode(
+          importHeaders
+        )
+      : requested;
+
+
+  importModeResolved =
+    nextMode;
+
+
+  if (
+    importMappingMode !==
+      nextMode ||
+    !Object.keys(
+      importMapping
+    )
+      .length
+  ) {
+
+    importMapping =
+      buildAutoMapping(
+        nextMode
+      );
+
+
+    importMappingMode =
+      nextMode;
+  }
+
+
+  renderImportMapping();
+
+
+  importRows =
+    applyFillDown(
+      importRawRows,
+      importModeResolved
+    )
+      .map(
+        previewImportRow
+      );
+
+
+  renderImportPreview();
+}
+
+
+function renderImportPreview() {
+
+  const counts =
+    {};
+
+
+  importRows
+    .forEach(
+      item => {
+
+        counts[
+          item.status
+        ] =
+          (
+            counts[
+              item.status
+            ] ||
+            0
+          ) +
+          1;
       }
     );
 
 
-  LIV.importer.workbook =
-    workbook;
+  const extraWarnings =
+    [];
 
 
-  LIV.importer.fileName =
-    file.name;
+  if (
+    importModeResolved ===
+    'resources'
+  ) {
+
+    if (
+      importMapping
+        .equipmentType &&
+      !importMapping
+        .equipmentQty
+    ) {
+
+      extraWarnings.push(
+        'ВНИМАНИЕ: найдена техника, но не сопоставлена колонка количества техники.'
+      );
+    }
 
 
-  const select =
-    LIV.$(
-      'importSheet'
+    if (
+      importMapping
+        .equipmentQty &&
+      !importMapping
+        .equipmentType
+    ) {
+
+      extraWarnings.push(
+        'ВНИМАНИЕ: найдено количество техники, но не сопоставлено наименование техники.'
+      );
+    }
+  }
+
+
+  $('importInfo')
+    .classList
+    .remove(
+      'hidden'
     );
 
 
-  if (!select) {
-    return;
-  }
+  $('importInfo')
+    .className =
+      extraWarnings.length
+        ? 'notice warn'
+        : 'notice';
 
 
-  select.innerHTML =
-    workbook.SheetNames
-      .map(
-        name => `
-          <option value="${LIV.esc(name)}">
-            ${LIV.esc(name)}
-          </option>
-        `
+  $('importInfo')
+    .textContent =
+      `Файл: ${importFileName}\n` +
+      `Лист: ${importSheetName}\n` +
+      `Режим: ${MODE_LABELS[importModeResolved]}\n` +
+      `Строк: ${importRows.length}\n` +
+      Object.entries(
+        counts
       )
-      .join('');
+        .map(
+          (
+            [
+              key,
+              value
+            ]
+          ) =>
+            `${key}: ${value}`
+        )
+        .join(
+          ' · '
+        ) +
+      (
+        extraWarnings.length
+          ? `\n${extraWarnings.join(
+              '\n'
+            )}`
+          : ''
+      );
 
 
-  select.disabled =
-    false;
+  $('importHead')
+    .innerHTML = `
+      <tr>
+
+        <th></th>
+
+        <th>
+          Строка
+        </th>
+
+        <th>
+          Результат
+        </th>
+
+        <th>
+          Что найдено
+        </th>
+
+        ${
+          importHeaders
+            .slice(
+              0,
+              10
+            )
+            .map(
+              header =>
+                `<th>${esc(
+                  header
+                )}</th>`
+            )
+            .join('')
+        }
+
+      </tr>
+    `;
 
 
-  if (
-    LIV.$(
-      'analyzeImportBtn'
+  $('importBody')
+    .innerHTML =
+      importRows
+        .slice(
+          0,
+          500
+        )
+        .map(
+          (
+            item,
+            index
+          ) => `
+            <tr>
+
+              <td>
+
+                <input
+                  type="checkbox"
+                  data-import-row="${index}"
+                  ${
+                    item.selected
+                      ? 'checked'
+                      : ''
+                  }
+                  ${
+                    item.status ===
+                    'Ошибка'
+                      ? 'disabled'
+                      : ''
+                  }
+                >
+
+              </td>
+
+              <td>
+                ${item.rowNumber}
+              </td>
+
+              <td>
+                ${esc(
+                  item.status
+                )}
+              </td>
+
+              <td>
+                ${esc(
+                  item.message
+                )}
+              </td>
+
+              ${
+                importHeaders
+                  .slice(
+                    0,
+                    10
+                  )
+                  .map(
+                    header =>
+                      `<td>${esc(
+                        item.raw[
+                          header
+                        ]
+                      )}</td>`
+                  )
+                  .join('')
+              }
+
+            </tr>
+          `
+        )
+        .join('');
+
+
+  document
+    .querySelectorAll(
+      '[data-import-row]'
     )
-  ) {
-    LIV.$(
-      'analyzeImportBtn'
-    ).disabled =
-      false;
-  }
+    .forEach(
+      checkbox => {
+
+        checkbox.onchange =
+          () => {
+
+            importRows[
+              num(
+                checkbox.dataset
+                  .importRow
+              )
+            ]
+              .selected =
+                checkbox.checked;
+          };
+      }
+    );
 
 
-  if (
-    workbook.SheetNames
-      .length
-  ) {
-    select.value =
-      workbook.SheetNames[
-        0
-      ];
-  }
-};
+  $('commitImportBtn')
+    .disabled =
+      !importRows
+        .some(
+          item =>
+            item.selected &&
+            item.status !==
+              'Ошибка'
+        );
+}
 
 
 /* =========================================================
-   ПОИСК СУЩЕСТВУЮЩЕЙ ИМПОРТИРОВАННОЙ ЗАПИСИ
+   РЕСУРСЫ — ПРЕОБРАЗОВАНИЕ СТРОКИ
    ========================================================= */
 
-LIV.findExistingImportedResource = function (
-  sourceKey
+function importResourceFromRow(
+  row,
+  item,
+  batchId
 ) {
 
-  return (
-    LIV.project.resources ||
-    []
-  )
-    .find(
-      row =>
-        row.importSourceKey ===
-        sourceKey
-    ) ||
-    null;
-};
-
-
-/* =========================================================
-   ИМПОРТ В ПРОЕКТ
-   ========================================================= */
-
-LIV.commitResourceImport = async function () {
-
-  const preview =
-    LIV.importer.preview;
-
-
-  if (!preview.length) {
-    alert(
-      'Нет данных для импорта.'
+  const date =
+    normDate(
+      mappedValue(
+        row,
+        'date'
+      )
     );
 
-    return;
-  }
 
-
-  const equipmentTypeMapped =
-    Number(
-      LIV.importer.mapping
-        .equipmentType
-    ) >= 0;
-
-
-  const equipmentQtyMapped =
-    Number(
-      LIV.importer.mapping
-        .equipmentQty
-    ) >= 0;
-
-
-  if (
-    equipmentTypeMapped &&
-    !equipmentQtyMapped
-  ) {
-
-    alert(
-      'Найдена колонка с наименованием техники, ' +
-      'но не выбрана колонка с количеством техники. ' +
-      'Выбери ее в сопоставлении колонок.'
+  const organizationName =
+    normText(
+      mappedValue(
+        row,
+        'organization'
+      )
     );
 
-    return;
-  }
+
+  const organization =
+    organizationName
+      ? ensureNamed(
+          project.organizations,
+          'ORG',
+          organizationName
+        )
+      : null;
+
+
+  const buildingName =
+    normText(
+      mappedValue(
+        row,
+        'building'
+      )
+    );
+
+
+  const building =
+    buildingName
+      ? ensureNamed(
+          project.buildings,
+          'BLD',
+          buildingName
+        )
+      : null;
+
+
+  const workName =
+    normText(
+      mappedValue(
+        row,
+        'work'
+      )
+    );
+
+
+  const work =
+    workName
+      ? ensureNamed(
+          project.works,
+          'WRK',
+          workName
+        )
+      : null;
+
+
+  let itr =
+    num(
+      mappedValue(
+        row,
+        'itr'
+      )
+    );
+
+
+  let workers =
+    num(
+      mappedValue(
+        row,
+        'workers'
+      )
+    );
+
+
+  let mechanizers =
+    num(
+      mappedValue(
+        row,
+        'mechanizers'
+      )
+    );
+
+
+  const peopleQty =
+    num(
+      mappedValue(
+        row,
+        'peopleQty'
+      )
+    );
+
+
+  const specialization =
+    normText(
+      mappedValue(
+        row,
+        'specialization'
+      )
+    );
+
+
+  const specializationKey =
+    normKey(
+      specialization
+    );
 
 
   /*
-     Перед импортом обязательно
-     делаем локальную резервную копию.
+    Если таблица длинного формата:
+    "Количество человек" + "Специализация".
+
+    Но если одновременно уже заполнены отдельные
+    колонки ИТР / Рабочие / Механизаторы,
+    количество повторно НЕ добавляем.
   */
 
-  const backupKey =
-    await LIV.createLocalBackup(
-      'pre-import'
+  const hasDirectPeople =
+    itr !==
+      0 ||
+    workers !==
+      0 ||
+    mechanizers !==
+      0;
+
+
+  if (
+    peopleQty !==
+      0 &&
+    !hasDirectPeople
+  ) {
+
+    if (
+      specializationKey ===
+        'итр' ||
+      specializationKey
+        .includes(
+          'инженерно техничес'
+        )
+    ) {
+
+      itr =
+        peopleQty;
+
+    } else if (
+      specializationKey
+        .includes(
+          'механизатор'
+        ) ||
+      specializationKey
+        .includes(
+          'машинист'
+        )
+    ) {
+
+      mechanizers =
+        peopleQty;
+
+    } else if (
+      specializationKey
+        .includes(
+          'рабоч'
+        ) ||
+      specializationKey
+        .includes(
+          'подсоб'
+        )
+    ) {
+
+      workers =
+        peopleQty;
+    }
+  }
+
+
+  const equipmentType =
+    normText(
+      mappedValue(
+        row,
+        'equipmentType'
+      )
     );
 
 
-  const importId =
-    LIV.uid(
+  const equipmentQty =
+    num(
+      mappedValue(
+        row,
+        'equipmentQty'
+      )
+    );
+
+
+  const resource = {
+
+    id:
+      uid(
+        'R'
+      ),
+
+    date,
+
+    organizationId:
+      organization?.id ||
+      '',
+
+    buildingId:
+      building?.id ||
+      '',
+
+    workId:
+      work?.id ||
+      '',
+
+    frontId:
+      '',
+
+    itr:
+      roundInt(
+        itr
+      ),
+
+    workers:
+      roundInt(
+        workers
+      ),
+
+    mechanizers:
+      roundInt(
+        mechanizers
+      ),
+
+    specialization,
+
+    peopleQty:
+      roundInt(
+        peopleQty
+      ),
+
+    equipmentType,
+
+    equipmentQty:
+      roundInt(
+        equipmentQty
+      ),
+
+    comment:
+      normText(
+        mappedValue(
+          row,
+          'comment'
+        )
+      ),
+
+    createdAt:
+      nowIso(),
+
+    updatedAt:
+      nowIso(),
+
+    source: {
+
+      batchId,
+
+      file:
+        importFileName,
+
+      sheet:
+        importSheetName,
+
+      row:
+        item.rowNumber,
+
+      importedAt:
+        nowIso()
+    }
+  };
+
+
+  resource.importFingerprint =
+    [
+
+      resource.date,
+
+      resource.organizationId,
+
+      resource.buildingId,
+
+      resource.workId,
+
+      resource.itr,
+
+      resource.workers,
+
+      resource.mechanizers,
+
+      resource.specialization,
+
+      resource.peopleQty,
+
+      resource.equipmentType,
+
+      resource.equipmentQty,
+
+      resource.comment
+    ]
+      .join(
+        '|'
+      );
+
+
+  return resource;
+}
+
+
+/* =========================================================
+   COMMIT
+   ========================================================= */
+
+async function commitImport() {
+
+  const selected =
+    importRows
+      .filter(
+        item =>
+          item.selected &&
+          item.status !==
+            'Ошибка'
+      );
+
+
+  if (
+    !selected.length
+  ) {
+    return;
+  }
+
+
+  if (
+    !confirm(
+      `Импортировать выбранные строки: ${selected.length}?`
+    )
+  ) {
+    return;
+  }
+
+
+  const preImportBackupKey =
+    `pre-import-${Date.now()}`;
+
+
+  await dbPutKey(
+    clone(
+      project
+    ),
+    preImportBackupKey
+  );
+
+
+  const batchId =
+    uid(
       'IMP'
     );
-
-
-  const createdIds =
-    [];
-
-
-  const updatedBefore =
-    [];
 
 
   let created =
@@ -2112,478 +3743,1231 @@ LIV.commitResourceImport = async function () {
     0;
 
 
+  let appended =
+    0;
+
+
   let skipped =
     0;
 
 
   for (
-    const row of preview
+    const item
+    of selected
   ) {
 
+    const row =
+      item.raw;
+
+
+    /* =====================================================
+       РЕСУРСЫ
+       ===================================================== */
+
     if (
-      !row.date ||
-      !row.organizationName
+      importModeResolved ===
+      'resources'
     ) {
-      skipped += 1;
+
+      const resource =
+        importResourceFromRow(
+          row,
+          item,
+          batchId
+        );
+
+
+      const hasPeople =
+        resource.itr !==
+          0 ||
+        resource.workers !==
+          0 ||
+        resource.mechanizers !==
+          0 ||
+        resource.peopleQty !==
+          0;
+
+
+      const hasEquipment =
+        Boolean(
+          resource.equipmentType
+        ) ||
+        resource.equipmentQty !==
+          0;
+
+
+      if (
+        !resource.date ||
+        (
+          !hasPeople &&
+          !hasEquipment
+        )
+      ) {
+
+        skipped++;
+
+        continue;
+      }
+
+
+      if (
+        (
+          project.resources ||
+          []
+        )
+          .some(
+            existing =>
+              existing
+                .importFingerprint ===
+              resource
+                .importFingerprint
+          )
+      ) {
+
+        skipped++;
+
+        continue;
+      }
+
+
+      project.resources.push(
+        resource
+      );
+
+
+      appended++;
 
       continue;
     }
 
 
-    const organizationId =
-      LIV.ensureNamedImportItem(
-        'organizations',
-        row.organizationName,
-        'ORG'
+    /* =====================================================
+       ФРОНТЫ
+       ===================================================== */
+
+    if (
+      importModeResolved ===
+      'fronts'
+    ) {
+
+      const existed =
+        Boolean(
+          findMatchingFrontByMapped(
+            row
+          )
+        );
+
+
+      const front =
+        ensureFrontFromImport(
+          row
+        );
+
+
+      if (!front) {
+
+        skipped++;
+
+        continue;
+      }
+
+
+      const assign =
+        (
+          key,
+          sourceKey,
+          converter =
+            value =>
+              value
+        ) => {
+
+          const value =
+            mappedValue(
+              row,
+              sourceKey
+            );
+
+
+          if (
+            normText(
+              value
+            ) !==
+            ''
+          ) {
+
+            front[
+              key
+            ] =
+              converter(
+                value
+              );
+          }
+        };
+
+
+      assign(
+        'status',
+        'status',
+        normalizeStatus
       );
 
 
-    const buildingId =
-      row.buildingName
-        ? LIV.ensureNamedImportItem(
-            'buildings',
-            row.buildingName,
-            'BLD'
-          )
-        : '';
-
-
-    const workId =
-      row.workName
-        ? LIV.ensureNamedImportItem(
-            'works',
-            row.workName,
-            'WORK'
-          )
-        : '';
-
-
-    const existing =
-      LIV.findExistingImportedResource(
-        row.importSourceKey
+      assign(
+        'unit',
+        'unit',
+        normText
       );
 
 
-    const data = {
-      date:
-        row.date,
-
-      organizationId,
-
-      organizationName:
-        row.organizationName,
-
-      buildingId,
-
-      buildingName:
-        row.buildingName,
-
-      workId,
-
-      workName:
-        row.workName,
-
-      frontName:
-        row.frontName,
-
-      specialization:
-        row.specialization,
-
-      itr:
-        LIV.roundInt(
-          row.itr
-        ),
-
-      workers:
-        LIV.roundInt(
-          row.workers
-        ),
-
-      mechanizers:
-        LIV.roundInt(
-          row.mechanizers
-        ),
-
-      equipmentType:
-        row.equipmentType,
-
-      equipmentQty:
-        LIV.roundInt(
-          row.equipmentQty
-        ),
-
-      comment:
-        row.comment,
-
-      importSourceKey:
-        row.importSourceKey,
-
-      importId,
-
-      importFile:
-        LIV.importer.fileName,
-
-      importSheet:
-        LIV.importer.sheetName,
-
-      importSourceRow:
-        row.sourceRow,
-
-      updatedAt:
-        LIV.nowIso()
-    };
+      assign(
+        'totalQty',
+        'totalQty',
+        num
+      );
 
 
-    if (existing) {
+      assign(
+        'doneQty',
+        'doneQty',
+        num
+      );
 
-      updatedBefore.push({
+
+      assign(
+        'contractStart',
+        'contractStart',
+        normDate
+      );
+
+
+      assign(
+        'contractEnd',
+        'contractEnd',
+        normDate
+      );
+
+
+      assign(
+        'baselineStart',
+        'baselineStart',
+        normDate
+      );
+
+
+      assign(
+        'baselineEnd',
+        'baselineEnd',
+        normDate
+      );
+
+
+      assign(
+        'planStart',
+        'planStart',
+        normDate
+      );
+
+
+      assign(
+        'planEnd',
+        'planEnd',
+        normDate
+      );
+
+
+      assign(
+        'factStart',
+        'factStart',
+        normDate
+      );
+
+
+      assign(
+        'factEnd',
+        'factEnd',
+        normDate
+      );
+
+
+      assign(
+        'forecastEnd',
+        'forecastEnd',
+        normDate
+      );
+
+
+      assign(
+        'comment',
+        'comment',
+        normText
+      );
+
+
+      const organizationName =
+        normText(
+          mappedValue(
+            row,
+            'organization'
+          )
+        );
+
+
+      if (
+        organizationName
+      ) {
+
+        const organization =
+          ensureNamed(
+            project.organizations,
+            'ORG',
+            organizationName
+          );
+
+
+        front.organizationId =
+          organization.id;
+      }
+
+
+      front.completed =
+        front.status ===
+        'Завершено';
+
+
+      front.updatedAt =
+        nowIso();
+
+
+      if (
+        existed
+      ) {
+
+        updated++;
+
+      } else {
+
+        created++;
+      }
+
+
+      continue;
+    }
+
+
+    /* =====================================================
+       ФАКТ
+       ===================================================== */
+
+    if (
+      importModeResolved ===
+      'fact'
+    ) {
+
+      const date =
+        normDate(
+          mappedValue(
+            row,
+            'date'
+          )
+        );
+
+
+      const front =
+        ensureFrontFromImport(
+          row
+        );
+
+
+      if (
+        !date ||
+        !front
+      ) {
+
+        skipped++;
+
+        continue;
+      }
+
+
+      const qty =
+        num(
+          mappedValue(
+            row,
+            'qty'
+          )
+        );
+
+
+      const suppliedCumulative =
+        mappedValue(
+          row,
+          'cumulative'
+        );
+
+
+      const previous =
+        (
+          project.factLog ||
+          []
+        )
+          .filter(
+            existing =>
+              existing.frontId ===
+                front.id &&
+              existing.date <=
+                date
+          )
+          .reduce(
+            (
+              sum,
+              existing
+            ) =>
+              sum +
+              num(
+                existing.qty
+              ),
+            0
+          );
+
+
+      const cumulative =
+        normText(
+          suppliedCumulative
+        ) !==
+          ''
+          ? num(
+              suppliedCumulative
+            )
+          : previous +
+            qty;
+
+
+      const fingerprint =
+        [
+
+          front.id,
+
+          date,
+
+          qty,
+
+          cumulative,
+
+          num(
+            mappedValue(
+              row,
+              'people'
+            )
+          )
+        ]
+          .join(
+            '|'
+          );
+
+
+      if (
+        (
+          project.factLog ||
+          []
+        )
+          .some(
+            existing =>
+              existing
+                .importFingerprint ===
+              fingerprint
+          )
+      ) {
+
+        skipped++;
+
+        continue;
+      }
+
+
+      project.factLog.push({
+
         id:
-          existing.id,
+          uid(
+            'FCT'
+          ),
 
-        value:
-          LIV.clone(
-            existing
-          )
+        frontId:
+          front.id,
+
+        date,
+
+        qty,
+
+        cumulative,
+
+        people:
+          roundInt(
+            mappedValue(
+              row,
+              'people'
+            )
+          ),
+
+        comment:
+          normText(
+            mappedValue(
+              row,
+              'comment'
+            )
+          ),
+
+        importFingerprint:
+          fingerprint,
+
+        source: {
+
+          batchId,
+
+          file:
+            importFileName,
+
+          sheet:
+            importSheetName,
+
+          row:
+            item.rowNumber,
+
+          importedAt:
+            nowIso()
+        },
+
+        createdAt:
+          nowIso()
       });
 
 
-      Object.assign(
-        existing,
-        data
-      );
-
-
-      updated += 1;
-
-    } else {
-
-      const newRow = {
-        id:
-          LIV.uid(
-            'R'
+      front.doneQty =
+        Math.max(
+          num(
+            front.doneQty
           ),
-
-        createdAt:
-          LIV.nowIso(),
-
-        ...data
-      };
+          cumulative
+        );
 
 
-      LIV.project.resources.push(
-        newRow
-      );
+      if (
+        !front.factStart ||
+        date <
+        front.factStart
+      ) {
+
+        front.factStart =
+          date;
+      }
 
 
-      createdIds.push(
-        newRow.id
-      );
+      front.updatedAt =
+        nowIso();
 
 
-      created += 1;
+      appended++;
+
+      continue;
+    }
+
+
+    /* =====================================================
+       НОМЕРНЫЕ ЭЛЕМЕНТЫ
+       ===================================================== */
+
+    if (
+      importModeResolved ===
+      'elements'
+    ) {
+
+      const elementType =
+        normText(
+          mappedValue(
+            row,
+            'elementType'
+          )
+        );
+
+
+      const elementNo =
+        normText(
+          mappedValue(
+            row,
+            'elementNo'
+          )
+        );
+
+
+      if (
+        !elementType ||
+        !elementNo
+      ) {
+
+        skipped++;
+
+        continue;
+      }
+
+
+      const buildingName =
+        normText(
+          mappedValue(
+            row,
+            'building'
+          )
+        );
+
+
+      const building =
+        buildingName
+          ? ensureNamed(
+              project.buildings,
+              'BLD',
+              buildingName
+            )
+          : null;
+
+
+      const workName =
+        normText(
+          mappedValue(
+            row,
+            'work'
+          )
+        );
+
+
+      const work =
+        workName
+          ? ensureNamed(
+              project.works,
+              'WRK',
+              workName
+            )
+          : null;
+
+
+      const capture =
+        normText(
+          mappedValue(
+            row,
+            'capture'
+          )
+        );
+
+
+      const zone =
+        normText(
+          mappedValue(
+            row,
+            'zone'
+          )
+        );
+
+
+      const duplicate =
+        (
+          project
+            .numberedElements ||
+          []
+        )
+          .find(
+            existing =>
+              existing.active !==
+                false &&
+              sameText(
+                existing.elementType,
+                elementType
+              ) &&
+              sameText(
+                existing.elementNo,
+                elementNo
+              ) &&
+              String(
+                existing.buildingId ||
+                ''
+              ) ===
+              String(
+                building?.id ||
+                ''
+              ) &&
+              sameText(
+                existing.capture ||
+                '',
+                capture
+              ) &&
+              sameText(
+                existing.zone ||
+                '',
+                zone
+              )
+          );
+
+
+      if (
+        duplicate
+      ) {
+
+        duplicate.workId =
+          work?.id ||
+          duplicate.workId ||
+          '';
+
+
+        duplicate.status =
+          normalizeStatus(
+            mappedValue(
+              row,
+              'status'
+            )
+          ) ||
+          duplicate.status ||
+          'Не начато';
+
+
+        duplicate.comment =
+          normText(
+            mappedValue(
+              row,
+              'comment'
+            )
+          ) ||
+          duplicate.comment ||
+          '';
+
+
+        duplicate.updatedAt =
+          nowIso();
+
+
+        updated++;
+
+      } else {
+
+        project
+          .numberedElements
+          .push({
+
+            id:
+              uid(
+                'EL'
+              ),
+
+            elementType,
+
+            elementNo,
+
+            buildingId:
+              building?.id ||
+              '',
+
+            capture,
+
+            zone,
+
+            workId:
+              work?.id ||
+              '',
+
+            status:
+              normalizeStatus(
+                mappedValue(
+                  row,
+                  'status'
+                )
+              ) ||
+              'Не начато',
+
+            comment:
+              normText(
+                mappedValue(
+                  row,
+                  'comment'
+                )
+              ),
+
+            uniqueScope:
+              'context',
+
+            active:
+              true,
+
+            source: {
+
+              batchId,
+
+              file:
+                importFileName,
+
+              sheet:
+                importSheetName,
+
+              row:
+                item.rowNumber,
+
+              importedAt:
+                nowIso()
+            },
+
+            createdAt:
+              nowIso(),
+
+            updatedAt:
+              nowIso()
+          });
+
+
+        created++;
+      }
+
+
+      continue;
+    }
+
+
+    /* =====================================================
+       КЛЮЧЕВЫЕ ДАТЫ
+       ===================================================== */
+
+    if (
+      importModeResolved ===
+      'milestones'
+    ) {
+
+      const title =
+        normText(
+          mappedValue(
+            row,
+            'title'
+          )
+        );
+
+
+      if (!title) {
+
+        skipped++;
+
+        continue;
+      }
+
+
+      const buildingName =
+        normText(
+          mappedValue(
+            row,
+            'building'
+          )
+        );
+
+
+      const building =
+        buildingName
+          ? ensureNamed(
+              project.buildings,
+              'BLD',
+              buildingName
+            )
+          : null;
+
+
+      const organizationName =
+        normText(
+          mappedValue(
+            row,
+            'organization'
+          )
+        );
+
+
+      const organization =
+        organizationName
+          ? ensureNamed(
+              project.organizations,
+              'ORG',
+              organizationName
+            )
+          : null;
+
+
+      let milestone =
+        (
+          project
+            .milestones ||
+          []
+        )
+          .find(
+            existing =>
+              sameText(
+                existing.title ||
+                existing.name,
+                title
+              ) &&
+              String(
+                existing.buildingId ||
+                ''
+              ) ===
+              String(
+                building?.id ||
+                ''
+              )
+          );
+
+
+      const existed =
+        Boolean(
+          milestone
+        );
+
+
+      if (
+        !milestone
+      ) {
+
+        milestone = {
+
+          id:
+            uid(
+              'M'
+            ),
+
+          title,
+
+          createdAt:
+            nowIso()
+        };
+
+
+        project
+          .milestones
+          .push(
+            milestone
+          );
+      }
+
+
+      milestone.title =
+        title;
+
+
+      milestone.buildingId =
+        building?.id ||
+        milestone.buildingId ||
+        '';
+
+
+      milestone.organizationId =
+        organization?.id ||
+        milestone.organizationId ||
+        '';
+
+
+      milestone.contractDate =
+        normDate(
+          mappedValue(
+            row,
+            'contractEnd'
+          )
+        ) ||
+        milestone.contractDate ||
+        '';
+
+
+      milestone.workDate =
+        normDate(
+          mappedValue(
+            row,
+            'planEnd'
+          )
+        ) ||
+        milestone.workDate ||
+        '';
+
+
+      milestone.forecastDate =
+        normDate(
+          mappedValue(
+            row,
+            'forecastEnd'
+          )
+        ) ||
+        milestone.forecastDate ||
+        '';
+
+
+      milestone.factDate =
+        normDate(
+          mappedValue(
+            row,
+            'factEnd'
+          )
+        ) ||
+        milestone.factDate ||
+        '';
+
+
+      milestone.status =
+        normText(
+          mappedValue(
+            row,
+            'status'
+          )
+        ) ||
+        milestone.status ||
+        'Не наступила';
+
+
+      milestone.comment =
+        normText(
+          mappedValue(
+            row,
+            'comment'
+          )
+        ) ||
+        milestone.comment ||
+        '';
+
+
+      milestone.updatedAt =
+        nowIso();
+
+
+      if (
+        existed
+      ) {
+
+        updated++;
+
+      } else {
+
+        created++;
+      }
     }
   }
 
 
-  const history = {
-    id:
-      importId,
-
-    type:
-      'resources',
-
-    fileName:
-      LIV.importer.fileName,
-
-    sheetName:
-      LIV.importer.sheetName,
-
-    at:
-      LIV.nowIso(),
-
-    backupKey,
-
-    created,
-
-    updated,
-
-    skipped,
-
-    createdIds,
-
-    updatedBefore,
-
-    mapping:
-      LIV.clone(
-        LIV.importer.mapping
-      ),
-
-    headers:
-      LIV.clone(
-        LIV.importer.headers
-      )
-  };
+  project.importHistory =
+    project.importHistory ||
+    [];
 
 
-  LIV.project
+  project
     .importHistory
-    .push(
-      history
-    );
+    .unshift({
 
+      id:
+        batchId,
 
-  LIV.log(
-    'Импорт Excel',
-    'Ресурсы',
+      backupKey:
+        preImportBackupKey,
 
-    `${LIV.importer.fileName} · ${LIV.importer.sheetName}`,
+      at:
+        nowIso(),
 
-    {
-      importId,
+      fileName:
+        importFileName,
+
+      sheetName:
+        importSheetName,
+
+      mode:
+        importModeResolved,
+
+      selected:
+        selected.length,
 
       created,
 
       updated,
 
-      skipped
-    }
+      appended,
+
+      skipped,
+
+      mapping:
+        clone(
+          importMapping
+        )
+    });
+
+
+  log(
+    'Импорт',
+    'Проект',
+
+    `${importFileName} / ${importSheetName}: ` +
+    `создано ${created}, ` +
+    `обновлено ${updated}, ` +
+    `добавлено ${appended}, ` +
+    `пропущено ${skipped}`
   );
 
 
-  await LIV.saveProject();
+  await saveProject();
+
+
+  initSelects();
 
 
   if (
-    typeof LIV.refreshResourceFilters ===
+    typeof refreshAllMultiFilters ===
     'function'
   ) {
-    LIV.refreshResourceFilters();
+
+    refreshAllMultiFilters();
   }
 
 
   if (
-    typeof LIV.renderResources ===
+    typeof initOrganizationCard ===
     'function'
   ) {
-    LIV.renderResources();
+
+    initOrganizationCard();
   }
 
 
-  if (
-    typeof LIV.renderOrganizations ===
-    'function'
-  ) {
-    LIV.renderOrganizations();
-  }
+  renderAll();
 
 
-  alert(
-    `Импорт завершен.\n\n` +
-    `Добавлено: ${created}\n` +
-    `Обновлено: ${updated}\n` +
-    `Пропущено: ${skipped}`
-  );
-};
+  $('importInfo')
+    .className =
+      'notice good';
+
+
+  $('importInfo')
+    .textContent =
+      `Импорт завершен.\n` +
+      `Создано: ${created}\n` +
+      `Обновлено: ${updated}\n` +
+      `Добавлено: ${appended}\n` +
+      `Пропущено: ${skipped}`;
+
+
+  $('commitImportBtn')
+    .disabled =
+      true;
+}
 
 
 /* =========================================================
-   ОТМЕНА ПОСЛЕДНЕГО ИМПОРТА
+   ОТКАТ ПОСЛЕДНЕГО ИМПОРТА
    ========================================================= */
 
-LIV.rollbackLastResourceImport = async function () {
+async function rollbackLastImport() {
 
-  const imports =
-    LIV.project
-      .importHistory ||
-    [];
-
-
-  const last =
-    [...imports]
-      .reverse()
-      .find(
-        item =>
-          item.type ===
-          'resources'
-      );
+  const lastImport =
+    project
+      .importHistory
+      ?.[0];
 
 
-  if (!last) {
+  if (
+    !lastImport
+  ) {
 
     alert(
-      'Импорт ресурсов для отмены не найден.'
+      'В истории проекта нет импортов для отмены.'
     );
 
     return;
   }
 
 
-  const approved =
-    confirm(
-      `Отменить импорт:\n` +
-      `${last.fileName || ''}\n` +
-      `${last.sheetName || ''}?`
+  if (
+    !lastImport
+      .backupKey
+  ) {
+
+    alert(
+      'Для этого импорта отсутствует защитная копия.'
     );
 
-
-  if (!approved) {
     return;
   }
 
 
-  /*
-     Удаляем записи,
-     которые были созданы этим импортом.
-  */
-
-  const createdSet =
-    new Set(
-      last.createdIds ||
-      []
+  const backup =
+    await dbGetKey(
+      lastImport
+        .backupKey
     );
 
 
-  LIV.project.resources =
-    LIV.project.resources
-      .filter(
-        row =>
-          !createdSet.has(
-            row.id
-          )
-      );
+  if (
+    !backup
+  ) {
 
-
-  /*
-     Возвращаем старые значения
-     у обновленных записей.
-  */
-
-  (
-    last.updatedBefore ||
-    []
-  )
-    .forEach(
-      snapshot => {
-
-        const index =
-          LIV.project.resources
-            .findIndex(
-              row =>
-                row.id ===
-                snapshot.id
-            );
-
-
-        if (
-          index >=
-          0
-        ) {
-          LIV.project.resources[
-            index
-          ] =
-            LIV.clone(
-              snapshot.value
-            );
-        }
-      }
+    alert(
+      'Защитная копия перед импортом не найдена.'
     );
 
-
-  LIV.project.importHistory =
-    LIV.project.importHistory
-      .filter(
-        item =>
-          item.id !==
-          last.id
-      );
+    return;
+  }
 
 
-  LIV.log(
-    'Отмена импорта',
-    'Ресурсы',
+  if (
+    !confirm(
+      `Отменить последний импорт?\n\n` +
+      `Файл: ${lastImport.fileName || '—'}\n` +
+      `Лист: ${lastImport.sheetName || '—'}\n\n` +
+      'Текущее состояние перед откатом тоже будет сохранено.'
+    )
+  ) {
 
-    `${last.fileName || ''} · ${last.sheetName || ''}`,
+    return;
+  }
 
-    {
-      importId:
-        last.id
-    }
+
+  await dbPutKey(
+    clone(
+      project
+    ),
+    `before-rollback-${Date.now()}`
   );
 
 
-  await LIV.saveProject();
+  project =
+    normalizeProject(
+      backup
+    );
+
+
+  log(
+    'Отмена импорта',
+    'Проект',
+
+    `Восстановлено состояние до импорта ${lastImport.fileName || ''}`
+  );
+
+
+  await saveProject();
+
+
+  initSelects();
 
 
   if (
-    typeof LIV.refreshResourceFilters ===
+    typeof refreshAllMultiFilters ===
     'function'
   ) {
-    LIV.refreshResourceFilters();
+
+    refreshAllMultiFilters();
   }
 
 
   if (
-    typeof LIV.renderResources ===
+    typeof initOrganizationCard ===
     'function'
   ) {
-    LIV.renderResources();
+
+    initOrganizationCard();
   }
+
+
+  renderAll();
 
 
   alert(
-    'Последний импорт ресурсов отменен.'
+    'Последний импорт отменен.'
   );
-};
-
-
-/* =========================================================
-   ПРИВЯЗКА СОБЫТИЙ
-   ========================================================= */
-
-LIV.bindImportEvents = function () {
-
-  LIV.$(
-    'importFile'
-  )
-    ?.addEventListener(
-      'change',
-      async event => {
-
-        const file =
-          event.target
-            .files?.[0];
-
-
-        await LIV.handleImportFile(
-          file
-        );
-      }
-    );
-
-
-  LIV.$(
-    'analyzeImportBtn'
-  )
-    ?.addEventListener(
-      'click',
-      LIV.analyzeResourceImport
-    );
-
-
-  LIV.$(
-    'commitImportBtn'
-  )
-    ?.addEventListener(
-      'click',
-      LIV.commitResourceImport
-    );
-
-
-  LIV.$(
-    'rollbackImportBtn'
-  )
-    ?.addEventListener(
-      'click',
-      LIV.rollbackLastResourceImport
-    );
-};
+}

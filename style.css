@@ -1,6 +1,6 @@
 :root {
   --bg: #f4f6f8;
-  --card: #fff;
+  --card: #ffffff;
   --text: #182230;
   --muted: #667085;
   --line: #d9dee7;
@@ -9,11 +9,15 @@
   --green: #16825d;
   --red: #c23a3a;
   --amber: #b7791f;
-  --shadow: 0 8px 24px rgba(15, 23, 42, .06);
+  --shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
 }
 
 * {
   box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
 }
 
 body {
@@ -30,10 +34,20 @@ textarea {
   font: inherit;
 }
 
+button {
+  user-select: none;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .topbar {
   background: var(--dark);
   color: #fff;
-  padding: 18px 24px;
+
+  padding: 16px 24px;
 
   display: flex;
   align-items: center;
@@ -43,17 +57,13 @@ textarea {
 
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: 100;
 }
 
 .topbar h1 {
-  margin: 0 0 4px;
-  font-size: 25px;
-}
-
-.topbar p {
   margin: 0;
-  color: #c9d3e1;
+  font-size: 25px;
+  line-height: 1.1;
 }
 
 .top-actions {
@@ -63,6 +73,7 @@ textarea {
 }
 
 .container {
+  width: 100%;
   max-width: 1800px;
   margin: 0 auto;
   padding: 18px;
@@ -70,8 +81,10 @@ textarea {
 
 .backup-strip {
   padding: 8px 24px;
+
   background: #eef4ff;
   border-bottom: 1px solid #dbe7ff;
+
   color: #344054;
   font-size: 13px;
 }
@@ -80,17 +93,33 @@ textarea {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+
   margin-bottom: 14px;
 }
 
 .tab,
 .btn {
+  min-height: 38px;
+
   border: 1px solid var(--line);
   background: #fff;
+
   border-radius: 8px;
+
   padding: 9px 12px;
+
   cursor: pointer;
   color: var(--text);
+
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.tab:hover,
+.btn:hover:not(:disabled) {
+  border-color: #aeb8c7;
 }
 
 .tab.active,
@@ -104,6 +133,12 @@ textarea {
   background: #fff1f1;
   border-color: #f1bcbc;
   color: #9b1c1c;
+}
+
+.btn.danger-lite {
+  background: #fff;
+  border-color: #efc1c1;
+  color: #a52727;
 }
 
 .topbar .btn {
@@ -120,9 +155,13 @@ textarea {
 .card {
   background: var(--card);
   border: 1px solid var(--line);
+
   border-radius: 12px;
+
   padding: 16px;
+
   box-shadow: var(--shadow);
+
   margin-bottom: 14px;
 }
 
@@ -145,7 +184,9 @@ textarea {
 .field {
   display: flex;
   flex-direction: column;
+
   gap: 5px;
+
   min-width: 145px;
   flex: 1;
 }
@@ -161,14 +202,35 @@ textarea {
 .field textarea,
 .inline-add input {
   width: 100%;
+  height: 40px;
+
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 9px;
+
+  padding: 9px 10px;
+
   background: #fff;
+  color: var(--text);
 }
 
 .field textarea {
   min-height: 76px;
+  height: auto;
+  resize: vertical;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus,
+.inline-add input:focus {
+  outline: none;
+  border-color: #98a2b3;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+.compact-field {
+  flex: 0 0 150px;
+  min-width: 150px;
 }
 
 .align-end {
@@ -178,22 +240,41 @@ textarea {
 .stats {
   display: grid;
   grid-template-columns: repeat(6, minmax(120px, 1fr));
+
   gap: 10px;
   margin-bottom: 14px;
+}
+
+.stats-2 {
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+}
+
+.stats-3 {
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+}
+
+.stats-5 {
+  grid-template-columns: repeat(5, minmax(140px, 1fr));
 }
 
 .stat {
   background: #fff;
   border: 1px solid var(--line);
+
   border-radius: 12px;
+
   padding: 14px;
+
   box-shadow: var(--shadow);
 }
 
 .stat span {
   display: block;
+
   color: var(--muted);
+
   font-size: 12px;
+
   margin-bottom: 8px;
 }
 
@@ -203,22 +284,26 @@ textarea {
 
 .grid2 {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+
   gap: 14px;
 }
 
 .grid3 {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+
   gap: 14px;
 }
 
 .table-wrap {
+  width: 100%;
   overflow: auto;
 }
 
 table {
   border-collapse: collapse;
+
   width: 100%;
   min-width: 800px;
 }
@@ -226,33 +311,52 @@ table {
 th,
 td {
   border-bottom: 1px solid #e8ebf0;
+
   padding: 8px 9px;
+
   text-align: left;
+
   font-size: 13px;
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 th {
   position: sticky;
   top: 0;
+
   background: #f8fafc;
+
   z-index: 2;
+
+  color: #344054;
+}
+
+tbody tr:hover {
+  background: #fafbfc;
 }
 
 .row-btn {
   border: 0;
   background: transparent;
+
   color: #1d4ed8;
+
   text-decoration: underline;
+
   cursor: pointer;
+
   padding: 0;
 }
 
 .badge {
   display: inline-block;
+
   border-radius: 999px;
+
   padding: 4px 8px;
+
   background: #eef2f6;
+
   font-size: 12px;
 }
 
@@ -279,8 +383,11 @@ th {
 .item {
   display: flex;
   justify-content: space-between;
+
   gap: 10px;
+
   padding: 9px 0;
+
   border-bottom: 1px solid #edf0f4;
 }
 
@@ -292,9 +399,22 @@ th {
   color: var(--muted);
 }
 
+.eyebrow {
+  margin-bottom: 5px;
+
+  color: var(--muted);
+
+  font-size: 11px;
+  font-weight: 700;
+
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
 .inline-add {
   display: flex;
   gap: 7px;
+
   margin-bottom: 10px;
 }
 
@@ -305,9 +425,13 @@ th {
 
 .notice {
   padding: 10px 12px;
+
   border-radius: 8px;
+
   background: #f4f6f8;
+
   margin: 10px 0;
+
   white-space: pre-line;
 }
 
@@ -326,35 +450,46 @@ th {
   color: #8f2424;
 }
 
+
+/* =========================================================
+   МОДАЛЬНОЕ ОКНО
+   ========================================================= */
+
 .modal {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, .55);
+
+  background: rgba(15, 23, 42, 0.55);
 
   display: flex;
   justify-content: center;
   align-items: flex-start;
 
   padding: 4vh 16px;
-  z-index: 100;
+
+  z-index: 1000;
 }
 
 .modal-card {
   width: min(1100px, 100%);
   max-height: 92vh;
+
   overflow: auto;
 
   background: #fff;
+
   border-radius: 14px;
+
   padding: 18px;
 
-  box-shadow: 0 25px 70px rgba(0, 0, 0, .25);
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.25);
 }
 
 .modal-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
+
   margin-bottom: 12px;
 }
 
@@ -365,21 +500,27 @@ th {
 .icon-btn {
   border: 0;
   background: transparent;
+
   font-size: 30px;
+
   cursor: pointer;
 }
 
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+
   gap: 10px;
 }
 
 .editor-actions {
   display: flex;
   justify-content: flex-end;
+
   gap: 8px;
+
   margin-top: 16px;
+
   flex-wrap: wrap;
 }
 
@@ -387,29 +528,43 @@ th {
   justify-content: flex-start;
 }
 
+
+/* =========================================================
+   СРАВНЕНИЕ ПРОЕКТА
+   ========================================================= */
+
 .compare-summary {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
+
   gap: 8px;
+
   margin: 12px 0;
 }
 
 .compare-box {
   border: 1px solid var(--line);
+
   border-radius: 10px;
+
   padding: 10px;
 }
 
 .compare-details {
   max-height: 430px;
+
   overflow: auto;
+
   border: 1px solid var(--line);
+
   border-radius: 8px;
+
   padding: 8px;
 }
 
 .compare-record {
   border-bottom: 1px solid #edf0f4;
+
   padding: 9px 2px;
 }
 
@@ -420,20 +575,31 @@ th {
 .compare-record label {
   display: flex;
   gap: 8px;
+
   align-items: flex-start;
 }
 
 .compare-record small {
   display: block;
+
   color: var(--muted);
+
   margin: 4px 0 0 25px;
 }
+
+
+/* =========================================================
+   ГАНТ
+   ========================================================= */
 
 .gantt-row {
   display: grid;
   grid-template-columns: 330px 1fr;
+
   gap: 12px;
+
   padding: 7px 0;
+
   border-bottom: 1px solid #eef0f3;
 }
 
@@ -443,21 +609,28 @@ th {
 
 .gantt-line {
   position: relative;
+
   height: 30px;
+
   background: #f3f5f8;
+
   border-radius: 6px;
+
   overflow: hidden;
 }
 
 .gantt-bar {
   position: absolute;
+
   top: 5px;
+
   height: 20px;
 
   background: #27364e;
   color: #fff;
 
   border-radius: 5px;
+
   padding: 3px 6px;
 
   font-size: 11px;
@@ -475,16 +648,27 @@ th {
   color: var(--muted);
 }
 
+
+/* =========================================================
+   ИМПОРТ
+   ========================================================= */
+
 .import-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
+  grid-template-columns:
+    minmax(260px, 2fr)
+    minmax(180px, 1fr)
+    minmax(240px, 1fr);
+
   gap: 12px;
+
   align-items: end;
 }
 
 .check-line {
   display: flex;
   gap: 8px;
+
   align-items: center;
 
   font-size: 13px;
@@ -495,28 +679,35 @@ th {
 
 .check-line input {
   width: auto;
+  height: auto;
 }
 
 .mapping-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(220px, 1fr));
+
   gap: 10px;
 }
 
 .mapping-item {
   border: 1px solid var(--line);
+
   border-radius: 9px;
+
   padding: 9px;
 }
 
 .mapping-item b {
   display: block;
+
   font-size: 12px;
+
   margin-bottom: 6px;
 }
 
 .mapping-item select {
   width: 100%;
+
   padding: 8px;
 
   border: 1px solid var(--line);
@@ -558,10 +749,537 @@ th {
   color: var(--muted);
 }
 
+
+/* =========================================================
+   РЕСУРСЫ — НАВИГАЦИЯ
+   ========================================================= */
+
+.resource-nav {
+  padding: 8px;
+}
+
+.resource-tabs {
+  display: flex;
+  gap: 6px;
+
+  flex-wrap: wrap;
+}
+
+.resource-tab {
+  min-height: 38px;
+
+  border: 1px solid var(--line);
+
+  background: #fff;
+
+  border-radius: 8px;
+
+  padding: 8px 12px;
+
+  color: var(--text);
+
+  cursor: pointer;
+}
+
+.resource-tab:hover {
+  border-color: #aeb8c7;
+}
+
+.resource-tab.active {
+  background: var(--dark);
+  border-color: var(--dark);
+  color: #fff;
+}
+
+
+/* =========================================================
+   РЕСУРСЫ — ОБЩАЯ ПАНЕЛЬ
+   ========================================================= */
+
+.resource-toolbar {
+  position: relative;
+
+  overflow: visible;
+
+  z-index: 30;
+}
+
+.resource-filter-grid {
+  display: grid;
+
+  grid-template-columns:
+    150px
+    150px
+    minmax(210px, 1fr)
+    minmax(190px, 1fr)
+    minmax(190px, 1fr)
+    minmax(220px, 1.2fr);
+
+  gap: 10px;
+
+  align-items: end;
+}
+
+.resource-toolbar-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+
+  gap: 8px;
+
+  margin-top: 12px;
+
+  flex-wrap: wrap;
+}
+
+.switch-line {
+  min-height: 38px;
+
+  display: inline-flex;
+  align-items: center;
+
+  gap: 8px;
+
+  padding: 7px 10px;
+
+  border: 1px solid var(--line);
+  border-radius: 8px;
+
+  background: #fff;
+
+  color: #475467;
+
+  font-size: 13px;
+
+  cursor: pointer;
+}
+
+.switch-line input {
+  width: auto;
+  height: auto;
+
+  margin: 0;
+}
+
+
+/* =========================================================
+   МУЛЬТИФИЛЬТРЫ
+   ========================================================= */
+
+.multi-source {
+  display: none !important;
+}
+
+.multi-filter {
+  position: relative;
+
+  width: 100%;
+  min-width: 0;
+}
+
+.multi-filter-button {
+  position: relative;
+
+  width: 100%;
+  height: 40px;
+
+  border: 1px solid var(--line);
+  border-radius: 8px;
+
+  background: #fff;
+
+  padding: 9px 34px 9px 10px;
+
+  color: var(--text);
+
+  cursor: pointer;
+
+  text-align: left;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.multi-filter-button::after {
+  content: "▾";
+
+  position: absolute;
+
+  right: 11px;
+  top: 50%;
+
+  transform: translateY(-50%);
+
+  color: #667085;
+
+  pointer-events: none;
+}
+
+.multi-filter-button:hover {
+  border-color: #aeb8c7;
+}
+
+.multi-filter-menu {
+  position: absolute;
+
+  top: calc(100% + 5px);
+  left: 0;
+
+  width: min(340px, calc(100vw - 40px));
+
+  padding: 10px;
+
+  border: 1px solid var(--line);
+  border-radius: 10px;
+
+  background: #fff;
+
+  box-shadow:
+    0 15px 40px rgba(15, 23, 42, 0.16);
+
+  z-index: 500;
+}
+
+.multi-filter-search {
+  width: 100%;
+  height: 38px;
+
+  border: 1px solid var(--line);
+  border-radius: 7px;
+
+  padding: 8px 9px;
+
+  margin-bottom: 8px;
+}
+
+.multi-filter-actions {
+  display: flex;
+  gap: 6px;
+
+  margin-bottom: 8px;
+
+  flex-wrap: wrap;
+}
+
+.multi-filter-actions .btn {
+  min-height: 32px;
+  padding: 6px 9px;
+
+  font-size: 12px;
+}
+
+.multi-filter-list {
+  max-height: 300px;
+
+  overflow-y: auto;
+
+  padding: 5px 0;
+
+  border-top: 1px solid #edf0f4;
+  border-bottom: 1px solid #edf0f4;
+}
+
+.multi-filter-option {
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+
+  width: 100%;
+
+  padding: 7px 5px;
+
+  border-radius: 6px;
+
+  cursor: pointer;
+
+  font-size: 13px;
+}
+
+.multi-filter-option:hover {
+  background: #f6f8fa;
+}
+
+.multi-filter-option input {
+  width: auto;
+  height: auto;
+
+  margin: 0;
+}
+
+.multi-filter-footer {
+  display: flex;
+  justify-content: flex-end;
+
+  gap: 6px;
+
+  padding-top: 8px;
+}
+
+.multi-filter-footer .btn {
+  min-height: 34px;
+
+  padding: 6px 10px;
+
+  font-size: 12px;
+}
+
+
+/* =========================================================
+   РЕСУРСЫ — ТАБЛИЦА
+   ========================================================= */
+
+.section-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+
+  gap: 12px;
+
+  flex-wrap: wrap;
+}
+
+.section-toolbar-actions {
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+
+  flex-wrap: wrap;
+}
+
+.selection-state {
+  min-height: 38px;
+
+  display: flex;
+  align-items: center;
+
+  color: var(--muted);
+
+  font-size: 13px;
+}
+
+.resource-columns-panel {
+  margin: 12px 0;
+
+  padding: 12px;
+
+  border: 1px solid var(--line);
+  border-radius: 9px;
+
+  background: #fafbfc;
+}
+
+.resource-row-check,
+.resource-check-all {
+  width: 16px;
+  height: 16px;
+
+  cursor: pointer;
+}
+
+
+/* =========================================================
+   РЕСУРСЫ — ДИАГРАММЫ
+   ========================================================= */
+
+.chart-hint {
+  flex: 1;
+
+  min-width: 260px;
+
+  align-self: center;
+
+  font-size: 12px;
+
+  line-height: 1.4;
+}
+
+.resource-chart-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+
+  gap: 14px;
+}
+
+.resource-chart-card {
+  min-width: 0;
+
+  overflow: hidden;
+}
+
+.resource-chart-card h2 {
+  margin-bottom: 4px;
+}
+
+.resource-chart-subtitle {
+  min-height: 18px;
+
+  margin-bottom: 12px;
+
+  color: var(--muted);
+
+  font-size: 12px;
+}
+
+.resource-chart-box {
+  position: relative;
+
+  height: 320px;
+
+  width: 100%;
+}
+
+.resource-chart-box canvas,
+.chart-box canvas,
+.chart-box-large canvas {
+  max-width: 100%;
+}
+
+.chart-box {
+  position: relative;
+
+  height: 320px;
+
+  width: 100%;
+}
+
+.chart-box-large {
+  position: relative;
+
+  min-height: 360px;
+}
+
+.chart-box-large canvas {
+  max-height: 430px;
+}
+
+
+/* =========================================================
+   КАРТОЧКА ОРГАНИЗАЦИИ
+   ========================================================= */
+
+.organization-picker {
+  display: flex;
+  align-items: end;
+
+  gap: 10px;
+}
+
+.organization-picker .field {
+  max-width: 520px;
+}
+
+.organization-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 20px;
+}
+
+.organization-title h2 {
+  margin-bottom: 5px;
+
+  font-size: 24px;
+}
+
+.organization-resource-date {
+  flex: 0 0 auto;
+
+  padding: 8px 10px;
+
+  border: 1px solid var(--line);
+  border-radius: 8px;
+
+  background: #f8fafc;
+
+  color: #475467;
+
+  font-size: 12px;
+}
+
+.organization-work-item,
+.organization-milestone-item {
+  padding: 9px 0;
+
+  border-bottom: 1px solid #edf0f4;
+}
+
+.organization-work-item:last-child,
+.organization-milestone-item:last-child {
+  border-bottom: 0;
+}
+
+
+/* =========================================================
+   НЕБОЛЬШИЕ СЛУЖЕБНЫЕ ЭЛЕМЕНТЫ
+   ========================================================= */
+
+.empty-state {
+  padding: 28px 16px;
+
+  text-align: center;
+
+  color: var(--muted);
+}
+
+.empty-state strong {
+  display: block;
+
+  margin-bottom: 5px;
+
+  color: var(--text);
+}
+
+.table-actions {
+  display: flex;
+  gap: 8px;
+
+  align-items: center;
+}
+
+.danger-text {
+  color: var(--red);
+}
+
+.success-text {
+  color: var(--green);
+}
+
+.warning-text {
+  color: var(--amber);
+}
+
+
+/* =========================================================
+   АДАПТИВНОСТЬ
+   ========================================================= */
+
+@media (max-width: 1450px) {
+
+  .resource-filter-grid {
+    grid-template-columns:
+      150px
+      150px
+      repeat(2, minmax(210px, 1fr));
+  }
+}
+
 @media (max-width: 1100px) {
 
-  .stats {
-    grid-template-columns: repeat(2, 1fr);
+  .stats,
+  .stats-5 {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+  .stats-3 {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
   }
 
   .grid2,
@@ -584,7 +1302,107 @@ th {
   .gantt-name {
     margin-bottom: 4px;
   }
+
+  .resource-filter-grid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+  .resource-chart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .organization-title {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
+
+@media (max-width: 680px) {
+
+  .container {
+    padding: 10px;
+  }
+
+  .topbar {
+    padding: 14px;
+  }
+
+  .top-actions {
+    width: 100%;
+  }
+
+  .top-actions .btn {
+    flex: 1;
+  }
+
+  .tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+
+    padding-bottom: 4px;
+  }
+
+  .tab {
+    flex: 0 0 auto;
+  }
+
+  .stats,
+  .stats-2,
+  .stats-3,
+  .stats-5 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .resource-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .compact-field {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .resource-toolbar-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .resource-toolbar-actions > * {
+    width: 100%;
+  }
+
+  .switch-line {
+    justify-content: flex-start;
+  }
+
+  .section-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .section-toolbar-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .section-toolbar-actions .btn {
+    width: 100%;
+  }
+
+  .modal {
+    padding: 10px;
+  }
+
+  .modal-card {
+    padding: 14px;
+  }
+}
+
+
+/* =========================================================
+   ПЕЧАТЬ
+   ========================================================= */
 
 @media print {
 
@@ -629,7 +1447,10 @@ th {
     position: static;
   }
 
-  .stats {
+  .stats,
+  .stats-2,
+  .stats-3,
+  .stats-5 {
     grid-template-columns: repeat(3, 1fr);
   }
 }

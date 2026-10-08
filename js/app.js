@@ -2,1741 +2,6547 @@
 
 /* =========================================================
    LIV PLANNING
-   Главный запуск приложения
-
-   Этот файл:
-   - сразу подключает переключение вкладок;
-   - запускает IndexedDB отдельно;
-   - не блокирует интерфейс, если один модуль дал ошибку;
-   - связывает Ресурсы, Организации, Импорт;
-   - управляет резервной копией и модальным окном.
+   APP
+   Точка запуска + ключевые даты + номерные элементы +
+   демонтаж + история + настройки + конструктор + экспорт
    ========================================================= */
+
+const LIV_CONFIG = window.ACONS_CONFIG || {};
+
+
+function cfg(
+  key,
+  fallback
+) {
+
+  return (
+    LIV_CONFIG[key] !==
+      undefined
+      ? LIV_CONFIG[key]
+      : fallback
+  );
+}
+
+
+function bindChange(
+  id,
+  handler
+) {
+
+  const element =
+    $(
+      id
+    );
+
+
+  if (
+    element
+  ) {
+
+    element.onchange =
+      handler;
+  }
+}
+
+
+function bindClick(
+  id,
+  handler
+) {
+
+  const element =
+    $(
+      id
+    );
+
+
+  if (
+    element
+  ) {
+
+    element.onclick =
+      handler;
+  }
+}
 
 
 /* =========================================================
-   БЕЗОПАСНЫЙ ВЫЗОВ ФУНКЦИИ
+   КАЛЕНДАРИ И РАСЧЕТ СРОКОВ
    ========================================================= */
 
-LIV.safeCall = function (
-  functionName,
-  ...args
+
+function calendarById(
+  id
 ) {
 
-  try {
+  const calendars =
+    Object.values(
+      cfg(
+        'CALENDARS',
+        {}
+      )
+    );
 
-    const fn =
-      LIV[
-        functionName
-      ];
+
+  return (
+    calendars.find(
+      item =>
+        item.id ===
+        id
+    ) ||
+
+    calendars.find(
+      item =>
+        item.id ===
+        cfg(
+          'DEFAULT_CALENDAR',
+          '5x2'
+        )
+    ) ||
+
+    {
+      id:
+        '5x2',
+
+      name:
+        '5/2',
+
+      workdays: [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+
+      weekends: [
+        0,
+        6
+      ]
+    }
+  );
+}
+
+
+function projectDateSet(
+  key
+) {
+
+  return new Set(
+    (
+      cfg(
+        key,
+        []
+      ) ||
+      []
+    )
+      .map(
+        value =>
+          String(
+            value
+          )
+            .slice(
+              0,
+              10
+            )
+      )
+  );
+}
+
+
+function isProjectWorkingDay(
+  dateString,
+  calendarId =
+    cfg(
+      'DEFAULT_CALENDAR',
+      '5x2'
+    )
+) {
+
+  if (
+    !dateString
+  ) {
+    return false;
+  }
+
+
+  const forcedWorkdays =
+    projectDateSet(
+      'WORKDAY_OVERRIDES'
+    );
+
+
+  const holidays =
+    projectDateSet(
+      'HOLIDAYS'
+    );
+
+
+  if (
+    forcedWorkdays.has(
+      dateString
+    )
+  ) {
+
+    return true;
+  }
+
+
+  if (
+    holidays.has(
+      dateString
+    )
+  ) {
+
+    return false;
+  }
+
+
+  const date =
+    new Date(
+      `${dateString}T12:00:00`
+    );
+
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+
+    return false;
+  }
+
+
+  return calendarById(
+    calendarId
+  )
+    .workdays
+    .includes(
+      date.getDay()
+    );
+}
+
+
+function isoLocalDate(
+  date
+) {
+
+  return (
+    `${date.getFullYear()}-` +
+
+    `${String(
+      date.getMonth() +
+      1
+    )
+      .padStart(
+        2,
+        '0'
+      )}-` +
+
+    `${String(
+      date.getDate()
+    )
+      .padStart(
+        2,
+        '0'
+      )}`
+  );
+}
+
+
+function addProjectWorkingDays(
+  start,
+  count,
+  calendarId =
+    cfg(
+      'DEFAULT_CALENDAR',
+      '5x2'
+    )
+) {
+
+  if (
+    !start
+  ) {
+
+    return '';
+  }
+
+
+  let remaining =
+    Math.max(
+      0,
+      Math.round(
+        num(
+          count
+        )
+      )
+    );
+
+
+  const current =
+    new Date(
+      `${start}T12:00:00`
+    );
+
+
+  if (
+    Number.isNaN(
+      current.getTime()
+    )
+  ) {
+
+    return '';
+  }
+
+
+  if (
+    remaining ===
+    0
+  ) {
+
+    return isoLocalDate(
+      current
+    );
+  }
+
+
+  let guard =
+    0;
+
+
+  while (
+    remaining >
+      0 &&
+    guard <
+      5000
+  ) {
+
+    current.setDate(
+      current.getDate() +
+      1
+    );
+
+
+    const value =
+      isoLocalDate(
+        current
+      );
 
 
     if (
-      typeof fn ===
-      'function'
+      isProjectWorkingDay(
+        value,
+        calendarId
+      )
     ) {
-      return fn(
-        ...args
-      );
+
+      remaining--;
     }
 
-  } catch (error) {
 
-    console.error(
-      `Ошибка в ${functionName}:`,
-      error
+    guard++;
+  }
+
+
+  return isoLocalDate(
+    current
+  );
+}
+
+
+function workingDaysBetween(
+  from,
+  to,
+  calendarId =
+    cfg(
+      'DEFAULT_CALENDAR',
+      '5x2'
+    )
+) {
+
+  if (
+    !from ||
+    !to ||
+    from >
+      to
+  ) {
+
+    return 0;
+  }
+
+
+  return dateRange(
+    from,
+    to
+  )
+    .filter(
+      date =>
+        isProjectWorkingDay(
+          date,
+          calendarId
+        )
+    )
+    .length;
+}
+
+
+function calculateDurationDays(
+  data =
+    {}
+) {
+
+  const method =
+    data.durationMethod ||
+    'manual';
+
+
+  if (
+    method ===
+    'duration'
+  ) {
+
+    return Math.max(
+      0,
+      Math.round(
+        num(
+          data.durationDays
+        )
+      )
     );
   }
 
 
-  return null;
-};
+  if (
+    method ===
+    'productivity'
+  ) {
+
+    const volume =
+      num(
+        data.volume
+      );
 
 
-/* =========================================================
-   МОДАЛЬНОЕ ОКНО
-   ========================================================= */
+    const productivity =
+      num(
+        data.productivity
+      );
 
-LIV.openModal = function (
-  title,
-  html
+
+    return (
+      productivity >
+        0
+        ? Math.ceil(
+            volume /
+            productivity
+          )
+        : 0
+    );
+  }
+
+
+  if (
+    method ===
+    'productivity_resources'
+  ) {
+
+    const volume =
+      num(
+        data.volume
+      );
+
+
+    const productivity =
+      num(
+        data.productivity
+      );
+
+
+    const people =
+      Math.max(
+        0,
+        num(
+          data.people
+        )
+      );
+
+
+    return (
+      productivity >
+        0 &&
+      people >
+        0
+        ? Math.ceil(
+            volume /
+            (
+              productivity *
+              people
+            )
+          )
+        : 0
+    );
+  }
+
+
+  if (
+    data.planStart &&
+    data.planEnd
+  ) {
+
+    return workingDaysBetween(
+      data.planStart,
+      data.planEnd,
+      data.calendarId
+    );
+  }
+
+
+  return 0;
+}
+
+
+function applyReserveDays(
+  duration,
+  reserveType,
+  reserveValue
 ) {
 
-  const modal =
-    LIV.$(
-      'modal'
+  const base =
+    Math.max(
+      0,
+      Math.round(
+        num(
+          duration
+        )
+      )
     );
 
 
-  const modalTitle =
-    LIV.$(
-      'modalTitle'
-    );
-
-
-  const modalBody =
-    LIV.$(
-      'modalBody'
+  const reserve =
+    Math.max(
+      0,
+      num(
+        reserveValue
+      )
     );
 
 
   if (
-    !modal ||
-    !modalTitle ||
-    !modalBody
+    reserveType ===
+    'days'
   ) {
-    return;
+
+    return (
+      base +
+      Math.round(
+        reserve
+      )
+    );
   }
 
 
-  modalTitle.textContent =
-    title ||
-    'Редактор';
+  if (
+    reserveType ===
+    'percent'
+  ) {
+
+    return Math.ceil(
+      base *
+      (
+        1 +
+        reserve /
+        100
+      )
+    );
+  }
 
 
-  modalBody.innerHTML =
-    html ||
+  return base;
+}
+
+
+function calculateForecastEnd(
+  data =
+    {}
+) {
+
+  const start =
+    data.factStart ||
+    data.planStart ||
     '';
 
 
-  modal.classList.remove(
-    'hidden'
-  );
-};
+  if (
+    !start
+  ) {
 
-
-LIV.closeModal = function () {
-
-  const modal =
-    LIV.$(
-      'modal'
+    return (
+      data.forecastEnd ||
+      ''
     );
-
-
-  if (!modal) {
-    return;
   }
-
-
-  modal.classList.add(
-    'hidden'
-  );
-
-
-  const modalBody =
-    LIV.$(
-      'modalBody'
-    );
 
 
   if (
-    modalBody
+    (
+      data.durationMethod ||
+      'manual'
+    ) ===
+    'manual'
   ) {
-    modalBody.innerHTML =
-      '';
+
+    return (
+      data.forecastEnd ||
+      data.planEnd ||
+      ''
+    );
   }
-};
 
 
-/* =========================================================
-   ОСНОВНЫЕ ВКЛАДКИ
-   ========================================================= */
+  const duration =
+    calculateDurationDays(
+      data
+    );
 
-LIV.switchTab = function (
-  tabName
+
+  const withReserve =
+    applyReserveDays(
+      duration,
+      data.reserveType,
+      data.reserveValue
+    );
+
+
+  return addProjectWorkingDays(
+    start,
+    withReserve,
+    data.calendarId
+  );
+}
+
+
+function dateDeviationDays(
+  target,
+  actualOrForecast
 ) {
 
   if (
-    !tabName
+    !target ||
+    !actualOrForecast
+  ) {
+
+    return null;
+  }
+
+
+  return diffDays(
+    target,
+    actualOrForecast
+  );
+}
+
+
+/* =========================================================
+   КЛЮЧЕВЫЕ ДАТЫ
+   ========================================================= */
+
+
+function milestoneStatuses() {
+
+  return cfg(
+    'MILESTONE_STATUSES',
+
+    [
+      'Не наступила',
+      'В работе',
+      'Под риском',
+      'Просрочена',
+      'Выполнена',
+      'Выполнена с просрочкой',
+      'Перенесена',
+      'Отменена'
+    ]
+  );
+}
+
+
+function correspondenceTypes() {
+
+  return cfg(
+    'CORRESPONDENCE_TYPES',
+
+    [
+      'Исходящее письмо',
+      'Входящее письмо',
+      'Ответ подрядчика',
+      'Уведомление о нарушении',
+      'План компенсирующих мероприятий',
+      'Согласование',
+      'Замечания',
+      'Протокол',
+      'Иное'
+    ]
+  );
+}
+
+
+function milestoneTargetDate(
+  item
+) {
+
+  return (
+    item.contractDate ||
+    item.workDate ||
+    ''
+  );
+}
+
+
+function milestoneCurrentDate(
+  item
+) {
+
+  return (
+    item.factDate ||
+    item.forecastDate ||
+    item.workDate ||
+    ''
+  );
+}
+
+
+function milestoneDeviation(
+  item
+) {
+
+  return dateDeviationDays(
+    milestoneTargetDate(
+      item
+    ),
+
+    milestoneCurrentDate(
+      item
+    )
+  );
+}
+
+
+function milestoneOrganizationName(
+  item
+) {
+
+  return (
+    nameById(
+      project.organizations,
+      item.organizationId
+    ) ||
+    ''
+  );
+}
+
+
+function milestoneContractLabel(
+  item
+) {
+
+  const contract =
+    byId(
+      project.contracts,
+      item.contractId
+    );
+
+
+  return (
+    contract?.number ||
+    contract?.name ||
+    item.contractNo ||
+    ''
+  );
+}
+
+
+function milestoneLetters(
+  item
+) {
+
+  return (
+    Array.isArray(
+      item.correspondence
+    )
+      ? item.correspondence
+      : []
+  );
+}
+
+
+function renderMilestones() {
+
+  const body =
+    $('milestoneRows');
+
+
+  if (
+    !body
   ) {
     return;
   }
 
 
-  /* -------------------------------------------------------
-     КНОПКИ
-     ------------------------------------------------------- */
+  const rows =
+    [
+      ...(
+        project.milestones ||
+        []
+      )
+    ]
+      .sort(
+        (
+          a,
+          b
+        ) =>
+          String(
+            milestoneTargetDate(
+              a
+            )
+          )
+            .localeCompare(
+              String(
+                milestoneTargetDate(
+                  b
+                )
+              )
+            )
+      );
+
+
+  body.innerHTML =
+    rows
+      .map(
+        item => {
+
+          const deviation =
+            milestoneDeviation(
+              item
+            );
+
+
+          const org =
+            milestoneOrganizationName(
+              item
+            );
+
+
+          const contract =
+            milestoneContractLabel(
+              item
+            );
+
+
+          const letters =
+            milestoneLetters(
+              item
+            );
+
+
+          const lastLetter =
+            [
+              ...letters
+            ]
+              .sort(
+                (
+                  a,
+                  b
+                ) =>
+                  String(
+                    a.date ||
+                    ''
+                  )
+                    .localeCompare(
+                      String(
+                        b.date ||
+                        ''
+                      )
+                    )
+              )
+              .slice(
+                -1
+              )[0];
+
+
+          return `
+            <tr>
+
+              <td>
+                ${esc(
+                  nameById(
+                    project.buildings,
+                    item.buildingId
+                  ) ||
+                  '—'
+                )}
+              </td>
+
+
+              <td>
+
+                <button
+                  class="row-btn"
+                  data-ms="${esc(
+                    item.id
+                  )}">
+
+                  <b>
+                    ${esc(
+                      item.milestoneNo
+                        ? `${item.milestoneNo} · ${item.title || ''}`
+                        : (
+                            item.title ||
+                            'Ключевая дата'
+                          )
+                    )}
+                  </b>
+
+                </button>
+
+
+                ${
+                  org
+                    ? `
+                        <div class="tiny">
+                          ${esc(org)}
+                        </div>
+                      `
+                    : ''
+                }
+
+
+                ${
+                  contract
+                    ? `
+                        <div class="tiny">
+                          Договор:
+                          ${esc(contract)}
+                        </div>
+                      `
+                    : ''
+                }
+
+
+                ${
+                  lastLetter
+                    ? `
+                        <div class="tiny">
+
+                          Последнее письмо:
+
+                          ${esc(
+                            lastLetter.number ||
+                            'без №'
+                          )}
+
+                          от
+
+                          ${esc(
+                            ruDate(
+                              lastLetter.date
+                            ) ||
+                            '—'
+                          )}
+
+                        </div>
+                      `
+                    : ''
+                }
+
+              </td>
+
+
+              <td>
+                ${
+                  item.contractDate
+                    ? ruDate(
+                        item.contractDate
+                      )
+                    : '—'
+                }
+              </td>
+
+
+              <td>
+                ${
+                  item.workDate
+                    ? ruDate(
+                        item.workDate
+                      )
+                    : '—'
+                }
+              </td>
+
+
+              <td>
+                ${
+                  item.forecastDate
+                    ? ruDate(
+                        item.forecastDate
+                      )
+                    : '—'
+                }
+              </td>
+
+
+              <td>
+                ${
+                  item.factDate
+                    ? ruDate(
+                        item.factDate
+                      )
+                    : '—'
+                }
+              </td>
+
+
+              <td>
+
+                <span
+                  class="badge ${
+                    deviation !==
+                      null &&
+                    deviation >
+                      0
+                      ? 's-risk'
+                      : ''
+                  }">
+
+                  ${esc(
+                    item.status ||
+                    ''
+                  )}
+
+                </span>
+
+
+                ${
+                  deviation !==
+                    null
+                    ? `
+                        <div class="tiny">
+
+                          Отклонение:
+
+                          ${
+                            deviation >
+                              0
+                              ? '+'
+                              : ''
+                          }
+
+                          ${deviation}
+                          дн.
+
+                        </div>
+                      `
+                    : ''
+                }
+
+
+                ${
+                  letters.length
+                    ? `
+                        <div class="tiny">
+                          Писем:
+                          ${letters.length}
+                        </div>
+                      `
+                    : ''
+                }
+
+              </td>
+
+            </tr>
+          `;
+        }
+      )
+      .join('') ||
+
+    `
+      <tr>
+
+        <td colspan="7">
+
+          <div class="empty-state">
+            Ключевые даты пока не добавлены.
+          </div>
+
+        </td>
+
+      </tr>
+    `;
+
 
   document
     .querySelectorAll(
-      '.tab'
+      '[data-ms]'
     )
     .forEach(
       button => {
 
-        button.classList.toggle(
-          'active',
-          button.dataset.tab ===
-            tabName
-        );
+        button.onclick =
+          () =>
+            openMilestoneEditor(
+              button.dataset
+                .ms
+            );
       }
     );
+}
 
 
-  /* -------------------------------------------------------
-     СЕКЦИИ
-     ------------------------------------------------------- */
-
-  document
-    .querySelectorAll(
-      '.panel'
-    )
-    .forEach(
-      panel => {
-
-        panel.classList.add(
-          'hidden'
-        );
-      }
-    );
-
-
-  const target =
-    LIV.$(
-      `tab-${tabName}`
-    );
-
-
-  if (
-    !target
-  ) {
-
-    console.warn(
-      `Вкладка tab-${tabName} не найдена`
-    );
-
-    return;
-  }
-
-
-  target.classList.remove(
-    'hidden'
-  );
-
-
-  /* -------------------------------------------------------
-     ОТРИСОВКА ОТКРЫТОЙ ВКЛАДКИ
-
-     Ошибка одного модуля не должна ломать
-     само переключение вкладок.
-     ------------------------------------------------------- */
-
-  try {
-
-    LIV.renderTab(
-      tabName
-    );
-
-  } catch (error) {
-
-    console.error(
-      `Ошибка отрисовки вкладки ${tabName}:`,
-      error
-    );
-  }
-};
-
-
-/* =========================================================
-   ОТРИСОВКА КОНКРЕТНОЙ ВКЛАДКИ
-   ========================================================= */
-
-LIV.renderTab = function (
-  tabName
+function milestoneContractOptions(
+  selectedId =
+    ''
 ) {
 
-  if (
-    !LIV.project
-  ) {
-    return;
-  }
-
-
-  switch (
-    tabName
-  ) {
-
-    case 'dashboard':
-
-      LIV.safeCall(
-        'renderDashboard'
-      );
-
-      break;
-
-
-    case 'resources':
-
-      LIV.safeCall(
-        'renderResources'
-      );
-
-      break;
-
-
-    case 'organizations':
-
-      LIV.safeCall(
-        'renderOrganizations'
-      );
-
-      break;
-
-
-    case 'history':
-
-      LIV.safeCall(
-        'renderHistory'
-      );
-
-      break;
-
-
-    case 'settings':
-
-      LIV.safeCall(
-        'renderSystemInfo'
-      );
-
-      break;
-
-
-    /*
-       Шахматка, Гант, План/факт,
-       Ключевые даты, Номерные элементы,
-       Демонтаж пока представлены
-       временными секциями index.html.
-
-       Поэтому здесь им пока
-       не требуется отдельный render.
-    */
-
-    case 'matrix':
-    case 'gantt':
-    case 'planfact':
-    case 'milestones':
-    case 'elements':
-    case 'demolition':
-    case 'import':
-
-      break;
-
-
-    default:
-
-      console.warn(
-        `Неизвестная вкладка: ${tabName}`
-      );
-  }
-};
-
-
-/* =========================================================
-   СВОДКА
-   ========================================================= */
-
-LIV.renderDashboard = function () {
-
-  if (
-    !LIV.project
-  ) {
-    return;
-  }
-
-
-  const fronts =
-    Array.isArray(
-      LIV.project.fronts
-    )
-      ? LIV.project.fronts
-      : [];
-
-
-  const resources =
-    Array.isArray(
-      LIV.project.resources
-    )
-      ? LIV.project.resources
-      : [];
-
-
-  const today =
-    LIV.today();
-
-
-  const normalizedStatus =
-    function (
-      value
-    ) {
-
-      return LIV.normKey(
-        value
-      );
-    };
-
-
-  const isDone =
-    function (
-      front
-    ) {
-
-      const status =
-        normalizedStatus(
-          front.status
-        );
-
-
-      return (
-        status.includes(
-          'заверш'
-        ) ||
-        status.includes(
-          'выполн'
-        ) ||
-        status.includes(
-          'готов'
-        )
-      );
-    };
-
-
-  const isAccepted =
-    function (
-      front
-    ) {
-
-      const status =
-        normalizedStatus(
-          front.acceptanceStatus ||
-          front.statusAcceptance ||
-          ''
-        );
-
-
-      return (
-        status.includes(
-          'сдан'
-        ) ||
-        status.includes(
-          'принят'
-        ) ||
-        status.includes(
-          'освидетельств'
-        )
-      );
-    };
-
-
-  const isWork =
-    function (
-      front
-    ) {
-
-      const status =
-        normalizedStatus(
-          front.status
-        );
-
-
-      return (
-        status.includes(
-          'работ'
-        ) ||
-        status.includes(
-          'процесс'
-        )
-      );
-    };
-
-
-  const isLate =
-    function (
-      front
-    ) {
-
-      if (
-        isDone(
-          front
-        )
-      ) {
-        return false;
-      }
-
-
-      const end =
-        front.planEnd ||
-        front.baselineEnd ||
-        front.contractEnd ||
-        '';
-
-
-      return (
-        end &&
-        end <
-        today
-      );
-    };
-
-
-  const hasConstraint =
-    function (
-      front
-    ) {
-
-      if (
-        front.constraint ||
-        front.restriction ||
-        front.hasConstraint ===
-          true
-      ) {
-        return true;
-      }
-
-
-      return (
-        LIV.project.constraints ||
+  return `
+    <option value="">
+      —
+    </option>
+
+    ${
+      (
+        project.contracts ||
         []
       )
-        .some(
-          constraint => {
-
-            return (
-              String(
-                constraint.frontId ||
-                ''
-              ) ===
+        .map(
+          item => `
+            <option
+              value="${esc(
+                item.id
+              )}"
+              ${
                 String(
-                  front.id ||
+                  item.id
+                ) ===
+                String(
+                  selectedId
+                )
+                  ? 'selected'
+                  : ''
+              }>
+
+              ${esc(
+                item.number ||
+                item.name ||
+                item.id
+              )}
+
+            </option>
+          `
+        )
+        .join('')
+    }
+  `;
+}
+
+
+function milestoneFrontOptions(
+  selectedId =
+    ''
+) {
+
+  return `
+    <option value="">
+      —
+    </option>
+
+    ${
+      activeFronts()
+        .map(
+          front => `
+            <option
+              value="${esc(
+                front.id
+              )}"
+              ${
+                String(
+                  front.id
+                ) ===
+                String(
+                  selectedId
+                )
+                  ? 'selected'
+                  : ''
+              }>
+
+              ${esc(
+                frontLabel(
+                  front
+                )
+              )}
+
+            </option>
+          `
+        )
+        .join('')
+    }
+  `;
+}
+
+
+function correspondenceEditorRows(
+  items =
+    []
+) {
+
+  return (
+    items ||
+    []
+  )
+    .map(
+      (
+        item,
+        index
+      ) => `
+        <div
+          class="compare-record"
+          data-letter-row="${index}">
+
+          <div class="form-grid">
+
+            <div class="field">
+
+              <label>
+                Тип
+              </label>
+
+              <select data-letter-type>
+
+                ${
+                  correspondenceTypes()
+                    .map(
+                      type => `
+                        <option
+                          ${
+                            type ===
+                            item.type
+                              ? 'selected'
+                              : ''
+                          }>
+                          ${esc(type)}
+                        </option>
+                      `
+                    )
+                    .join('')
+                }
+
+              </select>
+
+            </div>
+
+
+            <div class="field">
+
+              <label>
+                Дата
+              </label>
+
+              <input
+                data-letter-date
+                type="date"
+                value="${esc(
+                  item.date ||
                   ''
-                ) &&
-              LIV.normKey(
-                constraint.status
-              ) !==
-                'закрыто'
-            );
-          }
-        );
-    };
+                )}"
+              >
+
+            </div>
 
 
-  if (
-    LIV.$(
-      'dTotal'
+            <div class="field">
+
+              <label>
+                Номер письма
+              </label>
+
+              <input
+                data-letter-number
+                value="${esc(
+                  item.number ||
+                  ''
+                )}"
+                placeholder="ПП.СРК.1213/26"
+              >
+
+            </div>
+
+
+            <div class="field">
+
+              <label>
+                Тема / краткое содержание
+              </label>
+
+              <input
+                data-letter-title
+                value="${esc(
+                  item.title ||
+                  ''
+                )}"
+              >
+
+            </div>
+
+
+            <div class="field">
+
+              <label>
+                Ссылка на PDF / файл
+              </label>
+
+              <input
+                data-letter-url
+                value="${esc(
+                  item.url ||
+                  ''
+                )}"
+                placeholder="https://..."
+              >
+
+            </div>
+
+
+            <div class="field align-end">
+
+              <button
+                type="button"
+                class="btn danger"
+                data-letter-remove>
+                Удалить письмо
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+      `
     )
-  ) {
-    LIV.$(
-      'dTotal'
-    ).textContent =
-      fronts.length;
-  }
+    .join('');
+}
 
 
-  if (
-    LIV.$(
-      'dWork'
-    )
-  ) {
-    LIV.$(
-      'dWork'
-    ).textContent =
-      fronts.filter(
-        isWork
-      ).length;
-  }
+function openMilestoneEditor(
+  id =
+    null
+) {
 
-
-  if (
-    LIV.$(
-      'dDone'
-    )
-  ) {
-    LIV.$(
-      'dDone'
-    ).textContent =
-      fronts.filter(
-        isDone
-      ).length;
-  }
-
-
-  if (
-    LIV.$(
-      'dAccepted'
-    )
-  ) {
-    LIV.$(
-      'dAccepted'
-    ).textContent =
-      fronts.filter(
-        isAccepted
-      ).length;
-  }
-
-
-  if (
-    LIV.$(
-      'dLate'
-    )
-  ) {
-    LIV.$(
-      'dLate'
-    ).textContent =
-      fronts.filter(
-        isLate
-      ).length;
-  }
-
-
-  if (
-    LIV.$(
-      'dRisk'
-    )
-  ) {
-    LIV.$(
-      'dRisk'
-    ).textContent =
-      fronts.filter(
-        hasConstraint
-      ).length;
-  }
-
-
-  /* =======================================================
-     КРИТИЧНЫЕ ФРОНТЫ
-     ======================================================= */
-
-  const critical =
-    fronts
-      .filter(
-        front =>
-          isLate(
-            front
+  const milestone =
+    id
+      ? (
+          byId(
+            project.milestones,
+            id
           ) ||
-          hasConstraint(
-            front
-          )
+          {}
+        )
+      : {};
+
+
+  const letters =
+    clone(
+      milestoneLetters(
+        milestone
       )
-      .slice(
-        0,
-        15
-      );
-
-
-  const criticalContainer =
-    LIV.$(
-      'dCritical'
     );
 
 
-  if (
-    criticalContainer
-  ) {
+  openModal(
+    id
+      ? 'Ключевая дата'
+      : 'Новая ключевая дата',
 
-    if (
-      !critical.length
-    ) {
+    `
+      <div class="form-grid">
 
-      criticalContainer.innerHTML = `
-        <div class="muted">
-          Критичные фронты не найдены.
-        </div>
-      `;
+        <div class="field">
 
-    } else {
+          <label>
+            Подрядчик
+          </label>
 
-      criticalContainer.innerHTML =
-        critical
-          .map(
-            front => {
+          <select id="mOrg">
 
-              const end =
-                front.planEnd ||
-                front.baselineEnd ||
-                front.contractEnd ||
-                '';
-
-
-              return `
-                <div class="organization-work-item">
-
-                  <strong>
-                    ${LIV.esc(
-                      LIV.getFrontLabel(
-                        front
-                      )
-                    )}
-                  </strong>
-
-                  <div class="muted">
-                    ${
-                      end
-                        ? `Срок: ${LIV.ruDate(end)}`
-                        : 'Срок не указан'
-                    }
-                  </div>
-
-                </div>
-              `;
+            ${
+              selectOptions(
+                project.organizations,
+                milestone.organizationId,
+                true
+              )
             }
-          )
-          .join('');
-    }
-  }
+
+          </select>
+
+        </div>
 
 
-  /* =======================================================
-     ТЕКУЩИЕ РЕСУРСЫ
-     ======================================================= */
+        <div class="field">
 
-  const resourceDates =
-    LIV.unique(
-      resources
-        .map(
-          row =>
-            row.date
-        )
-        .filter(
-          Boolean
-        )
-    )
-      .sort();
+          <label>
+            Договор из справочника
+          </label>
 
+          <select id="mContractId">
 
-  const latestDate =
-    resourceDates.length
-      ? resourceDates[
-          resourceDates.length -
-          1
-        ]
-      : null;
+            ${
+              milestoneContractOptions(
+                milestone.contractId
+              )
+            }
+
+          </select>
+
+        </div>
 
 
-  const latestRows =
-    latestDate
-      ? resources.filter(
-          row =>
-            row.date ===
-            latestDate
-        )
-      : [];
+        <div class="field">
+
+          <label>
+            № договора вручную
+          </label>
+
+          <input
+            id="mContractNo"
+            value="${esc(
+              milestone.contractNo ||
+              ''
+            )}"
+          >
+
+        </div>
 
 
-  const peopleTotal =
-    latestRows.reduce(
-      (
-        total,
-        row
-      ) => {
+        <div class="field">
 
-        if (
-          typeof LIV.getResourcePeopleTotal ===
-          'function'
-        ) {
-          return (
-            total +
-            LIV.getResourcePeopleTotal(
-              row
-            )
-          );
+          <label>
+            № ключевой даты
+          </label>
+
+          <input
+            id="mNo"
+            value="${esc(
+              milestone.milestoneNo ||
+              ''
+            )}"
+            placeholder="КД №1"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Здание
+          </label>
+
+          <select id="mBuilding">
+
+            ${
+              selectOptions(
+                project.buildings,
+                milestone.buildingId,
+                true
+              )
+            }
+
+          </select>
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Вид работ
+          </label>
+
+          <select id="mWorkId">
+
+            ${
+              selectOptions(
+                project.works,
+                milestone.workId,
+                true
+              )
+            }
+
+          </select>
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Связанный фронт
+          </label>
+
+          <select id="mFrontId">
+
+            ${
+              milestoneFrontOptions(
+                milestone.frontId
+              )
+            }
+
+          </select>
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Статус
+          </label>
+
+          <select id="mStatus">
+
+            ${
+              milestoneStatuses()
+                .map(
+                  status => `
+                    <option
+                      ${
+                        status ===
+                        (
+                          milestone.status ||
+                          'Не наступила'
+                        )
+                          ? 'selected'
+                          : ''
+                      }>
+                      ${esc(status)}
+                    </option>
+                  `
+                )
+                .join('')
+            }
+
+          </select>
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Ответственный
+          </label>
+
+          <input
+            id="mResponsible"
+            value="${esc(
+              milestone.responsible ||
+              ''
+            )}"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Договорная дата
+          </label>
+
+          <input
+            id="mContract"
+            type="date"
+            value="${esc(
+              milestone.contractDate ||
+              ''
+            )}"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Рабочая дата
+          </label>
+
+          <input
+            id="mWork"
+            type="date"
+            value="${esc(
+              milestone.workDate ||
+              ''
+            )}"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Прогноз
+          </label>
+
+          <input
+            id="mForecast"
+            type="date"
+            value="${esc(
+              milestone.forecastDate ||
+              ''
+            )}"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Факт
+          </label>
+
+          <input
+            id="mFact"
+            type="date"
+            value="${esc(
+              milestone.factDate ||
+              ''
+            )}"
+          >
+
+        </div>
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Формулировка ключевой даты
+        </label>
+
+        <textarea id="mTitle">${esc(
+          milestone.title ||
+          ''
+        )}</textarea>
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Комментарий
+        </label>
+
+        <textarea id="mComment">${esc(
+          milestone.comment ||
+          ''
+        )}</textarea>
+
+      </div>
+
+
+      <div
+        class="card"
+        style="margin-top:14px">
+
+        <div class="section-toolbar">
+
+          <div>
+
+            <h2>
+              Переписка
+            </h2>
+
+            <div class="muted">
+
+              Номер, дата, тип и ссылка на PDF/файл.
+
+              Сам файл добавим после перехода
+              на файловое хранилище.
+
+            </div>
+
+          </div>
+
+
+          <button
+            id="mAddLetter"
+            type="button"
+            class="btn">
+
+            + Добавить письмо
+
+          </button>
+
+        </div>
+
+
+        <div id="mLetters"></div>
+
+      </div>
+
+
+      <div class="editor-actions">
+
+        ${
+          id
+            ? `
+                <button
+                  id="mDelete"
+                  class="btn danger">
+                  Удалить
+                </button>
+              `
+            : ''
         }
 
 
-        return (
-          total +
-          LIV.num(
-            row.itr
-          ) +
-          LIV.num(
-            row.workers
-          ) +
-          LIV.num(
-            row.mechanizers
-          )
+        <button
+          id="mSave"
+          class="btn primary">
+          Сохранить
+        </button>
+
+      </div>
+    `
+  );
+
+
+  function renderLetters() {
+
+    $('mLetters')
+      .innerHTML =
+        correspondenceEditorRows(
+          letters
+        ) ||
+
+        `
+          <div class="muted">
+            Переписка пока не добавлена.
+          </div>
+        `;
+
+
+    $('mLetters')
+      .querySelectorAll(
+        '[data-letter-remove]'
+      )
+      .forEach(
+        button => {
+
+          button.onclick =
+            () => {
+
+              const row =
+                button.closest(
+                  '[data-letter-row]'
+                );
+
+
+              const index =
+                Number(
+                  row?.dataset
+                    .letterRow
+                );
+
+
+              if (
+                Number.isInteger(
+                  index
+                )
+              ) {
+
+                letters.splice(
+                  index,
+                  1
+                );
+
+
+                renderLetters();
+              }
+            };
+        }
+      );
+  }
+
+
+  function collectLetters() {
+
+    return [
+      ...$('mLetters')
+        .querySelectorAll(
+          '[data-letter-row]'
+        )
+    ]
+      .map(
+        row => {
+
+          const index =
+            Number(
+              row.dataset
+                .letterRow
+            );
+
+
+          return {
+
+            id:
+              letters[
+                index
+              ]?.id ||
+              uid(
+                'COR'
+              ),
+
+            type:
+              row.querySelector(
+                '[data-letter-type]'
+              )?.value ||
+              'Иное',
+
+            date:
+              row.querySelector(
+                '[data-letter-date]'
+              )?.value ||
+              '',
+
+            number:
+              row.querySelector(
+                '[data-letter-number]'
+              )?.value
+                .trim() ||
+              '',
+
+            title:
+              row.querySelector(
+                '[data-letter-title]'
+              )?.value
+                .trim() ||
+              '',
+
+            url:
+              row.querySelector(
+                '[data-letter-url]'
+              )?.value
+                .trim() ||
+              ''
+          };
+        }
+      )
+      .filter(
+        item =>
+          item.date ||
+          item.number ||
+          item.title ||
+          item.url
+      );
+  }
+
+
+  renderLetters();
+
+
+  $('mAddLetter').onclick =
+    () => {
+
+      letters.push({
+
+        id:
+          uid(
+            'COR'
+          ),
+
+        type:
+          'Исходящее письмо',
+
+        date:
+          today(),
+
+        number:
+          '',
+
+        title:
+          '',
+
+        url:
+          ''
+      });
+
+
+      renderLetters();
+    };
+
+
+  $('mSave').onclick =
+    () =>
+      saveMilestone(
+        id,
+        collectLetters()
+      );
+
+
+  if (
+    id &&
+    $('mDelete')
+  ) {
+
+    $('mDelete').onclick =
+      () =>
+        deleteMilestone(
+          id
         );
-      },
-      0
-    );
+  }
+}
 
 
-  const equipmentTotal =
-    latestRows.reduce(
-      (
-        total,
-        row
-      ) =>
-        total +
-        LIV.num(
-          row.equipmentQty
+async function saveMilestone(
+  id,
+  correspondence =
+    []
+) {
+
+  let milestone =
+    id
+      ? byId(
+          project.milestones,
+          id
+        )
+      : null;
+
+
+  if (
+    !milestone
+  ) {
+
+    milestone = {
+
+      id:
+        uid(
+          'M'
         ),
-      0
+
+      createdAt:
+        nowIso()
+    };
+  }
+
+
+  const title =
+    $('mTitle')
+      .value
+      .trim();
+
+
+  if (
+    !title
+  ) {
+
+    alert(
+      'Укажи формулировку ключевой даты.'
     );
 
+    return;
+  }
 
-  const resourceContainer =
-    LIV.$(
-      'dResources'
+
+  Object.assign(
+    milestone,
+    {
+
+      organizationId:
+        $('mOrg').value,
+
+      contractId:
+        $('mContractId').value,
+
+      contractNo:
+        $('mContractNo')
+          .value
+          .trim(),
+
+      milestoneNo:
+        $('mNo')
+          .value
+          .trim(),
+
+      buildingId:
+        $('mBuilding').value,
+
+      workId:
+        $('mWorkId').value,
+
+      frontId:
+        $('mFrontId').value,
+
+      responsible:
+        $('mResponsible')
+          .value
+          .trim(),
+
+      title,
+
+      status:
+        $('mStatus').value,
+
+      contractDate:
+        $('mContract').value,
+
+      workDate:
+        $('mWork').value,
+
+      forecastDate:
+        $('mForecast').value,
+
+      factDate:
+        $('mFact').value,
+
+      comment:
+        $('mComment')
+          .value
+          .trim(),
+
+      correspondence,
+
+      updatedAt:
+        nowIso()
+    }
+  );
+
+
+  if (
+    !id
+  ) {
+
+    project.milestones
+      .push(
+        milestone
+      );
+  }
+
+
+  log(
+    id
+      ? 'Изменено'
+      : 'Создано',
+
+    'Ключевая дата',
+
+    `${
+      milestone.milestoneNo
+        ? `${milestone.milestoneNo} · `
+        : ''
+    }${milestone.title}`
+  );
+
+
+  await saveProject();
+
+
+  closeModal();
+
+
+  renderAll();
+}
+
+
+async function deleteMilestone(
+  id
+) {
+
+  const item =
+    byId(
+      project.milestones,
+      id
     );
 
 
   if (
-    resourceContainer
+    !item
+  ) {
+    return;
+  }
+
+
+  if (
+    !confirm(
+      'Удалить ключевую дату? Перед удалением будет создана защитная копия.'
+    )
   ) {
 
-    resourceContainer.innerHTML = `
-      ${
-        latestDate
-          ? `
-            <div class="muted">
-              Данные на
-              ${LIV.ruDate(
-                latestDate
-              )}
-            </div>
-          `
-          : `
-            <div class="muted">
-              Данные ресурсов пока отсутствуют.
-            </div>
-          `
-      }
-
-      <div style="margin-top:10px;">
-        <strong>
-          Людей:
-          ${LIV.roundInt(
-            peopleTotal
-          )}
-        </strong>
-      </div>
-
-      <div style="margin-top:6px;">
-        <strong>
-          Техники:
-          ${LIV.roundInt(
-            equipmentTotal
-          )}
-        </strong>
-      </div>
-    `;
+    return;
   }
-};
+
+
+  await dbPutKey(
+    clone(
+      project
+    ),
+
+    `pre-milestone-delete-${Date.now()}`
+  );
+
+
+  project.milestones =
+    project.milestones
+      .filter(
+        row =>
+          String(
+            row.id
+          ) !==
+          String(
+            id
+          )
+      );
+
+
+  log(
+    'Удалено',
+    'Ключевая дата',
+    item.title ||
+    item.id
+  );
+
+
+  await saveProject();
+
+
+  closeModal();
+
+
+  renderAll();
+}
+
+
+/* =========================================================
+   НОМЕРНЫЕ ЭЛЕМЕНТЫ
+   ========================================================= */
+
+
+function elementContextKey(
+  element
+) {
+
+  const scope =
+    element.uniqueScope ||
+    'context';
+
+
+  const type =
+    normKey(
+      element.elementType
+    );
+
+
+  const number =
+    normKey(
+      element.elementNo
+    );
+
+
+  if (
+    scope ===
+    'project'
+  ) {
+
+    return [
+      type,
+      number
+    ]
+      .join(
+        '|'
+      );
+  }
+
+
+  if (
+    scope ===
+    'building'
+  ) {
+
+    return [
+      type,
+      element.buildingId ||
+      '',
+      number
+    ]
+      .join(
+        '|'
+      );
+  }
+
+
+  return [
+    type,
+    element.buildingId ||
+      '',
+    normKey(
+      element.capture
+    ),
+    normKey(
+      element.zone
+    ),
+    number
+  ]
+    .join(
+      '|'
+    );
+}
+
+
+function findElementDuplicate(
+  candidate,
+  excludeId =
+    ''
+) {
+
+  const key =
+    elementContextKey(
+      candidate
+    );
+
+
+  return (
+    project.numberedElements ||
+    []
+  )
+    .find(
+      element =>
+
+        element.active !==
+          false &&
+
+        String(
+          element.id
+        ) !==
+        String(
+          excludeId
+        ) &&
+
+        elementContextKey(
+          element
+        ) ===
+        key
+    );
+}
+
+
+function renderElements() {
+
+  const body =
+    $('elementRows');
+
+
+  if (
+    !body
+  ) {
+    return;
+  }
+
+
+  const buildingId =
+    $('elBuilding')?.value ||
+    'all';
+
+
+  const type =
+    $('elType')?.value ||
+    'all';
+
+
+  const search =
+    normKey(
+      $('elSearch')?.value ||
+      ''
+    );
+
+
+  const rows =
+    (
+      project.numberedElements ||
+      []
+    )
+      .filter(
+        element =>
+
+          element.active !==
+            false &&
+
+          (
+            buildingId ===
+              'all' ||
+            element.buildingId ===
+              buildingId
+          ) &&
+
+          (
+            type ===
+              'all' ||
+            element.elementType ===
+              type
+          ) &&
+
+          (
+            !search ||
+            normKey(
+              element.elementNo
+            )
+              .includes(
+                search
+              )
+          )
+      );
+
+
+  body.innerHTML =
+    rows
+      .map(
+        element => `
+          <tr>
+
+            <td>
+              ${esc(
+                element.elementType ||
+                ''
+              )}
+            </td>
+
+            <td>
+              <b>
+                ${esc(
+                  element.elementNo ||
+                  ''
+                )}
+              </b>
+            </td>
+
+            <td>
+              ${esc(
+                nameById(
+                  project.buildings,
+                  element.buildingId
+                ) ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              ${esc(
+                element.capture ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              ${esc(
+                element.zone ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              ${esc(
+                nameById(
+                  project.works,
+                  element.workId
+                ) ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              ${esc(
+                element.status ||
+                ''
+              )}
+            </td>
+
+            <td>
+              ${esc(
+                element.comment ||
+                ''
+              )}
+            </td>
+
+            <td>
+
+              <button
+                class="row-btn"
+                data-el="${esc(
+                  element.id
+                )}">
+                Открыть
+              </button>
+
+            </td>
+
+          </tr>
+        `
+      )
+      .join('') ||
+
+    `
+      <tr>
+
+        <td colspan="9">
+
+          <div class="empty-state">
+            Номерные элементы не найдены.
+          </div>
+
+        </td>
+
+      </tr>
+    `;
+
+
+  document
+    .querySelectorAll(
+      '[data-el]'
+    )
+    .forEach(
+      button => {
+
+        button.onclick =
+          () =>
+            openElementEditor(
+              button.dataset
+                .el
+            );
+      }
+    );
+}
+
+
+function openElementEditor(
+  id =
+    null
+) {
+
+  const element =
+    id
+      ? (
+          byId(
+            project.numberedElements,
+            id
+          ) ||
+          {}
+        )
+      : {};
+
+
+  const frontOptions =
+    activeFronts()
+      .map(
+        front => `
+          <option
+            value="${esc(
+              front.id
+            )}"
+            ${
+              String(
+                front.id
+              ) ===
+              String(
+                element.frontId ||
+                ''
+              )
+                ? 'selected'
+                : ''
+            }>
+
+            ${esc(
+              frontLabel(
+                front
+              )
+            )}
+
+          </option>
+        `
+      )
+      .join('');
+
+
+  openModal(
+    id
+      ? 'Номерной элемент'
+      : 'Новый номерной элемент',
+
+    `
+      <div class="form-grid">
+
+        <div class="field">
+
+          <label>
+            Тип элемента
+          </label>
+
+          <input
+            id="neType"
+            value="${esc(
+              element.elementType ||
+              ''
+            )}"
+            placeholder="Свая / Анкер / Шпунт"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Номер
+          </label>
+
+          <input
+            id="neNo"
+            value="${esc(
+              element.elementNo ||
+              ''
+            )}"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Область уникальности
+          </label>
+
+          <select id="neScope">
+
+            <option
+              value="context"
+              ${
+                ![
+                  'project',
+                  'building'
+                ]
+                  .includes(
+                    element.uniqueScope
+                  )
+                  ? 'selected'
+                  : ''
+              }>
+
+              Здание + захватка + зона
+
+            </option>
+
+
+            <option
+              value="building"
+              ${
+                element.uniqueScope ===
+                'building'
+                  ? 'selected'
+                  : ''
+              }>
+
+              В пределах здания
+
+            </option>
+
+
+            <option
+              value="project"
+              ${
+                element.uniqueScope ===
+                'project'
+                  ? 'selected'
+                  : ''
+              }>
+
+              По всему проекту
+
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Здание
+          </label>
+
+          <select id="neBuilding">
+
+            ${
+              selectOptions(
+                project.buildings,
+                element.buildingId,
+                true
+              )
+            }
+
+          </select>
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Захватка
+          </label>
+
+          <input
+            id="neCapture"
+            value="${esc(
+              element.capture ||
+              ''
+            )}"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Зона / ряд
+          </label>
+
+          <input
+            id="neZone"
+            value="${esc(
+              element.zone ||
+              ''
+            )}"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Вид работ
+          </label>
+
+          <select id="neWork">
+
+            ${
+              selectOptions(
+                project.works,
+                element.workId,
+                true
+              )
+            }
+
+          </select>
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Статус
+          </label>
+
+          <select id="neStatus">
+
+            ${
+              ELEMENT_STATUS_LIST
+                .map(
+                  status => `
+                    <option
+                      ${
+                        status ===
+                        (
+                          element.status ||
+                          'Не начато'
+                        )
+                          ? 'selected'
+                          : ''
+                      }>
+
+                      ${esc(status)}
+
+                    </option>
+                  `
+                )
+                .join('')
+            }
+
+          </select>
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Фронт
+          </label>
+
+          <select id="neFront">
+
+            <option value="">
+              —
+            </option>
+
+            ${frontOptions}
+
+          </select>
+
+        </div>
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Комментарий
+        </label>
+
+        <textarea id="neComment">${esc(
+          element.comment ||
+          ''
+        )}</textarea>
+
+      </div>
+
+
+      <div class="editor-actions">
+
+        ${
+          id
+            ? `
+                <button
+                  id="neArchive"
+                  class="btn danger">
+
+                  Архивировать
+
+                </button>
+              `
+            : ''
+        }
+
+
+        <button
+          id="neSave"
+          class="btn primary">
+
+          Сохранить
+
+        </button>
+
+      </div>
+    `
+  );
+
+
+  $('neSave').onclick =
+    () =>
+      saveElement(
+        id
+      );
+
+
+  if (
+    id &&
+    $('neArchive')
+  ) {
+
+    $('neArchive').onclick =
+      () =>
+        archiveElement(
+          id
+        );
+  }
+}
+
+
+async function saveElement(
+  id
+) {
+
+  const candidate = {
+
+    id:
+      id ||
+      uid(
+        'EL'
+      ),
+
+    elementType:
+      $('neType')
+        .value
+        .trim(),
+
+    elementNo:
+      $('neNo')
+        .value
+        .trim(),
+
+    uniqueScope:
+      $('neScope').value,
+
+    buildingId:
+      $('neBuilding').value,
+
+    capture:
+      $('neCapture')
+        .value
+        .trim(),
+
+    zone:
+      $('neZone')
+        .value
+        .trim(),
+
+    workId:
+      $('neWork').value,
+
+    frontId:
+      $('neFront').value,
+
+    status:
+      $('neStatus').value,
+
+    comment:
+      $('neComment')
+        .value
+        .trim(),
+
+    active:
+      true
+  };
+
+
+  if (
+    !candidate.elementType ||
+    !candidate.elementNo
+  ) {
+
+    alert(
+      'Укажи тип элемента и номер.'
+    );
+
+    return;
+  }
+
+
+  const duplicate =
+    findElementDuplicate(
+      candidate,
+      id ||
+      ''
+    );
+
+
+  if (
+    duplicate
+  ) {
+
+    alert(
+      `Такой номер уже существует.\n` +
+      `${duplicate.elementType} №${duplicate.elementNo}`
+    );
+
+    return;
+  }
+
+
+  if (
+    id
+  ) {
+
+    Object.assign(
+      byId(
+        project.numberedElements,
+        id
+      ),
+
+      candidate,
+
+      {
+        updatedAt:
+          nowIso()
+      }
+    );
+
+  } else {
+
+    project.numberedElements
+      .push({
+
+        ...candidate,
+
+        createdAt:
+          nowIso(),
+
+        updatedAt:
+          nowIso()
+      });
+  }
+
+
+  log(
+    id
+      ? 'Изменено'
+      : 'Создано',
+
+    'Номерной элемент',
+
+    `${candidate.elementType} №${candidate.elementNo}`
+  );
+
+
+  await saveProject();
+
+
+  closeModal();
+
+
+  initSelects();
+
+
+  renderAll();
+}
+
+
+async function archiveElement(
+  id
+) {
+
+  const element =
+    byId(
+      project.numberedElements,
+      id
+    );
+
+
+  if (
+    !element ||
+    !confirm(
+      'Архивировать номерной элемент?'
+    )
+  ) {
+
+    return;
+  }
+
+
+  element.active =
+    false;
+
+
+  element.archivedAt =
+    nowIso();
+
+
+  log(
+    'Архивировано',
+    'Номерной элемент',
+
+    `${element.elementType} №${element.elementNo}`
+  );
+
+
+  await saveProject();
+
+
+  closeModal();
+
+
+  initSelects();
+
+
+  renderAll();
+}
+
+
+/* =========================================================
+   ДЕМОНТАЖ
+   ========================================================= */
+
+
+function demolitionForecast(
+  item
+) {
+
+  const calculated =
+    calculateForecastEnd({
+
+      planStart:
+        item.planStart,
+
+      factStart:
+        item.factStart,
+
+      planEnd:
+        item.planEnd,
+
+      forecastEnd:
+        item.forecastEnd,
+
+      durationMethod:
+        item.durationMethod ||
+        'manual',
+
+      durationDays:
+        item.durationDays,
+
+      volume:
+        item.volume,
+
+      productivity:
+        item.productivity,
+
+      people:
+        item.people,
+
+      reserveType:
+        item.reserveType ||
+        'none',
+
+      reserveValue:
+        item.reserveValue,
+
+      calendarId:
+        item.calendarId ||
+        cfg(
+          'DEFAULT_CALENDAR',
+          '5x2'
+        )
+    });
+
+
+  return (
+    calculated ||
+    item.forecastEnd ||
+    ''
+  );
+}
+
+
+function renderDemolition() {
+
+  const body =
+    $('demolitionRows');
+
+
+  if (
+    !body
+  ) {
+    return;
+  }
+
+
+  body.innerHTML =
+    (
+      project.demolition ||
+      []
+    )
+      .filter(
+        item =>
+          item.active !==
+          false
+      )
+      .map(
+        item => {
+
+          const forecast =
+            demolitionForecast(
+              item
+            );
+
+
+          const current =
+            item.factEnd ||
+            forecast;
+
+
+          const deviation =
+            dateDeviationDays(
+              item.planEnd,
+              current
+            );
+
+
+          return `
+            <tr>
+
+              <td>
+
+                <button
+                  class="row-btn"
+                  data-dem-open="${esc(
+                    item.id
+                  )}">
+
+                  ${esc(
+                    item.name ||
+                    ''
+                  )}
+
+                </button>
+
+
+                ${
+                  deviation !==
+                    null
+                    ? `
+                        <div
+                          class="tiny ${
+                            deviation >
+                              0
+                              ? 'danger-text'
+                              : ''
+                          }">
+
+                          Отклонение:
+
+                          ${
+                            deviation >
+                              0
+                              ? '+'
+                              : ''
+                          }
+
+                          ${deviation}
+                          дн.
+
+                        </div>
+                      `
+                    : ''
+                }
+
+              </td>
+
+
+              <td>
+
+                <span class="badge">
+                  ${esc(
+                    item.status ||
+                    'Не начато'
+                  )}
+                </span>
+
+              </td>
+
+
+              <td>
+
+                ${
+                  item.planEnd
+                    ? ruDate(
+                        item.planEnd
+                      )
+                    : '—'
+                }
+
+              </td>
+
+
+              <td>
+
+                ${
+                  forecast
+                    ? ruDate(
+                        forecast
+                      )
+                    : '—'
+                }
+
+              </td>
+
+
+              <td>
+
+                ${
+                  item.factEnd
+                    ? ruDate(
+                        item.factEnd
+                      )
+                    : '—'
+                }
+
+              </td>
+
+
+              <td>
+                ${esc(
+                  item.comment ||
+                  ''
+                )}
+              </td>
+
+            </tr>
+          `;
+        }
+      )
+      .join('') ||
+
+    `
+      <tr>
+
+        <td colspan="6">
+
+          <div class="empty-state">
+            Нет объектов демонтажа.
+          </div>
+
+        </td>
+
+      </tr>
+    `;
+
+
+  document
+    .querySelectorAll(
+      '[data-dem-open]'
+    )
+    .forEach(
+      button => {
+
+        button.onclick =
+          () =>
+            openDemolitionEditor(
+              button.dataset
+                .demOpen
+            );
+      }
+    );
+}
+
+
+function durationMethodOptions(
+  selected =
+    'manual'
+) {
+
+  return (
+    cfg(
+      'DURATION_METHODS',
+      []
+    ) ||
+    []
+  )
+    .map(
+      item => `
+        <option
+          value="${esc(
+            item.id
+          )}"
+          ${
+            item.id ===
+            selected
+              ? 'selected'
+              : ''
+          }>
+
+          ${esc(
+            item.name
+          )}
+
+        </option>
+      `
+    )
+    .join('');
+}
+
+
+function reserveTypeOptions(
+  selected =
+    'none'
+) {
+
+  return (
+    cfg(
+      'RESERVE_TYPES',
+      []
+    ) ||
+    []
+  )
+    .map(
+      item => `
+        <option
+          value="${esc(
+            item.id
+          )}"
+          ${
+            item.id ===
+            selected
+              ? 'selected'
+              : ''
+          }>
+
+          ${esc(
+            item.name
+          )}
+
+        </option>
+      `
+    )
+    .join('');
+}
+
+
+function calendarOptions(
+  selected =
+    cfg(
+      'DEFAULT_CALENDAR',
+      '5x2'
+    )
+) {
+
+  return Object.values(
+    cfg(
+      'CALENDARS',
+      {}
+    )
+  )
+    .map(
+      item => `
+        <option
+          value="${esc(
+            item.id
+          )}"
+          ${
+            item.id ===
+            selected
+              ? 'selected'
+              : ''
+          }>
+
+          ${esc(
+            item.name
+          )}
+
+        </option>
+      `
+    )
+    .join('');
+}
+
+
+function openDemolitionEditor(
+  id
+) {
+
+  const item =
+    byId(
+      project.demolition,
+      id
+    );
+
+
+  if (
+    !item
+  ) {
+    return;
+  }
+
+
+  openModal(
+    'Демонтаж',
+
+    `
+      <div class="form-grid">
+
+        <div class="field">
+
+          <label>
+            Объект
+          </label>
+
+          <input
+            id="demName"
+            value="${esc(
+              item.name ||
+              ''
+            )}"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Статус
+          </label>
+
+          <select id="demStatus">
+
+            ${
+              STATUS_LIST
+                .map(
+                  status => `
+                    <option
+                      ${
+                        status ===
+                        (
+                          item.status ||
+                          'Не начато'
+                        )
+                          ? 'selected'
+                          : ''
+                      }>
+
+                      ${esc(status)}
+
+                    </option>
+                  `
+                )
+                .join('')
+            }
+
+          </select>
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Календарь
+          </label>
+
+          <select id="demCalendar">
+
+            ${
+              calendarOptions(
+                item.calendarId
+              )
+            }
+
+          </select>
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            План начало
+          </label>
+
+          <input
+            id="demPlanStart"
+            type="date"
+            value="${esc(
+              item.planStart ||
+              ''
+            )}"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            План окончание
+          </label>
+
+          <input
+            id="demPlanEnd"
+            type="date"
+            value="${esc(
+              item.planEnd ||
+              ''
+            )}"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Метод длительности
+          </label>
+
+          <select id="demDurationMethod">
+
+            ${
+              durationMethodOptions(
+                item.durationMethod ||
+                'manual'
+              )
+            }
+
+          </select>
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Длительность, рабочих дней
+          </label>
+
+          <input
+            id="demDuration"
+            type="number"
+            min="0"
+            step="1"
+            value="${
+              item.durationDays ??
+              ''
+            }"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Объём
+          </label>
+
+          <input
+            id="demVolume"
+            type="number"
+            step="any"
+            value="${
+              item.volume ??
+              ''
+            }"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Выработка
+          </label>
+
+          <input
+            id="demProductivity"
+            type="number"
+            step="any"
+            value="${
+              item.productivity ??
+              ''
+            }"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Люди / ресурс
+          </label>
+
+          <input
+            id="demPeople"
+            type="number"
+            min="0"
+            step="1"
+            value="${
+              item.people ??
+              ''
+            }"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Тип резерва
+          </label>
+
+          <select id="demReserveType">
+
+            ${
+              reserveTypeOptions(
+                item.reserveType ||
+                'none'
+              )
+            }
+
+          </select>
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Резерв
+          </label>
+
+          <input
+            id="demReserve"
+            type="number"
+            min="0"
+            step="any"
+            value="${
+              item.reserveValue ??
+              ''
+            }"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Факт начало
+          </label>
+
+          <input
+            id="demFactStart"
+            type="date"
+            value="${esc(
+              item.factStart ||
+              ''
+            )}"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Факт окончание
+          </label>
+
+          <input
+            id="demFactEnd"
+            type="date"
+            value="${esc(
+              item.factEnd ||
+              ''
+            )}"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Прогноз окончание
+          </label>
+
+          <input
+            id="demForecast"
+            type="date"
+            value="${esc(
+              item.forecastEnd ||
+              ''
+            )}"
+          >
+
+        </div>
+
+      </div>
+
+
+      <div
+        class="notice"
+        id="demCalcInfo">
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Комментарий
+        </label>
+
+        <textarea id="demComment">${esc(
+          item.comment ||
+          ''
+        )}</textarea>
+
+      </div>
+
+
+      <div class="editor-actions">
+
+        <button
+          id="demArchive"
+          class="btn danger">
+
+          Архивировать
+
+        </button>
+
+
+        <button
+          id="demSave"
+          class="btn primary">
+
+          Сохранить
+
+        </button>
+
+      </div>
+    `
+  );
+
+
+  const recalc =
+    () => {
+
+      const data = {
+
+        planStart:
+          $('demPlanStart').value,
+
+        factStart:
+          $('demFactStart').value,
+
+        planEnd:
+          $('demPlanEnd').value,
+
+        forecastEnd:
+          $('demForecast').value,
+
+        durationMethod:
+          $('demDurationMethod').value,
+
+        durationDays:
+          $('demDuration').value,
+
+        volume:
+          $('demVolume').value,
+
+        productivity:
+          $('demProductivity').value,
+
+        people:
+          $('demPeople').value,
+
+        reserveType:
+          $('demReserveType').value,
+
+        reserveValue:
+          $('demReserve').value,
+
+        calendarId:
+          $('demCalendar').value
+      };
+
+
+      const duration =
+        calculateDurationDays(
+          data
+        );
+
+
+      const total =
+        applyReserveDays(
+          duration,
+          data.reserveType,
+          data.reserveValue
+        );
+
+
+      const forecast =
+        calculateForecastEnd(
+          data
+        );
+
+
+      $('demCalcInfo')
+        .textContent =
+          data.durationMethod ===
+          'manual'
+            ? 'Ручной режим: прогноз указывается вручную.'
+            : (
+                `Расчётная длительность: ${duration} р.д.` +
+                ` · с резервом: ${total} р.д.` +
+                ` · прогноз: ${
+                  forecast
+                    ? ruDate(
+                        forecast
+                      )
+                    : '—'
+                }`
+              );
+
+
+      if (
+        data.durationMethod !==
+          'manual' &&
+        forecast
+      ) {
+
+        $('demForecast').value =
+          forecast;
+      }
+    };
+
+
+  [
+    'demPlanStart',
+    'demFactStart',
+    'demPlanEnd',
+    'demDurationMethod',
+    'demDuration',
+    'demVolume',
+    'demProductivity',
+    'demPeople',
+    'demReserveType',
+    'demReserve',
+    'demCalendar'
+  ]
+    .forEach(
+      field =>
+        bindChange(
+          field,
+          recalc
+        )
+    );
+
+
+  recalc();
+
+
+  $('demSave').onclick =
+    () =>
+      saveDemolitionEditor(
+        id
+      );
+
+
+  $('demArchive').onclick =
+    () =>
+      archiveDemolition(
+        id
+      );
+}
+
+
+async function saveDemolitionEditor(
+  id
+) {
+
+  const item =
+    byId(
+      project.demolition,
+      id
+    );
+
+
+  if (
+    !item
+  ) {
+    return;
+  }
+
+
+  const data = {
+
+    name:
+      $('demName')
+        .value
+        .trim(),
+
+    status:
+      $('demStatus').value,
+
+    calendarId:
+      $('demCalendar').value,
+
+    planStart:
+      $('demPlanStart').value,
+
+    planEnd:
+      $('demPlanEnd').value,
+
+    durationMethod:
+      $('demDurationMethod').value,
+
+    durationDays:
+      roundInt(
+        $('demDuration').value
+      ),
+
+    volume:
+      num(
+        $('demVolume').value
+      ),
+
+    productivity:
+      num(
+        $('demProductivity').value
+      ),
+
+    people:
+      roundInt(
+        $('demPeople').value
+      ),
+
+    reserveType:
+      $('demReserveType').value,
+
+    reserveValue:
+      num(
+        $('demReserve').value
+      ),
+
+    factStart:
+      $('demFactStart').value,
+
+    factEnd:
+      $('demFactEnd').value,
+
+    forecastEnd:
+      $('demForecast').value,
+
+    comment:
+      $('demComment')
+        .value
+        .trim(),
+
+    updatedAt:
+      nowIso()
+  };
+
+
+  if (
+    !data.name
+  ) {
+
+    alert(
+      'Укажи объект.'
+    );
+
+    return;
+  }
+
+
+  if (
+    data.durationMethod !==
+    'manual'
+  ) {
+
+    data.forecastEnd =
+      calculateForecastEnd(
+        data
+      );
+  }
+
+
+  Object.assign(
+    item,
+    data
+  );
+
+
+  log(
+    'Изменено',
+    'Демонтаж',
+    item.name
+  );
+
+
+  await saveProject();
+
+
+  closeModal();
+
+
+  renderAll();
+}
+
+
+async function archiveDemolition(
+  id
+) {
+
+  const item =
+    byId(
+      project.demolition,
+      id
+    );
+
+
+  if (
+    !item ||
+    !confirm(
+      'Архивировать объект демонтажа?'
+    )
+  ) {
+
+    return;
+  }
+
+
+  item.active =
+    false;
+
+
+  item.archivedAt =
+    nowIso();
+
+
+  log(
+    'Архивировано',
+    'Демонтаж',
+    item.name
+  );
+
+
+  await saveProject();
+
+
+  closeModal();
+
+
+  renderAll();
+}
 
 
 /* =========================================================
    ИСТОРИЯ
    ========================================================= */
 
-LIV.renderHistory = function () {
+
+function renderHistory() {
 
   const body =
-    LIV.$(
-      'historyBody'
-    );
+    $('historyRows');
 
 
   if (
-    !body ||
-    !LIV.project
+    !body
   ) {
     return;
   }
 
 
-  const history =
-    Array.isArray(
-      LIV.project.history
-    )
-      ? LIV.project.history
-      : [];
-
-
   body.innerHTML =
-    history
+    (
+      project.history ||
+      []
+    )
       .slice(
         0,
         1000
       )
       .map(
-        item => {
+        item => `
+          <tr>
 
-          let date =
-            '';
+            <td class="nowrap">
 
-
-          if (
-            item.at
-          ) {
-
-            const value =
-              new Date(
+              ${
                 item.at
-              );
+                  ? new Date(
+                      item.at
+                    )
+                      .toLocaleString(
+                        'ru-RU'
+                      )
+                  : '—'
+              }
+
+            </td>
 
 
-            if (
-              !Number.isNaN(
-                value.getTime()
-              )
-            ) {
-              date =
-                value.toLocaleString(
-                  'ru-RU'
-                );
-            }
-          }
+            <td>
+              ${esc(
+                item.action ||
+                ''
+              )}
+            </td>
 
 
-          return `
-            <tr>
+            <td>
+              ${esc(
+                item.entity ||
+                ''
+              )}
+            </td>
 
-              <td>
-                ${LIV.esc(
-                  date
-                )}
-              </td>
 
-              <td>
-                ${LIV.esc(
-                  item.action ||
-                  ''
-                )}
-              </td>
+            <td>
+              ${esc(
+                item.description ||
+                ''
+              )}
+            </td>
 
-              <td>
-                ${LIV.esc(
-                  item.entity ||
-                  ''
-                )}
-              </td>
-
-              <td>
-                ${LIV.esc(
-                  item.description ||
-                  ''
-                )}
-              </td>
-
-            </tr>
-          `;
-        }
+          </tr>
+        `
       )
-      .join('');
-};
+      .join('') ||
+
+    `
+      <tr>
+
+        <td colspan="4">
+
+          <div class="empty-state">
+            История пока пуста.
+          </div>
+
+        </td>
+
+      </tr>
+    `;
+}
 
 
 /* =========================================================
-   О СИСТЕМЕ
+   СПРАВОЧНИКИ
    ========================================================= */
 
-LIV.renderSystemInfo = function () {
 
-  const container =
-    LIV.$(
-      'systemInfo'
-    );
-
-
-  if (
-    !container
-  ) {
-    return;
-  }
-
-
-  const lastBackup =
-    LIV.project
-      ?.meta
-      ?.lastBackupAt;
-
-
-  let lastBackupText =
-    'не создавалась';
-
-
-  if (
-    lastBackup
-  ) {
-
-    const date =
-      new Date(
-        lastBackup
-      );
-
-
-    if (
-      !Number.isNaN(
-        date.getTime()
-      )
-    ) {
-      lastBackupText =
-        date.toLocaleString(
-          'ru-RU'
-        );
-    }
-  }
-
-
-  container.innerHTML = `
-    <div class="form-grid">
-
-      <div>
-        <div class="muted">
-          Название
-        </div>
-
-        <strong>
-          LIV Planning
-        </strong>
-      </div>
-
-
-      <div>
-        <div class="muted">
-          Назначение
-        </div>
-
-        <strong>
-          Система производственного планирования
-          и контроля строительства
-        </strong>
-      </div>
-
-
-      <div>
-        <div class="muted">
-          Структура данных
-        </div>
-
-        <strong>
-          ${LIV.esc(
-            LIV.SCHEMA_VERSION
-          )}
-        </strong>
-      </div>
-
-
-      <div>
-        <div class="muted">
-          Локальная база
-        </div>
-
-        <strong>
-          ${LIV.esc(
-            LIV.DB_NAME
-          )}
-        </strong>
-      </div>
-
-
-      <div>
-        <div class="muted">
-          Версия IndexedDB
-        </div>
-
-        <strong>
-          ${LIV.DB_VERSION}
-        </strong>
-      </div>
-
-
-      <div>
-        <div class="muted">
-          Последняя резервная копия
-        </div>
-
-        <strong>
-          ${LIV.esc(
-            lastBackupText
-          )}
-        </strong>
-      </div>
-
-    </div>
-  `;
-};
-
-
-/* =========================================================
-   СКАЧИВАНИЕ ФАЙЛА
-   ========================================================= */
-
-LIV.downloadBlob = function (
-  content,
-  filename,
-  type =
-    'application/octet-stream'
+async function addSimple(
+  type
 ) {
 
-  const blob =
-    new Blob(
-      [
-        content
-      ],
-      {
-        type
-      }
-    );
-
-
-  const url =
-    URL.createObjectURL(
-      blob
-    );
-
-
-  const link =
-    document.createElement(
-      'a'
-    );
-
-
-  link.href =
-    url;
-
-
-  link.download =
-    filename;
-
-
-  document.body.appendChild(
-    link
-  );
-
-
-  link.click();
-
-
-  link.remove();
-
-
-  setTimeout(
-    () => {
-
-      URL.revokeObjectURL(
-        url
-      );
-
-    },
-    1000
-  );
-};
-
-
-/* =========================================================
-   СОХРАНЕНИЕ ПРОЕКТА В JSON
-   ========================================================= */
-
-LIV.exportProjectBackup = async function () {
-
-  if (
-    !LIV.project
-  ) {
-    alert(
-      'Проект еще не загружен.'
-    );
-
-    return;
-  }
-
-
-  LIV.project.meta =
-    LIV.project.meta ||
-    {};
-
-
-  LIV.project.meta.lastBackupAt =
-    LIV.nowIso();
-
-
-  try {
-
-    if (
-      typeof LIV.saveProject ===
-      'function'
-    ) {
-      await LIV.saveProject();
-    }
-
-  } catch (error) {
-
-    console.error(
-      'Ошибка сохранения отметки резервной копии:',
-      error
-    );
-  }
-
-
-  const stamp =
-    LIV.nowIso()
-      .replace(
-        /[:.]/g,
-        '-'
-      );
-
-
-  const json =
-    JSON.stringify(
-      LIV.project,
-      null,
-      2
-    );
-
-
-  LIV.downloadBlob(
-    json,
-    `LIV-Planning-backup-${stamp}.json`,
-    'application/json'
-  );
-
-
-  LIV.renderSystemInfo();
-};
-
-
-/* =========================================================
-   ЗАГРУЗКА ПРОЕКТА ИЗ JSON
-   ========================================================= */
-
-LIV.restoreProjectFromFile = async function (
-  file
-) {
-
-  if (
-    !file
-  ) {
-    return;
-  }
-
-
-  let data;
-
-
-  try {
-
-    data =
-      JSON.parse(
-        await file.text()
-      );
-
-  } catch (error) {
-
-    alert(
-      'Не удалось прочитать JSON-файл.'
-    );
-
-    return;
-  }
-
-
-  if (
-    !data ||
-    typeof data !==
-      'object'
-  ) {
-
-    alert(
-      'Выбранный файл не похож на резервную копию LIV Planning.'
-    );
-
-    return;
-  }
-
-
-  const approved =
-    confirm(
-      'Загрузить выбранный проект?\n\n' +
-      'Перед заменой текущих данных будет создана ' +
-      'локальная резервная копия.'
-    );
-
-
-  if (
-    !approved
-  ) {
-    return;
-  }
-
-
-  try {
-
-    if (
-      typeof LIV.createLocalBackup ===
-      'function' &&
-      LIV.project
-    ) {
-      await LIV.createLocalBackup(
-        'pre-restore'
-      );
-    }
-
-
-    LIV.project =
-      LIV.normalizeProject(
-        data
-      );
-
-
-    LIV.log(
-      'Восстановление проекта',
-      'Проект',
-      file.name ||
-      'JSON'
-    );
-
-
-    await LIV.saveProject();
-
-
-    LIV.refreshAll();
-
-
-    alert(
-      'Проект загружен.'
-    );
-
-  } catch (error) {
-
-    console.error(
-      error
-    );
-
-
-    alert(
-      'Не удалось загрузить проект.\n\n' +
-      (
-        error?.message ||
-        String(error)
-      )
-    );
-  }
-};
-
-
-/* =========================================================
-   СРАВНЕНИЕ ПРОЕКТОВ
-   ========================================================= */
-
-LIV.compareProjectWithFile = async function (
-  file
-) {
-
-  if (
-    !file
-  ) {
-    return;
-  }
-
-
-  if (
-    !LIV.project
-  ) {
-    alert(
-      'Текущий проект еще не загружен.'
-    );
-
-    return;
-  }
-
-
-  let other;
-
-
-  try {
-
-    other =
-      JSON.parse(
-        await file.text()
-      );
-
-
-    other =
-      LIV.normalizeProject(
-        other
-      );
-
-  } catch (error) {
-
-    alert(
-      'Не удалось прочитать файл сравнения.'
-    );
-
-    return;
-  }
-
-
-  const sections = [
-    {
-      key:
-        'fronts',
-
-      name:
-        'Фронты'
-    },
-
-    {
-      key:
-        'resources',
-
-      name:
-        'Ресурсы'
-    },
-
-    {
-      key:
-        'resourcePlans',
-
-      name:
-        'Планы ресурсов'
-    },
-
-    {
-      key:
-        'milestones',
-
-      name:
-        'Ключевые даты'
-    },
-
-    {
-      key:
-        'organizations',
-
-      name:
-        'Организации'
-    },
-
-    {
-      key:
-        'contracts',
-
-      name:
-        'Договоры'
-    },
-
-    {
-      key:
-        'constraints',
-
-      name:
-        'Ограничения'
-    }
+  const config = {
+
+    building: [
+      'newBuilding',
+      project.buildings,
+      'BLD'
+    ],
+
+    work: [
+      'newWork',
+      project.works,
+      'WRK'
+    ],
+
+    org: [
+      'newOrg',
+      project.organizations,
+      'ORG'
+    ]
+
+  }[
+    type
   ];
 
 
-  const rows =
-    sections
-      .map(
-        section => {
-
-          const currentCount =
-            Array.isArray(
-              LIV.project[
-                section.key
-              ]
-            )
-              ? LIV.project[
-                  section.key
-                ].length
-              : 0;
+  if (
+    !config
+  ) {
+    return;
+  }
 
 
-          const otherCount =
-            Array.isArray(
-              other[
-                section.key
-              ]
-            )
-              ? other[
-                  section.key
-                ].length
-              : 0;
+  const [
+    inputId,
+    list,
+    prefix
+  ] =
+    config;
 
 
-          const difference =
-            currentCount -
-            otherCount;
+  const input =
+    $(
+      inputId
+    );
 
 
-          return `
-            <tr>
-
-              <td>
-                ${LIV.esc(
-                  section.name
-                )}
-              </td>
-
-              <td>
-                ${currentCount}
-              </td>
-
-              <td>
-                ${otherCount}
-              </td>
-
-              <td>
-                ${
-                  difference > 0
-                    ? '+'
-                    : ''
-                }${difference}
-              </td>
-
-            </tr>
-          `;
-        }
-      )
-      .join('');
+  const name =
+    input?.value
+      .trim() ||
+    '';
 
 
-  LIV.openModal(
-    'Сравнение проектов',
+  if (
+    !name
+  ) {
+    return;
+  }
 
-    `
-      <div class="table-wrap">
 
-        <table>
+  if (
+    list.some(
+      item =>
+        sameText(
+          item.name,
+          name
+        )
+    )
+  ) {
 
-          <thead>
-            <tr>
-              <th>
-                Раздел
-              </th>
+    alert(
+      'Такая запись уже есть.'
+    );
 
-              <th>
-                Текущий проект
-              </th>
+    return;
+  }
 
-              <th>
-                Выбранный файл
-              </th>
 
-              <th>
-                Разница
-              </th>
-            </tr>
-          </thead>
+  list.push({
 
-          <tbody>
-            ${rows}
-          </tbody>
+    id:
+      uid(
+        prefix
+      ),
 
-        </table>
+    name,
+
+    active:
+      true,
+
+    createdAt:
+      nowIso()
+  });
+
+
+  input.value =
+    '';
+
+
+  log(
+    'Создано',
+    'Справочник',
+    name
+  );
+
+
+  await saveProject();
+
+
+  initSelects();
+
+
+  if (
+    typeof refreshAllMultiFilters ===
+    'function'
+  ) {
+
+    refreshAllMultiFilters();
+  }
+
+
+  renderAll();
+}
+
+
+/* =========================================================
+   НАСТРОЙКИ
+   ========================================================= */
+
+
+function settingsListHtml(
+  list
+) {
+
+  return (
+    list ||
+    []
+  )
+    .map(
+      item => `
+        <div class="item">
+
+          <span>
+
+            ${esc(
+              item.name ||
+              ''
+            )}
+
+            ${
+              item.unit
+                ? ` · ${esc(
+                    item.unit
+                  )}`
+                : ''
+            }
+
+          </span>
+
+
+          <small>
+
+            ${
+              item.active ===
+                false
+                ? 'архив'
+                : 'активно'
+            }
+
+          </small>
+
+        </div>
+      `
+    )
+    .join('') ||
+
+  `
+    <div class="muted">
+      Список пуст.
+    </div>
+  `;
+}
+
+
+function ensureBuilderSettingsCard() {
+
+  const settings =
+    $('tab-settings');
+
+
+  if (
+    !settings ||
+    $('customSectionsCard')
+  ) {
+
+    return;
+  }
+
+
+  const card =
+    document.createElement(
+      'section'
+    );
+
+
+  card.id =
+    'customSectionsCard';
+
+
+  card.className =
+    'card';
+
+
+  settings.appendChild(
+    card
+  );
+}
+
+
+function renderSettings() {
+
+  if (
+    $('buildingList')
+  ) {
+
+    $('buildingList').innerHTML =
+      settingsListHtml(
+        project.buildings
+      );
+  }
+
+
+  if (
+    $('workList')
+  ) {
+
+    $('workList').innerHTML =
+      settingsListHtml(
+        project.works
+      );
+  }
+
+
+  if (
+    $('orgList')
+  ) {
+
+    $('orgList').innerHTML =
+      settingsListHtml(
+        project.organizations
+      );
+  }
+
+
+  if (
+    $('projectMeta')
+  ) {
+
+    $('projectMeta').innerHTML = `
+
+      <div class="item">
+
+        <span>
+          Версия структуры
+        </span>
+
+        <strong>
+          ${esc(
+            project.schemaVersion ||
+            ''
+          )}
+        </strong>
 
       </div>
-    `
-  );
-};
+
+
+      <div class="item">
+
+        <span>
+          Последнее изменение
+        </span>
+
+        <strong>
+
+          ${
+            project.meta
+              ?.updatedAt
+              ? new Date(
+                  project.meta.updatedAt
+                )
+                  .toLocaleString(
+                    'ru-RU'
+                  )
+              : '—'
+          }
+
+        </strong>
+
+      </div>
+
+
+      <div class="item">
+
+        <span>
+          Последняя резервная копия
+        </span>
+
+        <strong>
+
+          ${
+            project.meta
+              ?.lastBackupAt
+              ? new Date(
+                  project.meta.lastBackupAt
+                )
+                  .toLocaleString(
+                    'ru-RU'
+                  )
+              : 'не создавалась'
+          }
+
+        </strong>
+
+      </div>
+
+
+      <div class="item">
+
+        <span>
+          Фронтов
+        </span>
+
+        <strong>
+          ${activeFronts().length}
+        </strong>
+
+      </div>
+
+
+      <div class="item">
+
+        <span>
+          Записей ресурсов
+        </span>
+
+        <strong>
+          ${
+            (
+              project.resources ||
+              []
+            )
+              .length
+          }
+        </strong>
+
+      </div>
+
+
+      <div class="item">
+
+        <span>
+          Планов ресурсов
+        </span>
+
+        <strong>
+          ${
+            (
+              project.resourcePlans ||
+              []
+            )
+              .length
+          }
+        </strong>
+
+      </div>
+
+
+      <div class="item">
+
+        <span>
+          Ключевых дат
+        </span>
+
+        <strong>
+          ${
+            (
+              project.milestones ||
+              []
+            )
+              .length
+          }
+        </strong>
+
+      </div>
+
+
+      <div class="item">
+
+        <span>
+          Импортов
+        </span>
+
+        <strong>
+          ${
+            (
+              project.importHistory ||
+              []
+            )
+              .length
+          }
+        </strong>
+
+      </div>
+
+
+      <div class="editor-actions left-actions no-print">
+
+        <button
+          id="fullResetProjectBtn"
+          class="btn danger">
+
+          Полный сброс системы
+
+        </button>
+
+      </div>
+    `;
+
+
+    bindClick(
+      'fullResetProjectBtn',
+      fullResetProject
+    );
+  }
+
+
+  ensureBuilderSettingsCard();
+
+
+  renderCustomSectionsSettings();
+}
 
 
 /* =========================================================
-   PDF
+   ПОЛНЫЙ СБРОС
    ========================================================= */
 
-LIV.printCurrentView = function () {
 
-  window.print();
-};
+async function fullResetProject() {
 
+  const first =
+    confirm(
+      'Полный сброс удалит рабочие данные И справочники LIV Planning.\n\n' +
+      'Перед сбросом будет создана защитная копия. Продолжить?'
+    );
 
-/* =========================================================
-   УСТАНОВКА ДАТ РЕСУРСОВ
-   ========================================================= */
-
-LIV.setInitialResourceDates = function () {
 
   if (
-    !LIV.project
+    !first
   ) {
     return;
   }
 
 
-  const rows =
-    Array.isArray(
-      LIV.project.resources
-    )
-      ? LIV.project.resources
-      : [];
-
-
-  const dates =
-    LIV.unique(
-      rows
-        .map(
-          row =>
-            row.date
-        )
-        .filter(
-          Boolean
-        )
-    )
-      .sort();
-
-
-  const firstDate =
-    dates.length
-      ? dates[0]
-      : LIV.today();
-
-
-  const lastDate =
-    dates.length
-      ? dates[
-          dates.length -
-          1
-        ]
-      : LIV.today();
-
-
-  const from =
-    LIV.$(
-      'resourceFrom'
-    );
-
-
-  const to =
-    LIV.$(
-      'resourceTo'
-    );
-
-
-  const daily =
-    LIV.$(
-      'resourceDailyDate'
+  const phrase =
+    prompt(
+      'Для подтверждения введи: СБРОСИТЬ'
     );
 
 
   if (
-    from &&
-    !from.value
+    phrase !==
+    'СБРОСИТЬ'
   ) {
-    from.value =
-      firstDate;
+
+    alert(
+      'Сброс отменен.'
+    );
+
+    return;
   }
+
+
+  await dbPutKey(
+    clone(
+      project
+    ),
+
+    `pre-full-reset-${Date.now()}`
+  );
+
+
+  project =
+    emptyProject();
+
+
+  project.customSections =
+    [];
+
+
+  log(
+    'Полный сброс',
+    'Проект',
+    'Система сброшена до первоначального состояния.'
+  );
+
+
+  await saveProject();
 
 
   if (
-    to &&
-    !to.value
+    typeof resetMultiFilter ===
+    'function'
   ) {
-    to.value =
-      lastDate;
+
+    [
+      'rOrg',
+      'rBuilding',
+      'rWork',
+      'rFront'
+    ]
+      .forEach(
+        id =>
+          resetMultiFilter(
+            id,
+            false
+          )
+      );
   }
 
 
-  if (
-    daily &&
-    !daily.value
-  ) {
-    daily.value =
-      lastDate;
-  }
-};
+  initSelects();
+
+
+  renderAll();
+
+
+  alert(
+    'LIV Planning сброшен. Защитная копия сохранена локально.'
+  );
+}
 
 
 /* =========================================================
-   ОБЩАЯ ПЕРЕРИСОВКА
+   КОНСТРУКТОР РАЗДЕЛОВ
    ========================================================= */
 
-LIV.refreshAll = function () {
+
+function builderFields() {
+
+  return cfg(
+    'BUILDER_FIELDS',
+
+    [
+      {
+        id:
+          'organization',
+        name:
+          'Организация'
+      },
+      {
+        id:
+          'building',
+        name:
+          'Здание'
+      },
+      {
+        id:
+          'work',
+        name:
+          'Работа'
+      },
+      {
+        id:
+          'status',
+        name:
+          'Статус'
+      },
+      {
+        id:
+          'planStart',
+        name:
+          'План начало'
+      },
+      {
+        id:
+          'planEnd',
+        name:
+          'План окончание'
+      },
+      {
+        id:
+          'factStart',
+        name:
+          'Факт начало'
+      },
+      {
+        id:
+          'factEnd',
+        name:
+          'Факт окончание'
+      },
+      {
+        id:
+          'forecastEnd',
+        name:
+          'Прогноз'
+      },
+      {
+        id:
+          'deviation',
+        name:
+          'Отклонение'
+      },
+      {
+        id:
+          'volume',
+        name:
+          'Объём'
+      },
+      {
+        id:
+          'comment',
+        name:
+          'Комментарий'
+      }
+    ]
+  );
+}
+
+
+function renderCustomSectionsSettings() {
+
+  const card =
+    $('customSectionsCard');
+
 
   if (
-    !LIV.project
+    !card
   ) {
     return;
   }
 
 
-  LIV.safeCall(
-    'refreshResourceFilters'
+  card.innerHTML = `
+    <div class="section-toolbar">
+
+      <div>
+
+        <h2>
+          Конструктор разделов
+        </h2>
+
+        <div class="muted">
+
+          Создавай собственные рабочие страницы
+          из одной базы:
+          например «Фасады», «Кровля»,
+          «Наружные сети».
+
+        </div>
+
+      </div>
+
+
+      <button
+        id="newCustomSectionBtn"
+        class="btn primary">
+
+        + Создать раздел
+
+      </button>
+
+    </div>
+
+
+    <div style="margin-top:12px">
+
+      ${
+        (
+          project.customSections ||
+          []
+        )
+          .map(
+            item => `
+              <div class="item">
+
+                <span>
+
+                  <b>
+                    ${esc(
+                      item.name
+                    )}
+                  </b>
+
+                  ·
+
+                  ${esc(
+                    item.viewType ||
+                    'table'
+                  )}
+
+                  · полей
+
+                  ${
+                    item.fields?.length ||
+                    0
+                  }
+
+                </span>
+
+
+                <span>
+
+                  <button
+                    class="row-btn"
+                    data-section-edit="${esc(
+                      item.id
+                    )}">
+
+                    Изменить
+
+                  </button>
+
+                  &nbsp;
+
+                  <button
+                    class="row-btn danger-text"
+                    data-section-delete="${esc(
+                      item.id
+                    )}">
+
+                    Удалить
+
+                  </button>
+
+                </span>
+
+              </div>
+            `
+          )
+          .join('') ||
+
+        `
+          <div class="muted">
+            Пользовательские разделы пока не созданы.
+          </div>
+        `
+      }
+
+    </div>
+  `;
+
+
+  bindClick(
+    'newCustomSectionBtn',
+    () =>
+      openCustomSectionEditor()
   );
 
 
-  LIV.safeCall(
-    'renderDashboard'
-  );
-
-
-  LIV.safeCall(
-    'renderResources'
-  );
-
-
-  LIV.safeCall(
-    'renderOrganizations'
-  );
-
-
-  LIV.safeCall(
-    'renderHistory'
-  );
-
-
-  LIV.safeCall(
-    'renderSystemInfo'
-  );
-};
-
-
-/* =========================================================
-   ПРИВЯЗКА ОСНОВНЫХ КНОПОК
-
-   ВАЖНО:
-   ЭТО ДЕЛАЕТСЯ ДО ЗАГРУЗКИ INDEXEDDB.
-   ПОЭТОМУ ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК РАБОТАЕТ
-   ДАЖЕ ЕСЛИ БАЗА ИЛИ ОДИН МОДУЛЬ ДАЛ ОШИБКУ.
-   ========================================================= */
-
-LIV.bindGlobalEvents = function () {
-
-  /* -------------------------------------------------------
-     ВКЛАДКИ
-     ------------------------------------------------------- */
-
-  document
+  card
     .querySelectorAll(
-      '.tab'
+      '[data-section-edit]'
     )
     .forEach(
       button => {
 
         button.onclick =
-          function () {
-
-            const tabName =
-              this.dataset.tab;
-
-
-            LIV.switchTab(
-              tabName
+          () =>
+            openCustomSectionEditor(
+              button.dataset
+                .sectionEdit
             );
-          };
       }
     );
 
 
-  /* -------------------------------------------------------
-     ЗАКРЫТИЕ МОДАЛЬНОГО ОКНА
-     ------------------------------------------------------- */
+  card
+    .querySelectorAll(
+      '[data-section-delete]'
+    )
+    .forEach(
+      button => {
 
-  const closeButton =
-    LIV.$(
-      'modalClose'
+        button.onclick =
+          () =>
+            deleteCustomSection(
+              button.dataset
+                .sectionDelete
+            );
+      }
+    );
+}
+
+
+function openCustomSectionEditor(
+  id =
+    null
+) {
+
+  const item =
+    id
+      ? byId(
+          project.customSections,
+          id
+        )
+      : null;
+
+
+  const selected =
+    new Set(
+      item?.fields ||
+      [
+        'building',
+        'work',
+        'organization',
+        'status',
+        'planStart',
+        'planEnd',
+        'forecastEnd',
+        'factEnd',
+        'deviation'
+      ]
+    );
+
+
+  const viewTypes =
+    cfg(
+      'VIEW_TYPES',
+
+      [
+        {
+          id:
+            'table',
+          name:
+            'Таблица'
+        },
+        {
+          id:
+            'gantt',
+          name:
+            'Гант'
+        }
+      ]
+    );
+
+
+  openModal(
+    id
+      ? 'Настройка раздела'
+      : 'Новый раздел',
+
+    `
+      <div class="form-grid">
+
+        <div class="field">
+
+          <label>
+            Название раздела
+          </label>
+
+          <input
+            id="csName"
+            value="${esc(
+              item?.name ||
+              ''
+            )}"
+            placeholder="Например: Фасады"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Вид
+          </label>
+
+          <select id="csViewType">
+
+            ${
+              viewTypes
+                .map(
+                  type => `
+                    <option
+                      value="${esc(
+                        type.id
+                      )}"
+                      ${
+                        type.id ===
+                        (
+                          item?.viewType ||
+                          'table'
+                        )
+                          ? 'selected'
+                          : ''
+                      }>
+
+                      ${esc(
+                        type.name
+                      )}
+
+                    </option>
+                  `
+                )
+                .join('')
+            }
+
+          </select>
+
+        </div>
+
+      </div>
+
+
+      <h3>
+        Поля
+      </h3>
+
+
+      <div class="mapping-grid">
+
+        ${
+          builderFields()
+            .map(
+              field => `
+                <label class="check-line">
+
+                  <input
+                    type="checkbox"
+                    data-cs-field="${esc(
+                      field.id
+                    )}"
+                    ${
+                      selected.has(
+                        field.id
+                      )
+                        ? 'checked'
+                        : ''
+                    }
+                  >
+
+                  ${esc(
+                    field.name
+                  )}
+
+                </label>
+              `
+            )
+            .join('')
+        }
+
+      </div>
+
+
+      <div class="editor-actions">
+
+        <button
+          id="csSave"
+          class="btn primary">
+          Сохранить
+        </button>
+
+      </div>
+    `
+  );
+
+
+  $('csSave').onclick =
+    () =>
+      saveCustomSection(
+        id
+      );
+}
+
+
+async function saveCustomSection(
+  id =
+    null
+) {
+
+  const name =
+    $('csName')
+      .value
+      .trim();
+
+
+  if (
+    !name
+  ) {
+
+    alert(
+      'Укажи название раздела.'
+    );
+
+    return;
+  }
+
+
+  const fields =
+    [
+      ...document
+        .querySelectorAll(
+          '[data-cs-field]:checked'
+        )
+    ]
+      .map(
+        input =>
+          input.dataset
+            .csField
+      );
+
+
+  if (
+    !fields.length
+  ) {
+
+    alert(
+      'Выбери хотя бы одно поле.'
+    );
+
+    return;
+  }
+
+
+  let item =
+    id
+      ? byId(
+          project.customSections,
+          id
+        )
+      : null;
+
+
+  if (
+    !item
+  ) {
+
+    item = {
+
+      id:
+        uid(
+          'SECTION'
+        ),
+
+      createdAt:
+        nowIso()
+    };
+
+
+    project.customSections
+      .push(
+        item
+      );
+  }
+
+
+  Object.assign(
+    item,
+    {
+
+      name,
+
+      viewType:
+        $('csViewType').value,
+
+      fields,
+
+      updatedAt:
+        nowIso()
+    }
+  );
+
+
+  log(
+    id
+      ? 'Изменено'
+      : 'Создано',
+
+    'Раздел',
+
+    name
+  );
+
+
+  await saveProject();
+
+
+  closeModal();
+
+
+  rebuildCustomSections();
+
+
+  renderSettings();
+}
+
+
+async function deleteCustomSection(
+  id
+) {
+
+  const item =
+    byId(
+      project.customSections,
+      id
     );
 
 
   if (
-    closeButton
+    !item ||
+    !confirm(
+      `Удалить пользовательский раздел «${item.name}»? Данные проекта при этом не удаляются.`
+    )
   ) {
-    closeButton.onclick =
-      LIV.closeModal;
+
+    return;
   }
 
 
-  const modal =
-    LIV.$(
-      'modal'
+  project.customSections =
+    project.customSections
+      .filter(
+        row =>
+          String(
+            row.id
+          ) !==
+          String(
+            id
+          )
+      );
+
+
+  log(
+    'Удалено',
+    'Раздел',
+    item.name
+  );
+
+
+  await saveProject();
+
+
+  rebuildCustomSections();
+
+
+  renderSettings();
+}
+
+
+function customFieldLabel(
+  id
+) {
+
+  return (
+    builderFields()
+      .find(
+        item =>
+          item.id ===
+          id
+      )?.name ||
+    id
+  );
+}
+
+
+function customFrontValue(
+  front,
+  field
+) {
+
+  const hydrated =
+    hydrateFront(
+      front
     );
+
+
+  const map = {
+
+    organization:
+      hydrated.organization,
+
+    contract:
+      front.contractNo ||
+      '',
+
+    building:
+      hydrated.building,
+
+    work:
+      hydrated.work,
+
+    front:
+      frontLabel(
+        front
+      ),
+
+    status:
+      front.status ||
+      '',
+
+    planStart:
+      front.planStart
+        ? ruDate(
+            front.planStart
+          )
+        : '',
+
+    planEnd:
+      front.planEnd
+        ? ruDate(
+            front.planEnd
+          )
+        : '',
+
+    factStart:
+      front.factStart
+        ? ruDate(
+            front.factStart
+          )
+        : '',
+
+    factEnd:
+      front.factEnd
+        ? ruDate(
+            front.factEnd
+          )
+        : '',
+
+    forecastEnd:
+      front.forecastEnd
+        ? ruDate(
+            front.forecastEnd
+          )
+        : '',
+
+    deviation:
+      (() => {
+
+        const d =
+          dateDeviationDays(
+            front.planEnd,
+            front.factEnd ||
+            front.forecastEnd
+          );
+
+
+        return (
+          d ===
+            null
+            ? ''
+            : `${
+                d >
+                  0
+                  ? '+'
+                  : ''
+              }${d}`
+        );
+      })(),
+
+    duration:
+      front.planStart &&
+      front.planEnd
+        ? diffDays(
+            front.planStart,
+            front.planEnd
+          ) +
+          1
+        : '',
+
+    volume:
+      fmt(
+        front.totalQty
+      ),
+
+    productivity:
+      front.productivity ??
+      '',
+
+    people:
+      front.people ??
+      '',
+
+    equipment:
+      front.equipment ??
+      '',
+
+    reserve:
+      front.reserveValue ??
+      '',
+
+    comment:
+      front.comment ||
+      ''
+  };
+
+
+  return (
+    map[
+      field
+    ] ??
+    ''
+  );
+}
+
+
+function rebuildCustomSections() {
+
+  document
+    .querySelectorAll(
+      '[data-custom-tab]'
+    )
+    .forEach(
+      node =>
+        node.remove()
+    );
+
+
+  document
+    .querySelectorAll(
+      '[data-custom-panel]'
+    )
+    .forEach(
+      node =>
+        node.remove()
+    );
+
+
+  const nav =
+    document.querySelector(
+      'nav.tabs'
+    );
+
+
+  const main =
+    document.querySelector(
+      'main.container'
+    );
+
+
+  if (
+    !nav ||
+    !main
+  ) {
+
+    return;
+  }
+
+
+  (
+    project.customSections ||
+    []
+  )
+    .forEach(
+      section => {
+
+        const tab =
+          document.createElement(
+            'button'
+          );
+
+
+        tab.className =
+          'tab';
+
+
+        tab.dataset.tab =
+          `custom-${section.id}`;
+
+
+        tab.dataset.customTab =
+          section.id;
+
+
+        tab.textContent =
+          section.name;
+
+
+        nav.appendChild(
+          tab
+        );
+
+
+        const panel =
+          document.createElement(
+            'section'
+          );
+
+
+        panel.id =
+          `tab-custom-${section.id}`;
+
+
+        panel.dataset.customPanel =
+          section.id;
+
+
+        panel.className =
+          'panel hidden';
+
+
+        main.appendChild(
+          panel
+        );
+
+
+        tab.onclick =
+          () =>
+            switchTab(
+              `custom-${section.id}`
+            );
+      }
+    );
+}
+
+
+function renderCustomSection(
+  sectionId
+) {
+
+  const section =
+    byId(
+      project.customSections,
+      sectionId
+    );
+
+
+  const panel =
+    $(
+      `tab-custom-${sectionId}`
+    );
+
+
+  if (
+    !section ||
+    !panel
+  ) {
+
+    return;
+  }
+
+
+  const fronts =
+    activeFronts();
+
+
+  panel.innerHTML = `
+    <section class="card">
+
+      <div class="section-toolbar">
+
+        <div>
+
+          <h2>
+            ${esc(
+              section.name
+            )}
+          </h2>
+
+          <div class="muted">
+
+            Пользовательское представление общей базы.
+
+            Настройка — в разделе «Настройки».
+
+          </div>
+
+        </div>
+
+
+        <button
+          class="btn"
+          data-custom-export="${esc(
+            section.id
+          )}">
+
+          Экспорт Excel
+
+        </button>
+
+      </div>
+
+    </section>
+
+
+    <section class="card table-wrap">
+
+      <table>
+
+        <thead>
+
+          <tr>
+
+            ${
+              section.fields
+                .map(
+                  field =>
+                    `<th>${esc(
+                      customFieldLabel(
+                        field
+                      )
+                    )}</th>`
+                )
+                .join('')
+            }
+
+          </tr>
+
+        </thead>
+
+
+        <tbody>
+
+          ${
+            fronts
+              .map(
+                front => `
+                  <tr>
+
+                    ${
+                      section.fields
+                        .map(
+                          field =>
+                            `<td>${esc(
+                              customFrontValue(
+                                front,
+                                field
+                              )
+                            )}</td>`
+                        )
+                        .join('')
+                    }
+
+                  </tr>
+                `
+              )
+              .join('')
+          }
+
+        </tbody>
+
+      </table>
+
+    </section>
+  `;
+
+
+  panel
+    .querySelector(
+      '[data-custom-export]'
+    )
+    ?.addEventListener(
+      'click',
+
+      () =>
+        exportCustomSectionExcel(
+          section.id
+        )
+    );
+}
+
+
+/* =========================================================
+   ЭКСПОРТ EXCEL
+   ========================================================= */
+
+
+function ensureExcelButton() {
+
+  const actions =
+    document.querySelector(
+      '.top-actions'
+    );
+
+
+  if (
+    !actions ||
+    $('excelBtn')
+  ) {
+
+    return;
+  }
+
+
+  const button =
+    document.createElement(
+      'button'
+    );
+
+
+  button.id =
+    'excelBtn';
+
+
+  button.className =
+    'btn';
+
+
+  button.textContent =
+    'Экспорт Excel';
+
+
+  actions.appendChild(
+    button
+  );
+
+
+  button.onclick =
+    exportCurrentViewExcel;
+}
+
+
+function excelDownload(
+  rows,
+  sheetName,
+  fileName
+) {
+
+  if (
+    typeof XLSX ===
+    'undefined'
+  ) {
+
+    alert(
+      'Библиотека Excel не загрузилась.'
+    );
+
+    return;
+  }
+
+
+  const wb =
+    XLSX.utils
+      .book_new();
+
+
+  const ws =
+    XLSX.utils
+      .json_to_sheet(
+        rows
+      );
+
+
+  XLSX.utils
+    .book_append_sheet(
+      wb,
+      ws,
+      String(
+        sheetName ||
+        'Данные'
+      )
+        .slice(
+          0,
+          31
+        )
+    );
+
+
+  XLSX.writeFile(
+    wb,
+    fileName
+  );
+}
+
+
+function exportCustomSectionExcel(
+  sectionId
+) {
+
+  const section =
+    byId(
+      project.customSections,
+      sectionId
+    );
+
+
+  if (
+    !section
+  ) {
+    return;
+  }
+
+
+  const rows =
+    activeFronts()
+      .map(
+        front => {
+
+          const result =
+            {};
+
+
+          section.fields
+            .forEach(
+              field => {
+
+                result[
+                  customFieldLabel(
+                    field
+                  )
+                ] =
+                  customFrontValue(
+                    front,
+                    field
+                  );
+              }
+            );
+
+
+          return result;
+        }
+      );
+
+
+  excelDownload(
+    rows,
+    section.name,
+    `${section.name}_${today()}.xlsx`
+  );
+}
+
+
+function exportCurrentViewExcel() {
+
+  const active =
+    document.querySelector(
+      '.tab.active[data-tab]'
+    )
+      ?.dataset
+      .tab ||
+    'dashboard';
+
+
+  let rows =
+    [];
+
+
+  let sheet =
+    'Данные';
+
+
+  if (
+    active ===
+    'resources'
+  ) {
+
+    rows =
+      resourceFiltered()
+        .map(
+          row => ({
+
+            'Дата':
+              row.date,
+
+            'Организация':
+              nameById(
+                project.organizations,
+                row.organizationId
+              ) ||
+              '',
+
+            'Здание':
+              nameById(
+                project.buildings,
+                row.buildingId
+              ) ||
+              '',
+
+            'Работа':
+              nameById(
+                project.works,
+                row.workId
+              ) ||
+              '',
+
+            'Фронт':
+              row.frontId
+                ? frontLabel(
+                    byId(
+                      project.fronts,
+                      row.frontId
+                    )
+                  )
+                : '',
+
+            'ИТР':
+              roundInt(
+                row.itr
+              ),
+
+            'Рабочие':
+              roundInt(
+                row.workers
+              ),
+
+            'Механизаторы':
+              roundInt(
+                row.mechanizers
+              ),
+
+            'Техника':
+              row.equipmentType ||
+              '',
+
+            'Количество техники':
+              roundInt(
+                row.equipmentQty
+              ),
+
+            'Комментарий':
+              row.comment ||
+              ''
+          })
+        );
+
+
+    sheet =
+      'Ресурсы';
+
+  } else if (
+    active ===
+    'milestones'
+  ) {
+
+    rows =
+      (
+        project.milestones ||
+        []
+      )
+        .map(
+          item => ({
+
+            'Подрядчик':
+              milestoneOrganizationName(
+                item
+              ),
+
+            'Договор':
+              milestoneContractLabel(
+                item
+              ),
+
+            'Ключевая дата':
+              item.milestoneNo ||
+              '',
+
+            'Формулировка':
+              item.title ||
+              '',
+
+            'Здание':
+              nameById(
+                project.buildings,
+                item.buildingId
+              ) ||
+              '',
+
+            'Договорная дата':
+              item.contractDate ||
+              '',
+
+            'Рабочая дата':
+              item.workDate ||
+              '',
+
+            'Прогноз':
+              item.forecastDate ||
+              '',
+
+            'Факт':
+              item.factDate ||
+              '',
+
+            'Отклонение, дн.':
+              milestoneDeviation(
+                item
+              ) ??
+              '',
+
+            'Статус':
+              item.status ||
+              '',
+
+            'Писем':
+              milestoneLetters(
+                item
+              )
+                .length
+          })
+        );
+
+
+    sheet =
+      'Ключевые даты';
+
+  } else if (
+    active ===
+    'elements'
+  ) {
+
+    rows =
+      (
+        project.numberedElements ||
+        []
+      )
+        .filter(
+          item =>
+            item.active !==
+            false
+        )
+        .map(
+          item => ({
+
+            'Тип':
+              item.elementType ||
+              '',
+
+            'Номер':
+              item.elementNo ||
+              '',
+
+            'Здание':
+              nameById(
+                project.buildings,
+                item.buildingId
+              ) ||
+              '',
+
+            'Захватка':
+              item.capture ||
+              '',
+
+            'Зона':
+              item.zone ||
+              '',
+
+            'Работа':
+              nameById(
+                project.works,
+                item.workId
+              ) ||
+              '',
+
+            'Статус':
+              item.status ||
+              '',
+
+            'Комментарий':
+              item.comment ||
+              ''
+          })
+        );
+
+
+    sheet =
+      'Номерные элементы';
+
+  } else if (
+    active.startsWith(
+      'custom-'
+    )
+  ) {
+
+    exportCustomSectionExcel(
+      active.replace(
+        'custom-',
+        ''
+      )
+    );
+
+
+    return;
+
+  } else {
+
+    rows =
+      activeFronts()
+        .map(
+          front => ({
+
+            'Здание':
+              hydrateFront(
+                front
+              )
+                .building,
+
+            'Работа':
+              hydrateFront(
+                front
+              )
+                .work,
+
+            'Организация':
+              hydrateFront(
+                front
+              )
+                .organization,
+
+            'Статус':
+              front.status ||
+              '',
+
+            'План начало':
+              front.planStart ||
+              '',
+
+            'План окончание':
+              front.planEnd ||
+              '',
+
+            'Факт начало':
+              front.factStart ||
+              '',
+
+            'Факт окончание':
+              front.factEnd ||
+              '',
+
+            'Прогноз':
+              front.forecastEnd ||
+              '',
+
+            'Объём':
+              num(
+                front.totalQty
+              ),
+
+            'Выполнено':
+              num(
+                front.doneQty
+              )
+          })
+        );
+
+
+    sheet =
+      'Фронты';
+  }
+
+
+  excelDownload(
+    rows,
+    sheet,
+    `LIV_Planning_${sheet}_${today()}.xlsx`
+  );
+}
+
+
+/* =========================================================
+   ПЕЧАТЬ / PDF
+   ========================================================= */
+
+
+function printCurrent() {
+
+  const active =
+    document.querySelector(
+      '.panel:not(.hidden)'
+    );
+
+
+  document
+    .querySelectorAll(
+      '.panel'
+    )
+    .forEach(
+      panel =>
+        panel.classList
+          .remove(
+            'print-active'
+          )
+    );
+
+
+  if (
+    active
+  ) {
+
+    active.classList
+      .add(
+        'print-active'
+      );
+  }
+
+
+  window.print();
+
+
+  setTimeout(
+    () =>
+      active
+        ?.classList
+        .remove(
+          'print-active'
+        ),
+
+    500
+  );
+}
+
+
+/* =========================================================
+   ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК
+   ========================================================= */
+
+
+function switchTab(
+  name
+) {
+
+  document
+    .querySelectorAll(
+      '.tab[data-tab]'
+    )
+    .forEach(
+      button => {
+
+        button.classList
+          .toggle(
+            'active',
+
+            button.dataset
+              .tab ===
+              name
+          );
+      }
+    );
+
+
+  document
+    .querySelectorAll(
+      'main > .panel'
+    )
+    .forEach(
+      panel =>
+        panel.classList
+          .add(
+            'hidden'
+          )
+    );
+
+
+  $(
+    `tab-${name}`
+  )
+    ?.classList
+    .remove(
+      'hidden'
+    );
+
+
+  if (
+    name.startsWith(
+      'custom-'
+    )
+  ) {
+
+    renderCustomSection(
+      name.replace(
+        'custom-',
+        ''
+      )
+    );
+
+
+    return;
+  }
+
+
+  if (
+    name ===
+    'dashboard'
+  ) {
+
+    renderDashboard();
+  }
+
+
+  if (
+    name ===
+    'matrix'
+  ) {
+
+    renderMatrix();
+  }
+
+
+  if (
+    name ===
+    'gantt'
+  ) {
+
+    renderGantt();
+  }
+
+
+  if (
+    name ===
+    'planfact'
+  ) {
+
+    renderPlanFact();
+  }
+
+
+  if (
+    name ===
+    'resources'
+  ) {
+
+    initSelects();
+
+
+    refreshAllMultiFilters();
+
+
+    renderResourceCurrentView();
+  }
+
+
+  if (
+    name ===
+    'organizations'
+  ) {
+
+    initOrganizationCard();
+  }
+
+
+  if (
+    name ===
+    'milestones'
+  ) {
+
+    renderMilestones();
+  }
+
+
+  if (
+    name ===
+    'elements'
+  ) {
+
+    renderElements();
+  }
+
+
+  if (
+    name ===
+    'demolition'
+  ) {
+
+    renderDemolition();
+  }
+
+
+  if (
+    name ===
+    'history'
+  ) {
+
+    renderHistory();
+  }
+
+
+  if (
+    name ===
+    'settings'
+  ) {
+
+    renderSettings();
+  }
+}
+
+
+/* =========================================================
+   ОБЩАЯ ОТРИСОВКА
+   ========================================================= */
+
+
+function renderAll() {
+
+  initSelects();
+
+
+  if (
+    typeof refreshAllMultiFilters ===
+    'function'
+  ) {
+
+    refreshAllMultiFilters();
+  }
+
+
+  if (
+    $('dTotal')
+  ) {
+
+    renderDashboard();
+  }
+
+
+  if (
+    $('matrixBody')
+  ) {
+
+    renderMatrix();
+  }
+
+
+  if (
+    $('gantt')
+  ) {
+
+    renderGantt();
+  }
+
+
+  if (
+    $('planRows')
+  ) {
+
+    renderPlanFact();
+  }
+
+
+  if (
+    $('resourceRows')
+  ) {
+
+    renderResourceCurrentView();
+  }
+
+
+  if (
+    $('milestoneRows')
+  ) {
+
+    renderMilestones();
+  }
+
+
+  if (
+    $('elementRows')
+  ) {
+
+    renderElements();
+  }
+
+
+  if (
+    $('demolitionRows')
+  ) {
+
+    renderDemolition();
+  }
+
+
+  if (
+    $('historyRows')
+  ) {
+
+    renderHistory();
+  }
+
+
+  if (
+    $('projectMeta')
+  ) {
+
+    renderSettings();
+  }
+
+
+  if (
+    $('organizationCardSelect')
+  ) {
+
+    refreshOrganizationCard();
+  }
+
+
+  rebuildCustomSections();
+}
+
+
+/* =========================================================
+   СОБЫТИЯ
+   ========================================================= */
+
+
+function bindUi() {
+
+  document
+    .querySelectorAll(
+      '.tab[data-tab]'
+    )
+    .forEach(
+      button => {
+
+        button.onclick =
+          () =>
+            switchTab(
+              button.dataset
+                .tab
+            );
+      }
+    );
+
+
+  bindClick(
+    'modalClose',
+    closeModal
+  );
+
+
+  const modal =
+    $('modal');
 
 
   if (
@@ -1744,15 +6550,14 @@ LIV.bindGlobalEvents = function () {
   ) {
 
     modal.onclick =
-      function (
-        event
-      ) {
+      event => {
 
         if (
           event.target ===
           modal
         ) {
-          LIV.closeModal();
+
+          closeModal();
         }
       };
   }
@@ -1760,63 +6565,195 @@ LIV.bindGlobalEvents = function () {
 
   document.addEventListener(
     'keydown',
+
     event => {
 
       if (
         event.key ===
-        'Escape'
+          'Escape' &&
+        modal &&
+        !modal.classList
+          .contains(
+            'hidden'
+          )
       ) {
-        LIV.closeModal();
+
+        closeModal();
       }
     }
   );
 
 
-  /* -------------------------------------------------------
-     РЕЗЕРВНАЯ КОПИЯ
-     ------------------------------------------------------- */
-
-  const backup =
-    LIV.$(
-      'backupBtn'
+  [
+    'mfBuilding',
+    'mfBlock',
+    'mfFloor',
+    'mfWork',
+    'mfOrg',
+    'mfStatus'
+  ]
+    .forEach(
+      id =>
+        bindChange(
+          id,
+          renderMatrix
+        )
     );
 
 
+  bindClick(
+    'newFrontBtn',
+    () =>
+      openFrontEditor()
+  );
+
+
+  [
+    'gBuilding',
+    'gWork',
+    'gMode'
+  ]
+    .forEach(
+      id =>
+        bindChange(
+          id,
+          renderGantt
+        )
+    );
+
+
+  [
+    'pfFrom',
+    'pfTo',
+    'pfBuilding',
+    'pfWork'
+  ]
+    .forEach(
+      id =>
+        bindChange(
+          id,
+          renderPlanFact
+        )
+    );
+
+
+  bindClick(
+    'newPlanRow',
+    () =>
+      openLogEditor(
+        'plan'
+      )
+  );
+
+
+  bindClick(
+    'newFactRow',
+    () =>
+      openLogEditor(
+        'fact'
+      )
+  );
+
+
   if (
-    backup
+    typeof bindResourceUi ===
+    'function'
   ) {
-    backup.onclick =
-      LIV.exportProjectBackup;
+
+    bindResourceUi();
   }
 
 
-  /* -------------------------------------------------------
-     ЗАГРУЗКА ПРОЕКТА
-     ------------------------------------------------------- */
+  bindClick(
+    'newMilestoneBtn',
+    () =>
+      openMilestoneEditor()
+  );
 
-  const restore =
-    LIV.$(
-      'restoreInput'
+
+  [
+    'elBuilding',
+    'elType'
+  ]
+    .forEach(
+      id =>
+        bindChange(
+          id,
+          renderElements
+        )
     );
 
 
   if (
-    restore
+    $('elSearch')
   ) {
 
-    restore.onchange =
-      async function (
-        event
-      ) {
+    $('elSearch').oninput =
+      renderElements;
+  }
+
+
+  bindClick(
+    'newElementBtn',
+    () =>
+      openElementEditor()
+  );
+
+
+  bindClick(
+    'addBuildingBtn',
+    () =>
+      addSimple(
+        'building'
+      )
+  );
+
+
+  bindClick(
+    'addWorkBtn',
+    () =>
+      addSimple(
+        'work'
+      )
+  );
+
+
+  bindClick(
+    'addOrgBtn',
+    () =>
+      addSimple(
+        'org'
+      )
+  );
+
+
+  bindClick(
+    'backupBtn',
+    exportBackup
+  );
+
+
+  if (
+    $('restoreInput')
+  ) {
+
+    $('restoreInput').onchange =
+      event => {
 
         const file =
           event.target
-            .files?.[0];
+            .files
+            ?.[0];
 
 
-        await LIV.restoreProjectFromFile(
+        if (
           file
-        );
+        ) {
+
+          restoreProject(
+            file
+          );
+        }
 
 
         event.target.value =
@@ -1825,33 +6762,27 @@ LIV.bindGlobalEvents = function () {
   }
 
 
-  /* -------------------------------------------------------
-     СРАВНЕНИЕ
-     ------------------------------------------------------- */
-
-  const compare =
-    LIV.$(
-      'compareInput'
-    );
-
-
   if (
-    compare
+    $('compareInput')
   ) {
 
-    compare.onchange =
-      async function (
-        event
-      ) {
+    $('compareInput').onchange =
+      event => {
 
         const file =
           event.target
-            .files?.[0];
+            .files
+            ?.[0];
 
 
-        await LIV.compareProjectWithFile(
+        if (
           file
-        );
+        ) {
+
+          compareProjectFile(
+            file
+          );
+        }
 
 
         event.target.value =
@@ -1860,225 +6791,468 @@ LIV.bindGlobalEvents = function () {
   }
 
 
-  /* -------------------------------------------------------
-     PDF
-     ------------------------------------------------------- */
-
-  const pdf =
-    LIV.$(
-      'pdfBtn'
-    );
-
-
-  if (
-    pdf
-  ) {
-    pdf.onclick =
-      LIV.printCurrentView;
-  }
-};
-
-
-/* =========================================================
-   ПРИВЯЗКА МОДУЛЕЙ
-   ========================================================= */
-
-LIV.bindModules = function () {
-
-  LIV.safeCall(
-    'bindResourceEvents'
+  bindClick(
+    'pdfBtn',
+    printCurrent
   );
 
 
-  LIV.safeCall(
-    'bindOrganizationEvents'
+  bindChange(
+    'importFile',
+    readImportFile
   );
 
 
-  LIV.safeCall(
-    'bindImportEvents'
-  );
-};
+  bindChange(
+    'importSheet',
+
+    () => {
+
+      importSheetName =
+        $('importSheet').value;
 
 
-/* =========================================================
-   АВАРИЙНОЕ СОЗДАНИЕ ПУСТОГО ПРОЕКТА
-
-   Используется только если загрузка IndexedDB дала ошибку.
-   Саму базу при этом НЕ очищаем.
-   ========================================================= */
-
-LIV.createRuntimeFallbackProject = function () {
-
-  try {
-
-    LIV.project =
-      LIV.emptyProject();
-
-  } catch (error) {
-
-    console.error(
-      'Не удалось создать резервный проект в памяти:',
-      error
-    );
+      importMapping =
+        {};
 
 
-    LIV.project = {
-      schemaVersion:
-        '2.3.0',
-
-      meta: {
-        projectName:
-          'LIV Planning'
-      },
-
-      buildings: [],
-      organizations: [],
-      works: [],
-      structures: [],
-      fronts: [],
-      planLog: [],
-      factLog: [],
-      resources: [],
-      resourcePlans: [],
-      milestones: [],
-      numberedElements: [],
-      demolition: [],
-      contracts: [],
-      constraints: [],
-      diagrams: [],
-      diagramMarks: [],
-      scheduleVersions: [],
-      customFields: [],
-      views: [],
-      importProfiles: [],
-      importHistory: [],
-      history: []
-    };
-  }
-};
+      importMappingMode =
+        '';
 
 
-/* =========================================================
-   ЗАПУСК ДАННЫХ
-   ========================================================= */
-
-LIV.initializeData = async function () {
-
-  try {
-
-    await LIV.loadProject();
+      importRows =
+        [];
 
 
-    console.log(
-      'LIV Planning: проект загружен',
-      LIV.project
-    );
-
-  } catch (error) {
-
-    console.error(
-      'Ошибка загрузки IndexedDB:',
-      error
-    );
+      readSelectedSheet();
 
 
-    /*
-       ВАЖНО:
-       НЕ удаляем IndexedDB.
-       НЕ повышаем и НЕ понижаем ее версию.
-       Просто даем интерфейсу возможность работать.
-    */
+      if (
+        $('commitImportBtn')
+      ) {
 
-    LIV.createRuntimeFallbackProject();
-
-
-    console.warn(
-      'LIV Planning запущен с временным пустым проектом в памяти. ' +
-      'Исходная IndexedDB не изменена.'
-    );
-  }
-
-
-  LIV.setInitialResourceDates();
-
-
-  try {
-
-    LIV.initResourceFilters();
-
-  } catch (error) {
-
-    console.error(
-      'Ошибка создания фильтров ресурсов:',
-      error
-    );
-  }
-
-
-  LIV.bindModules();
-
-
-  LIV.refreshAll();
-
-
-  LIV.switchTab(
-    'dashboard'
-  );
-};
-
-
-/* =========================================================
-   ОСНОВНОЙ ЗАПУСК
-   ========================================================= */
-
-LIV.start = function () {
-
-  /*
-     Сначала включаем интерфейс.
-     Кнопки вкладок после этого уже должны работать.
-  */
-
-  LIV.bindGlobalEvents();
-
-
-  /*
-     Затем отдельно загружаем данные.
-     Ошибка IndexedDB уже не способна
-     отключить навигацию.
-  */
-
-  LIV.initializeData()
-    .catch(
-      error => {
-
-        console.error(
-          'Критическая ошибка инициализации:',
-          error
-        );
+        $('commitImportBtn')
+          .disabled =
+            true;
       }
-    );
-};
 
 
-/* =========================================================
-   ЗАПУСК ПОСЛЕ ГОТОВНОСТИ DOM
-   ========================================================= */
-
-if (
-  document.readyState ===
-  'loading'
-) {
-
-  document.addEventListener(
-    'DOMContentLoaded',
-    LIV.start,
-    {
-      once: true
+      $('importMappingCard')
+        ?.classList
+        .add(
+          'hidden'
+        );
     }
   );
 
-} else {
 
-  LIV.start();
+  bindChange(
+    'importMode',
+
+    () => {
+
+      importMapping =
+        {};
+
+
+      importMappingMode =
+        '';
+
+
+      importRows =
+        [];
+
+
+      if (
+        $('commitImportBtn')
+      ) {
+
+        $('commitImportBtn')
+          .disabled =
+            true;
+      }
+
+
+      $('importMappingCard')
+        ?.classList
+        .add(
+          'hidden'
+        );
+    }
+  );
+
+
+  bindClick(
+    'analyzeImportBtn',
+    analyzeImport
+  );
+
+
+  bindClick(
+    'commitImportBtn',
+    commitImport
+  );
+
+
+  bindClick(
+    'rollbackImportBtn',
+    rollbackLastImport
+  );
+
+
+  bindClick(
+    'clearProjectBtn',
+
+    async () => {
+
+      if (
+        !confirm(
+          'Очистить рабочие данные?\n\n' +
+          'Перед очисткой будет создана локальная защитная копия. ' +
+          'Справочники зданий, видов работ и организаций останутся.'
+        )
+      ) {
+
+        return;
+      }
+
+
+      const backupKey =
+        `pre-clear-${Date.now()}`;
+
+
+      await dbPutKey(
+        clone(
+          project
+        ),
+        backupKey
+      );
+
+
+      const currentOrganizations =
+        clone(
+          project.organizations ||
+          []
+        );
+
+
+      const currentBuildings =
+        clone(
+          project.buildings ||
+          []
+        );
+
+
+      const currentWorks =
+        clone(
+          project.works ||
+          []
+        );
+
+
+      const currentCustomSections =
+        clone(
+          project.customSections ||
+          []
+        );
+
+
+      const fresh =
+        emptyProject();
+
+
+      fresh.organizations =
+        currentOrganizations;
+
+
+      fresh.buildings =
+        currentBuildings;
+
+
+      fresh.works =
+        currentWorks;
+
+
+      fresh.customSections =
+        currentCustomSections;
+
+
+      project =
+        fresh;
+
+
+      log(
+        'Очищено',
+        'Проект',
+
+        'Рабочие данные очищены. Справочники и пользовательские разделы сохранены.',
+
+        {
+          backupKey
+        }
+      );
+
+
+      await saveProject();
+
+
+      if (
+        typeof resourceSelectedIds !==
+        'undefined'
+      ) {
+
+        resourceSelectedIds
+          .clear();
+      }
+
+
+      initSelects();
+
+
+      if (
+        typeof resetMultiFilter ===
+        'function'
+      ) {
+
+        [
+          'rOrg',
+          'rBuilding',
+          'rWork',
+          'rFront'
+        ]
+          .forEach(
+            id =>
+              resetMultiFilter(
+                id,
+                false
+              )
+          );
+      }
+
+
+      renderAll();
+
+
+      alert(
+        'Рабочие данные очищены. Защитная копия сохранена локально.'
+      );
+    }
+  );
 }
+
+
+/* =========================================================
+   ДАТЫ ПО УМОЛЧАНИЮ
+   ========================================================= */
+
+
+function initDefaultDates() {
+
+  const currentDate =
+    today();
+
+
+  if (
+    $('pfTo') &&
+    !$('pfTo').value
+  ) {
+
+    $('pfTo').value =
+      currentDate;
+  }
+
+
+  if (
+    $('rTo') &&
+    !$('rTo').value
+  ) {
+
+    $('rTo').value =
+      currentDate;
+  }
+
+
+  if (
+    $('rDailyDate') &&
+    !$('rDailyDate').value
+  ) {
+
+    $('rDailyDate').value =
+      currentDate;
+  }
+}
+
+
+/* =========================================================
+   ПРОВЕРКА СТРУКТУРЫ ЗАГРУЖЕННОГО ПРОЕКТА
+   ========================================================= */
+
+
+function validateLoadedProject() {
+
+  const arrays = [
+
+    'buildings',
+    'organizations',
+    'works',
+    'structures',
+    'fronts',
+    'planLog',
+    'factLog',
+    'resources',
+    'resourcePlans',
+    'milestones',
+    'numberedElements',
+    'contracts',
+    'constraints',
+    'diagrams',
+    'diagramMarks',
+    'scheduleVersions',
+    'customFields',
+    'views',
+    'importProfiles',
+    'importHistory',
+    'history',
+    'demolition',
+    'customSections'
+  ];
+
+
+  arrays.forEach(
+    key => {
+
+      if (
+        !Array.isArray(
+          project[
+            key
+          ]
+        )
+      ) {
+
+        project[
+          key
+        ] =
+          [];
+      }
+    }
+  );
+}
+
+
+/* =========================================================
+   ЗАПУСК
+   ========================================================= */
+
+
+async function init() {
+
+  db =
+    await openDb();
+
+
+  const raw =
+    await dbGetKey();
+
+
+  project =
+    await migrateIfNeeded(
+      raw
+    );
+
+
+  validateLoadedProject();
+
+
+  if (
+    !raw ||
+    raw.schemaVersion !==
+      SCHEMA_VERSION
+  ) {
+
+    await saveProject();
+  }
+
+
+  initSelects();
+
+
+  if (
+    typeof initResourceMultiFilters ===
+    'function'
+  ) {
+
+    initResourceMultiFilters();
+  }
+
+
+  bindUi();
+
+
+  initDefaultDates();
+
+
+  ensureExcelButton();
+
+
+  rebuildCustomSections();
+
+
+  if (
+    typeof renderBackupNotice ===
+    'function'
+  ) {
+
+    renderBackupNotice();
+  }
+
+
+  if (
+    $('rShowZero')
+  ) {
+
+    $('rShowZero').checked =
+      Boolean(
+        cfg(
+          'SHOW_ZERO_ORGANIZATIONS_BY_DEFAULT',
+          false
+        )
+      );
+  }
+
+
+  renderAll();
+}
+
+
+/* =========================================================
+   DOM READY
+   ========================================================= */
+
+
+document.addEventListener(
+  'DOMContentLoaded',
+
+  () => {
+
+    init()
+      .catch(
+        error => {
+
+          console.error(
+            'LIV Planning startup error:',
+            error
+          );
+
+
+          alert(
+            `Ошибка запуска LIV Planning:\n${
+              error?.message ||
+              String(
+                error
+              )
+            }`
+          );
+        }
+      );
+  }
+);

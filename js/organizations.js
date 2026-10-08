@@ -2,150 +2,143 @@
 
 /* =========================================================
    LIV PLANNING
-   Карточка организации
+   ОРГАНИЗАЦИИ
    ========================================================= */
+
+
+let organizationPeopleChart =
+  null;
 
 
 /* =========================================================
-   СОСТОЯНИЕ МОДУЛЯ
+   СВЯЗАННЫЕ КЛЮЧЕВЫЕ ДАТЫ
    ========================================================= */
 
-LIV.organizations = {
-  selectedOrganizationId: null,
-  peopleChart: null
-};
 
+function organizationLinkedMilestones(
+  organizationId
+) {
 
-/* =========================================================
-   ПОЛУЧЕНИЕ ТЕКУЩЕЙ ОРГАНИЗАЦИИ
-   ========================================================= */
-
-LIV.getSelectedOrganization = function () {
-
-  const select =
-    LIV.$(
-      'organizationCardSelect'
-    );
-
-
-  const selectedId =
-    select?.value ||
-    LIV.organizations
-      .selectedOrganizationId ||
-    '';
-
-
-  if (!selectedId) {
-    return null;
-  }
-
-
-  LIV.organizations
-    .selectedOrganizationId =
-      selectedId;
-
-
-  return LIV.byId(
-    LIV.project.organizations,
-    selectedId
-  );
-};
-
-
-/* =========================================================
-   ЗАПОЛНЕНИЕ СПИСКА ОРГАНИЗАЦИЙ
-   ========================================================= */
-
-LIV.renderOrganizationSelect = function () {
-
-  const select =
-    LIV.$(
-      'organizationCardSelect'
-    );
-
-
-  if (!select) {
-    return;
-  }
-
-
-  const organizations =
-    (LIV.project.organizations || [])
-      .filter(
-        item =>
-          item.active !== false
+  const contractIds =
+    new Set(
+      (
+        project.contracts ||
+        []
       )
-      .sort(
-        (
-          a,
-          b
-        ) =>
-          String(
-            a.name || ''
-          ).localeCompare(
+        .filter(
+          contract =>
             String(
-              b.name || ''
-            ),
-            'ru'
+              contract.organizationId ||
+              ''
+            ) ===
+            String(
+              organizationId
+            )
+        )
+        .map(
+          contract =>
+            String(
+              contract.id
+            )
+        )
+    );
+
+
+  return (
+    project.milestones ||
+    []
+  )
+    .filter(
+      item =>
+
+        String(
+          item.organizationId ||
+          ''
+        ) ===
+          String(
+            organizationId
+          ) ||
+
+        (
+          item.contractId &&
+          contractIds.has(
+            String(
+              item.contractId
+            )
+          )
+        )
+    );
+}
+
+
+/* =========================================================
+   ПОСЛЕДНИЕ РЕСУРСЫ ОРГАНИЗАЦИИ
+   ========================================================= */
+
+
+function organizationLatestResourceRows(
+  organizationId
+) {
+
+  const rows =
+    (
+      project.resources ||
+      []
+    )
+      .filter(
+        row =>
+          String(
+            row.organizationId ||
+            ''
+          ) ===
+          String(
+            organizationId
           )
       );
 
 
-  const previous =
-    LIV.organizations
-      .selectedOrganizationId ||
-    select.value ||
-    organizations[0]?.id ||
+  const lastDate =
+    rows
+      .map(
+        row =>
+          row.date
+      )
+      .filter(
+        Boolean
+      )
+      .sort()
+      .slice(
+        -1
+      )[0] ||
     '';
 
 
-  select.innerHTML =
-    organizations
-      .map(
-        item => `
-          <option
-            value="${LIV.esc(item.id)}"
-            ${
-              String(item.id) ===
-              String(previous)
-                ? 'selected'
-                : ''
-            }
-          >
-            ${LIV.esc(item.name)}
-          </option>
-        `
-      )
-      .join('');
+  return {
 
+    lastDate,
 
-  if (
-    organizations.length &&
-    !select.value
-  ) {
-    select.value =
-      organizations[0].id;
-  }
-
-
-  LIV.organizations
-    .selectedOrganizationId =
-      select.value || null;
-};
+    rows:
+      lastDate
+        ? rows.filter(
+            row =>
+              row.date ===
+              lastDate
+          )
+        : []
+  };
+}
 
 
 /* =========================================================
-   ФРОНТЫ ОРГАНИЗАЦИИ
+   АКТИВНЫЕ ФРОНТЫ ОРГАНИЗАЦИИ
    ========================================================= */
 
-LIV.getOrganizationFronts = function (
+
+function organizationFronts(
   organizationId
 ) {
 
-  return (
-    LIV.project.fronts ||
-    []
-  )
+  return activeFronts()
     .filter(
       front =>
         String(
@@ -153,408 +146,796 @@ LIV.getOrganizationFronts = function (
           ''
         ) ===
         String(
-          organizationId ||
-          ''
+          organizationId
         )
     );
-};
+}
 
 
 /* =========================================================
-   КЛЮЧЕВЫЕ ДАТЫ ОРГАНИЗАЦИИ
+   СВЯЗАННЫЕ ДОГОВОРЫ
    ========================================================= */
 
-LIV.getOrganizationMilestones = function (
+
+function organizationContracts(
   organizationId
 ) {
 
   return (
-    LIV.project.milestones ||
+    project.contracts ||
     []
   )
     .filter(
-      milestone => {
+      contract =>
+        String(
+          contract.organizationId ||
+          ''
+        ) ===
+        String(
+          organizationId
+        )
+    );
+}
 
-        if (
+
+/* =========================================================
+   СВЯЗАННЫЕ ОГРАНИЧЕНИЯ
+   ========================================================= */
+
+
+function organizationConstraints(
+  organizationId
+) {
+
+  const frontIds =
+    new Set(
+      organizationFronts(
+        organizationId
+      )
+        .map(
+          front =>
+            String(
+              front.id
+            )
+        )
+    );
+
+
+  return (
+    project.constraints ||
+    []
+  )
+    .filter(
+      item =>
+
+        String(
+          item.organizationId ||
+          ''
+        ) ===
           String(
-            milestone.organizationId ||
-            ''
-          ) ===
+            organizationId
+          ) ||
+
+        (
+          item.frontId &&
+          frontIds.has(
+            String(
+              item.frontId
+            )
+          )
+        )
+    );
+}
+
+
+/* =========================================================
+   ИНИЦИАЛИЗАЦИЯ КАРТОЧКИ
+   ========================================================= */
+
+
+function initOrganizationCard() {
+
+  const select =
+    $('organizationCardSelect');
+
+
+  if (!select) {
+    return;
+  }
+
+
+  const current =
+    select.value;
+
+
+  fill(
+    select,
+
+    (
+      project.organizations ||
+      []
+    )
+      .filter(
+        item =>
+          item.active !==
+          false
+      )
+      .sort(
+        (
+          a,
+          b
+        ) =>
           String(
-            organizationId ||
+            a.name ||
             ''
           )
-        ) {
-          return true;
-        }
-
-
-        if (
-          milestone.frontId
-        ) {
-
-          const front =
-            LIV.byId(
-              LIV.project.fronts,
-              milestone.frontId
-            );
-
-
-          if (
-            String(
-              front?.organizationId ||
-              ''
-            ) ===
-            String(
-              organizationId ||
-              ''
+            .localeCompare(
+              String(
+                b.name ||
+                ''
+              ),
+              'ru'
             )
-          ) {
-            return true;
-          }
-        }
+      ),
+
+    undefined
+  );
 
 
-        if (
-          milestone.contractId
-        ) {
+  if (
+    current &&
+    [
+      ...select.options
+    ]
+      .some(
+        option =>
+          option.value ===
+          current
+      )
+  ) {
 
-          const contract =
-            LIV.byId(
-              LIV.project.contracts,
-              milestone.contractId
-            );
+    select.value =
+      current;
+
+  } else if (
+    !select.value &&
+    select.options.length
+  ) {
+
+    select.value =
+      select.options[0].value;
+  }
 
 
-          if (
-            String(
-              contract?.organizationId ||
-              ''
-            ) ===
-            String(
-              organizationId ||
-              ''
-            )
-          ) {
-            return true;
-          }
-        }
+  select.onchange =
+    renderOrganizationCard;
 
 
-        return false;
-      }
+  renderOrganizationCard();
+}
+
+
+/* =========================================================
+   ОСНОВНАЯ КАРТОЧКА ОРГАНИЗАЦИИ
+   ========================================================= */
+
+
+function renderOrganizationCard() {
+
+  const select =
+    $('organizationCardSelect');
+
+
+  if (!select) {
+    return;
+  }
+
+
+  const organizationId =
+    select.value;
+
+
+  const organization =
+    byId(
+      project.organizations,
+      organizationId
     );
-};
+
+
+  const empty =
+    $('organizationCardEmpty');
+
+
+  const body =
+    $('organizationCardBody');
+
+
+  if (
+    !organization
+  ) {
+
+    if (empty) {
+
+      empty.classList
+        .remove(
+          'hidden'
+        );
+    }
+
+
+    if (body) {
+
+      body.classList
+        .add(
+          'hidden'
+        );
+    }
+
+
+    if (
+      organizationPeopleChart
+    ) {
+
+      organizationPeopleChart.destroy();
+
+      organizationPeopleChart =
+        null;
+    }
+
+
+    return;
+  }
+
+
+  if (empty) {
+
+    empty.classList
+      .add(
+        'hidden'
+      );
+  }
+
+
+  if (body) {
+
+    body.classList
+      .remove(
+        'hidden'
+      );
+  }
+
+
+  if (
+    $('organizationCardName')
+  ) {
+
+    $('organizationCardName')
+      .textContent =
+        organization.name;
+  }
+
+
+  const fronts =
+    organizationFronts(
+      organizationId
+    );
+
+
+  const resourceLatest =
+    organizationLatestResourceRows(
+      organizationId
+    );
+
+
+  const people =
+    resourceLatest.rows
+      .reduce(
+        (
+          sum,
+          row
+        ) =>
+          sum +
+          num(
+            row.itr
+          ) +
+          num(
+            row.workers
+          ) +
+          num(
+            row.mechanizers
+          ),
+        0
+      );
+
+
+  const equipment =
+    resourceLatest.rows
+      .reduce(
+        (
+          sum,
+          row
+        ) =>
+          sum +
+          num(
+            row.equipmentQty
+          ),
+        0
+      );
+
+
+  const milestones =
+    organizationLinkedMilestones(
+      organizationId
+    );
+
+
+  const contracts =
+    organizationContracts(
+      organizationId
+    );
+
+
+  const constraints =
+    organizationConstraints(
+      organizationId
+    );
+
+
+  const lateMilestones =
+    milestones
+      .filter(
+        item => {
+
+          const target =
+            item.contractDate ||
+            item.workDate ||
+            item.date ||
+            '';
+
+
+          return (
+            target &&
+            !item.factDate &&
+            target <
+              today()
+          );
+        }
+      );
+
+
+  if (
+    $('organizationPeople')
+  ) {
+
+    $('organizationPeople')
+      .textContent =
+        roundInt(
+          people
+        );
+  }
+
+
+  if (
+    $('organizationEquipment')
+  ) {
+
+    $('organizationEquipment')
+      .textContent =
+        roundInt(
+          equipment
+        );
+  }
+
+
+  if (
+    $('organizationFronts')
+  ) {
+
+    $('organizationFronts')
+      .textContent =
+        fronts.length;
+  }
+
+
+  if (
+    $('organizationMilestones')
+  ) {
+
+    $('organizationMilestones')
+      .textContent =
+        milestones.length;
+  }
+
+
+  if (
+    $('organizationLateMilestones')
+  ) {
+
+    $('organizationLateMilestones')
+      .textContent =
+        lateMilestones.length;
+  }
+
+
+  if (
+    $('organizationResourceDate')
+  ) {
+
+    $('organizationResourceDate')
+      .textContent =
+        resourceLatest.lastDate
+          ? ruDate(
+              resourceLatest.lastDate
+            )
+          : 'нет данных';
+  }
+
+
+  renderOrganizationWorks(
+    fronts
+  );
+
+
+  renderOrganizationMilestones(
+    milestones
+  );
+
+
+  renderOrganizationPeopleChart(
+    organizationId
+  );
+
+
+  /*
+    contracts и constraints пока считаются здесь,
+    чтобы карточка уже была готова к следующим вкладкам:
+    Договоры / Ограничения.
+  */
+
+  return {
+
+    organization,
+
+    fronts,
+
+    milestones,
+
+    contracts,
+
+    constraints,
+
+    resourceLatest
+  };
+}
 
 
 /* =========================================================
    РАБОТЫ ОРГАНИЗАЦИИ
    ========================================================= */
 
-LIV.getOrganizationWorks = function (
-  organizationId
+
+function renderOrganizationWorks(
+  fronts
 ) {
 
-  const fronts =
-    LIV.getOrganizationFronts(
-      organizationId
-    );
+  const container =
+    $('organizationWorks');
 
 
-  const workIds =
-    LIV.unique(
-      fronts
-        .map(
-          front =>
-            front.workId
-        )
-        .filter(Boolean)
-    );
+  if (!container) {
+    return;
+  }
 
 
-  return workIds
-    .map(
-      workId => {
+  const workMap =
+    new Map();
 
-        const work =
-          LIV.byId(
-            LIV.project.works,
+
+  (
+    fronts ||
+    []
+  )
+    .forEach(
+      front => {
+
+        const workId =
+          front.workId ||
+          '';
+
+
+        const workName =
+          nameById(
+            project.works,
+            workId
+          ) ||
+          'Без вида работ';
+
+
+        if (
+          !workMap.has(
+            workId
+          )
+        ) {
+
+          workMap.set(
+            workId,
+            {
+
+              name:
+                workName,
+
+              fronts:
+                0,
+
+              active:
+                0,
+
+              done:
+                0
+            }
+          );
+        }
+
+
+        const item =
+          workMap.get(
             workId
           );
 
 
-        const frontCount =
-          fronts.filter(
-            front =>
-              String(
-                front.workId
-              ) ===
-              String(
-                workId
-              )
-          ).length;
+        item.fronts +=
+          1;
 
 
-        return {
-          id:
-            workId,
+        if (
+          front.status ===
+          'В работе'
+        ) {
 
-          name:
-            work?.name ||
-            'Без названия',
+          item.active +=
+            1;
+        }
 
-          frontCount
-        };
+
+        if (
+          front.status ===
+            'Завершено' ||
+          front.completed
+        ) {
+
+          item.done +=
+            1;
+        }
       }
-    )
-    .sort(
-      (
-        a,
-        b
-      ) =>
-        a.name.localeCompare(
-          b.name,
-          'ru'
-        )
     );
-};
 
-
-/* =========================================================
-   РЕСУРСЫ ОРГАНИЗАЦИИ НА ПОСЛЕДНЮЮ ДАТУ
-   ========================================================= */
-
-LIV.getOrganizationCurrentResources = function (
-  organizationId
-) {
 
   const rows =
-    (
-      LIV.project.resources ||
-      []
-    )
-      .filter(
-        row =>
-          String(
-            row.organizationId ||
-            ''
-          ) ===
-          String(
-            organizationId ||
-            ''
-          ) &&
-          row.date
+    [
+      ...workMap.values()
+    ]
+      .sort(
+        (
+          a,
+          b
+        ) =>
+          a.name.localeCompare(
+            b.name,
+            'ru'
+          )
       );
 
 
-  if (!rows.length) {
-    return {
-      date: null,
-      people: 0,
-      equipment: 0
-    };
+  container.innerHTML =
+    rows.length
+      ? rows
+          .map(
+            item => `
+              <div class="organization-work-item">
+
+                <div>
+                  <b>
+                    ${esc(
+                      item.name
+                    )}
+                  </b>
+                </div>
+
+                <div class="muted">
+
+                  Фронтов:
+                  ${item.fronts}
+
+                  · В работе:
+                  ${item.active}
+
+                  · Завершено:
+                  ${item.done}
+
+                </div>
+
+              </div>
+            `
+          )
+          .join('')
+      : `
+          <div class="muted">
+            Нет привязанных работ
+          </div>
+        `;
+}
+
+
+/* =========================================================
+   КЛЮЧЕВЫЕ ДАТЫ ОРГАНИЗАЦИИ
+   ========================================================= */
+
+
+function renderOrganizationMilestones(
+  milestones
+) {
+
+  const container =
+    $('organizationMilestoneList');
+
+
+  if (!container) {
+    return;
   }
 
 
-  const latestDate =
-    rows
-      .map(
-        row =>
-          row.date
-      )
-      .sort()
-      .at(-1);
-
-
-  const latestRows =
-    rows.filter(
-      row =>
-        row.date ===
-        latestDate
-    );
-
-
-  const people =
-    latestRows.reduce(
-      (
-        total,
-        row
-      ) =>
-        total +
-        LIV.getResourcePeopleTotal(
-          row
-        ),
-      0
-    );
-
-
-  const equipment =
-    latestRows.reduce(
-      (
-        total,
-        row
-      ) =>
-        total +
-        LIV.num(
-          row.equipmentQty
-        ),
-      0
-    );
-
-
-  return {
-    date:
-      latestDate,
-
-    people:
-      LIV.roundInt(
-        people
-      ),
-
-    equipment:
-      LIV.roundInt(
-        equipment
-      )
-  };
-};
-
-
-/* =========================================================
-   ДИНАМИКА ЛЮДЕЙ
-   ========================================================= */
-
-LIV.getOrganizationPeopleDynamics = function (
-  organizationId
-) {
-
   const rows =
-    (
-      LIV.project.resources ||
-      []
-    )
-      .filter(
-        row =>
+    [
+      ...(
+        milestones ||
+        []
+      )
+    ]
+      .sort(
+        (
+          a,
+          b
+        ) =>
           String(
-            row.organizationId ||
+            a.contractDate ||
+            a.workDate ||
+            a.date ||
             ''
-          ) ===
-          String(
-            organizationId ||
-            ''
-          ) &&
-          row.date
+          )
+            .localeCompare(
+              String(
+                b.contractDate ||
+                b.workDate ||
+                b.date ||
+                ''
+              )
+            )
       );
 
 
-  const dates =
-    LIV.unique(
-      rows.map(
-        row =>
-          row.date
-      )
-    )
-      .sort();
+  container.innerHTML =
+    rows.length
+      ? rows
+          .map(
+            item => {
+
+              const targetDate =
+                item.contractDate ||
+                item.workDate ||
+                item.date ||
+                '';
 
 
-  return dates.map(
-    date => {
-
-      const dayRows =
-        rows.filter(
-          row =>
-            row.date ===
-            date
-        );
+              const late =
+                targetDate &&
+                !item.factDate &&
+                targetDate <
+                  today();
 
 
-      const itr =
-        dayRows.reduce(
-          (
-            total,
-            row
-          ) =>
-            total +
-            LIV.num(
-              row.itr
-            ),
-          0
-        );
+              return `
+                <div class="organization-milestone-item">
 
+                  <div>
 
-      const workers =
-        dayRows.reduce(
-          (
-            total,
-            row
-          ) =>
-            total +
-            LIV.num(
-              row.workers
-            ),
-          0
-        );
+                    <b>
+                      ${esc(
+                        item.title ||
+                        item.name ||
+                        'Ключевая дата'
+                      )}
+                    </b>
 
+                  </div>
 
-      const mechanizers =
-        dayRows.reduce(
-          (
-            total,
-            row
-          ) =>
-            total +
-            LIV.num(
-              row.mechanizers
-            ),
-          0
-        );
+                  <div
+                    class="${
+                      late
+                        ? 'danger-text'
+                        : 'muted'
+                    }">
 
+                    ${
+                      targetDate
+                        ? ruDate(
+                            targetDate
+                          )
+                        : 'дата не указана'
+                    }
 
-      return {
-        date,
+                    ${
+                      item.status
+                        ? ` · ${esc(
+                            item.status
+                          )}`
+                        : ''
+                    }
 
-        itr:
-          LIV.roundInt(
-            itr
-          ),
+                    ${
+                      late
+                        ? ' · просрочено'
+                        : ''
+                    }
 
-        workers:
-          LIV.roundInt(
-            workers
-          ),
+                  </div>
 
-        mechanizers:
-          LIV.roundInt(
-            mechanizers
-          ),
-
-        total:
-          LIV.roundInt(
-            itr +
-            workers +
-            mechanizers
+                </div>
+              `;
+            }
           )
-      };
-    }
-  );
-};
+          .join('')
+      : `
+          <div class="muted">
+            Ключевые даты пока не связаны
+            с этой организацией
+          </div>
+        `;
+}
 
 
 /* =========================================================
-   ГРАФИК ЛЮДЕЙ ОРГАНИЗАЦИИ
+   ДИНАМИКА ЧИСЛЕННОСТИ ОРГАНИЗАЦИИ
    ========================================================= */
 
-LIV.renderOrganizationPeopleChart = function (
+
+function renderOrganizationPeopleChart(
   organizationId
 ) {
 
   const canvas =
-    LIV.$(
-      'organizationPeopleChart'
-    );
+    $('organizationPeopleChart');
+
+
+  if (!canvas) {
+    return;
+  }
 
 
   if (
-    !canvas ||
+    organizationPeopleChart
+  ) {
+
+    try {
+
+      organizationPeopleChart
+        .destroy();
+
+    } catch (
+      error
+    ) {
+
+      console.warn(
+        error
+      );
+    }
+
+
+    organizationPeopleChart =
+      null;
+  }
+
+
+  if (
     typeof Chart ===
     'undefined'
   ) {
@@ -562,422 +943,254 @@ LIV.renderOrganizationPeopleChart = function (
   }
 
 
-  if (
-    LIV.organizations
-      .peopleChart
-  ) {
-    try {
-      LIV.organizations
-        .peopleChart
-        .destroy();
-    } catch (error) {
-      console.warn(error);
+  const rows =
+    (
+      project.resources ||
+      []
+    )
+      .filter(
+        row =>
+          String(
+            row.organizationId ||
+            ''
+          ) ===
+          String(
+            organizationId
+          )
+      );
+
+
+  const daily =
+    new Map();
+
+
+  rows.forEach(
+    row => {
+
+      if (
+        !row.date
+      ) {
+        return;
+      }
+
+
+      if (
+        !daily.has(
+          row.date
+        )
+      ) {
+
+        daily.set(
+          row.date,
+          {
+
+            itr:
+              0,
+
+            workers:
+              0,
+
+            mechanizers:
+              0
+          }
+        );
+      }
+
+
+      const item =
+        daily.get(
+          row.date
+        );
+
+
+      item.itr +=
+        num(
+          row.itr
+        );
+
+
+      item.workers +=
+        num(
+          row.workers
+        );
+
+
+      item.mechanizers +=
+        num(
+          row.mechanizers
+        );
     }
-  }
+  );
 
 
-  const dynamics =
-    LIV.getOrganizationPeopleDynamics(
-      organizationId
-    );
+  const dates =
+    [
+      ...daily.keys()
+    ]
+      .sort();
 
 
-  LIV.organizations
-    .peopleChart =
-      new Chart(
-        canvas,
-        {
-          type:
-            'line',
+  const values =
+    dates
+      .map(
+        date => {
 
-          data: {
-            labels:
-              dynamics.map(
-                item =>
-                  LIV.shortDate(
-                    item.date
-                  )
-              ),
+          const item =
+            daily.get(
+              date
+            );
 
-            datasets: [
-              {
-                label:
-                  'ИТР',
 
-                data:
-                  dynamics.map(
-                    item =>
-                      item.itr
-                  ),
+          return roundInt(
+            item.itr +
+            item.workers +
+            item.mechanizers
+          );
+        }
+      );
 
-                borderWidth:
-                  2,
 
-                tension:
-                  0.15
-              },
+  organizationPeopleChart =
+    new Chart(
+      canvas,
+      {
 
-              {
-                label:
-                  'Рабочие',
+        type:
+          'line',
 
-                data:
-                  dynamics.map(
-                    item =>
-                      item.workers
-                  ),
+        data: {
 
-                borderWidth:
-                  2,
+          labels:
+            dates.map(
+              shortDate
+            ),
 
-                tension:
-                  0.15
-              },
+          datasets: [
 
-              {
-                label:
-                  'Механизаторы',
+            {
+              label:
+                'Общая численность',
 
-                data:
-                  dynamics.map(
-                    item =>
-                      item.mechanizers
-                  ),
+              data:
+                values,
 
-                borderWidth:
-                  2,
+              borderWidth:
+                2,
 
-                tension:
-                  0.15
-              }
-            ]
+              tension:
+                0.15,
+
+              spanGaps:
+                false,
+
+              pointRadius:
+                dates.length >
+                  60
+                  ? 0
+                  : 2
+            }
+          ]
+        },
+
+        options: {
+
+          responsive:
+            true,
+
+          maintainAspectRatio:
+            false,
+
+          interaction: {
+
+            mode:
+              'index',
+
+            intersect:
+              false
           },
 
-          options: {
-            responsive:
-              true,
+          scales: {
 
-            interaction: {
-              mode:
-                'index',
+            x: {
 
-              intersect:
-                false
-            },
+              ticks: {
 
-            scales: {
-              y: {
-                beginAtZero:
+                maxRotation:
+                  0,
+
+                autoSkip:
                   true,
 
-                ticks: {
-                  precision:
-                    0
-                }
+                maxTicksLimit:
+                  14
               }
+            },
+
+            y: {
+
+              beginAtZero:
+                true,
+
+              ticks: {
+
+                precision:
+                  0
+              }
+            }
+          },
+
+          plugins: {
+
+            legend: {
+
+              display:
+                false
             }
           }
         }
-      );
-};
+      }
+    );
+}
 
 
 /* =========================================================
-   ОТРИСОВКА КАРТОЧКИ ОРГАНИЗАЦИИ
+   ОБНОВЛЕНИЕ КАРТОЧКИ ПОСЛЕ ИЗМЕНЕНИЙ
    ========================================================= */
 
-LIV.renderOrganizationCard = function () {
 
-  const organization =
-    LIV.getSelectedOrganization();
+function refreshOrganizationCard() {
+
+  const select =
+    $('organizationCardSelect');
 
 
-  if (!organization) {
-
-    if (
-      LIV.$(
-        'organizationCard'
-      )
-    ) {
-      LIV.$(
-        'organizationCard'
-      ).innerHTML = `
-        <div class="card">
-          Нет организаций для отображения.
-        </div>
-      `;
-    }
-
+  if (!select) {
     return;
   }
 
 
-  const organizationId =
-    organization.id;
+  const current =
+    select.value;
 
 
-  const resources =
-    LIV.getOrganizationCurrentResources(
-      organizationId
-    );
-
-
-  const fronts =
-    LIV.getOrganizationFronts(
-      organizationId
-    );
-
-
-  const milestones =
-    LIV.getOrganizationMilestones(
-      organizationId
-    );
-
-
-  const works =
-    LIV.getOrganizationWorks(
-      organizationId
-    );
+  initOrganizationCard();
 
 
   if (
-    LIV.$(
-      'organizationCardName'
-    )
-  ) {
-    LIV.$(
-      'organizationCardName'
-    ).textContent =
-      organization.name ||
-      'Организация';
-  }
-
-
-  if (
-    LIV.$(
-      'organizationPeople'
-    )
-  ) {
-    LIV.$(
-      'organizationPeople'
-    ).textContent =
-      resources.people;
-  }
-
-
-  if (
-    LIV.$(
-      'organizationEquipment'
-    )
-  ) {
-    LIV.$(
-      'organizationEquipment'
-    ).textContent =
-      resources.equipment;
-  }
-
-
-  if (
-    LIV.$(
-      'organizationFronts'
-    )
-  ) {
-    LIV.$(
-      'organizationFronts'
-    ).textContent =
-      fronts.length;
-  }
-
-
-  if (
-    LIV.$(
-      'organizationMilestones'
-    )
-  ) {
-    LIV.$(
-      'organizationMilestones'
-    ).textContent =
-      milestones.length;
-  }
-
-
-  if (
-    LIV.$(
-      'organizationWorks'
-    )
+    current &&
+    [
+      ...select.options
+    ]
+      .some(
+        option =>
+          option.value ===
+          current
+      )
   ) {
 
-    if (!works.length) {
-      LIV.$(
-        'organizationWorks'
-      ).innerHTML = `
-        <div class="muted">
-          Связанные работы пока не найдены.
-        </div>
-      `;
-    } else {
-      LIV.$(
-        'organizationWorks'
-      ).innerHTML =
-        works
-          .map(
-            work => `
-              <div class="organization-work-item">
+    select.value =
+      current;
 
-                <strong>
-                  ${LIV.esc(
-                    work.name
-                  )}
-                </strong>
-
-                <div class="muted">
-                  Фронтов: ${work.frontCount}
-                </div>
-
-              </div>
-            `
-          )
-          .join('');
-    }
+    renderOrganizationCard();
   }
-
-
-  if (
-    LIV.$(
-      'organizationMilestoneList'
-    )
-  ) {
-
-    const sortedMilestones =
-      [...milestones]
-        .sort(
-          (
-            a,
-            b
-          ) =>
-            String(
-              a.date ||
-              a.planDate ||
-              a.deadline ||
-              ''
-            )
-              .localeCompare(
-                String(
-                  b.date ||
-                  b.planDate ||
-                  b.deadline ||
-                  ''
-                )
-              )
-        );
-
-
-    if (
-      !sortedMilestones.length
-    ) {
-      LIV.$(
-        'organizationMilestoneList'
-      ).innerHTML = `
-        <div class="muted">
-          Связанные ключевые даты пока не найдены.
-        </div>
-      `;
-    } else {
-
-      LIV.$(
-        'organizationMilestoneList'
-      ).innerHTML =
-        sortedMilestones
-          .map(
-            milestone => {
-
-              const date =
-                milestone.date ||
-                milestone.planDate ||
-                milestone.deadline ||
-                '';
-
-
-              const name =
-                milestone.name ||
-                milestone.title ||
-                milestone.description ||
-                'Ключевая дата';
-
-
-              const status =
-                milestone.status ||
-                '';
-
-
-              return `
-                <div class="organization-milestone-item">
-
-                  <strong>
-                    ${LIV.esc(name)}
-                  </strong>
-
-                  <div class="muted">
-                    ${
-                      date
-                        ? LIV.ruDate(
-                            date
-                          )
-                        : 'Дата не указана'
-                    }
-                    ${
-                      status
-                        ? ` · ${LIV.esc(status)}`
-                        : ''
-                    }
-                  </div>
-
-                </div>
-              `;
-            }
-          )
-          .join('');
-    }
-  }
-
-
-  LIV.renderOrganizationPeopleChart(
-    organizationId
-  );
-};
-
-
-/* =========================================================
-   ОБЩАЯ ОТРИСОВКА МОДУЛЯ
-   ========================================================= */
-
-LIV.renderOrganizations = function () {
-
-  LIV.renderOrganizationSelect();
-
-  LIV.renderOrganizationCard();
-};
-
-
-/* =========================================================
-   СОБЫТИЯ
-   ========================================================= */
-
-LIV.bindOrganizationEvents = function () {
-
-  LIV.$(
-    'organizationCardSelect'
-  )
-    ?.addEventListener(
-      'change',
-      function () {
-
-        LIV.organizations
-          .selectedOrganizationId =
-            this.value;
-
-
-        LIV.renderOrganizationCard();
-      }
-    );
-};
+}

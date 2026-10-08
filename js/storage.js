@@ -2,262 +2,1481 @@
 
 /* =========================================================
    LIV PLANNING
-   Работа с IndexedDB
+   STORAGE
+   Резервные копии, восстановление и сравнение проектов
    ========================================================= */
 
 
 /* =========================================================
-   ОТКРЫТИЕ БАЗЫ ДАННЫХ
+   ПАНЕЛЬ РЕЗЕРВНОЙ КОПИИ
    ========================================================= */
 
-LIV.openDb = function () {
-  return new Promise((resolve, reject) => {
 
-    const request = indexedDB.open(
-      LIV.DB_NAME,
-      LIV.DB_VERSION
-    );
+function renderBackupNotice() {
+
+  const notice =
+    $('backupNotice');
 
 
-    request.onupgradeneeded = event => {
-      const database =
-        event.target.result;
-
-      if (
-        !database.objectStoreNames.contains(
-          LIV.STORE
-        )
-      ) {
-        database.createObjectStore(
-          LIV.STORE
-        );
-      }
-    };
-
-
-    request.onsuccess = event => {
-      resolve(
-        event.target.result
-      );
-    };
-
-
-    request.onerror = () => {
-      reject(
-        request.error
-      );
-    };
-  });
-};
-
-
-/* =========================================================
-   ЧТЕНИЕ ИЗ БАЗЫ
-   ========================================================= */
-
-LIV.dbGet = function (
-  key = LIV.PROJECT_KEY
-) {
-  return new Promise((resolve, reject) => {
-
-    const transaction =
-      LIV.db.transaction(
-        LIV.STORE,
-        'readonly'
-      );
-
-
-    const request =
-      transaction
-        .objectStore(
-          LIV.STORE
-        )
-        .get(key);
-
-
-    request.onsuccess = () => {
-      resolve(
-        request.result || null
-      );
-    };
-
-
-    request.onerror = () => {
-      reject(
-        request.error
-      );
-    };
-  });
-};
-
-
-/* =========================================================
-   ЗАПИСЬ В БАЗУ
-   ========================================================= */
-
-LIV.dbPut = function (
-  value,
-  key = LIV.PROJECT_KEY
-) {
-  return new Promise((resolve, reject) => {
-
-    const transaction =
-      LIV.db.transaction(
-        LIV.STORE,
-        'readwrite'
-      );
-
-
-    transaction
-      .objectStore(
-        LIV.STORE
-      )
-      .put(
-        value,
-        key
-      );
-
-
-    transaction.oncomplete = () => {
-      resolve();
-    };
-
-
-    transaction.onerror = () => {
-      reject(
-        transaction.error
-      );
-    };
-  });
-};
-
-
-/* =========================================================
-   СОХРАНЕНИЕ ПРОЕКТА
-   ========================================================= */
-
-LIV.saveProject = async function () {
-
-  if (!LIV.project) {
+  if (!notice) {
     return;
   }
 
 
-  LIV.project.meta =
-    LIV.project.meta || {};
-
-
-  LIV.project.meta.updatedAt =
-    LIV.nowIso();
-
-
-  LIV.project.schemaVersion =
-    LIV.SCHEMA_VERSION;
-
-
-  await LIV.dbPut(
-    LIV.project,
-    LIV.PROJECT_KEY
+  notice.classList.remove(
+    'hidden'
   );
-};
 
 
-/* =========================================================
-   ЗАГРУЗКА ПРОЕКТА
-   ========================================================= */
-
-LIV.loadProject = async function () {
-
-  LIV.db =
-    await LIV.openDb();
+  const last =
+    project?.meta
+      ?.lastBackupAt;
 
 
-  const raw =
-    await LIV.dbGet(
-      LIV.PROJECT_KEY
-    );
+  if (!last) {
 
-
-  if (!raw) {
-
-    LIV.project =
-      LIV.emptyProject();
-
-
-    await LIV.saveProject();
+    notice.textContent =
+      'Резервная копия проекта еще не создавалась.';
 
     return;
   }
 
 
-  /* -------------------------------------------------------
-     Если структура проекта старая —
-     сначала создаем резервную копию
-     ------------------------------------------------------- */
+  const parsed =
+    Date.parse(
+      last
+    );
+
+
+  const days =
+    Number.isFinite(
+      parsed
+    )
+      ? Math.floor(
+          (
+            Date.now() -
+            parsed
+          ) /
+          86400000
+        )
+      : 0;
+
+
+  const dateText =
+    Number.isFinite(
+      parsed
+    )
+      ? new Date(
+          parsed
+        )
+          .toLocaleString(
+            'ru-RU'
+          )
+      : 'дата неизвестна';
+
+
+  notice.textContent =
+    `Последняя резервная копия: ${dateText}` +
+    (
+      days >=
+        7
+        ? ' · рекомендуется создать новую копию'
+        : ''
+    );
+}
+
+
+/* =========================================================
+   ИМЯ ФАЙЛА РЕЗЕРВНОЙ КОПИИ
+   ========================================================= */
+
+
+function backupFileName() {
+
+  const stamp =
+    new Date()
+      .toISOString()
+      .slice(
+        0,
+        16
+      )
+      .replace(
+        'T',
+        '_'
+      )
+      .replace(
+        ':',
+        '-'
+      );
+
+
+  return (
+    `LIV_Planning_${stamp}.json`
+  );
+}
+
+
+/* =========================================================
+   ВЫГРУЗКА ПОЛНОЙ РЕЗЕРВНОЙ КОПИИ
+   ========================================================= */
+
+
+async function exportBackup() {
+
+  if (!project) {
+    return;
+  }
+
+
+  project.meta =
+    project.meta ||
+    {};
+
+
+  project.meta.lastBackupAt =
+    nowIso();
+
+
+  await saveProject();
+
+
+  const payload = {
+
+    ...clone(
+      project
+    ),
+
+    exportedAt:
+      nowIso(),
+
+    source:
+      'LIV Planning',
+
+    format:
+      'liv-planning-backup',
+
+    schemaVersion:
+      SCHEMA_VERSION
+  };
+
+
+  download(
+    backupFileName(),
+
+    JSON.stringify(
+      payload,
+      null,
+      2
+    ),
+
+    'application/json'
+  );
+
+
+  renderBackupNotice();
+}
+
+
+/* =========================================================
+   ПРОВЕРКА JSON ПЕРЕД ВОССТАНОВЛЕНИЕМ
+   ========================================================= */
+
+
+function validateBackupPayload(
+  value
+) {
 
   if (
-    raw.schemaVersion !==
-    LIV.SCHEMA_VERSION
+    !value ||
+    typeof value !==
+      'object' ||
+    Array.isArray(
+      value
+    )
   ) {
 
-    const backupKey =
-      `migration-backup-${Date.now()}`;
-
-
-    await LIV.dbPut(
-      LIV.clone(raw),
-      backupKey
+    throw new Error(
+      'Файл не содержит корректный проект LIV Planning.'
     );
   }
 
 
-  /* -------------------------------------------------------
-     Нормализуем старый проект
-     без удаления существующих данных
-     ------------------------------------------------------- */
+  const usefulCollections = [
+    'fronts',
+    'resources',
+    'milestones',
+    'buildings',
+    'works',
+    'organizations'
+  ];
 
-  LIV.project =
-    LIV.normalizeProject(
-      raw
+
+  const hasProjectData =
+    usefulCollections
+      .some(
+        key =>
+          Array.isArray(
+            value[
+              key
+            ]
+          )
+      );
+
+
+  if (
+    !hasProjectData
+  ) {
+
+    throw new Error(
+      'В файле не найдена структура проекта.'
     );
+  }
 
 
-  await LIV.saveProject();
-};
+  return true;
+}
 
 
 /* =========================================================
-   СОЗДАНИЕ РЕЗЕРВНОЙ КОПИИ В INDEXEDDB
+   ВОССТАНОВЛЕНИЕ ПРОЕКТА
    ========================================================= */
 
-LIV.createLocalBackup =
-  async function (
-    prefix = 'backup'
-  ) {
 
-    if (!LIV.project) {
-      return null;
+async function restoreProject(
+  file
+) {
+
+  if (!file) {
+    return;
+  }
+
+
+  try {
+
+    const text =
+      await file.text();
+
+
+    const parsed =
+      JSON.parse(
+        text
+      );
+
+
+    validateBackupPayload(
+      parsed
+    );
+
+
+    const data =
+      normalizeProject(
+        parsed
+      );
+
+
+    const currentFronts =
+      (
+        project?.fronts ||
+        []
+      )
+        .length;
+
+
+    const currentResources =
+      (
+        project?.resources ||
+        []
+      )
+        .length;
+
+
+    const incomingFronts =
+      (
+        data.fronts ||
+        []
+      )
+        .length;
+
+
+    const incomingResources =
+      (
+        data.resources ||
+        []
+      )
+        .length;
+
+
+    const confirmed =
+      confirm(
+        'Заменить текущий проект данными из резервной копии?\n\n' +
+
+        `Файл: ${file.name}\n\n` +
+
+        `Текущий проект:\n` +
+        `Фронтов: ${currentFronts}\n` +
+        `Записей ресурсов: ${currentResources}\n\n` +
+
+        `Загружаемый проект:\n` +
+        `Фронтов: ${incomingFronts}\n` +
+        `Записей ресурсов: ${incomingResources}\n\n` +
+
+        'Перед заменой текущая база будет сохранена локально.'
+      );
+
+
+    if (
+      !confirmed
+    ) {
+
+      return;
     }
 
 
-    const key =
-      `${prefix}-${Date.now()}`;
+    const safetyKey =
+      `restore-backup-${Date.now()}`;
 
 
-    await LIV.dbPut(
-      LIV.clone(
-        LIV.project
+    await dbPutKey(
+      clone(
+        project
       ),
-      key
+      safetyKey
     );
 
 
-    LIV.project.meta.lastBackupAt =
-      LIV.nowIso();
+    project =
+      data;
 
 
-    await LIV.saveProject();
+    project.meta =
+      project.meta ||
+      {};
 
 
-    return key;
+    project.meta.restoredAt =
+      nowIso();
+
+
+    project.meta.restoredFrom =
+      file.name;
+
+
+    log(
+      'Восстановлено',
+      'Проект',
+      `Загружена резервная копия ${file.name}`,
+      {
+        safetyKey
+      }
+    );
+
+
+    await saveProject();
+
+
+    if (
+      typeof initSelects ===
+      'function'
+    ) {
+
+      initSelects();
+    }
+
+
+    if (
+      typeof resetMultiFilter ===
+      'function'
+    ) {
+
+      [
+        'rOrg',
+        'rBuilding',
+        'rWork',
+        'rFront'
+      ]
+        .forEach(
+          id => {
+
+            resetMultiFilter(
+              id,
+              false
+            );
+          }
+        );
+    }
+
+
+    if (
+      typeof refreshAllMultiFilters ===
+      'function'
+    ) {
+
+      refreshAllMultiFilters();
+    }
+
+
+    renderAll();
+
+
+    alert(
+      'Проект восстановлен из резервной копии.'
+    );
+
+  } catch (
+    error
+  ) {
+
+    console.error(
+      error
+    );
+
+
+    alert(
+      'Ошибка загрузки резервной копии:\n' +
+      (
+        error?.message ||
+        String(
+          error
+        )
+      )
+    );
+
+  } finally {
+
+    if (
+      $('restoreInput')
+    ) {
+
+      $('restoreInput').value =
+        '';
+    }
+  }
+}
+
+
+/* =========================================================
+   СРАВНЕНИЕ МАССИВОВ
+   ========================================================= */
+
+
+function compareCollections(
+  current,
+  incoming
+) {
+
+  const currentMap =
+    new Map(
+      (
+        current ||
+        []
+      )
+        .filter(
+          item =>
+            item &&
+            item.id !==
+              undefined
+        )
+        .map(
+          item => [
+
+            String(
+              item.id
+            ),
+
+            item
+          ]
+        )
+    );
+
+
+  const incomingMap =
+    new Map(
+      (
+        incoming ||
+        []
+      )
+        .filter(
+          item =>
+            item &&
+            item.id !==
+              undefined
+        )
+        .map(
+          item => [
+
+            String(
+              item.id
+            ),
+
+            item
+          ]
+        )
+    );
+
+
+  const added =
+    [];
+
+
+  const changed =
+    [];
+
+
+  const missing =
+    [];
+
+
+  for (
+    const [
+      id,
+      row
+    ]
+    of incomingMap
+  ) {
+
+    if (
+      !currentMap.has(
+        id
+      )
+    ) {
+
+      added.push(
+        row
+      );
+
+      continue;
+    }
+
+
+    const currentRow =
+      currentMap.get(
+        id
+      );
+
+
+    if (
+      JSON.stringify(
+        currentRow
+      ) !==
+      JSON.stringify(
+        row
+      )
+    ) {
+
+      changed.push({
+
+        before:
+          currentRow,
+
+        after:
+          row
+      });
+    }
+  }
+
+
+  for (
+    const [
+      id,
+      row
+    ]
+    of currentMap
+  ) {
+
+    if (
+      !incomingMap.has(
+        id
+      )
+    ) {
+
+      missing.push(
+        row
+      );
+    }
+  }
+
+
+  return {
+
+    added,
+
+    changed,
+
+    missing
   };
+}
+
+
+/* =========================================================
+   КОЛЛЕКЦИИ ДЛЯ СРАВНЕНИЯ
+   ========================================================= */
+
+
+const COMPARE_COLLECTIONS = [
+
+  [
+    'buildings',
+    'Здания'
+  ],
+
+  [
+    'organizations',
+    'Организации'
+  ],
+
+  [
+    'works',
+    'Виды работ'
+  ],
+
+  [
+    'structures',
+    'Структура объекта'
+  ],
+
+  [
+    'fronts',
+    'Фронты'
+  ],
+
+  [
+    'planLog',
+    'План'
+  ],
+
+  [
+    'factLog',
+    'Факт'
+  ],
+
+  [
+    'resources',
+    'Ресурсы'
+  ],
+
+  [
+    'resourcePlans',
+    'Планы ресурсов'
+  ],
+
+  [
+    'milestones',
+    'Ключевые даты'
+  ],
+
+  [
+    'numberedElements',
+    'Номерные элементы'
+  ],
+
+  [
+    'contracts',
+    'Договоры'
+  ],
+
+  [
+    'constraints',
+    'Ограничения'
+  ],
+
+  [
+    'demolition',
+    'Демонтаж'
+  ],
+
+  [
+    'diagrams',
+    'Схемы'
+  ],
+
+  [
+    'diagramMarks',
+    'Отметки на схемах'
+  ],
+
+  [
+    'scheduleVersions',
+    'Версии графика'
+  ],
+
+  [
+    'views',
+    'Сохраненные представления'
+  ]
+];
+
+
+/* =========================================================
+   ТЕКСТ ДЛЯ ЭЛЕМЕНТА СРАВНЕНИЯ
+   ========================================================= */
+
+
+function compareItemLabel(
+  item
+) {
+
+  const row =
+    item.after ||
+    item.before ||
+    {};
+
+
+  if (
+    item.key ===
+    'organizations'
+  ) {
+
+    return (
+      row.name ||
+      row.id ||
+      'Организация'
+    );
+  }
+
+
+  if (
+    item.key ===
+    'buildings'
+  ) {
+
+    return (
+      row.name ||
+      row.id ||
+      'Здание'
+    );
+  }
+
+
+  if (
+    item.key ===
+    'works'
+  ) {
+
+    return (
+      row.name ||
+      row.id ||
+      'Работа'
+    );
+  }
+
+
+  if (
+    item.key ===
+    'milestones'
+  ) {
+
+    return (
+      row.title ||
+      row.name ||
+      row.id ||
+      'Ключевая дата'
+    );
+  }
+
+
+  if (
+    item.key ===
+    'resources'
+  ) {
+
+    const organization =
+      nameById(
+        project.organizations,
+        row.organizationId
+      ) ||
+      'Без организации';
+
+
+    return (
+      `${row.date || 'без даты'} · ${organization}`
+    );
+  }
+
+
+  if (
+    item.key ===
+    'fronts'
+  ) {
+
+    try {
+
+      return (
+        frontLabel(
+          row
+        ) ||
+        row.id
+      );
+
+    } catch (
+      error
+    ) {
+
+      return (
+        row.id ||
+        'Фронт'
+      );
+    }
+  }
+
+
+  return (
+    row.name ||
+    row.title ||
+    row.id ||
+    item.label
+  );
+}
+
+
+/* =========================================================
+   СРАВНЕНИЕ ФАЙЛА С ТЕКУЩЕЙ БАЗОЙ
+   ========================================================= */
+
+
+async function compareProjectFile(
+  file
+) {
+
+  if (!file) {
+    return;
+  }
+
+
+  try {
+
+    const parsed =
+      JSON.parse(
+        await file.text()
+      );
+
+
+    validateBackupPayload(
+      parsed
+    );
+
+
+    compareIncoming =
+      normalizeProject(
+        parsed
+      );
+
+
+    compareItems =
+      [];
+
+
+    let totalMissing =
+      0;
+
+
+    COMPARE_COLLECTIONS
+      .forEach(
+        (
+          [
+            key,
+            label
+          ]
+        ) => {
+
+          const result =
+            compareCollections(
+              project[
+                key
+              ],
+              compareIncoming[
+                key
+              ]
+            );
+
+
+          result.added
+            .forEach(
+              row => {
+
+                compareItems.push({
+
+                  token:
+                    uid(
+                      'CMP'
+                    ),
+
+                  key,
+
+                  label,
+
+                  type:
+                    'added',
+
+                  id:
+                    row.id,
+
+                  after:
+                    row
+                });
+              }
+            );
+
+
+          result.changed
+            .forEach(
+              pair => {
+
+                compareItems.push({
+
+                  token:
+                    uid(
+                      'CMP'
+                    ),
+
+                  key,
+
+                  label,
+
+                  type:
+                    'changed',
+
+                  id:
+                    pair.after.id,
+
+                  before:
+                    pair.before,
+
+                  after:
+                    pair.after
+                });
+              }
+            );
+
+
+          totalMissing +=
+            result.missing
+              .length;
+        }
+      );
+
+
+    const addedCount =
+      compareItems
+        .filter(
+          item =>
+            item.type ===
+            'added'
+        )
+        .length;
+
+
+    const changedCount =
+      compareItems
+        .filter(
+          item =>
+            item.type ===
+            'changed'
+        )
+        .length;
+
+
+    openModal(
+      'Сравнение проекта',
+
+      `
+        <div class="compare-summary">
+
+          <div class="compare-box">
+
+            <div class="muted">
+              Новых
+            </div>
+
+            <strong>
+              ${addedCount}
+            </strong>
+
+          </div>
+
+
+          <div class="compare-box">
+
+            <div class="muted">
+              Измененных
+            </div>
+
+            <strong>
+              ${changedCount}
+            </strong>
+
+          </div>
+
+
+          <div class="compare-box">
+
+            <div class="muted">
+              Отсутствуют в файле
+            </div>
+
+            <strong>
+              ${totalMissing}
+            </strong>
+
+          </div>
+
+        </div>
+
+
+        <div class="notice">
+
+          Сравнение не меняет рабочую базу.
+
+          Можно принять только выбранные
+          новые/измененные записи
+          либо заменить проект целиком.
+
+          Записи, которые отсутствуют
+          в загружаемом файле,
+          автоматически не удаляются.
+
+        </div>
+
+
+        <div class="compare-details">
+
+          ${
+            compareItems.length
+              ? compareItems
+                  .slice(
+                    0,
+                    1000
+                  )
+                  .map(
+                    item => `
+                      <div class="compare-record">
+
+                        <label>
+
+                          <input
+                            type="checkbox"
+                            data-cmp="${esc(
+                              item.token
+                            )}"
+                            checked
+                          >
+
+                          <span>
+
+                            <b>
+
+                              ${
+                                item.type ===
+                                  'added'
+                                  ? 'НОВОЕ'
+                                  : 'ИЗМЕНЕНО'
+                              }
+
+                              ·
+
+                              ${esc(
+                                item.label
+                              )}
+
+                            </b>
+
+                          </span>
+
+                        </label>
+
+
+                        <small>
+
+                          ${esc(
+                            compareItemLabel(
+                              item
+                            )
+                          )}
+
+                        </small>
+
+                      </div>
+                    `
+                  )
+                  .join('')
+              : `
+                  <div class="empty-state">
+
+                    <strong>
+                      Различий нет
+                    </strong>
+
+                    Выбранные версии проекта
+                    совпадают по рабочим данным.
+
+                  </div>
+                `
+          }
+
+        </div>
+
+
+        <div class="editor-actions">
+
+          <button
+            id="acceptSelectedCompare"
+            class="btn primary"
+            ${
+              compareItems.length
+                ? ''
+                : 'disabled'
+            }>
+            Принять отмеченные
+          </button>
+
+
+          <button
+            id="replaceCompare"
+            class="btn danger">
+            Заменить проект целиком
+          </button>
+
+        </div>
+      `
+    );
+
+
+    if (
+      $('acceptSelectedCompare')
+    ) {
+
+      $('acceptSelectedCompare')
+        .onclick =
+          acceptSelectedCompared;
+    }
+
+
+    if (
+      $('replaceCompare')
+    ) {
+
+      $('replaceCompare')
+        .onclick =
+          replaceCompared;
+    }
+
+  } catch (
+    error
+  ) {
+
+    console.error(
+      error
+    );
+
+
+    alert(
+      'Ошибка сравнения проектов:\n' +
+      (
+        error?.message ||
+        String(
+          error
+        )
+      )
+    );
+
+  } finally {
+
+    if (
+      $('compareInput')
+    ) {
+
+      $('compareInput').value =
+        '';
+    }
+  }
+}
+
+
+/* =========================================================
+   ПРИМЕНИТЬ ВЫБРАННЫЕ ИЗМЕНЕНИЯ
+   ========================================================= */
+
+
+async function acceptSelectedCompared() {
+
+  if (
+    !compareIncoming
+  ) {
+    return;
+  }
+
+
+  const selected =
+    new Set(
+      [
+        ...document
+          .querySelectorAll(
+            '[data-cmp]:checked'
+          )
+      ]
+        .map(
+          checkbox =>
+            checkbox.dataset
+              .cmp
+        )
+    );
+
+
+  const chosen =
+    compareItems
+      .filter(
+        item =>
+          selected.has(
+            item.token
+          )
+      );
+
+
+  if (
+    !chosen.length
+  ) {
+
+    alert(
+      'Ничего не выбрано.'
+    );
+
+    return;
+  }
+
+
+  if (
+    !confirm(
+      `Применить выбранные изменения: ${chosen.length}? Перед применением будет создана защитная копия.`
+    )
+  ) {
+
+    return;
+  }
+
+
+  const safetyKey =
+    `compare-merge-backup-${Date.now()}`;
+
+
+  await dbPutKey(
+    clone(
+      project
+    ),
+    safetyKey
+  );
+
+
+  chosen.forEach(
+    item => {
+
+      if (
+        !Array.isArray(
+          project[
+            item.key
+          ]
+        )
+      ) {
+
+        project[
+          item.key
+        ] =
+          [];
+      }
+
+
+      const list =
+        project[
+          item.key
+        ];
+
+
+      const index =
+        list.findIndex(
+          row =>
+            String(
+              row.id
+            ) ===
+            String(
+              item.id
+            )
+        );
+
+
+      if (
+        index >=
+        0
+      ) {
+
+        list[
+          index
+        ] =
+          clone(
+            item.after
+          );
+
+      } else {
+
+        list.push(
+          clone(
+            item.after
+          )
+        );
+      }
+    }
+  );
+
+
+  log(
+    'Сравнение',
+    'Проект',
+    `Принято изменений: ${chosen.length}`,
+    {
+      safetyKey
+    }
+  );
+
+
+  await saveProject();
+
+
+  compareIncoming =
+    null;
+
+
+  compareItems =
+    [];
+
+
+  closeModal();
+
+
+  if (
+    typeof initSelects ===
+    'function'
+  ) {
+
+    initSelects();
+  }
+
+
+  if (
+    typeof refreshAllMultiFilters ===
+    'function'
+  ) {
+
+    refreshAllMultiFilters();
+  }
+
+
+  renderAll();
+}
+
+
+/* =========================================================
+   ПОЛНАЯ ЗАМЕНА СРАВНИВАЕМОЙ ВЕРСИЕЙ
+   ========================================================= */
+
+
+async function replaceCompared() {
+
+  if (
+    !compareIncoming
+  ) {
+    return;
+  }
+
+
+  if (
+    !confirm(
+      'Полностью заменить текущий проект сравниваемой версией?\n\nПеред заменой текущая база будет сохранена локально.'
+    )
+  ) {
+
+    return;
+  }
+
+
+  const safetyKey =
+    `compare-replace-backup-${Date.now()}`;
+
+
+  await dbPutKey(
+    clone(
+      project
+    ),
+    safetyKey
+  );
+
+
+  project =
+    normalizeProject(
+      compareIncoming
+    );
+
+
+  log(
+    'Заменено',
+    'Проект',
+    'Применена сравниваемая версия проекта целиком.',
+    {
+      safetyKey
+    }
+  );
+
+
+  await saveProject();
+
+
+  compareIncoming =
+    null;
+
+
+  compareItems =
+    [];
+
+
+  closeModal();
+
+
+  if (
+    typeof initSelects ===
+    'function'
+  ) {
+
+    initSelects();
+  }
+
+
+  if (
+    typeof resetMultiFilter ===
+    'function'
+  ) {
+
+    [
+      'rOrg',
+      'rBuilding',
+      'rWork',
+      'rFront'
+    ]
+      .forEach(
+        id => {
+
+          resetMultiFilter(
+            id,
+            false
+          );
+        }
+      );
+  }
+
+
+  if (
+    typeof refreshAllMultiFilters ===
+    'function'
+  ) {
+
+    refreshAllMultiFilters();
+  }
+
+
+  renderAll();
+}
