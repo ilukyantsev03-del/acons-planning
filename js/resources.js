@@ -8,66 +8,290 @@ let livResourceView = 'journal';
 let livResourceCharts = [];
 let livResourcePlanFactChart = null;
 let livResourceSelectedIds = new Set();
+
 let livResourceColumns = [
-  'date','organization','building','work','front',
-  'itr','workers','mechanizers','equipmentType','equipmentQty','comment'
+  'date',
+  'organization',
+  'building',
+  'work',
+  'front',
+  'itr',
+  'workers',
+  'mechanizers',
+  'equipmentType',
+  'equipmentQty',
+  'comment'
 ];
 
+
 const LIV_RESOURCE_COLUMN_LABELS = {
-  date:'Дата',
-  organization:'Организация',
-  building:'Здание',
-  work:'Работа',
-  front:'Фронт',
-  itr:'ИТР',
-  workers:'Рабочие',
-  mechanizers:'Механизаторы',
-  equipmentType:'Наименование техники',
-  equipmentQty:'Количество техники',
-  comment:'Комментарий'
+
+  date:
+    'Дата',
+
+  organization:
+    'Организация',
+
+  building:
+    'Здание',
+
+  work:
+    'Работа',
+
+  front:
+    'Фронт',
+
+  itr:
+    'ИТР',
+
+  workers:
+    'Рабочие',
+
+  mechanizers:
+    'Механизаторы',
+
+  equipmentType:
+    'Наименование техники',
+
+  equipmentQty:
+    'Количество техники',
+
+  comment:
+    'Комментарий'
 };
 
-function resourceShowZero(){
-  return $('rShowZero')?.checked === true;
-}
 
-function resourceTotalPeople(row){
-  return (
-    num(row?.itr) +
-    num(row?.workers) +
-    num(row?.mechanizers)
-  );
-}
+/* =========================================================
+   ЕДИНЫЙ СТИЛЬ ТАБЛИЦ РЕСУРСОВ
+   ========================================================= */
 
-function resourceActivityTotal(rows){
-  return (rows || [])
-    .reduce(
-      (sum,row) =>
-        sum +
-        resourceTotalPeople(row) +
-        num(row.equipmentQty),
-      0
+
+function ensureResourceUiStyles() {
+
+  if (
+    document.getElementById(
+      'livResourceUiStyles'
+    )
+  ) {
+    return;
+  }
+
+
+  const style =
+    document.createElement(
+      'style'
     );
-}
 
-function hasOwn(
-  object,
-  key
-){
-  return Object.prototype.hasOwnProperty.call(
-    object,
-    key
+
+  style.id =
+    'livResourceUiStyles';
+
+
+  style.textContent = `
+
+    #tab-resources table th,
+    #tab-resources table td {
+      vertical-align: middle;
+    }
+
+
+    #tab-resources .num-cell,
+    #tab-resources .num-head {
+      text-align: center !important;
+      font-variant-numeric: tabular-nums;
+    }
+
+
+    #tab-resources .total-cell {
+      font-weight: 700;
+    }
+
+
+    #tab-resources tfoot th,
+    #tab-resources tfoot td {
+      font-weight: 700;
+      background: #f6f8fb;
+      border-top: 1.5px solid #cfd5df;
+    }
+
+
+    #tab-resources .resource-empty {
+      padding: 18px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+
+    #tab-resources .analytics-equipment-table {
+      table-layout: auto;
+    }
+
+
+    #tab-resources .analytics-equipment-table th:not(:first-child),
+    #tab-resources .analytics-equipment-table td:not(:first-child) {
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+
+    #tab-resources .analytics-equipment-table th:first-child,
+    #tab-resources .analytics-equipment-table td:first-child {
+      text-align: left;
+      min-width: 250px;
+    }
+
+  `;
+
+
+  document.head.appendChild(
+    style
   );
 }
 
 
 /* =========================================================
-   ФИЛЬТР
+   СОЗДАНИЕ FOOTER ДЛЯ ТАБЛИЦ
    ========================================================= */
 
+
+function ensureTableFoot(
+  tableBodyId,
+  footId
+) {
+
+  const body =
+    $(
+      tableBodyId
+    );
+
+
+  const table =
+    body
+      ?.closest(
+        'table'
+      );
+
+
+  if (
+    !table
+  ) {
+    return null;
+  }
+
+
+  let foot =
+    $(
+      footId
+    );
+
+
+  if (
+    !foot
+  ) {
+
+    foot =
+      document.createElement(
+        'tfoot'
+      );
+
+
+    foot.id =
+      footId;
+
+
+    table.appendChild(
+      foot
+    );
+  }
+
+
+  return foot;
+}
+
+
+/* =========================================================
+   БАЗОВЫЕ РАСЧЕТЫ
+   ========================================================= */
+
+
+function resourceShowZero() {
+
+  return (
+    $('rShowZero')
+      ?.checked ===
+    true
+  );
+}
+
+
+function resourceTotalPeople(
+  row
+) {
+
+  return (
+    num(
+      row?.itr
+    ) +
+
+    num(
+      row?.workers
+    ) +
+
+    num(
+      row?.mechanizers
+    )
+  );
+}
+
+
+function resourceActivityTotal(
+  rows
+) {
+
+  return (
+    rows ||
+    []
+  )
+    .reduce(
+      (
+        sum,
+        row
+      ) =>
+        sum +
+        resourceTotalPeople(
+          row
+        ) +
+        num(
+          row.equipmentQty
+        ),
+      0
+    );
+}
+
+
+function hasOwn(
+  object,
+  key
+) {
+
+  return Object.prototype
+    .hasOwnProperty
+    .call(
+      object,
+      key
+    );
+}
+
+
+/* =========================================================
+   ФИЛЬТРАЦИЯ
+   ========================================================= */
+
+
 function resourceFiltered(
-  options = {}
-){
+  options =
+    {}
+) {
 
   const from =
     hasOwn(
@@ -76,9 +300,11 @@ function resourceFiltered(
     )
       ? options.from
       : (
-          $('rFrom')?.value ||
+          $('rFrom')
+            ?.value ||
           ''
         );
+
 
   const to =
     hasOwn(
@@ -87,11 +313,13 @@ function resourceFiltered(
     )
       ? options.to
       : (
-          $('rTo')?.value ||
+          $('rTo')
+            ?.value ||
           ''
         );
 
-  const orgValues =
+
+  const organizationIds =
     hasOwn(
       options,
       'organizationIds'
@@ -101,7 +329,8 @@ function resourceFiltered(
           'rOrg'
         );
 
-  const buildingValues =
+
+  const buildingIds =
     hasOwn(
       options,
       'buildingIds'
@@ -111,7 +340,8 @@ function resourceFiltered(
           'rBuilding'
         );
 
-  const workValues =
+
+  const workIds =
     hasOwn(
       options,
       'workIds'
@@ -121,7 +351,8 @@ function resourceFiltered(
           'rWork'
         );
 
-  const frontValues =
+
+  const frontIds =
     hasOwn(
       options,
       'frontIds'
@@ -131,11 +362,13 @@ function resourceFiltered(
           'rFront'
         );
 
+
   const ignoreZeroFilter =
     options.ignoreZeroFilter ===
     true;
 
-  const match =
+
+  const matches =
     (
       values,
       value
@@ -148,6 +381,7 @@ function resourceFiltered(
         return true;
       }
 
+
       if (
         Array.isArray(
           values
@@ -157,6 +391,7 @@ function resourceFiltered(
       ) {
         return false;
       }
+
 
       return (
         Array.isArray(
@@ -187,6 +422,7 @@ function resourceFiltered(
           return false;
         }
 
+
         if (
           to &&
           row.date >
@@ -195,41 +431,46 @@ function resourceFiltered(
           return false;
         }
 
+
         if (
-          !match(
-            orgValues,
+          !matches(
+            organizationIds,
             row.organizationId
           )
         ) {
           return false;
         }
 
+
         if (
-          !match(
-            buildingValues,
+          !matches(
+            buildingIds,
             row.buildingId
           )
         ) {
           return false;
         }
 
+
         if (
-          !match(
-            workValues,
+          !matches(
+            workIds,
             row.workId
           )
         ) {
           return false;
         }
 
+
         if (
-          !match(
-            frontValues,
+          !matches(
+            frontIds,
             row.frontId
           )
         ) {
           return false;
         }
+
 
         if (
           !ignoreZeroFilter &&
@@ -244,6 +485,7 @@ function resourceFiltered(
           return false;
         }
 
+
         return true;
       }
     );
@@ -254,10 +496,11 @@ function resourceFiltered(
    ЖУРНАЛ
    ========================================================= */
 
+
 function resourceColumnValue(
   row,
   column
-){
+) {
 
   if (
     column ===
@@ -268,10 +511,12 @@ function resourceColumnValue(
     );
   }
 
+
   if (
     column ===
     'organization'
   ) {
+
     return (
       nameById(
         project.organizations,
@@ -281,10 +526,12 @@ function resourceColumnValue(
     );
   }
 
+
   if (
     column ===
     'building'
   ) {
+
     return (
       nameById(
         project.buildings,
@@ -294,10 +541,12 @@ function resourceColumnValue(
     );
   }
 
+
   if (
     column ===
     'work'
   ) {
+
     return (
       nameById(
         project.works,
@@ -306,6 +555,7 @@ function resourceColumnValue(
       '—'
     );
   }
+
 
   if (
     column ===
@@ -320,6 +570,7 @@ function resourceColumnValue(
           )
         : null;
 
+
     return (
       front
         ? frontLabel(
@@ -328,6 +579,7 @@ function resourceColumnValue(
         : '—'
     );
   }
+
 
   if (
     [
@@ -340,12 +592,14 @@ function resourceColumnValue(
         column
       )
   ) {
+
     return fmt(
       row[
         column
       ]
     );
   }
+
 
   return (
     row[
@@ -356,10 +610,11 @@ function resourceColumnValue(
 }
 
 
-function renderResourceColumnPanel(){
+function renderResourceColumnPanel() {
 
   const panel =
     $('resourceColumnsPanel');
+
 
   if (
     !panel
@@ -367,46 +622,49 @@ function renderResourceColumnPanel(){
     return;
   }
 
-  panel.innerHTML =
-    `
-      <div class="mapping-grid">
 
-        ${
-          Object.entries(
-            LIV_RESOURCE_COLUMN_LABELS
+  panel.innerHTML = `
+
+    <div class="mapping-grid">
+
+      ${
+        Object.entries(
+          LIV_RESOURCE_COLUMN_LABELS
+        )
+          .map(
+            (
+              [
+                key,
+                label
+              ]
+            ) => `
+
+              <label class="check-line">
+
+                <input
+                  type="checkbox"
+                  data-resource-column="${esc(key)}"
+                  ${
+                    livResourceColumns.includes(
+                      key
+                    )
+                      ? 'checked'
+                      : ''
+                  }
+                >
+
+                ${esc(label)}
+
+              </label>
+
+            `
           )
-            .map(
-              (
-                [
-                  key,
-                  label
-                ]
-              ) =>
-                `
-                  <label class="check-line">
+          .join('')
+      }
 
-                    <input
-                      type="checkbox"
-                      data-resource-column="${esc(key)}"
-                      ${
-                        livResourceColumns.includes(
-                          key
-                        )
-                          ? 'checked'
-                          : ''
-                      }
-                    >
+    </div>
+  `;
 
-                    ${esc(label)}
-
-                  </label>
-                `
-            )
-            .join('')
-        }
-
-      </div>
-    `;
 
   panel
     .querySelectorAll(
@@ -422,6 +680,7 @@ function renderResourceColumnPanel(){
               checkbox.dataset
                 .resourceColumn;
 
+
             if (
               checkbox.checked
             ) {
@@ -431,6 +690,7 @@ function renderResourceColumnPanel(){
                   key
                 )
               ) {
+
                 livResourceColumns.push(
                   key
                 );
@@ -447,6 +707,7 @@ function renderResourceColumnPanel(){
                   );
             }
 
+
             renderResourceJournal();
           };
       }
@@ -454,10 +715,14 @@ function renderResourceColumnPanel(){
 }
 
 
-function renderResourceJournal(){
+function renderResourceJournal() {
+
+  ensureResourceUiStyles();
+
 
   const rows =
     resourceFiltered();
+
 
   const sum =
     field =>
@@ -475,8 +740,10 @@ function renderResourceJournal(){
         0
       );
 
+
   const daily =
     {};
+
 
   rows.forEach(
     row => {
@@ -486,6 +753,7 @@ function renderResourceJournal(){
       ) {
         return;
       }
+
 
       daily[
         row.date
@@ -506,6 +774,7 @@ function renderResourceJournal(){
   if (
     $('rItr')
   ) {
+
     $('rItr').textContent =
       Math.round(
         sum(
@@ -514,9 +783,11 @@ function renderResourceJournal(){
       );
   }
 
+
   if (
     $('rWorkers')
   ) {
+
     $('rWorkers').textContent =
       Math.round(
         sum(
@@ -525,9 +796,11 @@ function renderResourceJournal(){
       );
   }
 
+
   if (
     $('rMech')
   ) {
+
     $('rMech').textContent =
       Math.round(
         sum(
@@ -536,9 +809,11 @@ function renderResourceJournal(){
       );
   }
 
+
   if (
     $('rTotalPeople')
   ) {
+
     $('rTotalPeople').textContent =
       Math.round(
         sum(
@@ -553,9 +828,11 @@ function renderResourceJournal(){
       );
   }
 
+
   if (
     $('rPeak')
   ) {
+
     $('rPeak').textContent =
       Math.round(
         Math.max(
@@ -567,9 +844,11 @@ function renderResourceJournal(){
       );
   }
 
+
   if (
     $('rEquipDays')
   ) {
+
     $('rEquipDays').textContent =
       Math.round(
         sum(
@@ -588,6 +867,7 @@ function renderResourceJournal(){
           )
       )
     );
+
 
   livResourceSelectedIds =
     new Set(
@@ -612,21 +892,48 @@ function renderResourceJournal(){
         <tr>
 
           <th class="select-col">
+
             <input
               id="resourceSelectAll"
               type="checkbox"
             >
+
           </th>
 
           ${
             livResourceColumns
               .map(
-                key =>
-                  `<th>${esc(
-                    LIV_RESOURCE_COLUMN_LABELS[
-                      key
+                key => {
+
+                  const numeric =
+                    [
+                      'itr',
+                      'workers',
+                      'mechanizers',
+                      'equipmentQty'
                     ]
-                  )}</th>`
+                      .includes(
+                        key
+                      );
+
+
+                  return `
+                    <th
+                      class="${
+                        numeric
+                          ? 'num-head'
+                          : ''
+                      }">
+
+                      ${esc(
+                        LIV_RESOURCE_COLUMN_LABELS[
+                          key
+                        ]
+                      )}
+
+                    </th>
+                  `;
+                }
               )
               .join('')
           }
@@ -665,64 +972,85 @@ function renderResourceJournal(){
               )
         )
         .map(
-          row =>
-            `
-              <tr>
+          row => `
 
-                <td class="select-col">
+            <tr>
 
-                  <input
-                    type="checkbox"
-                    data-resource-select="${esc(row.id)}"
-                    ${
-                      livResourceSelectedIds.has(
-                        String(
-                          row.id
-                        )
+              <td class="select-col">
+
+                <input
+                  type="checkbox"
+                  data-resource-select="${esc(row.id)}"
+                  ${
+                    livResourceSelectedIds.has(
+                      String(
+                        row.id
                       )
-                        ? 'checked'
-                        : ''
-                    }
-                  >
-
-                </td>
-
-                ${
-                  livResourceColumns
-                    .map(
-                      column =>
-                        `
-                          <td>
-                            ${esc(
-                              resourceColumnValue(
-                                row,
-                                column
-                              )
-                            )}
-                          </td>
-                        `
                     )
-                    .join('')
-                }
+                      ? 'checked'
+                      : ''
+                  }
+                >
 
-                <td class="row-actions">
+              </td>
 
-                  <button
-                    class="row-btn"
-                    data-resource-edit="${esc(row.id)}">
-                    Открыть
-                  </button>
+              ${
+                livResourceColumns
+                  .map(
+                    column => {
 
-                  <button
-                    class="row-btn danger-link"
-                    data-resource-delete="${esc(row.id)}">
-                    Удалить
-                  </button>
+                      const numeric =
+                        [
+                          'itr',
+                          'workers',
+                          'mechanizers',
+                          'equipmentQty'
+                        ]
+                          .includes(
+                            column
+                          );
 
-                </td>
 
-              </tr>
-            `
+                      return `
+                        <td
+                          class="${
+                            numeric
+                              ? 'num-cell'
+                              : ''
+                          }">
+
+                          ${esc(
+                            resourceColumnValue(
+                              row,
+                              column
+                            )
+                          )}
+
+                        </td>
+                      `;
+                    }
+                  )
+                  .join('')
+              }
+
+              <td class="row-actions">
+
+                <button
+                  class="row-btn"
+                  data-resource-edit="${esc(row.id)}">
+                  Открыть
+                </button>
+
+                <button
+                  class="row-btn danger-link"
+                  data-resource-delete="${esc(row.id)}">
+                  Удалить
+                </button>
+
+              </td>
+
+            </tr>
+          `
         )
         .join('');
   }
@@ -744,17 +1072,22 @@ function renderResourceJournal(){
                   .resourceSelect
               );
 
+
             if (
               checkbox.checked
             ) {
+
               livResourceSelectedIds.add(
                 id
               );
+
             } else {
+
               livResourceSelectedIds.delete(
                 id
               );
             }
+
 
             updateResourceSelectionBar();
           };
@@ -764,6 +1097,7 @@ function renderResourceJournal(){
 
   const selectAll =
     $('resourceSelectAll');
+
 
   if (
     selectAll
@@ -781,6 +1115,7 @@ function renderResourceJournal(){
           )
       );
 
+
     selectAll.onchange =
       () => {
 
@@ -790,12 +1125,15 @@ function renderResourceJournal(){
             if (
               selectAll.checked
             ) {
+
               livResourceSelectedIds.add(
                 String(
                   row.id
                 )
               );
+
             } else {
+
               livResourceSelectedIds.delete(
                 String(
                   row.id
@@ -804,6 +1142,7 @@ function renderResourceJournal(){
             }
           }
         );
+
 
         renderResourceJournal();
       };
@@ -848,7 +1187,12 @@ function renderResourceJournal(){
 }
 
 
-function updateResourceSelectionBar(){
+/* =========================================================
+   ВЫБОР / УДАЛЕНИЕ
+   ========================================================= */
+
+
+function updateResourceSelectionBar() {
 
   if (
     $('resourceSelectedCount')
@@ -861,6 +1205,7 @@ function updateResourceSelectionBar(){
           ? `Выбрано: ${livResourceSelectedIds.size}`
           : 'Ничего не выбрано';
   }
+
 
   if (
     $('resourceDeleteSelectedBtn')
@@ -875,7 +1220,7 @@ function updateResourceSelectionBar(){
 }
 
 
-async function deleteSelectedResources(){
+async function deleteSelectedResources() {
 
   if (
     !livResourceSelectedIds
@@ -883,6 +1228,7 @@ async function deleteSelectedResources(){
   ) {
     return;
   }
+
 
   if (
     !confirm(
@@ -892,12 +1238,15 @@ async function deleteSelectedResources(){
     return;
   }
 
+
   await dbPutKey(
     clone(
       project
     ),
+
     `pre-resource-delete-${Date.now()}`
   );
+
 
   const before =
     (
@@ -905,6 +1254,7 @@ async function deleteSelectedResources(){
       []
     )
       .length;
+
 
   project.resources =
     (
@@ -920,13 +1270,16 @@ async function deleteSelectedResources(){
           )
       );
 
+
   const deleted =
     before -
     project.resources
       .length;
 
+
   livResourceSelectedIds
     .clear();
+
 
   log(
     'Удалено',
@@ -934,13 +1287,15 @@ async function deleteSelectedResources(){
     `Удалено выбранных записей: ${deleted}`
   );
 
+
   await saveProject();
+
 
   renderResourceCurrentView();
 }
 
 
-async function deleteFilteredResources(){
+async function deleteFilteredResources() {
 
   const rows =
     resourceFiltered({
@@ -948,11 +1303,13 @@ async function deleteFilteredResources(){
         true
     });
 
+
   if (
     !rows.length
   ) {
     return;
   }
+
 
   if (
     !confirm(
@@ -962,12 +1319,15 @@ async function deleteFilteredResources(){
     return;
   }
 
+
   await dbPutKey(
     clone(
       project
     ),
+
     `pre-resource-filter-delete-${Date.now()}`
   );
+
 
   const ids =
     new Set(
@@ -978,6 +1338,7 @@ async function deleteFilteredResources(){
           )
       )
     );
+
 
   project.resources =
     (
@@ -993,8 +1354,10 @@ async function deleteFilteredResources(){
           )
       );
 
+
   livResourceSelectedIds
     .clear();
+
 
   log(
     'Удалено',
@@ -1002,20 +1365,23 @@ async function deleteFilteredResources(){
     `Удалено по фильтру: ${rows.length}`
   );
 
+
   await saveProject();
+
 
   renderResourceCurrentView();
 }
 
 
 /* =========================================================
-   РЕДАКТОР
+   РЕДАКТОР РЕСУРСОВ
    ========================================================= */
+
 
 function openResourceEditor(
   id =
     null
-){
+) {
 
   const row =
     id
@@ -1028,32 +1394,34 @@ function openResourceEditor(
         )
       : {};
 
+
   const frontOptions =
     activeFronts()
       .map(
-        front =>
-          `
-            <option
-              value="${esc(front.id)}"
-              ${
-                String(
-                  front.id
-                ) ===
-                String(
-                  row.frontId ||
-                  ''
-                )
-                  ? 'selected'
-                  : ''
-              }
-            >
-              ${esc(
-                frontLabel(
-                  front
-                )
-              )}
-            </option>
-          `
+        front => `
+
+          <option
+            value="${esc(front.id)}"
+            ${
+              String(
+                front.id
+              ) ===
+              String(
+                row.frontId ||
+                ''
+              )
+                ? 'selected'
+                : ''
+            }>
+
+            ${esc(
+              frontLabel(
+                front
+              )
+            )}
+
+          </option>
+        `
       )
       .join('');
 
@@ -1067,84 +1435,238 @@ function openResourceEditor(
       <div class="form-grid">
 
         <div class="field">
-          <label>Дата</label>
-          <input id="rrDate" type="date" value="${esc(row.date || today())}">
+
+          <label>
+            Дата
+          </label>
+
+          <input
+            id="rrDate"
+            type="date"
+            value="${esc(
+              row.date ||
+              today()
+            )}"
+          >
+
         </div>
 
+
         <div class="field">
-          <label>Организация</label>
+
+          <label>
+            Организация
+          </label>
+
           <select id="rrOrg">
-            ${selectOptions(project.organizations,row.organizationId || '',true)}
+
+            ${
+              selectOptions(
+                project.organizations,
+                row.organizationId ||
+                '',
+                true
+              )
+            }
+
           </select>
+
         </div>
 
+
         <div class="field">
-          <label>Здание</label>
+
+          <label>
+            Здание
+          </label>
+
           <select id="rrBuilding">
-            ${selectOptions(project.buildings,row.buildingId || '',true)}
+
+            ${
+              selectOptions(
+                project.buildings,
+                row.buildingId ||
+                '',
+                true
+              )
+            }
+
           </select>
+
         </div>
 
+
         <div class="field">
-          <label>Вид работ</label>
+
+          <label>
+            Вид работ
+          </label>
+
           <select id="rrWork">
-            ${selectOptions(project.works,row.workId || '',true)}
+
+            ${
+              selectOptions(
+                project.works,
+                row.workId ||
+                '',
+                true
+              )
+            }
+
           </select>
+
         </div>
 
+
         <div class="field">
-          <label>Фронт</label>
+
+          <label>
+            Фронт
+          </label>
+
           <select id="rrFront">
-            <option value="">—</option>
+
+            <option value="">
+              —
+            </option>
+
             ${frontOptions}
+
           </select>
+
         </div>
 
-        <div class="field">
-          <label>ИТР</label>
-          <input id="rrItr" type="number" min="0" step="1" value="${row.itr ?? ''}">
-        </div>
 
         <div class="field">
-          <label>Подсобные рабочие</label>
-          <input id="rrWorkers" type="number" min="0" step="1" value="${row.workers ?? ''}">
+
+          <label>
+            ИТР
+          </label>
+
+          <input
+            id="rrItr"
+            type="number"
+            min="0"
+            step="1"
+            value="${
+              row.itr ??
+              ''
+            }"
+          >
+
         </div>
 
-        <div class="field">
-          <label>Механизаторы</label>
-          <input id="rrMech" type="number" min="0" step="1" value="${row.mechanizers ?? ''}">
-        </div>
 
         <div class="field">
-          <label>Наименование техники</label>
-          <input id="rrEqType" value="${esc(row.equipmentType || '')}">
+
+          <label>
+            Подсобные рабочие
+          </label>
+
+          <input
+            id="rrWorkers"
+            type="number"
+            min="0"
+            step="1"
+            value="${
+              row.workers ??
+              ''
+            }"
+          >
+
         </div>
 
+
         <div class="field">
-          <label>Количество техники</label>
-          <input id="rrEqQty" type="number" min="0" step="1" value="${row.equipmentQty ?? ''}">
+
+          <label>
+            Механизаторы
+          </label>
+
+          <input
+            id="rrMech"
+            type="number"
+            min="0"
+            step="1"
+            value="${
+              row.mechanizers ??
+              ''
+            }"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Наименование техники
+          </label>
+
+          <input
+            id="rrEqType"
+            value="${esc(
+              row.equipmentType ||
+              ''
+            )}"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Количество техники
+          </label>
+
+          <input
+            id="rrEqQty"
+            type="number"
+            min="0"
+            step="1"
+            value="${
+              row.equipmentQty ??
+              ''
+            }"
+          >
+
         </div>
 
       </div>
+
 
       <div class="field">
-        <label>Комментарий</label>
-        <textarea id="rrComment">${esc(row.comment || '')}</textarea>
+
+        <label>
+          Комментарий
+        </label>
+
+        <textarea id="rrComment">${esc(
+          row.comment ||
+          ''
+        )}</textarea>
+
       </div>
+
 
       <div class="editor-actions">
 
         ${
           id
             ? `
-                <button id="rrDelete" class="btn danger">
+                <button
+                  id="rrDelete"
+                  class="btn danger">
                   Удалить
                 </button>
               `
             : ''
         }
 
-        <button id="rrSave" class="btn primary">
+        <button
+          id="rrSave"
+          class="btn primary">
           Сохранить
         </button>
 
@@ -1158,6 +1680,7 @@ function openResourceEditor(
       saveResource(
         id
       );
+
 
   if (
     id &&
@@ -1175,7 +1698,7 @@ function openResourceEditor(
 
 async function saveResource(
   id
-){
+) {
 
   const existing =
     id
@@ -1304,7 +1827,9 @@ async function saveResource(
 
   await saveProject();
 
+
   closeModal();
+
 
   renderAll();
 }
@@ -1312,7 +1837,7 @@ async function saveResource(
 
 async function deleteResource(
   id
-){
+) {
 
   const row =
     byId(
@@ -1320,11 +1845,13 @@ async function deleteResource(
       id
     );
 
+
   if (
     !row
   ) {
     return;
   }
+
 
   if (
     !confirm(
@@ -1333,6 +1860,7 @@ async function deleteResource(
   ) {
     return;
   }
+
 
   project.resources =
     (
@@ -1349,6 +1877,7 @@ async function deleteResource(
           )
       );
 
+
   log(
     'Удалено',
     'Ресурсы',
@@ -1362,9 +1891,12 @@ async function deleteResource(
     }`
   );
 
+
   await saveProject();
 
+
   closeModal();
+
 
   renderAll();
 }
@@ -1374,39 +1906,52 @@ async function deleteResource(
    ЕЖЕДНЕВНАЯ СВОДКА
    ========================================================= */
 
+
 function dailyResourceRows(
   date
-){
+) {
+
   return resourceFiltered({
     from:
       date,
+
     to:
       date
   });
 }
 
 
-function renderResourceDaily(){
+function renderResourceDaily() {
+
+  ensureResourceUiStyles();
+
 
   const date =
-    $('rDailyDate')?.value ||
-    $('rTo')?.value ||
+    $('rDailyDate')
+      ?.value ||
+    $('rTo')
+      ?.value ||
     today();
+
 
   if (
     $('rDailyDate')
   ) {
+
     $('rDailyDate').value =
       date;
   }
+
 
   const rows =
     dailyResourceRows(
       date
     );
 
+
   const peopleByOrg =
     new Map();
+
 
   const equipmentGrouped =
     new Map();
@@ -1421,6 +1966,7 @@ function renderResourceDaily(){
           ''
         );
 
+
       if (
         !peopleByOrg.has(
           organizationId
@@ -1431,30 +1977,37 @@ function renderResourceDaily(){
           organizationId,
           {
             organizationId,
+
             itr:
               0,
+
             workers:
               0,
+
             mechanizers:
               0
           }
         );
       }
 
+
       const people =
         peopleByOrg.get(
           organizationId
         );
+
 
       people.itr +=
         num(
           row.itr
         );
 
+
       people.workers +=
         num(
           row.workers
         );
+
 
       people.mechanizers +=
         num(
@@ -1466,6 +2019,7 @@ function renderResourceDaily(){
         num(
           row.equipmentQty
         );
+
 
       const equipmentType =
         normText(
@@ -1483,15 +2037,8 @@ function renderResourceDaily(){
       ) {
 
         const key =
-          [
-            organizationId,
-            normKey(
-              equipmentType
-            )
-          ]
-            .join(
-              '|'
-            );
+          `${organizationId}|${normKey(equipmentType)}`;
+
 
         if (
           !equipmentGrouped.has(
@@ -1503,16 +2050,20 @@ function renderResourceDaily(){
             key,
             {
               organizationId,
+
               equipmentType,
+
               quantity:
                 0
             }
           );
         }
 
-        equipmentGrouped.get(
-          key
-        )
+
+        equipmentGrouped
+          .get(
+            key
+          )
           .quantity +=
             quantity;
       }
@@ -1524,6 +2075,7 @@ function renderResourceDaily(){
     [
       ...peopleByOrg.values()
     ];
+
 
   if (
     !resourceShowZero()
@@ -1563,17 +2115,18 @@ function renderResourceDaily(){
   );
 
 
-  let equipment =
+  let equipmentRows =
     [
       ...equipmentGrouped.values()
     ];
+
 
   if (
     !resourceShowZero()
   ) {
 
-    equipment =
-      equipment.filter(
+    equipmentRows =
+      equipmentRows.filter(
         item =>
           num(
             item.quantity
@@ -1583,7 +2136,7 @@ function renderResourceDaily(){
   }
 
 
-  equipment.sort(
+  equipmentRows.sort(
     (
       a,
       b
@@ -1612,22 +2165,46 @@ function renderResourceDaily(){
   );
 
 
-  const totalPeople =
+  const peopleTotals =
     peopleRows.reduce(
       (
-        sum,
+        result,
         item
-      ) =>
-        sum +
-        item.itr +
-        item.workers +
-        item.mechanizers,
-      0
+      ) => {
+
+        result.itr +=
+          item.itr;
+
+        result.workers +=
+          item.workers;
+
+        result.mechanizers +=
+          item.mechanizers;
+
+
+        return result;
+      },
+      {
+        itr:
+          0,
+
+        workers:
+          0,
+
+        mechanizers:
+          0
+      }
     );
 
 
+  const totalPeople =
+    peopleTotals.itr +
+    peopleTotals.workers +
+    peopleTotals.mechanizers;
+
+
   const totalEquipment =
-    equipment.reduce(
+    equipmentRows.reduce(
       (
         sum,
         item
@@ -1643,6 +2220,7 @@ function renderResourceDaily(){
   if (
     $('rdPeopleTotal')
   ) {
+
     $('rdPeopleTotal')
       .textContent =
         Math.round(
@@ -1654,6 +2232,7 @@ function renderResourceDaily(){
   if (
     $('rdEquipmentTotal')
   ) {
+
     $('rdEquipmentTotal')
       .textContent =
         Math.round(
@@ -1667,55 +2246,104 @@ function renderResourceDaily(){
   ) {
 
     $('rdPeopleBody').innerHTML =
-      peopleRows
-        .map(
-          (
-            item,
-            index
-          ) =>
-            `
-              <tr>
+      peopleRows.length
+        ? peopleRows
+            .map(
+              (
+                item,
+                index
+              ) => `
 
-                <td>
-                  ${index + 1}
-                </td>
+                <tr>
 
-                <td>
-                  ${esc(
-                    nameById(
-                      project.organizations,
-                      item.organizationId
-                    ) ||
-                    '—'
-                  )}
-                </td>
+                  <td class="num-cell">
+                    ${index + 1}
+                  </td>
 
-                <td>
-                  ${Math.round(item.itr)}
-                </td>
+                  <td>
+                    ${esc(
+                      nameById(
+                        project.organizations,
+                        item.organizationId
+                      ) ||
+                      '—'
+                    )}
+                  </td>
 
-                <td>
-                  ${Math.round(item.workers)}
-                </td>
+                  <td class="num-cell">
+                    ${Math.round(item.itr)}
+                  </td>
 
-                <td>
-                  ${Math.round(item.mechanizers)}
-                </td>
+                  <td class="num-cell">
+                    ${Math.round(item.workers)}
+                  </td>
 
-                <td>
-                  <b>
+                  <td class="num-cell">
+                    ${Math.round(item.mechanizers)}
+                  </td>
+
+                  <td class="num-cell total-cell">
                     ${Math.round(
                       item.itr +
                       item.workers +
                       item.mechanizers
                     )}
-                  </b>
-                </td>
+                  </td>
 
-              </tr>
-            `
-        )
-        .join('');
+                </tr>
+              `
+            )
+            .join('')
+
+        : `
+            <tr>
+              <td
+                colspan="6"
+                class="resource-empty">
+                Нет данных за выбранную дату
+              </td>
+            </tr>
+          `;
+  }
+
+
+  const peopleFoot =
+    ensureTableFoot(
+      'rdPeopleBody',
+      'rdPeopleFoot'
+    );
+
+
+  if (
+    peopleFoot
+  ) {
+
+    peopleFoot.innerHTML =
+      `
+        <tr>
+
+          <th colspan="2">
+            Итого
+          </th>
+
+          <th class="num-head">
+            ${Math.round(peopleTotals.itr)}
+          </th>
+
+          <th class="num-head">
+            ${Math.round(peopleTotals.workers)}
+          </th>
+
+          <th class="num-head">
+            ${Math.round(peopleTotals.mechanizers)}
+          </th>
+
+          <th class="num-head">
+            ${Math.round(totalPeople)}
+          </th>
+
+        </tr>
+      `;
   }
 
 
@@ -1724,45 +2352,56 @@ function renderResourceDaily(){
   ) {
 
     $('rdEquipmentBody').innerHTML =
-      equipment
-        .map(
-          (
-            item,
-            index
-          ) =>
-            `
-              <tr>
+      equipmentRows.length
+        ? equipmentRows
+            .map(
+              (
+                item,
+                index
+              ) => `
 
-                <td>
-                  ${index + 1}
-                </td>
+                <tr>
 
-                <td>
-                  ${esc(
-                    nameById(
-                      project.organizations,
-                      item.organizationId
-                    ) ||
-                    '—'
-                  )}
-                </td>
+                  <td class="num-cell">
+                    ${index + 1}
+                  </td>
 
-                <td>
-                  ${esc(
-                    item.equipmentType
-                  )}
-                </td>
+                  <td>
+                    ${esc(
+                      nameById(
+                        project.organizations,
+                        item.organizationId
+                      ) ||
+                      '—'
+                    )}
+                  </td>
 
-                <td>
-                  ${Math.round(
-                    item.quantity
-                  )}
-                </td>
+                  <td>
+                    ${esc(
+                      item.equipmentType
+                    )}
+                  </td>
 
-              </tr>
-            `
-        )
-        .join('');
+                  <td class="num-cell total-cell">
+                    ${Math.round(
+                      item.quantity
+                    )}
+                  </td>
+
+                </tr>
+              `
+            )
+            .join('')
+
+        : `
+            <tr>
+              <td
+                colspan="4"
+                class="resource-empty">
+                Нет техники за выбранную дату
+              </td>
+            </tr>
+          `;
   }
 
 
@@ -1783,20 +2422,24 @@ function renderResourceDaily(){
    ДИНАМИКА
    ========================================================= */
 
-function destroyResourceCharts(){
+
+function destroyResourceCharts() {
 
   livResourceCharts
     .forEach(
       chart => {
 
         try {
+
           chart.destroy();
+
         } catch (
           error
         ) {
         }
       }
     );
+
 
   livResourceCharts =
     [];
@@ -1806,21 +2449,24 @@ function destroyResourceCharts(){
 function resourceBucketKey(
   date,
   step
-){
+) {
 
   if (
     step ===
     'week'
   ) {
+
     return startOfWeek(
       date
     );
   }
 
+
   if (
     step ===
     'month'
   ) {
+
     return (
       String(
         date
@@ -1833,6 +2479,7 @@ function resourceBucketKey(
     );
   }
 
+
   return date;
 }
 
@@ -1840,7 +2487,7 @@ function resourceBucketKey(
 function resourceBucketLabel(
   key,
   step
-){
+) {
 
   if (
     step ===
@@ -1855,15 +2502,19 @@ function resourceBucketLabel(
         '-'
       );
 
+
     return `${month}.${year}`;
   }
+
 
   if (
     step ===
     'week'
   ) {
+
     return `с ${shortDate(key)}`;
   }
+
 
   return shortDate(
     key
@@ -1871,12 +2522,14 @@ function resourceBucketLabel(
 }
 
 
-function renderResourceDynamics(){
+function renderResourceDynamics() {
 
   destroyResourceCharts();
 
+
   const container =
     $('resourceCharts');
+
 
   if (
     !container
@@ -1884,8 +2537,10 @@ function renderResourceDynamics(){
     return;
   }
 
+
   container.innerHTML =
     '';
+
 
   if (
     typeof Chart ===
@@ -1893,23 +2548,33 @@ function renderResourceDynamics(){
   ) {
 
     container.innerHTML =
-      '<div class="card muted">Библиотека диаграмм не загрузилась.</div>';
+      `
+        <div class="card muted">
+          Библиотека диаграмм не загрузилась.
+        </div>
+      `;
 
     return;
   }
 
 
   const metric =
-    $('rDynType')?.value ||
+    $('rDynType')
+      ?.value ||
     'total';
 
+
   const step =
-    $('rDynStep')?.value ||
+    $('rDynStep')
+      ?.value ||
     'week';
 
+
   const quickOrganization =
-    $('rDynOrg')?.value ||
+    $('rDynOrg')
+      ?.value ||
     'all';
+
 
   const rows =
     resourceFiltered();
@@ -1991,7 +2656,11 @@ function renderResourceDynamics(){
   ) {
 
     container.innerHTML =
-      '<div class="card muted">Нет данных для диаграмм.</div>';
+      `
+        <div class="card muted">
+          Нет данных для диаграмм.
+        </div>
+      `;
 
     return;
   }
@@ -2022,6 +2691,7 @@ function renderResourceDynamics(){
               return;
             }
 
+
             if (
               !daily.has(
                 row.date
@@ -2033,35 +2703,43 @@ function renderResourceDynamics(){
                 {
                   itr:
                     0,
+
                   workers:
                     0,
+
                   mechanizers:
                     0,
+
                   equipment:
                     0
                 }
               );
             }
 
+
             const item =
               daily.get(
                 row.date
               );
+
 
             item.itr +=
               num(
                 row.itr
               );
 
+
             item.workers +=
               num(
                 row.workers
               );
 
+
             item.mechanizers +=
               num(
                 row.mechanizers
               );
+
 
             item.equipment +=
               num(
@@ -2071,12 +2749,12 @@ function renderResourceDynamics(){
         );
 
 
-      const bucketMap =
+      const bucket =
         new Map();
 
 
       [
-        ...daily.entries()
+        ...daily
       ]
         .forEach(
           (
@@ -2092,21 +2770,24 @@ function renderResourceDynamics(){
                 step
               );
 
+
             if (
-              !bucketMap.has(
+              !bucket.has(
                 key
               )
             ) {
 
-              bucketMap.set(
+              bucket.set(
                 key,
                 []
               );
             }
 
-            bucketMap.get(
-              key
-            )
+
+            bucket
+              .get(
+                key
+              )
               .push(
                 value
               );
@@ -2116,7 +2797,7 @@ function renderResourceDynamics(){
 
       const keys =
         [
-          ...bucketMap.keys()
+          ...bucket.keys()
         ]
           .sort();
 
@@ -2146,7 +2827,7 @@ function renderResourceDynamics(){
             : null;
 
 
-      const totalAverage =
+      const total =
         array =>
           array.length
             ? Math.round(
@@ -2178,19 +2859,23 @@ function renderResourceDynamics(){
         datasets.push({
           label:
             'Общая численность',
+
           data:
             keys.map(
               key =>
-                totalAverage(
-                  bucketMap.get(
+                total(
+                  bucket.get(
                     key
                   )
                 )
             ),
+
           borderWidth:
             2,
+
           tension:
             0,
+
           spanGaps:
             false
         });
@@ -2205,20 +2890,24 @@ function renderResourceDynamics(){
         datasets.push({
           label:
             'ИТР',
+
           data:
             keys.map(
               key =>
                 average(
-                  bucketMap.get(
+                  bucket.get(
                     key
                   ),
                   'itr'
                 )
             ),
+
           borderWidth:
             2,
+
           tension:
             0,
+
           spanGaps:
             false
         });
@@ -2233,20 +2922,24 @@ function renderResourceDynamics(){
         datasets.push({
           label:
             'Рабочие',
+
           data:
             keys.map(
               key =>
                 average(
-                  bucketMap.get(
+                  bucket.get(
                     key
                   ),
                   'workers'
                 )
             ),
+
           borderWidth:
             2,
+
           tension:
             0,
+
           spanGaps:
             false
         });
@@ -2261,41 +2954,50 @@ function renderResourceDynamics(){
         datasets.push({
           label:
             'ИТР',
+
           data:
             keys.map(
               key =>
                 average(
-                  bucketMap.get(
+                  bucket.get(
                     key
                   ),
                   'itr'
                 )
             ),
+
           borderWidth:
             2,
+
           tension:
             0,
+
           spanGaps:
             false
         });
 
+
         datasets.push({
           label:
             'Рабочие',
+
           data:
             keys.map(
               key =>
                 average(
-                  bucketMap.get(
+                  bucket.get(
                     key
                   ),
                   'workers'
                 )
             ),
+
           borderWidth:
             2,
+
           tension:
             0,
+
           spanGaps:
             false
         });
@@ -2310,20 +3012,24 @@ function renderResourceDynamics(){
         datasets.push({
           label:
             'Техника',
+
           data:
             keys.map(
               key =>
                 average(
-                  bucketMap.get(
+                  bucket.get(
                     key
                   ),
                   'equipment'
                 )
             ),
+
           borderWidth:
             2,
+
           tension:
             0,
+
           spanGaps:
             false
         });
@@ -2335,8 +3041,10 @@ function renderResourceDynamics(){
           'div'
         );
 
+
       card.className =
         'card resource-chart-card';
+
 
       card.innerHTML =
         `
@@ -2359,21 +3067,26 @@ function renderResourceDynamics(){
           </div>
         `;
 
+
       container.appendChild(
         card
       );
 
 
       livResourceCharts.push(
+
         new Chart(
+
           card.querySelector(
             'canvas'
           ),
+
           {
             type:
               'line',
 
             data: {
+
               labels:
                 keys.map(
                   key =>
@@ -2382,35 +3095,48 @@ function renderResourceDynamics(){
                       step
                     )
                 ),
+
               datasets
             },
 
             options: {
+
               responsive:
                 true,
+
               maintainAspectRatio:
                 false,
+
               interaction: {
                 mode:
                   'index',
+
                 intersect:
                   false
               },
+
               scales: {
+
                 y: {
+
                   beginAtZero:
                     true,
+
                   ticks: {
                     precision:
                       0
                   }
                 }
               },
+
               plugins: {
+
                 legend: {
+
                   display:
                     datasets.length >
                     1,
+
                   position:
                     'top'
                 }
@@ -2428,12 +3154,14 @@ function renderResourceDynamics(){
    АНАЛИТИКА
    ========================================================= */
 
+
 function groupResourcesByOrganizationAndDay(
   rows
-){
+) {
 
-  const result =
+  const map =
     new Map();
+
 
   (
     rows ||
@@ -2445,64 +3173,78 @@ function groupResourcesByOrganizationAndDay(
         const key =
           `${row.organizationId || ''}|${row.date || ''}`;
 
+
         if (
-          !result.has(
+          !map.has(
             key
           )
         ) {
 
-          result.set(
+          map.set(
             key,
             {
               organizationId:
                 row.organizationId ||
                 '',
+
               date:
                 row.date ||
                 '',
+
               itr:
                 0,
+
               workers:
                 0,
+
               mechanizers:
                 0,
+
               equipment:
                 0,
+
               equipmentTypes:
                 {}
             }
           );
         }
 
+
         const item =
-          result.get(
+          map.get(
             key
           );
+
 
         item.itr +=
           num(
             row.itr
           );
 
+
         item.workers +=
           num(
             row.workers
           );
+
 
         item.mechanizers +=
           num(
             row.mechanizers
           );
 
+
         item.equipment +=
           num(
             row.equipmentQty
           );
 
+
         const type =
           normText(
             row.equipmentType
           );
+
 
         if (
           type
@@ -2524,8 +3266,9 @@ function groupResourcesByOrganizationAndDay(
       }
     );
 
+
   return [
-    ...result.values()
+    ...map.values()
   ];
 }
 
@@ -2533,19 +3276,25 @@ function groupResourcesByOrganizationAndDay(
 function analyticsDates(
   rows,
   organizationId
-){
+) {
 
   const method =
-    $('rAvgMethod')?.value ||
+    $('rAvgMethod')
+      ?.value ||
     'reported';
 
+
   const from =
-    $('rFrom')?.value ||
+    $('rFrom')
+      ?.value ||
     '';
 
+
   const to =
-    $('rTo')?.value ||
+    $('rTo')
+      ?.value ||
     '';
+
 
   const organizationDates =
     uniq(
@@ -2575,16 +3324,19 @@ function analyticsDates(
     method ===
     'calendar'
   ) {
+
     return dateRange(
       from,
       to
     );
   }
 
+
   if (
     method ===
     'workdays'
   ) {
+
     return dateRange(
       from,
       to
@@ -2594,10 +3346,12 @@ function analyticsDates(
       );
   }
 
+
   if (
     method ===
     'project-report-days'
   ) {
+
     return uniq(
       rows
         .map(
@@ -2611,6 +3365,7 @@ function analyticsDates(
       .sort();
   }
 
+
   return organizationDates;
 }
 
@@ -2620,27 +3375,33 @@ function averageByDate(
   allRows,
   organizationId,
   metric
-){
+) {
 
   const method =
-    $('rAvgMethod')?.value ||
+    $('rAvgMethod')
+      ?.value ||
     'reported';
 
+
   const missingRule =
-    $('rMissingRule')?.value ||
+    $('rMissingRule')
+      ?.value ||
     'skip';
 
+
   const own =
-    daily.filter(
-      item =>
-        String(
-          item.organizationId ||
-          ''
-        ) ===
-        String(
-          organizationId
-        )
-    );
+    daily
+      .filter(
+        item =>
+          String(
+            item.organizationId ||
+            ''
+          ) ===
+          String(
+            organizationId
+          )
+      );
+
 
   const map =
     new Map(
@@ -2672,7 +3433,9 @@ function averageByDate(
             0
         );
 
+
     return {
+
       average:
         values.length
           ? values.reduce(
@@ -2695,6 +3458,7 @@ function averageByDate(
 
   const values =
     [];
+
 
   analyticsDates(
     allRows,
@@ -2729,6 +3493,7 @@ function averageByDate(
 
 
   return {
+
     average:
       values.length
         ? values.reduce(
@@ -2749,10 +3514,14 @@ function averageByDate(
 }
 
 
-function renderResourceAnalytics(){
+function renderResourceAnalytics() {
+
+  ensureResourceUiStyles();
+
 
   const rows =
     resourceFiltered();
+
 
   const daily =
     groupResourcesByOrganizationAndDay(
@@ -2799,7 +3568,7 @@ function renderResourceAnalytics(){
 
     organizationIds =
       organizationIds.filter(
-        organizationId =>
+        id =>
           resourceActivityTotal(
             rows.filter(
               row =>
@@ -2807,7 +3576,7 @@ function renderResourceAnalytics(){
                   row.organizationId ||
                   ''
                 ) ===
-                organizationId
+                id
             )
           ) !==
           0
@@ -2833,12 +3602,14 @@ function renderResourceAnalytics(){
               .map(
                 item => ({
                   ...item,
+
                   totalPeople:
                     item.itr +
                     item.workers +
                     item.mechanizers
                 })
               );
+
 
           const itr =
             averageByDate(
@@ -2848,6 +3619,7 @@ function renderResourceAnalytics(){
               'itr'
             );
 
+
           const workers =
             averageByDate(
               daily,
@@ -2855,6 +3627,7 @@ function renderResourceAnalytics(){
               organizationId,
               'workers'
             );
+
 
           const mechanizers =
             averageByDate(
@@ -2864,6 +3637,7 @@ function renderResourceAnalytics(){
               'mechanizers'
             );
 
+
           const total =
             averageByDate(
               own,
@@ -2872,23 +3646,22 @@ function renderResourceAnalytics(){
               'totalPeople'
             );
 
+
           return {
+
             organizationId,
+
             itr:
               itr.average,
+
             workers:
               workers.average,
+
             mechanizers:
               mechanizers.average,
+
             total:
-              total.average,
-            days:
-              Math.max(
-                itr.days,
-                workers.days,
-                mechanizers.days,
-                total.days
-              )
+              total.average
           };
         }
       )
@@ -2905,44 +3678,304 @@ function renderResourceAnalytics(){
   ) {
 
     $('raPeopleBody').innerHTML =
-      peopleRows
-        .map(
-          item =>
-            `
-              <tr>
-                <td>${esc(nameById(project.organizations,item.organizationId) || '—')}</td>
-                <td>${Math.round(item.itr)}</td>
-                <td>${Math.round(item.mechanizers)}</td>
-                <td>${Math.round(item.workers)}</td>
-                <td><b>${Math.round(item.total)}</b></td>
-              </tr>
-            `
-        )
-        .join('');
+      peopleRows.length
+        ? peopleRows
+            .map(
+              item => `
+
+                <tr>
+
+                  <td>
+                    ${esc(
+                      nameById(
+                        project.organizations,
+                        item.organizationId
+                      ) ||
+                      '—'
+                    )}
+                  </td>
+
+                  <td class="num-cell">
+                    ${Math.round(item.itr)}
+                  </td>
+
+                  <td class="num-cell">
+                    ${Math.round(item.mechanizers)}
+                  </td>
+
+                  <td class="num-cell">
+                    ${Math.round(item.workers)}
+                  </td>
+
+                  <td class="num-cell total-cell">
+                    ${Math.round(item.total)}
+                  </td>
+
+                </tr>
+              `
+            )
+            .join('')
+
+        : `
+            <tr>
+              <td
+                colspan="5"
+                class="resource-empty">
+                Нет данных для выбранного периода
+              </td>
+            </tr>
+          `;
   }
 
 
-  const mean =
-    (
-      array,
-      field
-    ) =>
-      array.length
-        ? array.reduce(
-            (
-              sum,
-              item
-            ) =>
-              sum +
+  /*
+    Общая средняя численность по объекту.
+  */
+
+
+  const globalByDate =
+    new Map();
+
+
+  rows.forEach(
+    row => {
+
+      if (
+        !row.date
+      ) {
+        return;
+      }
+
+
+      if (
+        !globalByDate.has(
+          row.date
+        )
+      ) {
+
+        globalByDate.set(
+          row.date,
+          {
+            itr:
+              0,
+
+            workers:
+              0,
+
+            mechanizers:
+              0,
+
+            equipment:
+              0,
+
+            equipmentTypes:
+              {}
+          }
+        );
+      }
+
+
+      const day =
+        globalByDate.get(
+          row.date
+        );
+
+
+      day.itr +=
+        num(
+          row.itr
+        );
+
+
+      day.workers +=
+        num(
+          row.workers
+        );
+
+
+      day.mechanizers +=
+        num(
+          row.mechanizers
+        );
+
+
+      day.equipment +=
+        num(
+          row.equipmentQty
+        );
+
+
+      const type =
+        normText(
+          row.equipmentType
+        );
+
+
+      if (
+        type
+      ) {
+
+        day.equipmentTypes[
+          type
+        ] =
+          (
+            day.equipmentTypes[
+              type
+            ] ||
+            0
+          ) +
+          num(
+            row.equipmentQty
+          );
+      }
+    }
+  );
+
+
+  const method =
+    $('rAvgMethod')
+      ?.value ||
+    'reported';
+
+
+  const missingRule =
+    $('rMissingRule')
+      ?.value ||
+    'skip';
+
+
+  let globalDates =
+    [
+      ...globalByDate.keys()
+    ]
+      .sort();
+
+
+  if (
+    method ===
+    'calendar'
+  ) {
+
+    globalDates =
+      dateRange(
+        $('rFrom').value,
+        $('rTo').value
+      );
+
+  } else if (
+    method ===
+    'workdays'
+  ) {
+
+    globalDates =
+      dateRange(
+        $('rFrom').value,
+        $('rTo').value
+      )
+        .filter(
+          isWorkday
+        );
+  }
+
+
+  const globalMetricAverage =
+    field => {
+
+      const values =
+        [];
+
+
+      globalDates.forEach(
+        date => {
+
+          const day =
+            globalByDate.get(
+              date
+            );
+
+
+          if (
+            day
+          ) {
+
+            const value =
               num(
-                item[
+                day[
                   field
                 ]
-              ),
-            0
-          ) /
-          array.length
-        : 0;
+              );
+
+
+            if (
+              method !==
+                'nonzero' ||
+              value !==
+                0
+            ) {
+
+              values.push(
+                value
+              );
+            }
+
+          } else if (
+            missingRule ===
+            'zero'
+          ) {
+
+            values.push(
+              0
+            );
+          }
+        }
+      );
+
+
+      return (
+        values.length
+          ? values.reduce(
+              (
+                sum,
+                value
+              ) =>
+                sum +
+                value,
+              0
+            ) /
+            values.length
+          : 0
+      );
+    };
+
+
+  const averageItr =
+    globalMetricAverage(
+      'itr'
+    );
+
+
+  const averageWorkers =
+    globalMetricAverage(
+      'workers'
+    );
+
+
+  const averageMechanizers =
+    globalMetricAverage(
+      'mechanizers'
+    );
+
+
+  const averagePeople =
+    averageItr +
+    averageWorkers +
+    averageMechanizers;
+
+
+  const averageEquipment =
+    globalMetricAverage(
+      'equipment'
+    );
 
 
   if (
@@ -2952,91 +3985,175 @@ function renderResourceAnalytics(){
     $('raPeopleFoot').innerHTML =
       `
         <tr>
-          <th>Среднее по организациям</th>
-          <th>${Math.round(mean(peopleRows,'itr'))}</th>
-          <th>${Math.round(mean(peopleRows,'mechanizers'))}</th>
-          <th>${Math.round(mean(peopleRows,'workers'))}</th>
-          <th>${Math.round(mean(peopleRows,'total'))}</th>
+
+          <th>
+            Среднее по объекту
+          </th>
+
+          <th class="num-head">
+            ${Math.round(averageItr)}
+          </th>
+
+          <th class="num-head">
+            ${Math.round(averageMechanizers)}
+          </th>
+
+          <th class="num-head">
+            ${Math.round(averageWorkers)}
+          </th>
+
+          <th class="num-head">
+            ${Math.round(averagePeople)}
+          </th>
+
         </tr>
       `;
   }
 
 
+  /*
+    Определяем виды техники.
+
+    Если "Показывать нулевые" выключено,
+    полностью нулевые столбцы удаляются.
+  */
+
+
   const equipmentTypeTotals =
-  new Map();
+    new Map();
 
 
-rows.forEach(
-  row => {
+  rows.forEach(
+    row => {
 
-    const type =
-      normText(
-        row.equipmentType
+      const type =
+        normText(
+          row.equipmentType
+        );
+
+
+      if (
+        !type
+      ) {
+        return;
+      }
+
+
+      equipmentTypeTotals.set(
+        type,
+
+        (
+          equipmentTypeTotals.get(
+            type
+          ) ||
+          0
+        ) +
+
+        num(
+          row.equipmentQty
+        )
+      );
+    }
+  );
+
+
+  const equipmentTypes =
+    [
+      ...equipmentTypeTotals.entries()
+    ]
+      .filter(
+        (
+          [
+            type,
+            total
+          ]
+        ) =>
+          resourceShowZero() ||
+          total !==
+          0
+      )
+      .map(
+        (
+          [
+            type
+          ]
+        ) =>
+          type
+      )
+      .sort(
+        (
+          a,
+          b
+        ) =>
+          a.localeCompare(
+            b,
+            'ru'
+          )
       );
 
 
-    if (
-      !type
-    ) {
-      return;
-    }
+  const equipmentTable =
+    $('raEquipmentHead')
+      ?.closest(
+        'table'
+      );
 
 
-    equipmentTypeTotals.set(
-      type,
+  if (
+    equipmentTable
+  ) {
 
-      (
-        equipmentTypeTotals.get(
-          type
-        ) ||
-        0
-      ) +
-
-      num(
-        row.equipmentQty
-      )
+    equipmentTable.classList.add(
+      'analytics-equipment-table'
     );
   }
-);
 
 
-const equipmentTypes =
-  [
-    ...equipmentTypeTotals
-      .entries()
-  ]
-    .filter(
-      (
-        [
-          type,
-          total
-        ]
-      ) =>
-        resourceShowZero() ||
-        total !==
-          0
-    )
-    .map(
-      (
-        [
-          type
-        ]
-      ) =>
-        type
-    )
-    .sort(
-      (
-        a,
-        b
-      ) =>
-        a.localeCompare(
-          b,
-          'ru'
-        )
-    );
+  /*
+    Полноценная шапка техники.
+  */
 
 
-  const equipmentBody =
+  if (
+    $('raEquipmentHead')
+  ) {
+
+    $('raEquipmentHead').innerHTML =
+      `
+        <tr>
+
+          <th>
+            Организация
+          </th>
+
+          ${
+            equipmentTypes
+              .map(
+                type =>
+                  `
+                    <th class="num-head">
+                      ${esc(type)}
+                    </th>
+                  `
+              )
+              .join('')
+          }
+
+          <th class="num-head">
+            Итого
+          </th>
+
+        </tr>
+      `;
+  }
+
+
+  /*
+    Строки организаций.
+  */
+
+
+  const equipmentRows =
     organizationIds
       .map(
         organizationId => {
@@ -3058,6 +4175,7 @@ const equipmentTypes =
                     .map(
                       item => ({
                         ...item,
+
                         metric:
                           num(
                             item.equipmentTypes[
@@ -3066,6 +4184,7 @@ const equipmentTypes =
                           )
                       })
                     );
+
 
                 return averageByDate(
                   own,
@@ -3077,22 +4196,33 @@ const equipmentTypes =
               }
             );
 
+
           return {
+
             organizationId,
-            cells
+
+            cells,
+
+            total:
+              cells.reduce(
+                (
+                  sum,
+                  value
+                ) =>
+                  sum +
+                  num(
+                    value
+                  ),
+                0
+              )
           };
         }
       )
       .filter(
         item =>
           resourceShowZero() ||
-          item.cells.some(
-            value =>
-              num(
-                value
-              ) !==
-              0
-          )
+          item.total !==
+          0
       );
 
 
@@ -3101,223 +4231,226 @@ const equipmentTypes =
   ) {
 
     $('raEquipmentBody').innerHTML =
-      equipmentBody
-        .map(
-          item =>
-            `
-              <tr>
-                <td>${esc(nameById(project.organizations,item.organizationId) || '—')}</td>
-                ${
-                  item.cells
-                    .map(
-                      value =>
-                        `<td>${Math.round(value)}</td>`
-                    )
-                    .join('')
-                }
-              </tr>
-            `
-        )
-        .join('');
+      equipmentRows.length
+        ? equipmentRows
+            .map(
+              item => `
+
+                <tr>
+
+                  <td>
+                    ${esc(
+                      nameById(
+                        project.organizations,
+                        item.organizationId
+                      ) ||
+                      '—'
+                    )}
+                  </td>
+
+                  ${
+                    item.cells
+                      .map(
+                        value =>
+                          `
+                            <td class="num-cell">
+                              ${Math.round(value)}
+                            </td>
+                          `
+                      )
+                      .join('')
+                  }
+
+                  <td class="num-cell total-cell">
+                    ${Math.round(item.total)}
+                  </td>
+
+                </tr>
+              `
+            )
+            .join('')
+
+        : `
+            <tr>
+
+              <td
+                colspan="${equipmentTypes.length + 2}"
+                class="resource-empty">
+
+                Нет техники для выбранного периода
+
+              </td>
+
+            </tr>
+          `;
   }
 
 
-  const globalDaily =
-    new Map();
+  /*
+    Среднее по объекту для каждого вида техники.
+  */
 
 
-  rows.forEach(
-    row => {
-
-      if (
-        !row.date
-      ) {
-        return;
-      }
-
-      if (
-        !globalDaily.has(
-          row.date
-        )
-      ) {
-
-        globalDaily.set(
-          row.date,
-          {
-            people:
-              0,
-            equipment:
-              0
-          }
-        );
-      }
-
-      const item =
-        globalDaily.get(
-          row.date
-        );
-
-      item.people +=
-        resourceTotalPeople(
-          row
-        );
-
-      item.equipment +=
-        num(
-          row.equipmentQty
-        );
-    }
-  );
-
-
-  let dates =
-    [
-      ...globalDaily.keys()
-    ]
-      .sort();
-
-  const method =
-    $('rAvgMethod')?.value ||
-    'reported';
-
-  const missingRule =
-    $('rMissingRule')?.value ||
-    'skip';
+  const equipmentFoot =
+    ensureTableFoot(
+      'raEquipmentBody',
+      'raEquipmentFoot'
+    );
 
 
   if (
-    method ===
-    'calendar'
+    equipmentFoot
   ) {
 
-    dates =
-      dateRange(
-        $('rFrom').value,
-        $('rTo').value
+    const typeAverages =
+      equipmentTypes.map(
+        type => {
+
+          const values =
+            [];
+
+
+          globalDates.forEach(
+            date => {
+
+              const day =
+                globalByDate.get(
+                  date
+                );
+
+
+              const value =
+                day
+                  ? num(
+                      day.equipmentTypes[
+                        type
+                      ]
+                    )
+                  : 0;
+
+
+              if (
+                day
+              ) {
+
+                if (
+                  method !==
+                    'nonzero' ||
+                  value !==
+                    0
+                ) {
+
+                  values.push(
+                    value
+                  );
+                }
+
+              } else if (
+                missingRule ===
+                'zero'
+              ) {
+
+                values.push(
+                  0
+                );
+              }
+            }
+          );
+
+
+          return (
+            values.length
+              ? values.reduce(
+                  (
+                    sum,
+                    value
+                  ) =>
+                    sum +
+                    value,
+                  0
+                ) /
+                values.length
+              : 0
+          );
+        }
       );
 
-  } else if (
-    method ===
-    'workdays'
-  ) {
 
-    dates =
-      dateRange(
-        $('rFrom').value,
-        $('rTo').value
-      )
-        .filter(
-          isWorkday
-        );
+    equipmentFoot.innerHTML =
+      `
+        <tr>
+
+          <th>
+            Среднее по объекту
+          </th>
+
+          ${
+            typeAverages
+              .map(
+                value =>
+                  `
+                    <th class="num-head">
+                      ${Math.round(value)}
+                    </th>
+                  `
+              )
+              .join('')
+          }
+
+          <th class="num-head">
+
+            ${
+              Math.round(
+                typeAverages.reduce(
+                  (
+                    sum,
+                    value
+                  ) =>
+                    sum +
+                    value,
+                  0
+                )
+              )
+            }
+
+          </th>
+
+        </tr>
+      `;
   }
-
-
-  const peopleValues =
-    [];
-
-  const equipmentValues =
-    [];
-
-
-  dates.forEach(
-    date => {
-
-      const item =
-        globalDaily.get(
-          date
-        );
-
-      if (
-        item
-      ) {
-
-        if (
-          method !==
-            'nonzero' ||
-          item.people !==
-            0
-        ) {
-
-          peopleValues.push(
-            item.people
-          );
-        }
-
-        if (
-          method !==
-            'nonzero' ||
-          item.equipment !==
-            0
-        ) {
-
-          equipmentValues.push(
-            item.equipment
-          );
-        }
-
-      } else if (
-        missingRule ===
-        'zero'
-      ) {
-
-        peopleValues.push(
-          0
-        );
-
-        equipmentValues.push(
-          0
-        );
-      }
-    }
-  );
-
-
-  const average =
-    values =>
-      values.length
-        ? values.reduce(
-            (
-              sum,
-              value
-            ) =>
-              sum +
-              value,
-            0
-          ) /
-          values.length
-        : 0;
 
 
   if (
     $('raPeopleAvg')
   ) {
-    $('raPeopleAvg').textContent =
-      Math.round(
-        average(
-          peopleValues
-        )
-      );
+
+    $('raPeopleAvg')
+      .textContent =
+        Math.round(
+          averagePeople
+        );
   }
+
 
   if (
     $('raEquipmentAvg')
   ) {
-    $('raEquipmentAvg').textContent =
-      Math.round(
-        average(
-          equipmentValues
-        )
-      );
+
+    $('raEquipmentAvg')
+      .textContent =
+        Math.round(
+          averageEquipment
+        );
   }
+
 
   if (
     $('raDaysCount')
   ) {
-    $('raDaysCount').textContent =
-      Math.max(
-        peopleValues.length,
-        equipmentValues.length
-      );
+
+    $('raDaysCount')
+      .textContent =
+        globalDates.length;
   }
 }
 
@@ -3326,7 +4459,8 @@ const equipmentTypes =
    СОХРАНЕННОЕ ПРЕДСТАВЛЕНИЕ
    ========================================================= */
 
-async function saveResourceView(){
+
+async function saveResourceView() {
 
   const name =
     prompt(
@@ -3334,60 +4468,82 @@ async function saveResourceView(){
       'Ресурсы — аналитика'
     );
 
+
   if (
     !name
   ) {
     return;
   }
 
+
   project.views =
     project.views ||
     [];
 
+
   project.views.push({
+
     id:
       uid(
         'VIEW'
       ),
+
     name:
       name.trim(),
+
     type:
       'resourceAnalytics',
+
     createdAt:
       nowIso(),
+
     config: {
+
       from:
-        $('rFrom')?.value ||
+        $('rFrom')
+          ?.value ||
         '',
+
       to:
-        $('rTo')?.value ||
+        $('rTo')
+          ?.value ||
         '',
+
       organizations:
         getMultiFilterValues(
           'rOrg'
         ),
+
       buildings:
         getMultiFilterValues(
           'rBuilding'
         ),
+
       works:
         getMultiFilterValues(
           'rWork'
         ),
+
       fronts:
         getMultiFilterValues(
           'rFront'
         ),
+
       showZero:
         resourceShowZero(),
+
       averageMethod:
-        $('rAvgMethod')?.value ||
+        $('rAvgMethod')
+          ?.value ||
         'reported',
+
       missingRule:
-        $('rMissingRule')?.value ||
+        $('rMissingRule')
+          ?.value ||
         'skip'
     }
   });
+
 
   log(
     'Создано',
@@ -3395,7 +4551,9 @@ async function saveResourceView(){
     name.trim()
   );
 
+
   await saveProject();
+
 
   alert(
     'Представление сохранено.'
@@ -3407,22 +4565,26 @@ async function saveResourceView(){
    ПЛАН / ФАКТ РЕСУРСОВ
    ========================================================= */
 
-function resourcePlanFiltered(){
+
+function resourcePlanFiltered() {
 
   const organizations =
     getMultiFilterValues(
       'rOrg'
     );
 
+
   const buildings =
     getMultiFilterValues(
       'rBuilding'
     );
 
+
   const works =
     getMultiFilterValues(
       'rWork'
     );
+
 
   const fronts =
     getMultiFilterValues(
@@ -3430,7 +4592,7 @@ function resourcePlanFiltered(){
     );
 
 
-  const match =
+  const matches =
     (
       values,
       value
@@ -3443,6 +4605,7 @@ function resourcePlanFiltered(){
         return true;
       }
 
+
       if (
         !Array.isArray(
           values
@@ -3451,6 +4614,7 @@ function resourcePlanFiltered(){
       ) {
         return false;
       }
+
 
       return values.includes(
         String(
@@ -3462,11 +4626,14 @@ function resourcePlanFiltered(){
 
 
   const from =
-    $('rFrom')?.value ||
+    $('rFrom')
+      ?.value ||
     '';
 
+
   const to =
-    $('rTo')?.value ||
+    $('rTo')
+      ?.value ||
     '';
 
 
@@ -3486,19 +4653,19 @@ function resourcePlanFiltered(){
           plan.startDate <=
           to
         ) &&
-        match(
+        matches(
           organizations,
           plan.organizationId
         ) &&
-        match(
+        matches(
           buildings,
           plan.buildingId
         ) &&
-        match(
+        matches(
           works,
           plan.workId
         ) &&
-        match(
+        matches(
           fronts,
           plan.frontId
         )
@@ -3509,7 +4676,7 @@ function resourcePlanFiltered(){
 function openResourcePlanEditor(
   id =
     null
-){
+) {
 
   const plan =
     id
@@ -3542,7 +4709,13 @@ function openResourcePlanEditor(
                   : ''
               }
             >
-              ${esc(frontLabel(front))}
+
+              ${esc(
+                frontLabel(
+                  front
+                )
+              )}
+
             </option>
           `
       )
@@ -3558,74 +4731,196 @@ function openResourcePlanEditor(
       <div class="form-grid">
 
         <div class="field">
-          <label>Организация</label>
+
+          <label>
+            Организация
+          </label>
+
           <select id="rpOrg">
-            ${selectOptions(project.organizations,plan.organizationId || '',true)}
+
+            ${
+              selectOptions(
+                project.organizations,
+                plan.organizationId ||
+                '',
+                true
+              )
+            }
+
           </select>
+
         </div>
 
+
         <div class="field">
-          <label>Здание</label>
+
+          <label>
+            Здание
+          </label>
+
           <select id="rpBuilding">
-            ${selectOptions(project.buildings,plan.buildingId || '',true)}
+
+            ${
+              selectOptions(
+                project.buildings,
+                plan.buildingId ||
+                '',
+                true
+              )
+            }
+
           </select>
+
         </div>
 
+
         <div class="field">
-          <label>Работа</label>
+
+          <label>
+            Работа
+          </label>
+
           <select id="rpWork">
-            ${selectOptions(project.works,plan.workId || '',true)}
+
+            ${
+              selectOptions(
+                project.works,
+                plan.workId ||
+                '',
+                true
+              )
+            }
+
           </select>
+
         </div>
 
+
         <div class="field">
-          <label>Фронт</label>
+
+          <label>
+            Фронт
+          </label>
+
           <select id="rpFront">
-            <option value="">—</option>
+
+            <option value="">
+              —
+            </option>
+
             ${frontOptions}
+
           </select>
+
         </div>
 
-        <div class="field">
-          <label>С</label>
-          <input id="rpStart" type="date" value="${esc(plan.startDate || today())}">
-        </div>
 
         <div class="field">
-          <label>По</label>
-          <input id="rpEnd" type="date" value="${esc(plan.endDate || today())}">
+
+          <label>
+            С
+          </label>
+
+          <input
+            id="rpStart"
+            type="date"
+            value="${esc(
+              plan.startDate ||
+              today()
+            )}"
+          >
+
         </div>
 
-        <div class="field">
-          <label>План, чел.</label>
-          <input id="rpPeople" type="number" min="0" step="1" value="${plan.people ?? ''}">
-        </div>
 
         <div class="field">
-          <label>Источник / метод</label>
-          <input id="rpMethod" value="${esc(plan.method || 'Ручной')}">
+
+          <label>
+            По
+          </label>
+
+          <input
+            id="rpEnd"
+            type="date"
+            value="${esc(
+              plan.endDate ||
+              today()
+            )}"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            План, чел.
+          </label>
+
+          <input
+            id="rpPeople"
+            type="number"
+            min="0"
+            step="1"
+            value="${
+              plan.people ??
+              ''
+            }"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Источник / метод
+          </label>
+
+          <input
+            id="rpMethod"
+            value="${esc(
+              plan.method ||
+              'Ручной'
+            )}"
+          >
+
         </div>
 
       </div>
+
 
       <div class="field">
-        <label>Комментарий</label>
-        <textarea id="rpComment">${esc(plan.comment || '')}</textarea>
+
+        <label>
+          Комментарий
+        </label>
+
+        <textarea id="rpComment">${esc(
+          plan.comment ||
+          ''
+        )}</textarea>
+
       </div>
+
 
       <div class="editor-actions">
 
         ${
           id
             ? `
-                <button id="rpDelete" class="btn danger">
+                <button
+                  id="rpDelete"
+                  class="btn danger">
                   Удалить
                 </button>
               `
             : ''
         }
 
-        <button id="rpSave" class="btn primary">
+        <button
+          id="rpSave"
+          class="btn primary">
           Сохранить
         </button>
 
@@ -3639,6 +4934,7 @@ function openResourcePlanEditor(
       saveResourcePlan(
         id
       );
+
 
   if (
     id &&
@@ -3656,7 +4952,7 @@ function openResourcePlanEditor(
 
 async function saveResourcePlan(
   id
-){
+) {
 
   const existing =
     id
@@ -3753,13 +5049,18 @@ async function saveResourcePlan(
     existing
       ? 'Изменено'
       : 'Создано',
+
     'План ресурсов',
+
     `${row.startDate}—${row.endDate}`
   );
 
+
   await saveProject();
 
+
   closeModal();
+
 
   renderResourcePlanFact();
 }
@@ -3767,7 +5068,7 @@ async function saveResourcePlan(
 
 async function deleteResourcePlan(
   id
-){
+) {
 
   if (
     !confirm(
@@ -3776,6 +5077,7 @@ async function deleteResourcePlan(
   ) {
     return;
   }
+
 
   project.resourcePlans =
     (
@@ -3792,42 +5094,58 @@ async function deleteResourcePlan(
           )
       );
 
+
   log(
     'Удалено',
     'План ресурсов',
     id
   );
 
+
   await saveProject();
 
+
   closeModal();
+
 
   renderResourcePlanFact();
 }
 
 
-function renderResourcePlanFact(){
+function renderResourcePlanFact() {
+
+  ensureResourceUiStyles();
+
 
   const plans =
     resourcePlanFiltered();
 
+
   const facts =
     resourceFiltered();
 
+
   const step =
-    $('rpStep')?.value ||
+    $('rpStep')
+      ?.value ||
     'week';
 
+
   const from =
-    $('rFrom')?.value ||
+    $('rFrom')
+      ?.value ||
     today();
 
+
   const to =
-    $('rTo')?.value ||
+    $('rTo')
+      ?.value ||
     today();
+
 
   const planMap =
     new Map();
+
 
   const factMap =
     new Map();
@@ -3858,11 +5176,13 @@ function renderResourcePlanFact(){
               return;
             }
 
+
             const key =
               resourceBucketKey(
                 date,
                 step
               );
+
 
             planMap.set(
               key,
@@ -3885,6 +5205,7 @@ function renderResourcePlanFact(){
   const factDaily =
     new Map();
 
+
   facts.forEach(
     row => {
 
@@ -3893,6 +5214,7 @@ function renderResourcePlanFact(){
       ) {
         return;
       }
+
 
       factDaily.set(
         row.date,
@@ -3927,6 +5249,7 @@ function renderResourcePlanFact(){
             step
           );
 
+
         factMap.set(
           key,
           (
@@ -3942,10 +5265,12 @@ function renderResourcePlanFact(){
 
 
   const keys =
-    uniq([
-      ...planMap.keys(),
-      ...factMap.keys()
-    ])
+    uniq(
+      [
+        ...planMap.keys(),
+        ...factMap.keys()
+      ]
+    )
       .sort();
 
 
@@ -3962,6 +5287,7 @@ function renderResourcePlanFact(){
           value,
         0
       );
+
 
   const factSum =
     [
@@ -3981,24 +5307,29 @@ function renderResourcePlanFact(){
   if (
     $('rpPlanSum')
   ) {
+
     $('rpPlanSum').textContent =
       Math.round(
         planSum
       );
   }
 
+
   if (
     $('rpFactSum')
   ) {
+
     $('rpFactSum').textContent =
       Math.round(
         factSum
       );
   }
 
+
   if (
     $('rpDeviation')
   ) {
+
     $('rpDeviation').textContent =
       Math.round(
         factSum -
@@ -4014,10 +5345,23 @@ function renderResourcePlanFact(){
     $('rpHead').innerHTML =
       `
         <tr>
-          <th>Период</th>
-          <th>План</th>
-          <th>Факт</th>
-          <th>Отклонение</th>
+
+          <th>
+            Период
+          </th>
+
+          <th class="num-head">
+            План
+          </th>
+
+          <th class="num-head">
+            Факт
+          </th>
+
+          <th class="num-head">
+            Отклонение
+          </th>
+
         </tr>
       `;
   }
@@ -4039,6 +5383,7 @@ function renderResourcePlanFact(){
                 )
               );
 
+
             const fact =
               num(
                 factMap.get(
@@ -4046,12 +5391,34 @@ function renderResourcePlanFact(){
                 )
               );
 
+
             return `
               <tr>
-                <td>${esc(resourceBucketLabel(key,step))}</td>
-                <td>${Math.round(plan)}</td>
-                <td>${Math.round(fact)}</td>
-                <td>${Math.round(fact-plan)}</td>
+
+                <td>
+                  ${esc(
+                    resourceBucketLabel(
+                      key,
+                      step
+                    )
+                  )}
+                </td>
+
+                <td class="num-cell">
+                  ${Math.round(plan)}
+                </td>
+
+                <td class="num-cell">
+                  ${Math.round(fact)}
+                </td>
+
+                <td class="num-cell">
+                  ${Math.round(
+                    fact -
+                    plan
+                  )}
+                </td>
+
               </tr>
             `;
           }
@@ -4067,10 +5434,26 @@ function renderResourcePlanFact(){
     $('rpFoot').innerHTML =
       `
         <tr>
-          <th>Итого</th>
-          <th>${Math.round(planSum)}</th>
-          <th>${Math.round(factSum)}</th>
-          <th>${Math.round(factSum-planSum)}</th>
+
+          <th>
+            Итого
+          </th>
+
+          <th class="num-head">
+            ${Math.round(planSum)}
+          </th>
+
+          <th class="num-head">
+            ${Math.round(factSum)}
+          </th>
+
+          <th class="num-head">
+            ${Math.round(
+              factSum -
+              planSum
+            )}
+          </th>
+
         </tr>
       `;
   }
@@ -4081,8 +5464,10 @@ function renderResourcePlanFact(){
   ) {
 
     try {
+
       livResourcePlanFactChart
         .destroy();
+
     } catch (
       error
     ) {
@@ -4092,6 +5477,7 @@ function renderResourcePlanFact(){
 
   const canvas =
     $('resourcePlanFactChart');
+
 
   if (
     canvas &&
@@ -4107,6 +5493,7 @@ function renderResourcePlanFact(){
             'line',
 
           data: {
+
             labels:
               keys.map(
                 key =>
@@ -4117,9 +5504,11 @@ function renderResourcePlanFact(){
               ),
 
             datasets: [
+
               {
                 label:
                   'План',
+
                 data:
                   keys.map(
                     key =>
@@ -4129,14 +5518,18 @@ function renderResourcePlanFact(){
                         )
                       )
                   ),
+
                 borderWidth:
                   2,
+
                 tension:
                   0
               },
+
               {
                 label:
                   'Факт',
+
                 data:
                   keys.map(
                     key =>
@@ -4146,8 +5539,10 @@ function renderResourcePlanFact(){
                         )
                       )
                   ),
+
                 borderWidth:
                   2,
+
                 tension:
                   0
               }
@@ -4155,14 +5550,20 @@ function renderResourcePlanFact(){
           },
 
           options: {
+
             responsive:
               true,
+
             maintainAspectRatio:
               false,
+
             scales: {
+
               y: {
+
                 beginAtZero:
                   true,
+
                 ticks: {
                   precision:
                     0
@@ -4177,15 +5578,17 @@ function renderResourcePlanFact(){
 
 
 /* =========================================================
-   ПЕРЕКЛЮЧЕНИЕ
+   ПЕРЕКЛЮЧЕНИЕ ВИДОВ
    ========================================================= */
+
 
 function switchResourceView(
   view
-){
+) {
 
   livResourceView =
     view;
+
 
   document
     .querySelectorAll(
@@ -4203,6 +5606,7 @@ function switchResourceView(
       }
     );
 
+
   document
     .querySelectorAll(
       '.resource-view'
@@ -4214,6 +5618,7 @@ function switchResourceView(
         )
     );
 
+
   $(
     `rview-${view}`
   )
@@ -4222,45 +5627,71 @@ function switchResourceView(
       'hidden'
     );
 
+
   renderResourceCurrentView();
+
+
+  if (
+    typeof livApplyViewConstructor ===
+    'function'
+  ) {
+
+    livApplyViewConstructor();
+  }
 }
 
 
-function renderResourceCurrentView(){
+function renderResourceCurrentView() {
 
   if (
     livResourceView ===
     'daily'
   ) {
+
     return renderResourceDaily();
   }
+
 
   if (
     livResourceView ===
     'dynamics'
   ) {
+
     return renderResourceDynamics();
   }
+
 
   if (
     livResourceView ===
     'analytics'
   ) {
+
     return renderResourceAnalytics();
   }
+
 
   if (
     livResourceView ===
     'planfact'
   ) {
+
     return renderResourcePlanFact();
   }
+
 
   return renderResourceJournal();
 }
 
 
-function bindResourceUi(){
+/* =========================================================
+   СОБЫТИЯ
+   ========================================================= */
+
+
+function bindResourceUi() {
+
+  ensureResourceUiStyles();
+
 
   document
     .querySelectorAll(
@@ -4301,35 +5732,42 @@ function bindResourceUi(){
     renderResourceDaily
   );
 
+
   bindChange(
     'rDynType',
     renderResourceDynamics
   );
+
 
   bindChange(
     'rDynStep',
     renderResourceDynamics
   );
 
+
   bindChange(
     'rDynOrg',
     renderResourceDynamics
   );
+
 
   bindChange(
     'rAvgMethod',
     renderResourceAnalytics
   );
 
+
   bindChange(
     'rMissingRule',
     renderResourceAnalytics
   );
 
+
   bindChange(
     'rpStep',
     renderResourcePlanFact
   );
+
 
   bindChange(
     'rShowZero',
@@ -4339,9 +5777,11 @@ function bindResourceUi(){
 
   bindClick(
     'resourceResetFiltersBtn',
+
     () => {
 
       resetResourceFilters();
+
 
       renderResourceCurrentView();
     }
@@ -4353,22 +5793,28 @@ function bindResourceUi(){
     deleteSelectedResources
   );
 
+
   bindClick(
     'resourceDeleteFilteredBtn',
     deleteFilteredResources
   );
 
+
   bindClick(
     'newResourceBtn',
+
     () =>
       openResourceEditor()
   );
 
+
   bindClick(
     'newResourcePlanBtn',
+
     () =>
       openResourcePlanEditor()
   );
+
 
   bindClick(
     'saveResourceViewBtn',
@@ -4378,10 +5824,12 @@ function bindResourceUi(){
 
   bindClick(
     'resourceColumnsBtn',
+
     () => {
 
       const panel =
         $('resourceColumnsPanel');
+
 
       if (
         !panel
@@ -4389,15 +5837,18 @@ function bindResourceUi(){
         return;
       }
 
+
       panel.classList.toggle(
         'hidden'
       );
+
 
       if (
         !panel.classList.contains(
           'hidden'
         )
       ) {
+
         renderResourceColumnPanel();
       }
     }
