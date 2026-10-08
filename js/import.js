@@ -1,8 +1,8 @@
 'use strict';
 
 /* =========================================================
-   LIV PLANNING
-   ИМПОРТ EXCEL / CSV
+   LIV Planning — ИМПОРТ
+   Excel / CSV -> единая база LIV Planning
    ========================================================= */
 
 
@@ -10,47 +10,34 @@
    ДАТЫ
    ========================================================= */
 
-function normDate(value) {
+function normDate(
+  value
+){
 
   if (
-    value === null ||
-    value === undefined ||
-    value === ''
+    value ===
+      null ||
+    value ===
+      undefined ||
+    value ===
+      ''
   ) {
     return '';
   }
 
 
   if (
-    value instanceof Date &&
+    value instanceof
+      Date &&
     !Number.isNaN(
       value.getTime()
     )
   ) {
 
-    const y =
-      value.getFullYear();
-
-    const m =
-      String(
-        value.getMonth() + 1
-      )
-        .padStart(
-          2,
-          '0'
-        );
-
-    const d =
-      String(
-        value.getDate()
-      )
-        .padStart(
-          2,
-          '0'
-        );
-
     return (
-      `${y}-${m}-${d}`
+      `${value.getFullYear()}-` +
+      `${String(value.getMonth()+1).padStart(2,'0')}-` +
+      `${String(value.getDate()).padStart(2,'0')}`
     );
   }
 
@@ -71,25 +58,14 @@ function normDate(value) {
           value
         );
 
-
-    if (parsed) {
+    if (
+      parsed
+    ) {
 
       return (
         `${parsed.y}-` +
-        `${String(
-          parsed.m
-        )
-          .padStart(
-            2,
-            '0'
-          )}-` +
-        `${String(
-          parsed.d
-        )
-          .padStart(
-            2,
-            '0'
-          )}`
+        `${String(parsed.m).padStart(2,'0')}-` +
+        `${String(parsed.d).padStart(2,'0')}`
       );
     }
   }
@@ -107,27 +83,28 @@ function normDate(value) {
     );
 
 
-  if (match) {
+  if (
+    match
+  ) {
 
     const year =
-      match[3].length ===
+      match[
+        3
+      ]
+        .length ===
         2
-        ? `20${match[3]}`
-        : match[3];
-
+        ? '20' +
+          match[
+            3
+          ]
+        : match[
+            3
+          ];
 
     return (
       `${year}-` +
-      `${match[2]
-        .padStart(
-          2,
-          '0'
-        )}-` +
-      `${match[1]
-        .padStart(
-          2,
-          '0'
-        )}`
+      `${match[2].padStart(2,'0')}-` +
+      `${match[1].padStart(2,'0')}`
     );
   }
 
@@ -138,20 +115,14 @@ function normDate(value) {
     );
 
 
-  if (match) {
+  if (
+    match
+  ) {
 
     return (
       `${match[1]}-` +
-      `${match[2]
-        .padStart(
-          2,
-          '0'
-        )}-` +
-      `${match[3]
-        .padStart(
-          2,
-          '0'
-        )}`
+      `${match[2].padStart(2,'0')}-` +
+      `${match[3].padStart(2,'0')}`
     );
   }
 
@@ -161,8 +132,39 @@ function normDate(value) {
 
 
 /* =========================================================
-   СОЗДАНИЕ СПРАВОЧНИКОВ
+   СПРАВОЧНИКИ
    ========================================================= */
+
+function strictNameKey(
+  value
+){
+
+  return String(
+    value ??
+    ''
+  )
+    .trim()
+    .replace(
+      /\s+/g,
+      ' '
+    )
+    .toLocaleLowerCase(
+      'ru-RU'
+    );
+}
+
+
+/*
+  ВАЖНО:
+  для организаций НЕ используем агрессивную нормализацию.
+
+  Поэтому:
+  ООО "Пауэр Проджектс"
+  ООО "Пауэр Проджектс"(кладка)
+  ООО "Пауэр Проджектс" - сети
+
+  останутся разными организациями.
+*/
 
 function ensureNamed(
   list,
@@ -170,51 +172,47 @@ function ensureNamed(
   name,
   extra =
     {}
-) {
+){
 
   const clean =
     normText(
       name
     );
 
-
-  if (!clean) {
+  if (
+    !clean
+  ) {
     return null;
   }
 
 
   let item =
-    (
-      list ||
-      []
-    )
-      .find(
-        row =>
-          sameText(
-            row.name,
-            clean
-          )
-      );
+    list.find(
+      row =>
+        strictNameKey(
+          row.name
+        ) ===
+        strictNameKey(
+          clean
+        )
+    );
 
 
-  if (!item) {
+  if (
+    !item
+  ) {
 
     item = {
-
       id:
         uid(
           prefix
         ),
-
       name:
         clean,
-
       active:
         true,
-
       ...extra
     };
-
 
     list.push(
       item
@@ -228,7 +226,7 @@ function ensureNamed(
 
 function ensureStructure(
   data
-) {
+){
 
   const candidate = {
 
@@ -301,20 +299,18 @@ function ensureStructure(
       );
 
 
-  if (!structure) {
+  if (
+    !structure
+  ) {
 
     structure = {
-
       id:
         uid(
           'STR'
         ),
-
       ...candidate,
-
       signature
     };
-
 
     project.structures.push(
       structure
@@ -334,16 +330,14 @@ function ensureStructure(
 
 
 /* =========================================================
-   ОПИСАНИЕ ПОЛЕЙ
+   ПОЛЯ
    ========================================================= */
 
 const FIELD_DEFS = {
 
   building: {
-
     label:
       'Здание',
-
     aliases: [
       'здание',
       'объект',
@@ -352,36 +346,27 @@ const FIELD_DEFS = {
     ]
   },
 
-
   block: {
-
     label:
       'Блок',
-
     aliases: [
       'блок',
       'секция'
     ]
   },
 
-
   floor: {
-
     label:
       'Этаж',
-
     aliases: [
       'этаж',
       'уровень'
     ]
   },
 
-
   capture: {
-
     label:
       'Захватка',
-
     aliases: [
       'захватка',
       'номер захватки',
@@ -389,36 +374,27 @@ const FIELD_DEFS = {
     ]
   },
 
-
   axis: {
-
     label:
       'Ось',
-
     aliases: [
       'ось',
       'оси'
     ]
   },
 
-
   side: {
-
     label:
       'Сторона',
-
     aliases: [
       'сторона',
       'фасад'
     ]
   },
 
-
   zone: {
-
     label:
       'Зона',
-
     aliases: [
       'зона',
       'участок',
@@ -426,36 +402,27 @@ const FIELD_DEFS = {
     ]
   },
 
-
   roomNo: {
-
     label:
       '№ помещения',
-
     aliases: [
       '№ помещения',
       'номер помещения'
     ]
   },
 
-
   roomName: {
-
     label:
       'Помещение',
-
     aliases: [
       'помещение',
       'название помещения'
     ]
   },
 
-
   work: {
-
     label:
       'Работа',
-
     aliases: [
       'работа',
       'вид работы',
@@ -466,12 +433,9 @@ const FIELD_DEFS = {
     ]
   },
 
-
   organization: {
-
     label:
       'Организация',
-
     aliases: [
       'организация',
       'подрядчик',
@@ -480,24 +444,18 @@ const FIELD_DEFS = {
     ]
   },
 
-
   status: {
-
     label:
       'Статус',
-
     aliases: [
       'статус',
       'состояние'
     ]
   },
 
-
   unit: {
-
     label:
       'Ед. изм.',
-
     aliases: [
       'ед. изм.',
       'ед изм',
@@ -505,12 +463,9 @@ const FIELD_DEFS = {
     ]
   },
 
-
   totalQty: {
-
     label:
       'Общий объем',
-
     aliases: [
       'общий объем',
       'общий объём',
@@ -519,12 +474,9 @@ const FIELD_DEFS = {
     ]
   },
 
-
   doneQty: {
-
     label:
       'Накопительный итог',
-
     aliases: [
       'накопительный итог',
       'выполнено накопительно',
@@ -532,59 +484,43 @@ const FIELD_DEFS = {
     ]
   },
 
-
   contractStart: {
-
     label:
       'Договорное начало',
-
     aliases: [
       'договорное начало',
       'начало договор'
     ]
   },
 
-
   contractEnd: {
-
     label:
       'Договорное окончание',
-
     aliases: [
       'договорное окончание',
-      'окончание договор',
-      'дата по договору'
+      'окончание договор'
     ]
   },
 
-
   baselineStart: {
-
     label:
       'Базовое начало',
-
     aliases: [
       'базовое начало'
     ]
   },
 
-
   baselineEnd: {
-
     label:
       'Базовое окончание',
-
     aliases: [
       'базовое окончание'
     ]
   },
 
-
   planStart: {
-
     label:
       'План начало',
-
     aliases: [
       'рабочее начало',
       'начало план',
@@ -594,12 +530,9 @@ const FIELD_DEFS = {
     ]
   },
 
-
   planEnd: {
-
     label:
       'План окончание',
-
     aliases: [
       'рабочее окончание',
       'окончание план',
@@ -609,12 +542,9 @@ const FIELD_DEFS = {
     ]
   },
 
-
   factStart: {
-
     label:
       'Факт начало',
-
     aliases: [
       'начало факт',
       'факт начало',
@@ -622,12 +552,9 @@ const FIELD_DEFS = {
     ]
   },
 
-
   factEnd: {
-
     label:
       'Факт окончание',
-
     aliases: [
       'окончание факт',
       'факт окончание',
@@ -635,12 +562,9 @@ const FIELD_DEFS = {
     ]
   },
 
-
   forecastEnd: {
-
     label:
       'Прогноз окончание',
-
     aliases: [
       'прогнозное окончание',
       'прогноз окончания',
@@ -648,12 +572,9 @@ const FIELD_DEFS = {
     ]
   },
 
-
   date: {
-
     label:
       'Дата',
-
     aliases: [
       'дата',
       'дата отчета',
@@ -663,12 +584,9 @@ const FIELD_DEFS = {
     ]
   },
 
-
   qty: {
-
     label:
       'Факт за период',
-
     aliases: [
       'факт за период',
       'выполнено за период',
@@ -678,12 +596,9 @@ const FIELD_DEFS = {
     ]
   },
 
-
   cumulative: {
-
     label:
       'Накопительно',
-
     aliases: [
       'накопительно',
       'накопительный итог',
@@ -691,114 +606,82 @@ const FIELD_DEFS = {
     ]
   },
 
-
   people: {
-
     label:
       'Люди',
-
     aliases: [
       'люди',
       'количество людей'
     ]
   },
 
-
   peopleQty: {
-
     label:
       'Количество человек',
-
     aliases: [
       'количество человек',
       'кол-во человек',
       'кол во человек',
       'численность человек',
       'кол-во чел.',
-      'кол-во чел',
-      'численность',
-      'количество персонала'
+      'кол-во чел'
     ]
   },
 
-
   specialization: {
-
     label:
       'Специализация',
-
     aliases: [
       'специализация',
       'категория персонала',
       'категория работников',
-      'вид персонала',
-      'категория'
+      'вид персонала'
     ]
   },
-
 
   itr: {
-
     label:
       'ИТР',
-
     aliases: [
       'итр',
-      'инженерно технические работники',
-      'инженерно-технические работники'
+      'инженерно технические работники'
     ]
   },
 
-
   workers: {
-
     label:
       'Подсобные рабочие',
-
     aliases: [
       'подсобные рабочие',
       'рабочие',
-      'рабочих',
-      'рабочий персонал'
+      'рабочих'
     ]
   },
-
 
   mechanizers: {
-
     label:
       'Механизаторы',
-
     aliases: [
       'механизаторы',
-      'машинисты',
-      'механизатор'
+      'машинисты'
     ]
   },
 
-
   equipmentType: {
-
     label:
       'Наименование техники',
-
     aliases: [
       'наименование техники',
       'тип техники',
       'техника',
       'механизм',
-      'механизмы',
-      'наименование механизма',
-      'вид техники'
+      'механизмы'
     ]
   },
 
-
   equipmentQty: {
-
     label:
       'Количество техники',
-
     aliases: [
       'количество техники',
       'кол во техники',
@@ -810,23 +693,13 @@ const FIELD_DEFS = {
       'количество единиц техники',
       'кол-во, ед.',
       'количество механизмов',
-      'кол-во механизмов',
-      'кол во механизмов',
-      'количество единиц',
-      'кол-во ед.',
-      'кол во ед',
-      'количество ед',
-      'количество машин',
-      'кол-во машин'
+      'кол-во механизмов'
     ]
   },
 
-
   elementType: {
-
     label:
       'Тип элемента',
-
     aliases: [
       'тип элемента',
       'элемент',
@@ -834,12 +707,9 @@ const FIELD_DEFS = {
     ]
   },
 
-
   elementNo: {
-
     label:
       'Номер элемента',
-
     aliases: [
       'номер элемента',
       'порядковый номер',
@@ -853,12 +723,9 @@ const FIELD_DEFS = {
     ]
   },
 
-
   title: {
-
     label:
       'Наименование КД',
-
     aliases: [
       'ключевая дата',
       'контрольная дата',
@@ -868,12 +735,9 @@ const FIELD_DEFS = {
     ]
   },
 
-
   comment: {
-
     label:
       'Комментарий',
-
     aliases: [
       'комментарий',
       'примечание',
@@ -913,7 +777,6 @@ const MODE_FIELDS = {
     'comment'
   ],
 
-
   fact: [
     'date',
     'building',
@@ -933,7 +796,6 @@ const MODE_FIELDS = {
     'comment'
   ],
 
-
   resources: [
     'date',
     'organization',
@@ -949,7 +811,6 @@ const MODE_FIELDS = {
     'comment'
   ],
 
-
   elements: [
     'elementType',
     'elementNo',
@@ -961,11 +822,9 @@ const MODE_FIELDS = {
     'comment'
   ],
 
-
   milestones: [
     'title',
     'building',
-    'organization',
     'contractEnd',
     'planEnd',
     'forecastEnd',
@@ -977,138 +836,83 @@ const MODE_FIELDS = {
 
 
 const MODE_LABELS = {
-
   fronts:
     'Фронты / рабочий график',
-
   fact:
     'Факт выполненных работ',
-
   resources:
     'Ресурсы',
-
   elements:
     'Номерные элементы',
-
   milestones:
     'Ключевые даты'
 };
 
 
 /* =========================================================
-   ОПРЕДЕЛЕНИЕ КОЛОНОК
+   СОПОСТАВЛЕНИЕ КОЛОНОК
    ========================================================= */
 
 function fieldMatchScore(
   header,
   alias
-) {
+){
 
-  const h =
+  const normalizedHeader =
     normKey(
       header
     );
 
-
-  const a =
+  const normalizedAlias =
     normKey(
       alias
     );
 
-
   if (
-    !h ||
-    !a
+    !normalizedHeader ||
+    !normalizedAlias
   ) {
     return 0;
   }
 
-
   if (
-    h ===
-    a
+    normalizedHeader ===
+    normalizedAlias
   ) {
-    return 100;
-  }
-
-
-  if (
-    h.startsWith(
-      a
-    ) ||
-    a.startsWith(
-      h
-    )
-  ) {
-    return 80;
-  }
-
-
-  if (
-    h.includes(
-      a
-    ) ||
-    a.includes(
-      h
-    )
-  ) {
-    return 60;
-  }
-
-
-  const hWords =
-    new Set(
-      h
-        .split(
-          ' '
-        )
-        .filter(
-          Boolean
-        )
+    return (
+      1000 +
+      normalizedAlias.length
     );
+  }
 
-
-  const aWords =
-    a
-      .split(
-        ' '
+  if (
+    normalizedHeader.includes(
+      normalizedAlias
+    ) ||
+    normalizedAlias.includes(
+      normalizedHeader
+    )
+  ) {
+    return (
+      100 +
+      Math.min(
+        normalizedHeader.length,
+        normalizedAlias.length
       )
-      .filter(
-        Boolean
-      );
+    );
+  }
 
-
-  const matched =
-    aWords
-      .filter(
-        word =>
-          hWords.has(
-            word
-          )
-      )
-      .length;
-
-
-  return aWords.length
-    ? Math.round(
-        (
-          matched /
-          aWords.length
-        ) *
-        50
-      )
-    : 0;
+  return 0;
 }
 
 
 function matchField(
   header,
   mode
-) {
+){
 
   let best =
     '';
-
 
   let bestScore =
     0;
@@ -1122,25 +926,16 @@ function matchField(
     []
   ) {
 
-    const def =
+    const definition =
       FIELD_DEFS[
         key
       ];
 
-
-    if (!def) {
-      continue;
-    }
-
-
     for (
       const alias
       of [
-        def.label,
-        ...(
-          def.aliases ||
-          []
-        )
+        definition.label,
+        ...definition.aliases
       ]
     ) {
 
@@ -1150,647 +945,469 @@ function matchField(
           alias
         );
 
-
       if (
         score >
         bestScore
       ) {
-
-        best =
-          key;
-
         bestScore =
           score;
+        best =
+          key;
       }
     }
   }
 
 
-  return bestScore >=
-    60
-    ? best
-    : '';
+  return (
+    bestScore >=
+      104
+      ? best
+      : ''
+  );
+}
+
+
+function headerScore(
+  row
+){
+
+  return (
+    row ||
+    []
+  )
+    .reduce(
+      (
+        sum,
+        cell
+      ) =>
+        sum +
+        (
+          Object.values(
+            MODE_FIELDS
+          )
+            .some(
+              fields =>
+                fields.some(
+                  key =>
+                    [
+                      FIELD_DEFS[
+                        key
+                      ].label,
+                      ...FIELD_DEFS[
+                        key
+                      ].aliases
+                    ]
+                      .some(
+                        alias =>
+                          normKey(
+                            alias
+                          ) ===
+                          normKey(
+                            cell
+                          )
+                      )
+                )
+            )
+            ? 1
+            : 0
+        ),
+      0
+    );
+}
+
+
+function detectHeaderRow(
+  matrix
+){
+
+  let best = {
+    index:
+      0,
+    score:
+      -1
+  };
+
+  for (
+    let index =
+      0;
+    index <
+      Math.min(
+        matrix.length,
+        40
+      );
+    index++
+  ) {
+
+    const score =
+      headerScore(
+        matrix[
+          index
+        ]
+      );
+
+    if (
+      score >
+      best.score
+    ) {
+
+      best = {
+        index,
+        score
+      };
+    }
+  }
+
+  return best.index;
+}
+
+
+function uniqueHeaders(
+  row
+){
+
+  const used =
+    new Map();
+
+  return (
+    row ||
+    []
+  )
+    .map(
+      (
+        value,
+        index
+      ) => {
+
+        let header =
+          normText(
+            value
+          ) ||
+          `Колонка ${index + 1}`;
+
+        const count =
+          (
+            used.get(
+              header
+            ) ||
+            0
+          ) +
+          1;
+
+        used.set(
+          header,
+          count
+        );
+
+        if (
+          count >
+          1
+        ) {
+          header =
+            `${header} (${count})`;
+        }
+
+        return header;
+      }
+    );
+}
+
+
+function detectImportMode(
+  headers
+){
+
+  const text =
+    headers
+      .map(
+        normKey
+      )
+      .join(
+        ' | '
+      );
+
+
+  if (
+    /итр|механизатор|количество техники|рабочие|количество человек|специализация|наименование техники/.test(
+      text
+    ) &&
+    /дата/.test(
+      text
+    )
+  ) {
+    return 'resources';
+  }
+
+  if (
+    /порядковый номер|номер сваи|номер анкера|тип элемента/.test(
+      text
+    )
+  ) {
+    return 'elements';
+  }
+
+  if (
+    /ключевая дата|контрольная дата|формулировка/.test(
+      text
+    )
+  ) {
+    return 'milestones';
+  }
+
+  if (
+    /факт за период|объем за день|выполнено за период/.test(
+      text
+    ) &&
+    /дата/.test(
+      text
+    )
+  ) {
+    return 'fact';
+  }
+
+  return 'fronts';
 }
 
 
 function buildAutoMapping(
   mode
-) {
+){
 
-  const mapping =
+  const result =
     {};
-
-
-  const used =
-    new Set();
-
 
   for (
     const header
     of importHeaders
   ) {
 
-    const field =
+    const key =
       matchField(
         header,
         mode
       );
 
-
-    if (
-      field &&
-      !used.has(
-        field
+    result[
+      header
+    ] =
+      key &&
+      !Object.values(
+        result
       )
-    ) {
-
-      mapping[
-        field
-      ] =
-        header;
-
-
-      used.add(
-        field
-      );
-    }
+        .includes(
+          key
+        )
+        ? key
+        : '';
   }
 
+  return result;
+}
 
-  return mapping;
+
+function mappingOptions(
+  mode,
+  selected
+){
+
+  return `
+    <option value="">
+      Не использовать
+    </option>
+
+    ${
+      (
+        MODE_FIELDS[
+          mode
+        ] ||
+        []
+      )
+        .map(
+          key =>
+            `
+              <option
+                value="${esc(key)}"
+                ${
+                  key ===
+                  selected
+                    ? 'selected'
+                    : ''
+                }
+              >
+                ${esc(
+                  FIELD_DEFS[
+                    key
+                  ]?.label ||
+                  key
+                )}
+              </option>
+            `
+        )
+        .join('')
+    }
+  `;
+}
+
+
+function renderImportMapping(){
+
+  const card =
+    $('importMappingCard');
+
+  const container =
+    $('importMapping');
+
+  if (
+    !card ||
+    !container
+  ) {
+    return;
+  }
+
+  card.classList.remove(
+    'hidden'
+  );
+
+
+  container.innerHTML =
+    importHeaders
+      .map(
+        (
+          header,
+          index
+        ) =>
+          `
+            <div class="mapping-item">
+
+              <b>
+                ${esc(header)}
+              </b>
+
+              <select
+                data-map-header="${index}"
+              >
+                ${
+                  mappingOptions(
+                    importModeResolved,
+                    importMapping[
+                      header
+                    ] ||
+                    ''
+                  )
+                }
+              </select>
+
+            </div>
+          `
+      )
+      .join('');
+
+
+  container
+    .querySelectorAll(
+      '[data-map-header]'
+    )
+    .forEach(
+      select => {
+
+        select.onchange =
+          () => {
+
+            const header =
+              importHeaders[
+                num(
+                  select.dataset
+                    .mapHeader
+                )
+              ];
+
+            const chosen =
+              select.value;
+
+            if (
+              chosen
+            ) {
+
+              Object.keys(
+                importMapping
+              )
+                .forEach(
+                  key => {
+
+                    if (
+                      importMapping[
+                        key
+                      ] ===
+                      chosen
+                    ) {
+                      importMapping[
+                        key
+                      ] =
+                        '';
+                    }
+                  }
+                );
+            }
+
+            importMapping[
+              header
+            ] =
+              chosen;
+
+            renderImportMapping();
+          };
+      }
+    );
 }
 
 
 function mappedValue(
   row,
-  field
-) {
+  key
+){
 
   const header =
-    importMapping[
-      field
-    ];
-
-
-  return header
-    ? row[
-        header
-      ]
-    : '';
-}
-
-
-function detectImportMode(
-  headers
-) {
-
-  const keys =
-    headers.map(
-      normKey
-    );
-
-
-  const has =
-    (
-      ...patterns
-    ) =>
-      keys.some(
-        key =>
-          patterns.some(
-            pattern =>
-              key.includes(
-                normKey(
-                  pattern
-                )
-              )
-          )
-      );
-
-
-  if (
-    has(
-      'специализация',
-      'категория персонала'
-    ) ||
-    has(
-      'наименование техники',
-      'количество техники',
-      'механизмы'
-    ) ||
-    has(
-      'количество человек'
+    Object.keys(
+      importMapping
     )
-  ) {
-
-    return 'resources';
-  }
-
-
-  if (
-    has(
-      'номер сваи',
-      'номер анкера',
-      'тип элемента'
-    )
-  ) {
-
-    return 'elements';
-  }
-
-
-  if (
-    has(
-      'ключевая дата',
-      'контрольная дата',
-      'наименование кд'
-    )
-  ) {
-
-    return 'milestones';
-  }
-
-
-  if (
-    has(
-      'факт за период',
-      'выполнено за период',
-      'объем за день'
-    )
-  ) {
-
-    return 'fact';
-  }
-
-
-  return 'fronts';
-}
-
-
-/* =========================================================
-   ЧТЕНИЕ ФАЙЛА
-   ========================================================= */
-
-async function readImportFile(
-  event
-) {
-
-  const file =
-    event
-      ?.target
-      ?.files
-      ?.[0];
-
-
-  if (!file) {
-    return;
-  }
-
-
-  if (
-    typeof XLSX ===
-    'undefined'
-  ) {
-
-    alert(
-      'Библиотека Excel не загрузилась. Обнови страницу и попробуй еще раз.'
-    );
-
-    return;
-  }
-
-
-  importFileName =
-    file.name;
-
-
-  try {
-
-    const buffer =
-      await file.arrayBuffer();
-
-
-    importWorkbook =
-      XLSX.read(
-        buffer,
-        {
-
-          type:
-            'array',
-
-          cellDates:
-            true,
-
-          raw:
-            true
-        }
+      .find(
+        item =>
+          importMapping[
+            item
+          ] ===
+          key
       );
 
-
-    const sheetSelect =
-      $('importSheet');
-
-
-    sheetSelect.innerHTML =
-      '';
-
-
-    importWorkbook
-      .SheetNames
-      .forEach(
-        name => {
-
-          const option =
-            document.createElement(
-              'option'
-            );
-
-
-          option.value =
-            name;
-
-
-          option.textContent =
-            name;
-
-
-          sheetSelect.appendChild(
-            option
-          );
-        }
-      );
-
-
-    sheetSelect.disabled =
-      false;
-
-
-    importSheetName =
-      importWorkbook
-        .SheetNames[
-          0
-        ] ||
-      '';
-
-
-    sheetSelect.value =
-      importSheetName;
-
-
-    importMapping =
-      {};
-
-
-    importMappingMode =
-      '';
-
-
-    importRows =
-      [];
-
-
-    readSelectedSheet();
-
-
-    $('analyzeImportBtn')
-      .disabled =
-        !importRawRows.length;
-
-
-    $('commitImportBtn')
-      .disabled =
-        true;
-
-
-    $('importInfo')
-      .className =
-        'notice';
-
-
-    $('importInfo')
-      .classList
-      .remove(
-        'hidden'
-      );
-
-
-    $('importInfo')
-      .textContent =
-        `Файл загружен: ${importFileName}\n` +
-        `Лист: ${importSheetName}\n` +
-        `Строк найдено: ${importRawRows.length}\n` +
-        'Нажми «Анализировать».';
-
-  } catch (
-    error
-  ) {
-
-    console.error(
-      error
-    );
-
-
-    alert(
-      `Не удалось прочитать файл: ${error.message}`
-    );
-  }
-}
-
-
-function readSelectedSheet() {
-
-  if (
-    !importWorkbook
-  ) {
-    return;
-  }
-
-
-  importSheetName =
-    $('importSheet')
-      ?.value ||
-    importWorkbook
-      .SheetNames[
-        0
-      ] ||
-    '';
-
-
-  const sheet =
-    importWorkbook
-      .Sheets[
-        importSheetName
-      ];
-
-
-  if (!sheet) {
-
-    importHeaders =
-      [];
-
-
-    importRawRows =
-      [];
-
-
-    return;
-  }
-
-
-  const matrix =
-    XLSX.utils
-      .sheet_to_json(
-        sheet,
-        {
-
-          header:
-            1,
-
-          defval:
-            '',
-
-          raw:
-            true
-        }
-      );
-
-
-  const headerIndex =
-    findHeaderRow(
-      matrix
-    );
-
-
-  if (
-    headerIndex <
-    0
-  ) {
-
-    importHeaders =
-      [];
-
-
-    importRawRows =
-      [];
-
-
-    return;
-  }
-
-
-  importHeaders =
-    normalizeHeaders(
-      matrix[
-        headerIndex
-      ] ||
-      []
-    );
-
-
-  importRawRows =
-    matrix
-      .slice(
-        headerIndex +
-        1
-      )
-      .map(
-        (
-          values,
-          index
-        ) => {
-
-          const row = {
-
-            __sourceRow:
-              headerIndex +
-              index +
-              2
-          };
-
-
-          importHeaders
-            .forEach(
-              (
-                header,
-                i
-              ) => {
-
-                row[
-                  header
-                ] =
-                  values[
-                    i
-                  ] ??
-                  '';
-              }
-            );
-
-
-          return row;
-        }
-      )
-      .filter(
-        row =>
-          importHeaders
-            .some(
-              header =>
-                normText(
-                  row[
-                    header
-                  ]
-                ) !==
-                ''
-            )
-      );
-}
-
-
-function findHeaderRow(
-  matrix
-) {
-
-  const limit =
-    Math.min(
-      matrix.length,
-      40
-    );
-
-
-  let bestIndex =
-    -1;
-
-
-  let bestScore =
-    -1;
-
-
-  for (
-    let i =
-      0;
-    i <
-      limit;
-    i++
-  ) {
-
-    const row =
-      matrix[
-        i
-      ] ||
-      [];
-
-
-    const nonEmpty =
-      row
-        .filter(
-          value =>
-            normText(
-              value
-            ) !==
-            ''
-        )
-        .length;
-
-
-    if (
-      nonEmpty <
-      2
-    ) {
-      continue;
-    }
-
-
-    const textCells =
-      row
-        .filter(
-          value =>
-            typeof value ===
-              'string' &&
-            normText(
-              value
-            )
-        )
-        .length;
-
-
-    const score =
-      nonEmpty *
-      2 +
-      textCells;
-
-
-    if (
-      score >
-      bestScore
-    ) {
-
-      bestScore =
-        score;
-
-
-      bestIndex =
-        i;
-    }
-  }
-
-
-  return bestIndex;
-}
-
-
-function normalizeHeaders(
-  row
-) {
-
-  const used =
-    new Map();
-
-
-  return row.map(
-    (
-      value,
-      index
-    ) => {
-
-      let header =
-        normText(
-          value
-        ) ||
-        `Колонка ${index + 1}`;
-
-
-      const key =
-        normKey(
+  return (
+    header
+      ? row[
           header
-        );
+        ]
+      : ''
+  );
+}
 
 
-      const count =
-        (
-          used.get(
-            key
-          ) ||
-          0
-        ) +
-        1;
+function mappedHasValue(
+  row,
+  key
+){
 
+  const value =
+    mappedValue(
+      row,
+      key
+    );
 
-      used.set(
-        key,
-        count
-      );
-
-
-      if (
-        count >
-        1
-      ) {
-
-        header =
-          `${header} (${count})`;
-      }
-
-
-      return header;
-    }
+  return (
+    value !==
+      null &&
+    value !==
+      undefined &&
+    String(
+      value
+    )
+      .trim() !==
+      ''
   );
 }
 
@@ -1802,89 +1419,44 @@ function normalizeHeaders(
 function applyFillDown(
   rows,
   mode
-) {
+){
 
   if (
     !$('importFillDown')
       ?.checked
   ) {
-
-    return rows.map(
-      row => ({
-        ...row
-      })
-    );
+    return rows;
   }
 
 
-  const fieldsByMode = {
-
-    fronts: [
-      'building',
-      'block',
-      'floor',
-      'capture',
-      'axis',
-      'side',
-      'zone',
-      'roomNo',
-      'roomName',
-      'work',
-      'organization'
-    ],
-
-    fact: [
-      'building',
-      'block',
-      'floor',
-      'capture',
-      'axis',
-      'side',
-      'zone',
-      'roomNo',
-      'work',
-      'organization'
-    ],
-
-    resources: [
-      'date',
-      'organization',
-      'building',
-      'work',
-      'specialization'
-    ],
-
-    elements: [
-      'elementType',
-      'building',
-      'capture',
-      'zone',
-      'work'
-    ],
-
-    milestones: [
-      'building',
-      'organization'
-    ]
-  };
-
-
-  const headers =
+  const keys =
     (
-      fieldsByMode[
-        mode
-      ] ||
-      []
+      mode ===
+        'fronts' ||
+      mode ===
+        'fact'
     )
-      .map(
-        field =>
-          importMapping[
-            field
+      ? [
+          'building',
+          'block',
+          'work'
+        ]
+      : mode ===
+          'elements'
+        ? [
+            'elementType',
+            'building'
           ]
-      )
-      .filter(
-        Boolean
-      );
+        : mode ===
+            'resources'
+          ? [
+              'organization',
+              'building'
+            ]
+          : [
+              'building',
+              'title'
+            ];
 
 
   const last =
@@ -1894,679 +1466,444 @@ function applyFillDown(
   return rows.map(
     row => {
 
-      const copy = {
+      const output = {
         ...row
       };
 
+      keys.forEach(
+        key => {
 
-      headers.forEach(
-        header => {
+          const header =
+            Object.keys(
+              importMapping
+            )
+              .find(
+                item =>
+                  importMapping[
+                    item
+                  ] ===
+                  key
+              );
+
+          if (
+            !header
+          ) {
+            return;
+          }
 
           if (
             normText(
-              copy[
+              output[
                 header
               ]
-            ) !==
-            ''
+            )
           ) {
 
             last[
-              header
+              key
             ] =
-              copy[
+              output[
                 header
               ];
 
           } else if (
-            Object.prototype
-              .hasOwnProperty
-              .call(
-                last,
-                header
-              )
+            last[
+              key
+            ] !==
+            undefined
           ) {
 
-            copy[
+            output[
               header
             ] =
               last[
-                header
+                key
               ];
           }
         }
       );
 
-
-      return copy;
+      return output;
     }
   );
 }
 
 
 /* =========================================================
-   UI СОПОСТАВЛЕНИЯ
+   ЧТЕНИЕ EXCEL
    ========================================================= */
 
-function renderImportMapping() {
-
-  const card =
-    $('importMappingCard');
-
-
-  const box =
-    $('importMapping');
-
+function readSelectedSheet(){
 
   if (
-    !card ||
-    !box
+    !importWorkbook
   ) {
     return;
   }
 
+  importSheetName =
+    $('importSheet')?.value ||
+    importWorkbook
+      .SheetNames[
+        0
+      ];
 
-  card.classList
-    .remove(
-      'hidden'
+  const sheet =
+    importWorkbook
+      .Sheets[
+        importSheetName
+      ];
+
+  const matrix =
+    XLSX.utils
+      .sheet_to_json(
+        sheet,
+        {
+          header:
+            1,
+          defval:
+            '',
+          raw:
+            true,
+          blankrows:
+            false
+        }
+      );
+
+  const headerIndex =
+    detectHeaderRow(
+      matrix
     );
 
-
-  box.innerHTML =
-    (
-      MODE_FIELDS[
-        importModeResolved
+  importHeaders =
+    uniqueHeaders(
+      matrix[
+        headerIndex
       ] ||
       []
-    )
-      .map(
-        field => {
-
-          const def =
-            FIELD_DEFS[
-              field
-            ];
-
-
-          const current =
-            importMapping[
-              field
-            ] ||
-            '';
-
-
-          return `
-            <div class="mapping-item">
-
-              <b>
-                ${esc(
-                  def.label
-                )}
-              </b>
-
-              <select
-                data-import-map="${field}">
-
-                <option value="">
-                  — не использовать —
-                </option>
-
-                ${
-                  importHeaders
-                    .map(
-                      header => `
-                        <option
-                          value="${esc(
-                            header
-                          )}"
-                          ${
-                            header ===
-                            current
-                              ? 'selected'
-                              : ''
-                          }>
-                          ${esc(
-                            header
-                          )}
-                        </option>
-                      `
-                    )
-                    .join('')
-                }
-
-              </select>
-
-            </div>
-          `;
-        }
-      )
-      .join('');
-
-
-  box
-    .querySelectorAll(
-      '[data-import-map]'
-    )
-    .forEach(
-      select => {
-
-        select.onchange =
-          () => {
-
-            const field =
-              select.dataset
-                .importMap;
-
-
-            if (
-              select.value
-            ) {
-
-              importMapping[
-                field
-              ] =
-                select.value;
-
-            } else {
-
-              delete importMapping[
-                field
-              ];
-            }
-
-
-            $('commitImportBtn')
-              .disabled =
-                true;
-          };
-      }
     );
+
+  importRawRows =
+    matrix
+      .slice(
+        headerIndex +
+        1
+      )
+      .filter(
+        row =>
+          row.some(
+            value =>
+              normText(
+                value
+              ) !==
+              ''
+          )
+      )
+      .map(
+        row =>
+          Object.fromEntries(
+            importHeaders.map(
+              (
+                header,
+                index
+              ) => [
+                header,
+                row[
+                  index
+                ] ??
+                ''
+              ]
+            )
+          )
+      );
+}
+
+
+async function readImportFile(
+  event
+){
+
+  const file =
+    event.target
+      .files
+      ?.[0];
+
+  if (
+    !file
+  ) {
+    return;
+  }
+
+  try {
+
+    importWorkbook =
+      XLSX.read(
+        await file.arrayBuffer(),
+        {
+          type:
+            'array',
+          cellDates:
+            true,
+          cellNF:
+            false,
+          cellText:
+            false
+        }
+      );
+
+    importFileName =
+      file.name;
+
+    const select =
+      $('importSheet');
+
+    select.innerHTML =
+      importWorkbook
+        .SheetNames
+        .map(
+          name =>
+            `
+              <option value="${esc(name)}">
+                ${esc(name)}
+              </option>
+            `
+        )
+        .join('');
+
+    select.disabled =
+      false;
+
+    importSheetName =
+      importWorkbook
+        .SheetNames[
+          0
+        ];
+
+    select.value =
+      importSheetName;
+
+    readSelectedSheet();
+
+    if (
+      $('analyzeImportBtn')
+    ) {
+      $('analyzeImportBtn')
+        .disabled =
+          false;
+    }
+
+    if (
+      $('commitImportBtn')
+    ) {
+      $('commitImportBtn')
+        .disabled =
+          true;
+    }
+
+    if (
+      $('importInfo')
+    ) {
+
+      $('importInfo')
+        .classList
+        .remove(
+          'hidden'
+        );
+
+      $('importInfo')
+        .textContent =
+          `Файл загружен: ${file.name}. Выбери лист и нажми «Анализировать».`;
+    }
+
+  } catch (
+    error
+  ) {
+
+    console.error(
+      error
+    );
+
+    alert(
+      'Ошибка чтения файла: ' +
+      error.message
+    );
+  }
 }
 
 
 /* =========================================================
-   ПОИСК / СОЗДАНИЕ ФРОНТА
+   РАЗБОР РЕСУРСОВ
    ========================================================= */
 
-function mappedStructureData(
+function resourceValuesFromRow(
   row
-) {
+){
 
-  const buildingName =
+  const peopleRaw =
+    num(
+      mappedValue(
+        row,
+        'peopleQty'
+      )
+    );
+
+  const specialization =
     normText(
       mappedValue(
         row,
-        'building'
+        'specialization'
+      )
+    );
+
+  const specializationKey =
+    normKey(
+      specialization
+    );
+
+  const equipmentType =
+    normText(
+      mappedValue(
+        row,
+        'equipmentType'
       )
     );
 
 
-  const building =
-    buildingName
-      ? ensureNamed(
-          project.buildings,
-          'BLD',
-          buildingName
+  const explicitEquipmentQty =
+    mappedHasValue(
+      row,
+      'equipmentQty'
+    )
+      ? num(
+          mappedValue(
+            row,
+            'equipmentQty'
+          )
         )
       : null;
+
+
+  let itr =
+    num(
+      mappedValue(
+        row,
+        'itr'
+      )
+    );
+
+  let workers =
+    num(
+      mappedValue(
+        row,
+        'workers'
+      )
+    );
+
+  let mechanizers =
+    num(
+      mappedValue(
+        row,
+        'mechanizers'
+      )
+    );
+
+
+  /*
+    В исходной таблице пользователя
+    один числовой столбец используется и для людей,
+    и для строк техники.
+
+    Если есть название техники, но отдельное
+    "Количество техники" отсутствует или пусто,
+    число из "Количество человек" считаем количеством техники.
+  */
+
+  let equipmentQty =
+    explicitEquipmentQty;
+
+
+  if (
+    equipmentType &&
+    equipmentQty ===
+    null
+  ) {
+
+    equipmentQty =
+      peopleRaw;
+  }
+
+
+  if (
+    equipmentQty ===
+    null
+  ) {
+
+    equipmentQty =
+      0;
+  }
+
+
+  /*
+    Число считаем людьми только если есть специализация.
+    Поэтому строка:
+    3 | Экскаватор | [пустая специализация]
+    даст 3 ед. техники, а не 3 человека.
+  */
+
+  if (
+    specialization
+  ) {
+
+    if (
+      specializationKey ===
+        'итр' ||
+      specializationKey.includes(
+        'инженерно техничес'
+      )
+    ) {
+
+      itr +=
+        peopleRaw;
+
+    } else if (
+      specializationKey.includes(
+        'механизатор'
+      ) ||
+      specializationKey.includes(
+        'машинист'
+      )
+    ) {
+
+      mechanizers +=
+        peopleRaw;
+
+    } else if (
+      specializationKey.includes(
+        'рабоч'
+      )
+    ) {
+
+      workers +=
+        peopleRaw;
+    }
+  }
+
+
+  const peopleQty =
+    specialization
+      ? peopleRaw
+      : 0;
 
 
   return {
-
-    buildingId:
-      building?.id ||
-      '',
-
-    block:
-      mappedValue(
-        row,
-        'block'
-      ),
-
-    floor:
-      mappedValue(
-        row,
-        'floor'
-      ),
-
-    capture:
-      mappedValue(
-        row,
-        'capture'
-      ),
-
-    axis:
-      mappedValue(
-        row,
-        'axis'
-      ),
-
-    side:
-      mappedValue(
-        row,
-        'side'
-      ),
-
-    zone:
-      mappedValue(
-        row,
-        'zone'
-      ),
-
-    roomNo:
-      mappedValue(
-        row,
-        'roomNo'
-      ),
-
-    roomName:
-      mappedValue(
-        row,
-        'roomName'
-      )
+    itr,
+    workers,
+    mechanizers,
+    peopleQty,
+    specialization,
+    equipmentType,
+    equipmentQty
   };
-}
-
-
-function findMatchingFrontByMapped(
-  row
-) {
-
-  const buildingName =
-    normText(
-      mappedValue(
-        row,
-        'building'
-      )
-    );
-
-
-  const workName =
-    normText(
-      mappedValue(
-        row,
-        'work'
-      )
-    );
-
-
-  const building =
-    (
-      project.buildings ||
-      []
-    )
-      .find(
-        item =>
-          sameText(
-            item.name,
-            buildingName
-          )
-      );
-
-
-  const work =
-    (
-      project.works ||
-      []
-    )
-      .find(
-        item =>
-          sameText(
-            item.name,
-            workName
-          )
-      );
-
-
-  if (
-    !building ||
-    !work
-  ) {
-    return null;
-  }
-
-
-  const candidate = {
-
-    buildingId:
-      building.id,
-
-    block:
-      mappedValue(
-        row,
-        'block'
-      ),
-
-    floor:
-      mappedValue(
-        row,
-        'floor'
-      ),
-
-    capture:
-      mappedValue(
-        row,
-        'capture'
-      ),
-
-    axis:
-      mappedValue(
-        row,
-        'axis'
-      ),
-
-    side:
-      mappedValue(
-        row,
-        'side'
-      ),
-
-    zone:
-      mappedValue(
-        row,
-        'zone'
-      ),
-
-    roomNo:
-      mappedValue(
-        row,
-        'roomNo'
-      ),
-
-    roomName:
-      mappedValue(
-        row,
-        'roomName'
-      )
-  };
-
-
-  const signature =
-    structureSignature(
-      candidate
-    );
-
-
-  return activeFronts()
-    .find(
-      front => {
-
-        const structure =
-          byId(
-            project.structures,
-            front.structureId
-          );
-
-
-        return (
-          front.workId ===
-            work.id &&
-          structure &&
-          (
-            structure.signature ||
-            structureSignature(
-              structure
-            )
-          ) ===
-            signature
-        );
-      }
-    ) ||
-    null;
-}
-
-
-function ensureFrontFromImport(
-  row
-) {
-
-  const buildingName =
-    normText(
-      mappedValue(
-        row,
-        'building'
-      )
-    );
-
-
-  const workName =
-    normText(
-      mappedValue(
-        row,
-        'work'
-      )
-    );
-
-
-  if (
-    !buildingName ||
-    !workName
-  ) {
-
-    return null;
-  }
-
-
-  const existing =
-    findMatchingFrontByMapped(
-      row
-    );
-
-
-  if (
-    existing
-  ) {
-
-    return existing;
-  }
-
-
-  const building =
-    ensureNamed(
-      project.buildings,
-      'BLD',
-      buildingName
-    );
-
-
-  const work =
-    ensureNamed(
-      project.works,
-      'WRK',
-      workName
-    );
-
-
-  const organizationName =
-    normText(
-      mappedValue(
-        row,
-        'organization'
-      )
-    );
-
-
-  const organization =
-    organizationName
-      ? ensureNamed(
-          project.organizations,
-          'ORG',
-          organizationName
-        )
-      : null;
-
-
-  const structure =
-    ensureStructure({
-
-      ...mappedStructureData(
-        row
-      ),
-
-      buildingId:
-        building.id
-    });
-
-
-  const front = {
-
-    id:
-      uid(
-        'F'
-      ),
-
-    structureId:
-      structure.id,
-
-    workId:
-      work.id,
-
-    organizationId:
-      organization?.id ||
-      '',
-
-    status:
-      normalizeStatus(
-        mappedValue(
-          row,
-          'status'
-        )
-      ) ||
-      'Не начато',
-
-    unit:
-      normText(
-        mappedValue(
-          row,
-          'unit'
-        )
-      ),
-
-    totalQty:
-      num(
-        mappedValue(
-          row,
-          'totalQty'
-        )
-      ),
-
-    doneQty:
-      num(
-        mappedValue(
-          row,
-          'doneQty'
-        )
-      ),
-
-    contractStart:
-      normDate(
-        mappedValue(
-          row,
-          'contractStart'
-        )
-      ),
-
-    contractEnd:
-      normDate(
-        mappedValue(
-          row,
-          'contractEnd'
-        )
-      ),
-
-    baselineStart:
-      normDate(
-        mappedValue(
-          row,
-          'baselineStart'
-        )
-      ),
-
-    baselineEnd:
-      normDate(
-        mappedValue(
-          row,
-          'baselineEnd'
-        )
-      ),
-
-    planStart:
-      normDate(
-        mappedValue(
-          row,
-          'planStart'
-        )
-      ),
-
-    planEnd:
-      normDate(
-        mappedValue(
-          row,
-          'planEnd'
-        )
-      ),
-
-    factStart:
-      normDate(
-        mappedValue(
-          row,
-          'factStart'
-        )
-      ),
-
-    factEnd:
-      normDate(
-        mappedValue(
-          row,
-          'factEnd'
-        )
-      ),
-
-    forecastEnd:
-      normDate(
-        mappedValue(
-          row,
-          'forecastEnd'
-        )
-      ),
-
-    comment:
-      normText(
-        mappedValue(
-          row,
-          'comment'
-        )
-      ),
-
-    completed:
-      normalizeStatus(
-        mappedValue(
-          row,
-          'status'
-        )
-      ) ===
-      'Завершено',
-
-    accepted:
-      false,
-
-    active:
-      true,
-
-    createdAt:
-      nowIso(),
-
-    updatedAt:
-      nowIso()
-  };
-
-
-  project.fronts.push(
-    front
-  );
-
-
-  return front;
 }
 
 
@@ -2574,137 +1911,14 @@ function ensureFrontFromImport(
    ПРЕДПРОСМОТР
    ========================================================= */
 
-function resourcePreviewMessage(
-  raw
-) {
-
-  const org =
-    normText(
-      mappedValue(
-        raw,
-        'organization'
-      )
-    ) ||
-    'Без организации';
-
-
-  const date =
-    normDate(
-      mappedValue(
-        raw,
-        'date'
-      )
-    );
-
-
-  const specialization =
-    normText(
-      mappedValue(
-        raw,
-        'specialization'
-      )
-    );
-
-
-  const peopleQty =
-    num(
-      mappedValue(
-        raw,
-        'peopleQty'
-      )
-    );
-
-
-  const eqType =
-    normText(
-      mappedValue(
-        raw,
-        'equipmentType'
-      )
-    );
-
-
-  const eqQty =
-    num(
-      mappedValue(
-        raw,
-        'equipmentQty'
-      )
-    );
-
-
-  const parts = [
-    org
-  ];
-
-
-  if (
-    date
-  ) {
-
-    parts.push(
-      ruDate(
-        date
-      )
-    );
-  }
-
-
-  if (
-    specialization ||
-    peopleQty
-  ) {
-
-    parts.push(
-      `${specialization || 'Люди'}: ${roundInt(
-        peopleQty
-      )}`
-    );
-  }
-
-
-  if (
-    eqType ||
-    eqQty
-  ) {
-
-    parts.push(
-      `${eqType || 'Техника'}: ${roundInt(
-        eqQty
-      )}`
-    );
-  }
-
-
-  return parts.join(
-    ' · '
-  );
-}
-
-
 function previewImportRow(
   raw,
   index
-) {
+){
 
-  const item = {
-
-    raw,
-
-    rowNumber:
-      raw.__sourceRow ||
-      index +
-      1,
-
-    status:
-      '',
-
-    message:
-      '',
-
-    selected:
-      true
-  };
+  const rowNumber =
+    index +
+    2;
 
 
   if (
@@ -2720,206 +1934,109 @@ function previewImportRow(
         )
       );
 
-
-    if (!date) {
-
-      item.status =
-        'Ошибка';
-
-
-      item.message =
-        'Не распознана дата';
-
-
-      item.selected =
-        false;
-
-
-      return item;
-    }
-
-
-    const hasPersonnelMapping =
-      Boolean(
-        importMapping
-          .peopleQty ||
-        importMapping
-          .itr ||
-        importMapping
-          .workers ||
-        importMapping
-          .mechanizers
+    const organization =
+      normText(
+        mappedValue(
+          raw,
+          'organization'
+        )
       );
 
-
-    const hasEquipmentMapping =
-      Boolean(
-        importMapping
-          .equipmentType ||
-        importMapping
-          .equipmentQty
-      );
-
-
-    if (
-      !hasPersonnelMapping &&
-      !hasEquipmentMapping
-    ) {
-
-      item.status =
-        'Ошибка';
-
-
-      item.message =
-        'Не найдены колонки людей или техники';
-
-
-      item.selected =
-        false;
-
-
-      return item;
-    }
-
-
-    if (
-      importMapping
-        .equipmentType &&
-      !importMapping
-        .equipmentQty
-    ) {
-
-      item.status =
-        'Предупреждение';
-
-
-      item.message =
-        `${resourcePreviewMessage(
-          raw
-        )} · не сопоставлено количество техники`;
-
-
-      return item;
-    }
-
-
-    item.status =
-      'Добавить ресурсы';
-
-
-    item.message =
-      resourcePreviewMessage(
+    const values =
+      resourceValuesFromRow(
         raw
       );
 
 
-    return item;
-  }
+    if (
+      !date
+    ) {
 
-
-  if (
-    importModeResolved ===
-    'fronts'
-  ) {
-
-    const building =
-      normText(
-        mappedValue(
-          raw,
-          'building'
-        )
-      );
-
-
-    const work =
-      normText(
-        mappedValue(
-          raw,
-          'work'
-        )
-      );
+      return {
+        raw,
+        rowNumber,
+        status:
+          'Ошибка',
+        message:
+          'Не определена дата',
+        selected:
+          false
+      };
+    }
 
 
     if (
-      !building ||
-      !work
+      !organization
     ) {
 
-      item.status =
-        'Ошибка';
-
-
-      item.message =
-        'Нужны здание и работа';
-
-
-      item.selected =
-        false;
-
-    } else {
-
-      item.status =
-        findMatchingFrontByMapped(
-          raw
-        )
-          ? 'Обновление'
-          : 'Новый фронт';
-
-
-      item.message =
-        `${building} · ${work}`;
+      return {
+        raw,
+        rowNumber,
+        status:
+          'Ошибка',
+        message:
+          'Не определена организация',
+        selected:
+          false
+      };
     }
 
 
-    return item;
-  }
+    if (
+      !values.specialization &&
+      !values.equipmentType &&
+      values.itr ===
+        0 &&
+      values.workers ===
+        0 &&
+      values.mechanizers ===
+        0
+    ) {
 
-
-  if (
-    importModeResolved ===
-    'fact'
-  ) {
-
-    const date =
-      normDate(
-        mappedValue(
-          raw,
-          'date'
-        )
-      );
-
-
-    if (!date) {
-
-      item.status =
-        'Ошибка';
-
-
-      item.message =
-        'Не распознана дата';
-
-
-      item.selected =
-        false;
-
-    } else {
-
-      item.status =
-        'Добавить факт';
-
-
-      item.message =
-        normText(
-          mappedValue(
-            raw,
-            'work'
-          )
-        ) ||
-        'Факт';
+      return {
+        raw,
+        rowNumber,
+        status:
+          'Пропуск',
+        message:
+          'Нет людей и техники',
+        selected:
+          false
+      };
     }
 
 
-    return item;
+    let message =
+      'Ресурсы';
+
+
+    if (
+      values.equipmentType
+    ) {
+
+      message +=
+        ` · ${values.equipmentType}: ${values.equipmentQty} ед.`;
+    }
+
+
+    if (
+      values.specialization
+    ) {
+
+      message +=
+        ` · ${values.specialization}: ${values.peopleQty} чел.`;
+    }
+
+
+    return {
+      raw,
+      rowNumber,
+      status:
+        'Готово',
+      message,
+      selected:
+        true
+    };
   }
 
 
@@ -2927,15 +2044,6 @@ function previewImportRow(
     importModeResolved ===
     'elements'
   ) {
-
-    const type =
-      normText(
-        mappedValue(
-          raw,
-          'elementType'
-        )
-      );
-
 
     const number =
       normText(
@@ -2945,35 +2053,41 @@ function previewImportRow(
         )
       );
 
+    const type =
+      normText(
+        mappedValue(
+          raw,
+          'elementType'
+        )
+      );
 
     if (
-      !type ||
-      !number
+      !number ||
+      !type
     ) {
 
-      item.status =
-        'Ошибка';
-
-
-      item.message =
-        'Нужны тип элемента и номер';
-
-
-      item.selected =
-        false;
-
-    } else {
-
-      item.status =
-        'Новый элемент';
-
-
-      item.message =
-        `${type} №${number}`;
+      return {
+        raw,
+        rowNumber,
+        status:
+          'Ошибка',
+        message:
+          'Нужны тип и номер элемента',
+        selected:
+          false
+      };
     }
 
-
-    return item;
+    return {
+      raw,
+      rowNumber,
+      status:
+        'Готово',
+      message:
+        `${type} №${number}`,
+      selected:
+        true
+    };
   }
 
 
@@ -2990,330 +2104,283 @@ function previewImportRow(
         )
       );
 
+    if (
+      !title
+    ) {
 
-    if (!title) {
-
-      item.status =
-        'Ошибка';
-
-
-      item.message =
-        'Не найдено наименование';
-
-
-      item.selected =
-        false;
-
-    } else {
-
-      item.status =
-        'КД';
-
-
-      item.message =
-        title;
+      return {
+        raw,
+        rowNumber,
+        status:
+          'Ошибка',
+        message:
+          'Нет наименования ключевой даты',
+        selected:
+          false
+      };
     }
 
-
-    return item;
+    return {
+      raw,
+      rowNumber,
+      status:
+        'Готово',
+      message:
+        title,
+      selected:
+        true
+    };
   }
-
-
-  item.status =
-    'Ошибка';
-
-
-  item.message =
-    'Неизвестный режим импорта';
-
-
-  item.selected =
-    false;
-
-
-  return item;
-}
-
-
-function analyzeImport() {
-
-  if (
-    !importWorkbook
-  ) {
-    return;
-  }
-
-
-  readSelectedSheet();
-
-
-  const requested =
-    $('importMode')
-      .value;
-
-
-  const nextMode =
-    requested ===
-      'auto'
-      ? detectImportMode(
-          importHeaders
-        )
-      : requested;
-
-
-  importModeResolved =
-    nextMode;
-
-
-  if (
-    importMappingMode !==
-      nextMode ||
-    !Object.keys(
-      importMapping
-    )
-      .length
-  ) {
-
-    importMapping =
-      buildAutoMapping(
-        nextMode
-      );
-
-
-    importMappingMode =
-      nextMode;
-  }
-
-
-  renderImportMapping();
-
-
-  importRows =
-    applyFillDown(
-      importRawRows,
-      importModeResolved
-    )
-      .map(
-        previewImportRow
-      );
-
-
-  renderImportPreview();
-}
-
-
-function renderImportPreview() {
-
-  const counts =
-    {};
-
-
-  importRows
-    .forEach(
-      item => {
-
-        counts[
-          item.status
-        ] =
-          (
-            counts[
-              item.status
-            ] ||
-            0
-          ) +
-          1;
-      }
-    );
-
-
-  const extraWarnings =
-    [];
 
 
   if (
     importModeResolved ===
-    'resources'
+    'fact'
   ) {
 
     if (
-      importMapping
-        .equipmentType &&
-      !importMapping
-        .equipmentQty
+      !normDate(
+        mappedValue(
+          raw,
+          'date'
+        )
+      )
     ) {
 
-      extraWarnings.push(
-        'ВНИМАНИЕ: найдена техника, но не сопоставлена колонка количества техники.'
-      );
+      return {
+        raw,
+        rowNumber,
+        status:
+          'Ошибка',
+        message:
+          'Нет даты факта',
+        selected:
+          false
+      };
     }
 
-
-    if (
-      importMapping
-        .equipmentQty &&
-      !importMapping
-        .equipmentType
-    ) {
-
-      extraWarnings.push(
-        'ВНИМАНИЕ: найдено количество техники, но не сопоставлено наименование техники.'
-      );
-    }
+    return {
+      raw,
+      rowNumber,
+      status:
+        'Готово',
+      message:
+        'Факт работ',
+      selected:
+        true
+    };
   }
 
 
-  $('importInfo')
-    .classList
-    .remove(
-      'hidden'
+  const building =
+    normText(
+      mappedValue(
+        raw,
+        'building'
+      )
+    );
+
+  const work =
+    normText(
+      mappedValue(
+        raw,
+        'work'
+      )
     );
 
 
-  $('importInfo')
-    .className =
-      extraWarnings.length
-        ? 'notice warn'
-        : 'notice';
+  if (
+    !building &&
+    !work
+  ) {
+
+    return {
+      raw,
+      rowNumber,
+      status:
+        'Ошибка',
+      message:
+        'Не определены здание/работа',
+      selected:
+        false
+    };
+  }
 
 
-  $('importInfo')
-    .textContent =
-      `Файл: ${importFileName}\n` +
-      `Лист: ${importSheetName}\n` +
-      `Режим: ${MODE_LABELS[importModeResolved]}\n` +
-      `Строк: ${importRows.length}\n` +
-      Object.entries(
-        counts
-      )
-        .map(
-          (
-            [
-              key,
-              value
-            ]
-          ) =>
-            `${key}: ${value}`
-        )
-        .join(
-          ' · '
+  return {
+    raw,
+    rowNumber,
+    status:
+      'Готово',
+    message:
+      'Фронт работ',
+    selected:
+      true
+  };
+}
+
+
+function renderImportPreview(){
+
+  const counts =
+    {};
+
+  importRows.forEach(
+    item => {
+
+      counts[
+        item.status
+      ] =
+        (
+          counts[
+            item.status
+          ] ||
+          0
         ) +
-      (
-        extraWarnings.length
-          ? `\n${extraWarnings.join(
-              '\n'
-            )}`
-          : ''
+        1;
+    }
+  );
+
+
+  if (
+    $('importInfo')
+  ) {
+
+    $('importInfo')
+      .classList
+      .remove(
+        'hidden'
       );
 
+    $('importInfo')
+      .className =
+        'notice';
 
-  $('importHead')
-    .innerHTML = `
-      <tr>
+    $('importInfo')
+      .textContent =
 
-        <th></th>
+        `Файл: ${importFileName}\n` +
+        `Лист: ${importSheetName}\n` +
+        `Режим: ${MODE_LABELS[importModeResolved]}\n` +
+        `Строк: ${importRows.length}\n` +
 
-        <th>
-          Строка
-        </th>
-
-        <th>
-          Результат
-        </th>
-
-        <th>
-          Что найдено
-        </th>
-
-        ${
-          importHeaders
-            .slice(
-              0,
-              10
-            )
-            .map(
-              header =>
-                `<th>${esc(
-                  header
-                )}</th>`
-            )
-            .join('')
-        }
-
-      </tr>
-    `;
+        Object.entries(
+          counts
+        )
+          .map(
+            (
+              [
+                key,
+                value
+              ]
+            ) =>
+              `${key}: ${value}`
+          )
+          .join(
+            ' · '
+          );
+  }
 
 
-  $('importBody')
-    .innerHTML =
+  if (
+    $('importHead')
+  ) {
+
+    $('importHead').innerHTML =
+      `
+        <tr>
+
+          <th></th>
+          <th>Строка</th>
+          <th>Результат</th>
+          <th>Что найдено</th>
+
+          ${
+            importHeaders
+              .slice(
+                0,
+                10
+              )
+              .map(
+                header =>
+                  `<th>${esc(header)}</th>`
+              )
+              .join('')
+          }
+
+        </tr>
+      `;
+  }
+
+
+  if (
+    $('importBody')
+  ) {
+
+    $('importBody').innerHTML =
       importRows
         .slice(
           0,
-          500
+          300
         )
         .map(
           (
             item,
             index
-          ) => `
-            <tr>
+          ) =>
+            `
+              <tr>
 
-              <td>
+                <td>
 
-                <input
-                  type="checkbox"
-                  data-import-row="${index}"
-                  ${
-                    item.selected
-                      ? 'checked'
-                      : ''
-                  }
-                  ${
-                    item.status ===
-                    'Ошибка'
-                      ? 'disabled'
-                      : ''
-                  }
-                >
+                  <input
+                    type="checkbox"
+                    data-import-row="${index}"
+                    ${
+                      item.selected
+                        ? 'checked'
+                        : ''
+                    }
+                    ${
+                      item.status ===
+                        'Ошибка'
+                        ? 'disabled'
+                        : ''
+                    }
+                  >
 
-              </td>
+                </td>
 
-              <td>
-                ${item.rowNumber}
-              </td>
+                <td>
+                  ${item.rowNumber}
+                </td>
 
-              <td>
-                ${esc(
-                  item.status
-                )}
-              </td>
+                <td>
+                  ${esc(item.status)}
+                </td>
 
-              <td>
-                ${esc(
-                  item.message
-                )}
-              </td>
+                <td>
+                  ${esc(item.message)}
+                </td>
 
-              ${
-                importHeaders
-                  .slice(
-                    0,
-                    10
-                  )
-                  .map(
-                    header =>
-                      `<td>${esc(
-                        item.raw[
-                          header
-                        ]
-                      )}</td>`
-                  )
-                  .join('')
-              }
+                ${
+                  importHeaders
+                    .slice(
+                      0,
+                      10
+                    )
+                    .map(
+                      header =>
+                        `<td>${esc(item.raw[header])}</td>`
+                    )
+                    .join('')
+                }
 
-            </tr>
-          `
+              </tr>
+            `
         )
         .join('');
+  }
 
 
   document
@@ -3339,36 +2406,107 @@ function renderImportPreview() {
     );
 
 
-  $('commitImportBtn')
-    .disabled =
-      !importRows
-        .some(
+  if (
+    $('commitImportBtn')
+  ) {
+
+    $('commitImportBtn')
+      .disabled =
+        !importRows.some(
           item =>
             item.selected &&
             item.status !==
               'Ошибка'
         );
+  }
+}
+
+
+function analyzeImport(){
+
+  if (
+    !importWorkbook
+  ) {
+    return;
+  }
+
+
+  readSelectedSheet();
+
+
+  const requested =
+    $('importMode')?.value ||
+    'auto';
+
+
+  importModeResolved =
+    requested ===
+      'auto'
+      ? detectImportMode(
+          importHeaders
+        )
+      : requested;
+
+
+  if (
+    importMappingMode !==
+      importModeResolved ||
+    !Object.keys(
+      importMapping
+    )
+      .length
+  ) {
+
+    importMapping =
+      buildAutoMapping(
+        importModeResolved
+      );
+
+    importMappingMode =
+      importModeResolved;
+  }
+
+
+  renderImportMapping();
+
+
+  importRows =
+    applyFillDown(
+      importRawRows,
+      importModeResolved
+    )
+      .map(
+        previewImportRow
+      );
+
+
+  renderImportPreview();
 }
 
 
 /* =========================================================
-   РЕСУРСЫ — ПРЕОБРАЗОВАНИЕ СТРОКИ
+   ФРОНТЫ
    ========================================================= */
 
-function importResourceFromRow(
-  row,
-  item,
-  batchId
-) {
+function findMatchingFrontByMapped(
+  row
+){
 
-  const date =
-    normDate(
+  const buildingName =
+    normText(
       mappedValue(
         row,
-        'date'
+        'building'
       )
     );
 
+  const workName =
+    normText(
+      mappedValue(
+        row,
+        'work'
+      )
+    );
 
   const organizationName =
     normText(
@@ -3379,21 +2517,101 @@ function importResourceFromRow(
     );
 
 
-  const organization =
-    organizationName
-      ? ensureNamed(
-          project.organizations,
-          'ORG',
-          organizationName
-        )
-      : null;
+  const building =
+    (
+      project.buildings ||
+      []
+    )
+      .find(
+        item =>
+          strictNameKey(
+            item.name
+          ) ===
+          strictNameKey(
+            buildingName
+          )
+      );
 
+
+  const work =
+    (
+      project.works ||
+      []
+    )
+      .find(
+        item =>
+          strictNameKey(
+            item.name
+          ) ===
+          strictNameKey(
+            workName
+          )
+      );
+
+
+  const organization =
+    (
+      project.organizations ||
+      []
+    )
+      .find(
+        item =>
+          strictNameKey(
+            item.name
+          ) ===
+          strictNameKey(
+            organizationName
+          )
+      );
+
+
+  return activeFronts()
+    .find(
+      front =>
+        (
+          !building ||
+          front.buildingId ===
+          building.id
+        ) &&
+        (
+          !work ||
+          front.workId ===
+          work.id
+        ) &&
+        (
+          !organization ||
+          front.organizationId ===
+          organization.id
+        )
+    );
+}
+
+
+function ensureFrontFromImport(
+  row
+){
 
   const buildingName =
     normText(
       mappedValue(
         row,
         'building'
+      )
+    );
+
+  const workName =
+    normText(
+      mappedValue(
+        row,
+        'work'
+      )
+    );
+
+  const organizationName =
+    normText(
+      mappedValue(
+        row,
+        'organization'
       )
     );
 
@@ -3408,15 +2626,6 @@ function importResourceFromRow(
       : null;
 
 
-  const workName =
-    normText(
-      mappedValue(
-        row,
-        'work'
-      )
-    );
-
-
   const work =
     workName
       ? ensureNamed(
@@ -3427,278 +2636,154 @@ function importResourceFromRow(
       : null;
 
 
-  let itr =
-    num(
-      mappedValue(
-        row,
-        'itr'
-      )
-    );
-
-
-  let workers =
-    num(
-      mappedValue(
-        row,
-        'workers'
-      )
-    );
-
-
-  let mechanizers =
-    num(
-      mappedValue(
-        row,
-        'mechanizers'
-      )
-    );
-
-
-  const peopleQty =
-    num(
-      mappedValue(
-        row,
-        'peopleQty'
-      )
-    );
-
-
-  const specialization =
-    normText(
-      mappedValue(
-        row,
-        'specialization'
-      )
-    );
-
-
-  const specializationKey =
-    normKey(
-      specialization
-    );
-
-
-  /*
-    Если таблица длинного формата:
-    "Количество человек" + "Специализация".
-
-    Но если одновременно уже заполнены отдельные
-    колонки ИТР / Рабочие / Механизаторы,
-    количество повторно НЕ добавляем.
-  */
-
-  const hasDirectPeople =
-    itr !==
-      0 ||
-    workers !==
-      0 ||
-    mechanizers !==
-      0;
+  const organization =
+    organizationName
+      ? ensureNamed(
+          project.organizations,
+          'ORG',
+          organizationName
+        )
+      : null;
 
 
   if (
-    peopleQty !==
-      0 &&
-    !hasDirectPeople
+    !building &&
+    !work
   ) {
-
-    if (
-      specializationKey ===
-        'итр' ||
-      specializationKey
-        .includes(
-          'инженерно техничес'
-        )
-    ) {
-
-      itr =
-        peopleQty;
-
-    } else if (
-      specializationKey
-        .includes(
-          'механизатор'
-        ) ||
-      specializationKey
-        .includes(
-          'машинист'
-        )
-    ) {
-
-      mechanizers =
-        peopleQty;
-
-    } else if (
-      specializationKey
-        .includes(
-          'рабоч'
-        ) ||
-      specializationKey
-        .includes(
-          'подсоб'
-        )
-    ) {
-
-      workers =
-        peopleQty;
-    }
+    return null;
   }
 
 
-  const equipmentType =
-    normText(
-      mappedValue(
-        row,
-        'equipmentType'
-      )
-    );
-
-
-  const equipmentQty =
-    num(
-      mappedValue(
-        row,
-        'equipmentQty'
-      )
-    );
-
-
-  const resource = {
-
-    id:
-      uid(
-        'R'
-      ),
-
-    date,
-
-    organizationId:
-      organization?.id ||
-      '',
-
-    buildingId:
-      building?.id ||
-      '',
-
-    workId:
-      work?.id ||
-      '',
-
-    frontId:
-      '',
-
-    itr:
-      roundInt(
-        itr
-      ),
-
-    workers:
-      roundInt(
-        workers
-      ),
-
-    mechanizers:
-      roundInt(
-        mechanizers
-      ),
-
-    specialization,
-
-    peopleQty:
-      roundInt(
-        peopleQty
-      ),
-
-    equipmentType,
-
-    equipmentQty:
-      roundInt(
-        equipmentQty
-      ),
-
-    comment:
-      normText(
+  const structure =
+    ensureStructure({
+      buildingId:
+        building?.id ||
+        '',
+      block:
         mappedValue(
           row,
-          'comment'
+          'block'
+        ),
+      floor:
+        mappedValue(
+          row,
+          'floor'
+        ),
+      capture:
+        mappedValue(
+          row,
+          'capture'
+        ),
+      axis:
+        mappedValue(
+          row,
+          'axis'
+        ),
+      side:
+        mappedValue(
+          row,
+          'side'
+        ),
+      zone:
+        mappedValue(
+          row,
+          'zone'
+        ),
+      roomNo:
+        mappedValue(
+          row,
+          'roomNo'
+        ),
+      roomName:
+        mappedValue(
+          row,
+          'roomName'
         )
-      ),
+    });
 
-    createdAt:
-      nowIso(),
 
-    updatedAt:
-      nowIso(),
+  let front =
+    findMatchingFrontByMapped(
+      row
+    );
 
-    source: {
 
-      batchId,
+  if (
+    !front
+  ) {
 
-      file:
-        importFileName,
-
-      sheet:
-        importSheetName,
-
-      row:
-        item.rowNumber,
-
-      importedAt:
+    front = {
+      id:
+        uid(
+          'FR'
+        ),
+      buildingId:
+        building?.id ||
+        '',
+      workId:
+        work?.id ||
+        '',
+      organizationId:
+        organization?.id ||
+        '',
+      structureId:
+        structure.id,
+      status:
+        normalizeStatus(
+          mappedValue(
+            row,
+            'status'
+          ) ||
+          'Не начато'
+        ),
+      active:
+        true,
+      createdAt:
+        nowIso(),
+      updatedAt:
         nowIso()
-    }
-  };
+    };
+
+    project.fronts.push(
+      front
+    );
+  }
 
 
-  resource.importFingerprint =
-    [
-
-      resource.date,
-
-      resource.organizationId,
-
-      resource.buildingId,
-
-      resource.workId,
-
-      resource.itr,
-
-      resource.workers,
-
-      resource.mechanizers,
-
-      resource.specialization,
-
-      resource.peopleQty,
-
-      resource.equipmentType,
-
-      resource.equipmentQty,
-
-      resource.comment
-    ]
-      .join(
-        '|'
-      );
-
-
-  return resource;
+  return front;
 }
 
 
 /* =========================================================
-   COMMIT
+   ИМПОРТ
    ========================================================= */
 
-async function commitImport() {
+function importSource(
+  item
+){
+
+  return {
+    file:
+      importFileName,
+    sheet:
+      importSheetName,
+    row:
+      item.rowNumber,
+    importedAt:
+      nowIso()
+  };
+}
+
+
+async function commitImport(){
 
   const selected =
-    importRows
-      .filter(
-        item =>
-          item.selected &&
-          item.status !==
-            'Ошибка'
-      );
+    importRows.filter(
+      item =>
+        item.selected &&
+        item.status !==
+          'Ошибка'
+    );
 
 
   if (
@@ -3738,14 +2823,11 @@ async function commitImport() {
   let created =
     0;
 
-
   let updated =
     0;
 
-
   let appended =
     0;
-
 
   let skipped =
     0;
@@ -3769,12 +2851,144 @@ async function commitImport() {
       'resources'
     ) {
 
-      const resource =
-        importResourceFromRow(
-          row,
-          item,
-          batchId
+      const date =
+        normDate(
+          mappedValue(
+            row,
+            'date'
+          )
         );
+
+
+      const organizationName =
+        normText(
+          mappedValue(
+            row,
+            'organization'
+          )
+        );
+
+
+      const organization =
+        organizationName
+          ? ensureNamed(
+              project.organizations,
+              'ORG',
+              organizationName
+            )
+          : null;
+
+
+      const buildingName =
+        normText(
+          mappedValue(
+            row,
+            'building'
+          )
+        );
+
+
+      const building =
+        buildingName
+          ? ensureNamed(
+              project.buildings,
+              'BLD',
+              buildingName
+            )
+          : null;
+
+
+      const workName =
+        normText(
+          mappedValue(
+            row,
+            'work'
+          )
+        );
+
+
+      const work =
+        workName
+          ? ensureNamed(
+              project.works,
+              'WRK',
+              workName
+            )
+          : null;
+
+
+      const values =
+        resourceValuesFromRow(
+          row
+        );
+
+
+      const resource = {
+
+        id:
+          uid(
+            'R'
+          ),
+
+        date,
+
+        organizationId:
+          organization?.id ||
+          '',
+
+        buildingId:
+          building?.id ||
+          '',
+
+        workId:
+          work?.id ||
+          '',
+
+        frontId:
+          '',
+
+        itr:
+          values.itr,
+
+        workers:
+          values.workers,
+
+        mechanizers:
+          values.mechanizers,
+
+        specialization:
+          values.specialization,
+
+        peopleQty:
+          values.peopleQty,
+
+        equipmentType:
+          values.equipmentType,
+
+        equipmentQty:
+          values.equipmentQty,
+
+        comment:
+          normText(
+            mappedValue(
+              row,
+              'comment'
+            )
+          ),
+
+        createdAt:
+          nowIso(),
+
+        updatedAt:
+          nowIso(),
+
+        source: {
+          batchId,
+          ...importSource(
+            item
+          )
+        }
+      };
 
 
       const hasPeople =
@@ -3783,21 +2997,18 @@ async function commitImport() {
         resource.workers !==
           0 ||
         resource.mechanizers !==
-          0 ||
-        resource.peopleQty !==
           0;
 
 
       const hasEquipment =
-        Boolean(
-          resource.equipmentType
-        ) ||
+        !!resource.equipmentType ||
         resource.equipmentQty !==
           0;
 
 
       if (
-        !resource.date ||
+        !date ||
+        !organization ||
         (
           !hasPeople &&
           !hasEquipment
@@ -3810,6 +3021,24 @@ async function commitImport() {
       }
 
 
+      resource.importFingerprint =
+        [
+          resource.date,
+          resource.organizationId,
+          resource.buildingId,
+          resource.workId,
+          resource.itr,
+          resource.workers,
+          resource.mechanizers,
+          resource.equipmentType,
+          resource.equipmentQty,
+          resource.comment
+        ]
+          .join(
+            '|'
+          );
+
+
       if (
         (
           project.resources ||
@@ -3817,10 +3046,8 @@ async function commitImport() {
         )
           .some(
             existing =>
-              existing
-                .importFingerprint ===
-              resource
-                .importFingerprint
+              existing.importFingerprint ===
+              resource.importFingerprint
           )
       ) {
 
@@ -3833,7 +3060,6 @@ async function commitImport() {
       project.resources.push(
         resource
       );
-
 
       appended++;
 
@@ -3851,10 +3077,8 @@ async function commitImport() {
     ) {
 
       const existed =
-        Boolean(
-          findMatchingFrontByMapped(
-            row
-          )
+        !!findMatchingFrontByMapped(
+          row
         );
 
 
@@ -3864,7 +3088,9 @@ async function commitImport() {
         );
 
 
-      if (!front) {
+      if (
+        !front
+      ) {
 
         skipped++;
 
@@ -3886,7 +3112,6 @@ async function commitImport() {
               row,
               sourceKey
             );
-
 
           if (
             normText(
@@ -3911,13 +3136,11 @@ async function commitImport() {
         normalizeStatus
       );
 
-
       assign(
         'unit',
         'unit',
         normText
       );
-
 
       assign(
         'totalQty',
@@ -3925,20 +3148,17 @@ async function commitImport() {
         num
       );
 
-
       assign(
         'doneQty',
         'doneQty',
         num
       );
 
-
       assign(
         'contractStart',
         'contractStart',
         normDate
       );
-
 
       assign(
         'contractEnd',
@@ -3946,13 +3166,11 @@ async function commitImport() {
         normDate
       );
 
-
       assign(
         'baselineStart',
         'baselineStart',
         normDate
       );
-
 
       assign(
         'baselineEnd',
@@ -3960,13 +3178,11 @@ async function commitImport() {
         normDate
       );
 
-
       assign(
         'planStart',
         'planStart',
         normDate
       );
-
 
       assign(
         'planEnd',
@@ -3974,13 +3190,11 @@ async function commitImport() {
         normDate
       );
 
-
       assign(
         'factStart',
         'factStart',
         normDate
       );
-
 
       assign(
         'factEnd',
@@ -3988,67 +3202,37 @@ async function commitImport() {
         normDate
       );
 
-
       assign(
         'forecastEnd',
         'forecastEnd',
         normDate
       );
-
 
       assign(
         'comment',
         'comment',
         normText
       );
-
-
-      const organizationName =
-        normText(
-          mappedValue(
-            row,
-            'organization'
-          )
-        );
-
-
-      if (
-        organizationName
-      ) {
-
-        const organization =
-          ensureNamed(
-            project.organizations,
-            'ORG',
-            organizationName
-          );
-
-
-        front.organizationId =
-          organization.id;
-      }
-
-
-      front.completed =
-        front.status ===
-        'Завершено';
 
 
       front.updatedAt =
         nowIso();
 
+      front.lastImport = {
+        batchId,
+        ...importSource(
+          item
+        )
+      };
+
 
       if (
         existed
       ) {
-
         updated++;
-
       } else {
-
         created++;
       }
-
 
       continue;
     }
@@ -4063,6 +3247,11 @@ async function commitImport() {
       'fact'
     ) {
 
+      const front =
+        ensureFrontFromImport(
+          row
+        );
+
       const date =
         normDate(
           mappedValue(
@@ -4072,15 +3261,9 @@ async function commitImport() {
         );
 
 
-      const front =
-        ensureFrontFromImport(
-          row
-        );
-
-
       if (
-        !date ||
-        !front
+        !front ||
+        !date
       ) {
 
         skipped++;
@@ -4089,7 +3272,7 @@ async function commitImport() {
       }
 
 
-      const qty =
+      const quantity =
         num(
           mappedValue(
             row,
@@ -4098,65 +3281,25 @@ async function commitImport() {
         );
 
 
-      const suppliedCumulative =
-        mappedValue(
-          row,
-          'cumulative'
-        );
-
-
-      const previous =
-        (
-          project.factLog ||
-          []
-        )
-          .filter(
-            existing =>
-              existing.frontId ===
-                front.id &&
-              existing.date <=
-                date
+      const people =
+        num(
+          mappedValue(
+            row,
+            'people'
           )
-          .reduce(
-            (
-              sum,
-              existing
-            ) =>
-              sum +
-              num(
-                existing.qty
-              ),
-            0
-          );
-
-
-      const cumulative =
-        normText(
-          suppliedCumulative
-        ) !==
-          ''
-          ? num(
-              suppliedCumulative
-            )
-          : previous +
-            qty;
+        );
 
 
       const fingerprint =
         [
-
           front.id,
-
           date,
-
-          qty,
-
-          cumulative,
-
-          num(
+          quantity,
+          people,
+          normText(
             mappedValue(
               row,
-              'people'
+              'comment'
             )
           )
         ]
@@ -4172,8 +3315,7 @@ async function commitImport() {
         )
           .some(
             existing =>
-              existing
-                .importFingerprint ===
+              existing.importFingerprint ===
               fingerprint
           )
       ) {
@@ -4184,30 +3326,58 @@ async function commitImport() {
       }
 
 
-      project.factLog.push({
+      const cumulativeRaw =
+        mappedValue(
+          row,
+          'cumulative'
+        );
 
+
+      const cumulative =
+        normText(
+          cumulativeRaw
+        ) !==
+          ''
+          ? num(
+              cumulativeRaw
+            )
+          : (
+              project.factLog ||
+              []
+            )
+              .filter(
+                fact =>
+                  fact.frontId ===
+                    front.id &&
+                  fact.date <=
+                    date
+              )
+              .reduce(
+                (
+                  sum,
+                  fact
+                ) =>
+                  sum +
+                  num(
+                    fact.qty
+                  ),
+                0
+              ) +
+            quantity;
+
+
+      project.factLog.push({
         id:
           uid(
             'FCT'
           ),
-
         frontId:
           front.id,
-
         date,
-
-        qty,
-
+        qty:
+          quantity,
         cumulative,
-
-        people:
-          roundInt(
-            mappedValue(
-              row,
-              'people'
-            )
-          ),
-
+        people,
         comment:
           normText(
             mappedValue(
@@ -4215,55 +3385,17 @@ async function commitImport() {
               'comment'
             )
           ),
-
+        createdAt:
+          nowIso(),
         importFingerprint:
           fingerprint,
-
         source: {
-
           batchId,
-
-          file:
-            importFileName,
-
-          sheet:
-            importSheetName,
-
-          row:
-            item.rowNumber,
-
-          importedAt:
-            nowIso()
-        },
-
-        createdAt:
-          nowIso()
+          ...importSource(
+            item
+          )
+        }
       });
-
-
-      front.doneQty =
-        Math.max(
-          num(
-            front.doneQty
-          ),
-          cumulative
-        );
-
-
-      if (
-        !front.factStart ||
-        date <
-        front.factStart
-      ) {
-
-        front.factStart =
-          date;
-      }
-
-
-      front.updatedAt =
-        nowIso();
-
 
       appended++;
 
@@ -4280,7 +3412,7 @@ async function commitImport() {
       'elements'
     ) {
 
-      const elementType =
+      const type =
         normText(
           mappedValue(
             row,
@@ -4288,8 +3420,7 @@ async function commitImport() {
           )
         );
 
-
-      const elementNo =
+      const number =
         normText(
           mappedValue(
             row,
@@ -4299,8 +3430,8 @@ async function commitImport() {
 
 
       if (
-        !elementType ||
-        !elementNo
+        !type ||
+        !number
       ) {
 
         skipped++;
@@ -4347,179 +3478,145 @@ async function commitImport() {
           : null;
 
 
-      const capture =
-        normText(
-          mappedValue(
-            row,
-            'capture'
-          )
-        );
+      const candidate = {
 
+        id:
+          uid(
+            'EL'
+          ),
 
-      const zone =
-        normText(
-          mappedValue(
-            row,
-            'zone'
-          )
-        );
+        elementType:
+          type,
 
+        elementNo:
+          number,
 
-      const duplicate =
-        (
-          project
-            .numberedElements ||
-          []
-        )
-          .find(
-            existing =>
-              existing.active !==
-                false &&
-              sameText(
-                existing.elementType,
-                elementType
-              ) &&
-              sameText(
-                existing.elementNo,
-                elementNo
-              ) &&
-              String(
-                existing.buildingId ||
-                ''
-              ) ===
-              String(
-                building?.id ||
-                ''
-              ) &&
-              sameText(
-                existing.capture ||
-                '',
-                capture
-              ) &&
-              sameText(
-                existing.zone ||
-                '',
-                zone
-              )
-          );
+        uniqueScope:
+          'context',
 
+        buildingId:
+          building?.id ||
+          '',
 
-      if (
-        duplicate
-      ) {
+        capture:
+          normText(
+            mappedValue(
+              row,
+              'capture'
+            )
+          ),
 
-        duplicate.workId =
+        zone:
+          normText(
+            mappedValue(
+              row,
+              'zone'
+            )
+          ),
+
+        workId:
           work?.id ||
-          duplicate.workId ||
-          '';
+          '',
 
+        frontId:
+          '',
 
-        duplicate.status =
+        status:
           normalizeStatus(
             mappedValue(
               row,
               'status'
-            )
-          ) ||
-          duplicate.status ||
-          'Не начато';
+            ) ||
+            'Не начато'
+          ),
 
-
-        duplicate.comment =
+        comment:
           normText(
             mappedValue(
               row,
               'comment'
             )
-          ) ||
-          duplicate.comment ||
-          '';
+          ),
+
+        active:
+          true,
+
+        createdAt:
+          nowIso(),
+
+        source: {
+          batchId,
+          ...importSource(
+            item
+          )
+        }
+      };
 
 
-        duplicate.updatedAt =
-          nowIso();
+      const key =
+        [
+          normKey(
+            candidate.elementType
+          ),
+          candidate.buildingId,
+          normKey(
+            candidate.capture
+          ),
+          normKey(
+            candidate.zone
+          ),
+          normKey(
+            candidate.elementNo
+          )
+        ]
+          .join(
+            '|'
+          );
 
 
-        updated++;
-
-      } else {
-
-        project
-          .numberedElements
-          .push({
-
-            id:
-              uid(
-                'EL'
-              ),
-
-            elementType,
-
-            elementNo,
-
-            buildingId:
-              building?.id ||
-              '',
-
-            capture,
-
-            zone,
-
-            workId:
-              work?.id ||
-              '',
-
-            status:
-              normalizeStatus(
-                mappedValue(
-                  row,
-                  'status'
+      if (
+        (
+          project.numberedElements ||
+          []
+        )
+          .some(
+            existing =>
+              existing.active !==
+                false &&
+              [
+                normKey(
+                  existing.elementType
+                ),
+                existing.buildingId ||
+                  '',
+                normKey(
+                  existing.capture
+                ),
+                normKey(
+                  existing.zone
+                ),
+                normKey(
+                  existing.elementNo
                 )
-              ) ||
-              'Не начато',
+              ]
+                .join(
+                  '|'
+                ) ===
+                key
+          )
+      ) {
 
-            comment:
-              normText(
-                mappedValue(
-                  row,
-                  'comment'
-                )
-              ),
+        skipped++;
 
-            uniqueScope:
-              'context',
-
-            active:
-              true,
-
-            source: {
-
-              batchId,
-
-              file:
-                importFileName,
-
-              sheet:
-                importSheetName,
-
-              row:
-                item.rowNumber,
-
-              importedAt:
-                nowIso()
-            },
-
-            createdAt:
-              nowIso(),
-
-            updatedAt:
-              nowIso()
-          });
-
-
-        created++;
+        continue;
       }
 
+
+      project.numberedElements.push(
+        candidate
+      );
+
+      appended++;
 
       continue;
     }
@@ -4543,7 +3640,9 @@ async function commitImport() {
         );
 
 
-      if (!title) {
+      if (
+        !title
+      ) {
 
         skipped++;
 
@@ -4570,177 +3669,86 @@ async function commitImport() {
           : null;
 
 
-      const organizationName =
-        normText(
-          mappedValue(
-            row,
-            'organization'
-          )
-        );
+      project.milestones.push({
 
+        id:
+          uid(
+            'M'
+          ),
 
-      const organization =
-        organizationName
-          ? ensureNamed(
-              project.organizations,
-              'ORG',
-              organizationName
+        buildingId:
+          building?.id ||
+          '',
+
+        title,
+
+        status:
+          normText(
+            mappedValue(
+              row,
+              'status'
             )
-          : null;
+          ) ||
+          'Не наступила',
 
+        contractDate:
+          normDate(
+            mappedValue(
+              row,
+              'contractEnd'
+            )
+          ),
 
-      let milestone =
-        (
-          project
-            .milestones ||
-          []
-        )
-          .find(
-            existing =>
-              sameText(
-                existing.title ||
-                existing.name,
-                title
-              ) &&
-              String(
-                existing.buildingId ||
-                ''
-              ) ===
-              String(
-                building?.id ||
-                ''
-              )
-          );
+        workDate:
+          normDate(
+            mappedValue(
+              row,
+              'planEnd'
+            )
+          ),
 
+        forecastDate:
+          normDate(
+            mappedValue(
+              row,
+              'forecastEnd'
+            )
+          ),
 
-      const existed =
-        Boolean(
-          milestone
-        );
+        factDate:
+          normDate(
+            mappedValue(
+              row,
+              'factEnd'
+            )
+          ),
 
+        comment:
+          normText(
+            mappedValue(
+              row,
+              'comment'
+            )
+          ),
 
-      if (
-        !milestone
-      ) {
+        correspondence:
+          [],
 
-        milestone = {
+        createdAt:
+          nowIso(),
 
-          id:
-            uid(
-              'M'
-            ),
+        updatedAt:
+          nowIso(),
 
-          title,
-
-          createdAt:
-            nowIso()
-        };
-
-
-        project
-          .milestones
-          .push(
-            milestone
-          );
-      }
-
-
-      milestone.title =
-        title;
-
-
-      milestone.buildingId =
-        building?.id ||
-        milestone.buildingId ||
-        '';
-
-
-      milestone.organizationId =
-        organization?.id ||
-        milestone.organizationId ||
-        '';
-
-
-      milestone.contractDate =
-        normDate(
-          mappedValue(
-            row,
-            'contractEnd'
+        source: {
+          batchId,
+          ...importSource(
+            item
           )
-        ) ||
-        milestone.contractDate ||
-        '';
+        }
+      });
 
-
-      milestone.workDate =
-        normDate(
-          mappedValue(
-            row,
-            'planEnd'
-          )
-        ) ||
-        milestone.workDate ||
-        '';
-
-
-      milestone.forecastDate =
-        normDate(
-          mappedValue(
-            row,
-            'forecastEnd'
-          )
-        ) ||
-        milestone.forecastDate ||
-        '';
-
-
-      milestone.factDate =
-        normDate(
-          mappedValue(
-            row,
-            'factEnd'
-          )
-        ) ||
-        milestone.factDate ||
-        '';
-
-
-      milestone.status =
-        normText(
-          mappedValue(
-            row,
-            'status'
-          )
-        ) ||
-        milestone.status ||
-        'Не наступила';
-
-
-      milestone.comment =
-        normText(
-          mappedValue(
-            row,
-            'comment'
-          )
-        ) ||
-        milestone.comment ||
-        '';
-
-
-      milestone.updatedAt =
-        nowIso();
-
-
-      if (
-        existed
-      ) {
-
-        updated++;
-
-      } else {
-
-        created++;
-      }
+      appended++;
     }
   }
 
@@ -4750,55 +3758,40 @@ async function commitImport() {
     [];
 
 
-  project
-    .importHistory
-    .unshift({
+  project.importHistory.unshift({
 
-      id:
-        batchId,
+    id:
+      batchId,
 
-      backupKey:
-        preImportBackupKey,
+    file:
+      importFileName,
 
-      at:
-        nowIso(),
+    sheet:
+      importSheetName,
 
-      fileName:
-        importFileName,
+    mode:
+      importModeResolved,
 
-      sheetName:
-        importSheetName,
+    at:
+      nowIso(),
 
-      mode:
-        importModeResolved,
+    created,
 
-      selected:
-        selected.length,
+    updated,
 
-      created,
+    appended,
 
-      updated,
+    skipped,
 
-      appended,
-
-      skipped,
-
-      mapping:
-        clone(
-          importMapping
-        )
-    });
+    backupKey:
+      preImportBackupKey
+  });
 
 
   log(
     'Импорт',
     'Проект',
-
-    `${importFileName} / ${importSheetName}: ` +
-    `создано ${created}, ` +
-    `обновлено ${updated}, ` +
-    `добавлено ${appended}, ` +
-    `пропущено ${skipped}`
+    `${MODE_LABELS[importModeResolved]} · добавлено ${created + appended}, обновлено ${updated}, пропущено ${skipped}`
   );
 
 
@@ -4812,93 +3805,44 @@ async function commitImport() {
     typeof refreshAllMultiFilters ===
     'function'
   ) {
-
     refreshAllMultiFilters();
-  }
-
-
-  if (
-    typeof initOrganizationCard ===
-    'function'
-  ) {
-
-    initOrganizationCard();
   }
 
 
   renderAll();
 
 
-  $('importInfo')
-    .className =
-      'notice good';
-
-
-  $('importInfo')
-    .textContent =
-      `Импорт завершен.\n` +
-      `Создано: ${created}\n` +
-      `Обновлено: ${updated}\n` +
-      `Добавлено: ${appended}\n` +
-      `Пропущено: ${skipped}`;
-
-
-  $('commitImportBtn')
-    .disabled =
-      true;
+  alert(
+    `Импорт завершен.\n` +
+    `Добавлено: ${created + appended}\n` +
+    `Обновлено: ${updated}\n` +
+    `Пропущено: ${skipped}`
+  );
 }
 
 
 /* =========================================================
-   ОТКАТ ПОСЛЕДНЕГО ИМПОРТА
+   ОТКАТ
    ========================================================= */
 
-async function rollbackLastImport() {
+async function rollbackLastImport(){
 
-  const lastImport =
-    project
-      .importHistory
-      ?.[0];
+  const history =
+    project.importHistory ||
+    [];
 
-
-  if (
-    !lastImport
-  ) {
-
-    alert(
-      'В истории проекта нет импортов для отмены.'
-    );
-
-    return;
-  }
+  const last =
+    history[
+      0
+    ];
 
 
   if (
-    !lastImport
-      .backupKey
+    !last
   ) {
 
     alert(
-      'Для этого импорта отсутствует защитная копия.'
-    );
-
-    return;
-  }
-
-
-  const backup =
-    await dbGetKey(
-      lastImport
-        .backupKey
-    );
-
-
-  if (
-    !backup
-  ) {
-
-    alert(
-      'Защитная копия перед импортом не найдена.'
+      'Нет импорта для отмены.'
     );
 
     return;
@@ -4907,65 +3851,139 @@ async function rollbackLastImport() {
 
   if (
     !confirm(
-      `Отменить последний импорт?\n\n` +
-      `Файл: ${lastImport.fileName || '—'}\n` +
-      `Лист: ${lastImport.sheetName || '—'}\n\n` +
-      'Текущее состояние перед откатом тоже будет сохранено.'
+      `Отменить последний импорт?\n` +
+      `${last.file || ''}\n` +
+      `${
+        last.at
+          ? new Date(
+              last.at
+            )
+              .toLocaleString(
+                'ru-RU'
+              )
+          : ''
+      }`
     )
   ) {
-
     return;
   }
 
 
-  await dbPutKey(
-    clone(
-      project
-    ),
-    `before-rollback-${Date.now()}`
-  );
+  if (
+    last.backupKey
+  ) {
+
+    const backup =
+      await dbGetKey(
+        last.backupKey
+      );
 
 
-  project =
-    normalizeProject(
+    if (
       backup
+    ) {
+
+      project =
+        normalizeProject(
+          backup
+        );
+
+      log(
+        'Откат импорта',
+        'Проект',
+        `Отменен импорт ${last.file || ''}`
+      );
+
+      await saveProject();
+
+      initSelects();
+
+      if (
+        typeof refreshAllMultiFilters ===
+        'function'
+      ) {
+        refreshAllMultiFilters();
+      }
+
+      renderAll();
+
+      alert(
+        'Последний импорт отменен.'
+      );
+
+      return;
+    }
+  }
+
+
+  const batchId =
+    last.id;
+
+
+  project.resources =
+    (
+      project.resources ||
+      []
+    )
+      .filter(
+        item =>
+          item.source?.batchId !==
+          batchId
+      );
+
+
+  project.factLog =
+    (
+      project.factLog ||
+      []
+    )
+      .filter(
+        item =>
+          item.source?.batchId !==
+          batchId
+      );
+
+
+  project.numberedElements =
+    (
+      project.numberedElements ||
+      []
+    )
+      .filter(
+        item =>
+          item.source?.batchId !==
+          batchId
+      );
+
+
+  project.milestones =
+    (
+      project.milestones ||
+      []
+    )
+      .filter(
+        item =>
+          item.source?.batchId !==
+          batchId
+      );
+
+
+  project.importHistory =
+    history.slice(
+      1
     );
 
 
   log(
-    'Отмена импорта',
+    'Откат импорта',
     'Проект',
-
-    `Восстановлено состояние до импорта ${lastImport.fileName || ''}`
+    `Отменен импорт ${last.file || ''}`
   );
 
 
   await saveProject();
 
-
-  initSelects();
-
-
-  if (
-    typeof refreshAllMultiFilters ===
-    'function'
-  ) {
-
-    refreshAllMultiFilters();
-  }
-
-
-  if (
-    typeof initOrganizationCard ===
-    'function'
-  ) {
-
-    initOrganizationCard();
-  }
-
-
   renderAll();
-
 
   alert(
     'Последний импорт отменен.'
