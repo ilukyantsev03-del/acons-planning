@@ -1,163 +1,2309 @@
-.resource-tabs {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
+'use strict';
 
-.resource-tab {
-  appearance: none;
-  border: 1px solid #d5ddea;
-  background: #ffffff;
-  border-radius: 8px;
-  padding: 10px 14px;
-  font: inherit;
-  cursor: pointer;
-}
 
-.resource-tab.active {
-  background: #14233a;
-  border-color: #14233a;
-  color: #ffffff;
-}
+LIV.resources = {
 
-.resource-filter-bar {
-  display: grid;
-  grid-template-columns:
-    minmax(130px, 0.7fr)
-    minmax(130px, 0.7fr)
-    minmax(220px, 1.4fr)
-    minmax(200px, 1.2fr)
-    minmax(200px, 1.2fr)
-    auto;
-  gap: 12px;
-  align-items: end;
-}
+  view:
+    'journal',
 
-.multi-filter {
-  position: relative;
-  min-width: 180px;
-}
+  charts:
+    [],
 
-.multi-filter-button {
-  width: 100%;
-  min-height: 42px;
-  padding: 8px 34px 8px 12px;
-  border: 1px solid #cfd8e6;
-  border-radius: 8px;
-  background: #fff;
-  text-align: left;
-  font: inherit;
-  cursor: pointer;
-  position: relative;
-}
+  planFactChart:
+    null,
 
-.multi-filter-button::after {
-  content: "▾";
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-}
+  organizationFilter:
+    null,
 
-.multi-filter-menu {
-  position: absolute;
-  z-index: 1000;
-  top: calc(100% + 5px);
-  left: 0;
-  width: 320px;
-  max-width: 90vw;
-  padding: 10px;
-  background: #fff;
-  border: 1px solid #cfd8e6;
-  border-radius: 10px;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.15);
-}
+  buildingFilter:
+    null,
 
-.multi-filter-search {
-  width: 100%;
-  margin-bottom: 8px;
-}
+  workFilter:
+    null
+};
 
-.multi-filter-actions {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 8px;
-  flex-wrap: wrap;
-}
 
-.multi-filter-list {
-  max-height: 320px;
-  overflow-y: auto;
-  border-top: 1px solid #e3e8ef;
-  border-bottom: 1px solid #e3e8ef;
-  padding: 6px 0;
-}
+/* =========================================================
+   ФИЛЬТРЫ РЕСУРСОВ
+   ========================================================= */
 
-.multi-filter-option {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  padding: 6px 4px;
-  cursor: pointer;
-}
 
-.multi-filter-option:hover {
-  background: #f4f7fb;
-}
+LIV.initResourceFilters =
+  function () {
 
-.multi-filter-apply {
-  margin-top: 8px;
-  width: 100%;
-}
+    const organizations =
+      LIV.project.organizations
+        .filter(
+          item =>
+            item.active !== false
+        );
 
-.resource-chart-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
 
-.resource-chart-card canvas {
-  max-height: 330px;
-}
+    const buildings =
+      LIV.project.buildings
+        .filter(
+          item =>
+            item.active !== false
+        );
 
-.resource-chart-card h2 {
-  margin-bottom: 14px;
-}
 
-.resource-section-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
+    const works =
+      LIV.project.works
+        .filter(
+          item =>
+            item.active !== false
+        );
 
-.resource-analysis-settings {
-  display: grid;
-  grid-template-columns: 1fr 1fr auto;
-  gap: 12px;
-  align-items: end;
-}
 
-.organization-work-item,
-.organization-milestone-item {
-  padding: 9px 0;
-  border-bottom: 1px solid #e5e9f0;
-}
+    LIV.resources.organizationFilter =
+      LIV.createMultiFilter({
+        id:
+          'resource-organizations',
 
-.organization-work-item:last-child,
-.organization-milestone-item:last-child {
-  border-bottom: 0;
-}
+        container:
+          'resourceOrganizationFilter',
 
-@media (max-width: 1100px) {
-  .resource-filter-bar {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+        items:
+          organizations,
 
-  .resource-chart-grid {
-    grid-template-columns: 1fr;
-  }
+        allLabel:
+          'Все организации',
 
-  .resource-analysis-settings {
-    grid-template-columns: 1fr;
-  }
-}
+        onChange:
+          LIV.renderResources
+      });
+
+
+    LIV.resources.buildingFilter =
+      LIV.createMultiFilter({
+        id:
+          'resource-buildings',
+
+        container:
+          'resourceBuildingFilter',
+
+        items:
+          buildings,
+
+        allLabel:
+          'Все здания',
+
+        onChange:
+          LIV.renderResources
+      });
+
+
+    LIV.resources.workFilter =
+      LIV.createMultiFilter({
+        id:
+          'resource-works',
+
+        container:
+          'resourceWorkFilter',
+
+        items:
+          works,
+
+        allLabel:
+          'Все работы',
+
+        onChange:
+          LIV.renderResources
+      });
+  };
+
+
+LIV.getFilteredResources =
+  function ({
+    from,
+    to
+  } = {}) {
+
+    const dateFrom =
+      from ||
+      LIV.$(
+        'resourceFrom'
+      ).value;
+
+
+    const dateTo =
+      to ||
+      LIV.$(
+        'resourceTo'
+      ).value;
+
+
+    const organizations =
+      LIV.resources
+        .organizationFilter
+        ?.getSelected();
+
+
+    const buildings =
+      LIV.resources
+        .buildingFilter
+        ?.getSelected();
+
+
+    const works =
+      LIV.resources
+        .workFilter
+        ?.getSelected();
+
+
+    return LIV.project.resources
+      .filter(
+        row => {
+
+          if (
+            dateFrom &&
+            row.date <
+              dateFrom
+          ) {
+            return false;
+          }
+
+          if (
+            dateTo &&
+            row.date >
+              dateTo
+          ) {
+            return false;
+          }
+
+          if (
+            organizations &&
+            !organizations.includes(
+              String(
+                row.organizationId
+              )
+            )
+          ) {
+            return false;
+          }
+
+          if (
+            buildings &&
+            !buildings.includes(
+              String(
+                row.buildingId
+              )
+            )
+          ) {
+            return false;
+          }
+
+          if (
+            works &&
+            !works.includes(
+              String(
+                row.workId
+              )
+            )
+          ) {
+            return false;
+          }
+
+          return true;
+        }
+      );
+  };
+
+
+/* =========================================================
+   ЖУРНАЛ
+   ========================================================= */
+
+
+LIV.renderResourceJournal =
+  function () {
+
+    const rows =
+      LIV.getFilteredResources();
+
+
+    const sum =
+      field =>
+        rows.reduce(
+          (
+            total,
+            row
+          ) =>
+            total +
+            LIV.num(
+              row[field]
+            ),
+          0
+        );
+
+
+    const peopleByDate =
+      {};
+
+
+    rows.forEach(
+      row => {
+
+        peopleByDate[
+          row.date
+        ] =
+          (
+            peopleByDate[
+              row.date
+            ] ||
+            0
+          ) +
+          LIV.num(
+            row.itr
+          ) +
+          LIV.num(
+            row.workers
+          ) +
+          LIV.num(
+            row.mechanizers
+          );
+      }
+    );
+
+
+    LIV.$(
+      'rItrDays'
+    ).textContent =
+      LIV.roundInt(
+        sum('itr')
+      );
+
+
+    LIV.$(
+      'rWorkerDays'
+    ).textContent =
+      LIV.roundInt(
+        sum('workers')
+      );
+
+
+    LIV.$(
+      'rMechanizerDays'
+    ).textContent =
+      LIV.roundInt(
+        sum('mechanizers')
+      );
+
+
+    LIV.$(
+      'rPeopleDays'
+    ).textContent =
+      LIV.roundInt(
+        sum('itr') +
+        sum('workers') +
+        sum('mechanizers')
+      );
+
+
+    LIV.$(
+      'rPeoplePeak'
+    ).textContent =
+      LIV.roundInt(
+        Math.max(
+          0,
+          ...Object.values(
+            peopleByDate
+          )
+        )
+      );
+
+
+    LIV.$(
+      'rEquipmentDays'
+    ).textContent =
+      LIV.roundInt(
+        sum(
+          'equipmentQty'
+        )
+      );
+
+
+    LIV.$(
+      'resourceJournalBody'
+    ).innerHTML =
+      [...rows]
+        .sort(
+          (
+            a,
+            b
+          ) =>
+            b.date.localeCompare(
+              a.date
+            )
+        )
+        .map(
+          row => `
+            <tr>
+
+              <td>
+                ${LIV.ruDate(row.date)}
+              </td>
+
+              <td>
+                ${LIV.esc(
+                  LIV.nameById(
+                    LIV.project.organizations,
+                    row.organizationId
+                  ) || '—'
+                )}
+              </td>
+
+              <td>
+                ${LIV.esc(
+                  LIV.nameById(
+                    LIV.project.buildings,
+                    row.buildingId
+                  ) || '—'
+                )}
+              </td>
+
+              <td>
+                ${LIV.esc(
+                  LIV.nameById(
+                    LIV.project.works,
+                    row.workId
+                  ) || '—'
+                )}
+              </td>
+
+              <td>
+                ${LIV.roundInt(row.itr)}
+              </td>
+
+              <td>
+                ${LIV.roundInt(row.workers)}
+              </td>
+
+              <td>
+                ${LIV.roundInt(row.mechanizers)}
+              </td>
+
+              <td>
+                ${LIV.esc(
+                  row.equipmentType ||
+                  ''
+                )}
+              </td>
+
+              <td>
+                ${LIV.roundInt(
+                  row.equipmentQty
+                )}
+              </td>
+
+              <td>
+                ${LIV.esc(
+                  row.comment ||
+                  ''
+                )}
+              </td>
+
+              <td>
+
+                <button
+                  class="row-btn"
+                  data-resource-edit="${row.id}">
+                  Открыть
+                </button>
+
+              </td>
+
+            </tr>
+          `
+        )
+        .join('');
+
+
+    document
+      .querySelectorAll(
+        '[data-resource-edit]'
+      )
+      .forEach(
+        button => {
+
+          button.onclick =
+            () =>
+              LIV.openResourceEditor(
+                button.dataset
+                  .resourceEdit
+              );
+        }
+      );
+  };
+
+
+/* =========================================================
+   ЕЖЕДНЕВНАЯ СВОДКА
+   ========================================================= */
+
+
+LIV.renderResourceDaily =
+  function () {
+
+    const date =
+      LIV.$(
+        'resourceDailyDate'
+      ).value;
+
+
+    const rows =
+      LIV.getFilteredResources({
+        from: date,
+        to: date
+      });
+
+
+    const peopleMap =
+      new Map();
+
+
+    const equipmentMap =
+      new Map();
+
+
+    rows.forEach(
+      row => {
+
+        const org =
+          row.organizationId ||
+          '';
+
+
+        if (
+          !peopleMap.has(org)
+        ) {
+          peopleMap.set(
+            org,
+            {
+              organizationId:
+                org,
+
+              itr: 0,
+              workers: 0,
+              mechanizers: 0
+            }
+          );
+        }
+
+
+        const people =
+          peopleMap.get(org);
+
+
+        people.itr +=
+          LIV.num(
+            row.itr
+          );
+
+
+        people.workers +=
+          LIV.num(
+            row.workers
+          );
+
+
+        people.mechanizers +=
+          LIV.num(
+            row.mechanizers
+          );
+
+
+        if (
+          row.equipmentType
+        ) {
+
+          const key =
+            `${org}|${LIV.normKey(
+              row.equipmentType
+            )}`;
+
+
+          if (
+            !equipmentMap.has(key)
+          ) {
+            equipmentMap.set(
+              key,
+              {
+                organizationId:
+                  org,
+
+                equipmentType:
+                  row.equipmentType,
+
+                quantity:
+                  0
+              }
+            );
+          }
+
+
+          equipmentMap
+            .get(key)
+            .quantity +=
+              LIV.num(
+                row.equipmentQty
+              );
+        }
+      }
+    );
+
+
+    const people =
+      [
+        ...peopleMap.values()
+      ]
+        .filter(
+          row =>
+            row.itr ||
+            row.workers ||
+            row.mechanizers
+        );
+
+
+    const equipment =
+      [
+        ...equipmentMap.values()
+      ];
+
+
+    const peopleTotal =
+      people.reduce(
+        (
+          sum,
+          row
+        ) =>
+          sum +
+          row.itr +
+          row.workers +
+          row.mechanizers,
+        0
+      );
+
+
+    const equipmentTotal =
+      equipment.reduce(
+        (
+          sum,
+          row
+        ) =>
+          sum +
+          row.quantity,
+        0
+      );
+
+
+    LIV.$(
+      'dailyPeopleTotal'
+    ).textContent =
+      LIV.roundInt(
+        peopleTotal
+      );
+
+
+    LIV.$(
+      'dailyEquipmentTotal'
+    ).textContent =
+      LIV.roundInt(
+        equipmentTotal
+      );
+
+
+    LIV.$(
+      'dailyPeopleBody'
+    ).innerHTML =
+      people
+        .map(
+          (
+            row,
+            index
+          ) => `
+            <tr>
+
+              <td>
+                ${index + 1}
+              </td>
+
+              <td>
+                ${LIV.esc(
+                  LIV.nameById(
+                    LIV.project.organizations,
+                    row.organizationId
+                  )
+                )}
+              </td>
+
+              <td>
+                ${LIV.roundInt(row.itr)}
+              </td>
+
+              <td>
+                ${LIV.roundInt(row.workers)}
+              </td>
+
+              <td>
+                ${LIV.roundInt(row.mechanizers)}
+              </td>
+
+              <td>
+                <b>
+                  ${LIV.roundInt(
+                    row.itr +
+                    row.workers +
+                    row.mechanizers
+                  )}
+                </b>
+              </td>
+
+            </tr>
+          `
+        )
+        .join('');
+
+
+    LIV.$(
+      'dailyEquipmentBody'
+    ).innerHTML =
+      equipment
+        .map(
+          (
+            row,
+            index
+          ) => `
+            <tr>
+
+              <td>
+                ${index + 1}
+              </td>
+
+              <td>
+                ${LIV.esc(
+                  LIV.nameById(
+                    LIV.project.organizations,
+                    row.organizationId
+                  )
+                )}
+              </td>
+
+              <td>
+                ${LIV.esc(
+                  row.equipmentType
+                )}
+              </td>
+
+              <td>
+                ${LIV.roundInt(
+                  row.quantity
+                )}
+              </td>
+
+            </tr>
+          `
+        )
+        .join('');
+
+
+    LIV.$(
+      'dailyEquipmentFooter'
+    ).textContent =
+      LIV.roundInt(
+        equipmentTotal
+      );
+  };
+
+
+/* =========================================================
+   ДИАГРАММЫ
+   ДВЕ ЛИНИИ: ИТР + РАБОЧИЕ
+   ========================================================= */
+
+
+LIV.destroyResourceCharts =
+  function () {
+
+    LIV.resources.charts
+      .forEach(
+        chart => {
+          try {
+            chart.destroy();
+          } catch (error) {
+            console.warn(error);
+          }
+        }
+      );
+
+    LIV.resources.charts =
+      [];
+  };
+
+
+LIV.renderResourceCharts =
+  function () {
+
+    LIV.destroyResourceCharts();
+
+
+    const container =
+      LIV.$(
+        'resourceCharts'
+      );
+
+
+    const rows =
+      LIV.getFilteredResources();
+
+
+    const organizations =
+      LIV.unique(
+        rows.map(
+          row =>
+            row.organizationId
+        )
+      );
+
+
+    if (
+      typeof Chart ===
+      'undefined'
+    ) {
+
+      container.innerHTML =
+        `
+          <div class="card">
+            Диаграммы не загрузились.
+          </div>
+        `;
+
+      return;
+    }
+
+
+    if (
+      !organizations.length
+    ) {
+
+      container.innerHTML =
+        `
+          <div class="card">
+            Нет данных для диаграмм.
+          </div>
+        `;
+
+      return;
+    }
+
+
+    container.innerHTML =
+      '';
+
+
+    organizations.forEach(
+      organizationId => {
+
+        const orgRows =
+          rows.filter(
+            row =>
+              row.organizationId ===
+              organizationId
+          );
+
+
+        const dates =
+          LIV.unique(
+            orgRows.map(
+              row =>
+                row.date
+            )
+          )
+            .sort();
+
+
+        const itr =
+          [];
+
+
+        const workers =
+          [];
+
+
+        dates.forEach(
+          date => {
+
+            const dayRows =
+              orgRows.filter(
+                row =>
+                  row.date ===
+                  date
+              );
+
+
+            itr.push(
+              LIV.roundInt(
+                dayRows.reduce(
+                  (
+                    sum,
+                    row
+                  ) =>
+                    sum +
+                    LIV.num(
+                      row.itr
+                    ),
+                  0
+                )
+              )
+            );
+
+
+            workers.push(
+              LIV.roundInt(
+                dayRows.reduce(
+                  (
+                    sum,
+                    row
+                  ) =>
+                    sum +
+                    LIV.num(
+                      row.workers
+                    ),
+                  0
+                )
+              )
+            );
+          }
+        );
+
+
+        const card =
+          document.createElement(
+            'div'
+          );
+
+
+        card.className =
+          'card resource-chart-card';
+
+
+        card.innerHTML = `
+          <h2>
+            ${LIV.esc(
+              LIV.nameById(
+                LIV.project.organizations,
+                organizationId
+              )
+            )}
+          </h2>
+
+          <canvas></canvas>
+        `;
+
+
+        container.appendChild(
+          card
+        );
+
+
+        const chart =
+          new Chart(
+            card.querySelector(
+              'canvas'
+            ),
+            {
+              type:
+                'line',
+
+              data: {
+                labels:
+                  dates.map(
+                    LIV.shortDate
+                  ),
+
+                datasets: [
+                  {
+                    label:
+                      'ИТР',
+
+                    data:
+                      itr,
+
+                    borderWidth:
+                      2,
+
+                    tension:
+                      0,
+
+                    spanGaps:
+                      false
+                  },
+
+                  {
+                    label:
+                      'Рабочие',
+
+                    data:
+                      workers,
+
+                    borderWidth:
+                      2,
+
+                    tension:
+                      0,
+
+                    spanGaps:
+                      false
+                  }
+                ]
+              },
+
+              options: {
+                responsive:
+                  true,
+
+                maintainAspectRatio:
+                  true,
+
+                scales: {
+                  y: {
+                    beginAtZero:
+                      true,
+
+                    ticks: {
+                      precision:
+                        0
+                    },
+
+                    title: {
+                      display:
+                        true,
+
+                      text:
+                        'Количество человек'
+                    }
+                  }
+                },
+
+                plugins: {
+                  legend: {
+                    display:
+                      true,
+
+                    position:
+                      'top'
+                  }
+                }
+              }
+            }
+          );
+
+
+        LIV.resources
+          .charts
+          .push(
+            chart
+          );
+      }
+    );
+  };
+
+
+/* =========================================================
+   СРЕДНИЕ
+   ========================================================= */
+
+
+LIV.averageSeries =
+  function ({
+    valuesByDate,
+    periodDates,
+    reportDates,
+    projectReportDates,
+    method,
+    missingRule
+  }) {
+
+    let dates =
+      [];
+
+
+    if (
+      method ===
+      'calendar'
+    ) {
+
+      dates =
+        periodDates;
+
+    } else if (
+      method ===
+      'workdays'
+    ) {
+
+      dates =
+        periodDates.filter(
+          LIV.isWorkday
+        );
+
+    } else if (
+      method ===
+      'project-report-days'
+    ) {
+
+      dates =
+        projectReportDates;
+
+    } else {
+
+      dates =
+        reportDates;
+    }
+
+
+    let values =
+      [];
+
+
+    dates.forEach(
+      date => {
+
+        const exists =
+          Object.prototype
+            .hasOwnProperty
+            .call(
+              valuesByDate,
+              date
+            );
+
+
+        if (exists) {
+
+          const value =
+            LIV.num(
+              valuesByDate[
+                date
+              ]
+            );
+
+
+          if (
+            method ===
+              'nonzero' &&
+            value ===
+              0
+          ) {
+            return;
+          }
+
+
+          values.push(
+            value
+          );
+
+          return;
+        }
+
+
+        if (
+          missingRule ===
+          'zero'
+        ) {
+          values.push(
+            0
+          );
+        }
+      }
+    );
+
+
+    if (!values.length) {
+
+      return {
+        value: 0,
+        days: 0
+      };
+    }
+
+
+    return {
+      value:
+        values.reduce(
+          (
+            sum,
+            value
+          ) =>
+            sum +
+            value,
+          0
+        ) /
+        values.length,
+
+      days:
+        values.length
+    };
+  };
+
+
+LIV.renderResourceAnalytics =
+  function () {
+
+    const rows =
+      LIV.getFilteredResources();
+
+
+    const from =
+      LIV.$(
+        'resourceFrom'
+      ).value;
+
+
+    const to =
+      LIV.$(
+        'resourceTo'
+      ).value;
+
+
+    const method =
+      LIV.$(
+        'resourceAverageMethod'
+      ).value;
+
+
+    const missingRule =
+      LIV.$(
+        'resourceMissingRule'
+      ).value;
+
+
+    const periodDates =
+      LIV.dateRange(
+        from,
+        to
+      );
+
+
+    const projectReportDates =
+      LIV.unique(
+        rows.map(
+          row =>
+            row.date
+        )
+      )
+        .sort();
+
+
+    const organizations =
+      LIV.unique(
+        rows.map(
+          row =>
+            row.organizationId
+        )
+      );
+
+
+    const peopleRows =
+      [];
+
+
+    organizations.forEach(
+      organizationId => {
+
+        const orgRows =
+          rows.filter(
+            row =>
+              row.organizationId ===
+              organizationId
+          );
+
+
+        const reportDates =
+          LIV.unique(
+            orgRows.map(
+              row =>
+                row.date
+            )
+          )
+            .sort();
+
+
+        const itrByDate =
+          {};
+
+
+        const workersByDate =
+          {};
+
+
+        const mechanizersByDate =
+          {};
+
+
+        const totalByDate =
+          {};
+
+
+        reportDates.forEach(
+          date => {
+
+            const dayRows =
+              orgRows.filter(
+                row =>
+                  row.date ===
+                  date
+              );
+
+
+            itrByDate[
+              date
+            ] =
+              dayRows.reduce(
+                (
+                  sum,
+                  row
+                ) =>
+                  sum +
+                  LIV.num(
+                    row.itr
+                  ),
+                0
+              );
+
+
+            workersByDate[
+              date
+            ] =
+              dayRows.reduce(
+                (
+                  sum,
+                  row
+                ) =>
+                  sum +
+                  LIV.num(
+                    row.workers
+                  ),
+                0
+              );
+
+
+            mechanizersByDate[
+              date
+            ] =
+              dayRows.reduce(
+                (
+                  sum,
+                  row
+                ) =>
+                  sum +
+                  LIV.num(
+                    row.mechanizers
+                  ),
+                0
+              );
+
+
+            totalByDate[
+              date
+            ] =
+              itrByDate[
+                date
+              ] +
+              workersByDate[
+                date
+              ] +
+              mechanizersByDate[
+                date
+              ];
+          }
+        );
+
+
+        const common = {
+          periodDates,
+          reportDates,
+          projectReportDates,
+          method,
+          missingRule
+        };
+
+
+        const itr =
+          LIV.averageSeries({
+            ...common,
+            valuesByDate:
+              itrByDate
+          });
+
+
+        const workers =
+          LIV.averageSeries({
+            ...common,
+            valuesByDate:
+              workersByDate
+          });
+
+
+        const mechanizers =
+          LIV.averageSeries({
+            ...common,
+            valuesByDate:
+              mechanizersByDate
+          });
+
+
+        const total =
+          LIV.averageSeries({
+            ...common,
+            valuesByDate:
+              totalByDate
+          });
+
+
+        peopleRows.push({
+          organizationId,
+
+          itr:
+            LIV.roundInt(
+              itr.value
+            ),
+
+          workers:
+            LIV.roundInt(
+              workers.value
+            ),
+
+          mechanizers:
+            LIV.roundInt(
+              mechanizers.value
+            ),
+
+          total:
+            LIV.roundInt(
+              total.value
+            ),
+
+          days:
+            total.days
+        });
+      }
+    );
+
+
+    LIV.$(
+      'averagePeopleBody'
+    ).innerHTML =
+      peopleRows
+        .map(
+          row => `
+            <tr>
+
+              <td>
+                ${LIV.esc(
+                  LIV.nameById(
+                    LIV.project.organizations,
+                    row.organizationId
+                  )
+                )}
+              </td>
+
+              <td>
+                ${row.itr}
+              </td>
+
+              <td>
+                ${row.mechanizers}
+              </td>
+
+              <td>
+                ${row.workers}
+              </td>
+
+              <td>
+                <b>
+                  ${row.total}
+                </b>
+              </td>
+
+            </tr>
+          `
+        )
+        .join('');
+
+
+    /* =========================================
+       ТЕХНИКА
+       ========================================= */
+
+
+    const equipmentTypes =
+      LIV.unique(
+        rows
+          .map(
+            row =>
+              LIV.normText(
+                row.equipmentType
+              )
+          )
+      )
+        .filter(Boolean)
+        .sort(
+          (
+            a,
+            b
+          ) =>
+            a.localeCompare(
+              b,
+              'ru'
+            )
+        );
+
+
+    LIV.$(
+      'averageEquipmentHead'
+    ).innerHTML = `
+      <tr>
+
+        <th>
+          Организация
+        </th>
+
+        ${
+          equipmentTypes
+            .map(
+              type =>
+                `
+                  <th>
+                    ${LIV.esc(type)}
+                  </th>
+                `
+            )
+            .join('')
+        }
+
+      </tr>
+    `;
+
+
+    LIV.$(
+      'averageEquipmentBody'
+    ).innerHTML =
+      organizations
+        .map(
+          organizationId => {
+
+            const orgRows =
+              rows.filter(
+                row =>
+                  row.organizationId ===
+                  organizationId
+              );
+
+
+            const reportDates =
+              LIV.unique(
+                orgRows.map(
+                  row =>
+                    row.date
+                )
+              )
+                .sort();
+
+
+            const values =
+              equipmentTypes.map(
+                equipmentType => {
+
+                  const byDate =
+                    {};
+
+
+                  reportDates.forEach(
+                    date => {
+
+                      byDate[
+                        date
+                      ] =
+                        orgRows
+                          .filter(
+                            row =>
+                              row.date ===
+                                date &&
+                              LIV.sameText(
+                                row.equipmentType,
+                                equipmentType
+                              )
+                          )
+                          .reduce(
+                            (
+                              sum,
+                              row
+                            ) =>
+                              sum +
+                              LIV.num(
+                                row.equipmentQty
+                              ),
+                            0
+                          );
+                    }
+                  );
+
+
+                  const result =
+                    LIV.averageSeries({
+                      valuesByDate:
+                        byDate,
+
+                      periodDates,
+
+                      reportDates,
+
+                      projectReportDates,
+
+                      method,
+
+                      missingRule
+                    });
+
+
+                  return LIV.roundInt(
+                    result.value
+                  );
+                }
+              );
+
+
+            return `
+              <tr>
+
+                <td>
+                  ${LIV.esc(
+                    LIV.nameById(
+                      LIV.project.organizations,
+                      organizationId
+                    )
+                  )}
+                </td>
+
+                ${
+                  values
+                    .map(
+                      value =>
+                        `<td>${value}</td>`
+                    )
+                    .join('')
+                }
+
+              </tr>
+            `;
+          }
+        )
+        .join('');
+
+
+    /* =========================================
+       ОБЩИЙ СРЕДНИЙ ФАКТ
+       ========================================= */
+
+
+    const totalsByDate =
+      {};
+
+
+    rows.forEach(
+      row => {
+
+        if (
+          !totalsByDate[
+            row.date
+          ]
+        ) {
+          totalsByDate[
+            row.date
+          ] = {
+            people: 0,
+            equipment: 0
+          };
+        }
+
+
+        totalsByDate[
+          row.date
+        ].people +=
+          LIV.num(
+            row.itr
+          ) +
+          LIV.num(
+            row.workers
+          ) +
+          LIV.num(
+            row.mechanizers
+          );
+
+
+        totalsByDate[
+          row.date
+        ].equipment +=
+          LIV.num(
+            row.equipmentQty
+          );
+      }
+    );
+
+
+    const reportDates =
+      Object.keys(
+        totalsByDate
+      )
+        .sort();
+
+
+    const peopleByDate =
+      {};
+
+
+    const equipmentByDate =
+      {};
+
+
+    reportDates.forEach(
+      date => {
+
+        peopleByDate[
+          date
+        ] =
+          totalsByDate[
+            date
+          ].people;
+
+
+        equipmentByDate[
+          date
+        ] =
+          totalsByDate[
+            date
+          ].equipment;
+      }
+    );
+
+
+    const common = {
+      periodDates,
+      reportDates,
+      projectReportDates:
+        reportDates,
+      method,
+      missingRule
+    };
+
+
+    const peopleAvg =
+      LIV.averageSeries({
+        ...common,
+        valuesByDate:
+          peopleByDate
+      });
+
+
+    const equipmentAvg =
+      LIV.averageSeries({
+        ...common,
+        valuesByDate:
+          equipmentByDate
+      });
+
+
+    LIV.$(
+      'averagePeopleTotal'
+    ).textContent =
+      LIV.roundInt(
+        peopleAvg.value
+      );
+
+
+    LIV.$(
+      'averageEquipmentTotal'
+    ).textContent =
+      LIV.roundInt(
+        equipmentAvg.value
+      );
+
+
+    LIV.$(
+      'averageDaysCount'
+    ).textContent =
+      Math.max(
+        peopleAvg.days,
+        equipmentAvg.days
+      );
+  };
+
+
+/* =========================================================
+   РЕДАКТОР РЕСУРСОВ
+   ========================================================= */
+
+
+LIV.openResourceEditor =
+  function (
+    id = null
+  ) {
+
+    const row =
+      id
+        ? LIV.byId(
+            LIV.project.resources,
+            id
+          ) || {}
+        : {};
+
+
+    LIV.openModal(
+      id
+        ? 'Ресурсы'
+        : 'Добавить ресурсы',
+
+      `
+        <div class="form-grid">
+
+          <div class="field">
+
+            <label>
+              Дата
+            </label>
+
+            <input
+              id="editResourceDate"
+              type="date"
+              value="${row.date || LIV.today()}"
+            >
+
+          </div>
+
+
+          <div class="field">
+
+            <label>
+              Организация
+            </label>
+
+            <select id="editResourceOrganization">
+
+              <option value="">
+                —
+              </option>
+
+              ${
+                LIV.project.organizations
+                  .map(
+                    item => `
+                      <option
+                        value="${item.id}"
+                        ${
+                          item.id ===
+                          row.organizationId
+                            ? 'selected'
+                            : ''
+                        }>
+                        ${LIV.esc(item.name)}
+                      </option>
+                    `
+                  )
+                  .join('')
+              }
+
+            </select>
+
+          </div>
+
+
+          <div class="field">
+
+            <label>
+              ИТР
+            </label>
+
+            <input
+              id="editResourceItr"
+              type="number"
+              value="${row.itr ?? 0}"
+            >
+
+          </div>
+
+
+          <div class="field">
+
+            <label>
+              Рабочие
+            </label>
+
+            <input
+              id="editResourceWorkers"
+              type="number"
+              value="${row.workers ?? 0}"
+            >
+
+          </div>
+
+
+          <div class="field">
+
+            <label>
+              Механизаторы
+            </label>
+
+            <input
+              id="editResourceMechanizers"
+              type="number"
+              value="${row.mechanizers ?? 0}"
+            >
+
+          </div>
+
+
+          <div class="field">
+
+            <label>
+              Техника
+            </label>
+
+            <input
+              id="editResourceEquipment"
+              value="${LIV.esc(
+                row.equipmentType ||
+                ''
+              )}"
+            >
+
+          </div>
+
+
+          <div class="field">
+
+            <label>
+              Количество техники
+            </label>
+
+            <input
+              id="editResourceEquipmentQty"
+              type="number"
+              value="${row.equipmentQty ?? 0}"
+            >
+
+          </div>
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Комментарий
+          </label>
+
+          <textarea id="editResourceComment">${LIV.esc(
+            row.comment ||
+            ''
+          )}</textarea>
+
+        </div>
+
+
+        <div class="editor-actions">
+
+          ${
+            id
+              ? `
+                  <button
+                    id="deleteResourceBtn"
+                    class="btn danger">
+                    Удалить
+                  </button>
+                `
+              : ''
+          }
+
+          <button
+            id="saveResourceBtn"
+            class="btn primary">
+            Сохранить
+          </button>
+
+        </div>
+      `
+    );
+
+
+    LIV.$(
+      'saveResourceBtn'
+    ).onclick =
+      async () => {
+
+        const target =
+          row.id
+            ? row
+            : {
+                id:
+                  LIV.uid('R'),
+
+                createdAt:
+                  LIV.nowIso()
+              };
+
+
+        target.date =
+          LIV.$(
+            'editResourceDate'
+          ).value;
+
+
+        target.organizationId =
+          LIV.$(
+            'editResourceOrganization'
+          ).value;
+
+
+        target.itr =
+          LIV.num(
+            LIV.$(
+              'editResourceItr'
+            ).value
+          );
+
+
+        target.workers =
+          LIV.num(
+            LIV.$(
+              'editResourceWorkers'
+            ).value
+          );
+
+
+        target.mechanizers =
+          LIV.num(
+            LIV.$(
+              'editResourceMechanizers'
+            ).value
+          );
+
+
+        target.equipmentType =
+          LIV.$(
+            'editResourceEquipment'
+          )
+            .value
+            .trim();
+
+
+        target.equipmentQty =
+          LIV.num(
+            LIV.$(
+              'editResourceEquipmentQty'
+            ).value
+          );
+
+
+        target.comment =
+          LIV.$(
+            'editResourceComment'
+          )
+            .value
+            .trim();
+
+
+        target.updatedAt =
+          LIV.nowIso();
+
+
+        if (!row.id) {
+          LIV.project.resources.push(
+            target
+          );
+        }
+
+
+        LIV.log(
+          row.id
+            ? 'Изменено'
+            : 'Создано',
+
+          'Ресурсы',
+
+          target.date
+        );
+
+
+        await LIV.saveProject();
+
+
+        LIV.closeModal();
+
+
+        LIV.renderResources();
+      };
+
+
+    if (id) {
+
+      LIV.$(
+        'deleteResourceBtn'
+      ).onclick =
+        async () => {
+
+          if (
+            !confirm(
+              'Удалить запись ресурсов?'
+            )
+          ) {
+            return;
+          }
+
+
+          LIV.project.resources =
+            LIV.project.resources
+              .filter(
+                item =>
+                  item.id !==
+                  id
+              );
+
+
+          await LIV.saveProject();
+
+
+          LIV.closeModal();
+
+
+          LIV.renderResources();
+        };
+    }
+  };
+
+
+/* =========================================================
+   ПЛАН / ФАКТ
+   ========================================================= */
+
+
+LIV.renderResourcePlanFact =
+  function () {
+
+    const rows =
+      LIV.getFilteredResources();
+
+
+    const byDate =
+      {};
+
+
+    rows.forEach(
+      row => {
+
+        byDate[
+          row.date
+        ] =
+          (
+            byDate[
+              row.date
+            ] ||
+            0
+          ) +
+          LIV.num(
+            row.itr
+          ) +
+          LIV.num(
+            row.workers
+          ) +
+          LIV.num(
+            row.mechanizers
+          );
+      }
+    );
+
+
+    const dates =
+      Object.keys(
+        byDate
+      )
+        .sort();
+
+
+    LIV.$(
+      'resourceFactTotal'
+    ).textContent =
+      LIV.roundInt(
+        Object.values(
+          byDate
+        )
+          .reduce(
+            (
+              sum,
+              value
+            ) =>
+              sum +
+              value,
+            0
+          )
+      );
+
+
+    LIV.$(
+      'resourcePlanTotal'
+    ).textContent =
+      0;
+
+
+    LIV.$(
+      'resourceDeviation'
+    ).textContent =
+      LIV.roundInt(
+        Object.values(
+          byDate
+        )
+          .reduce(
+            (
+              sum,
+              value
+            ) =>
+              sum +
+              value,
+            0
+          )
+      );
+
+
+    LIV.$(
+      'resourcePlanFactBody'
+    ).innerHTML =
+      dates
+        .map(
+          date => `
+            <tr>
+
+              <td>
+                ${LIV.ruDate(date)}
+              </td>
+
+              <td>
+                0
+              </td>
+
+              <td>
+                ${LIV.roundInt(
+                  byDate[date]
+                )}
+              </td>
+
+              <td>
+                ${LIV.roundInt(
+                  byDate[date]
+                )}
+              </td>
+
+            </tr>
+          `
+        )
+        .join('');
+  };
+
+
+/* =========================================================
+   ОБЩИЙ РЕНДЕР
+   ========================================================= */
+
+
+LIV.switchResourceView =
+  function (
+    view
+  ) {
+
+    LIV.resources.view =
+      view;
+
+
+    document
+      .querySelectorAll(
+        '.resource-tab'
+      )
+      .forEach(
+        button => {
+
+          button.classList.toggle(
+            'active',
+            button.dataset
+              .resourceView ===
+              view
+          );
+        }
+      );
+
+
+    document
+      .querySelectorAll(
+        '.resource-view'
+      )
+      .forEach(
+        section => {
+
+          section.classList.add(
+            'hidden'
+          );
+        }
+      );
+
+
+    LIV.$(
+      `resource-view-${view}`
+    )
+      ?.classList
+      .remove(
+        'hidden'
+      );
+
+
+    LIV.renderResources();
+  };
+
+
+LIV.renderResources =
+  function () {
+
+    if (
+      LIV.resources.view ===
+      'journal'
+    ) {
+      LIV.renderResourceJournal();
+    }
+
+
+    if (
+      LIV.resources.view ===
+      'daily'
+    ) {
+      LIV.renderResourceDaily();
+    }
+
+
+    if (
+      LIV.resources.view ===
+      'charts'
+    ) {
+      LIV.renderResourceCharts();
+    }
+
+
+    if (
+      LIV.resources.view ===
+      'analytics'
+    ) {
+      LIV.renderResourceAnalytics();
+    }
+
+
+    if (
+      LIV.resources.view ===
+      'planfact'
+    ) {
+      LIV.renderResourcePlanFact();
+    }
+  };
