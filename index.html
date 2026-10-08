@@ -1,535 +1,1495 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ACONS Planning — локальный пилот</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>LIV Planning</title>
+
+  <link
+    rel="stylesheet"
+    href="style.css"
+  >
+
+  <link
+    rel="stylesheet"
+    href="resources.css"
+  >
+
+  <script
+    src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"
+    defer>
+  </script>
+
+  <script
+    src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"
+    defer>
+  </script>
 </head>
+
+
 <body>
+
 <header class="topbar no-print">
-  <div>
-    <h1>ACONS Planning</h1>
-    <p>Локальный пилот · импорт реальных таблиц · журнал факта · сравнение версий</p>
+
+  <div class="brand">
+    <h1>
+      LIV Planning
+    </h1>
   </div>
+
+
   <div class="top-actions">
-    <button id="backupBtn" class="btn primary">Сохранить проект</button>
-    <label class="btn">Загрузить проект<input id="restoreInput" type="file" accept=".json,application/json" hidden></label>
-    <label class="btn">Сравнить проект<input id="compareInput" type="file" accept=".json,application/json" hidden></label>
-    <button id="pdfBtn" class="btn">Сохранить PDF</button>
+
+    <button
+      id="backupBtn"
+      class="btn primary">
+      Сохранить проект
+    </button>
+
+
+    <label class="btn">
+
+      Загрузить проект
+
+      <input
+        id="restoreInput"
+        type="file"
+        accept=".json,application/json"
+        hidden
+      >
+
+    </label>
+
+
+    <label class="btn">
+
+      Сравнить проект
+
+      <input
+        id="compareInput"
+        type="file"
+        accept=".json,application/json"
+        hidden
+      >
+
+    </label>
+
+
+    <button
+      id="pdfBtn"
+      class="btn">
+      Сохранить PDF
+    </button>
+
   </div>
+
 </header>
-<div id="backupNotice" class="backup-strip no-print"></div>
+
+
 <main class="container">
+
+
   <nav class="tabs no-print">
-    <button class="tab active" data-tab="dashboard">Сводка</button>
-    <button class="tab" data-tab="matrix">Шахматка</button>
-    <button class="tab" data-tab="gantt">Гант</button>
-    <button class="tab" data-tab="planfact">План / факт</button>
-    <button class="tab" data-tab="resources">Ресурсы</button>
-    <button class="tab" data-tab="milestones">Ключевые даты</button>
-    <button class="tab" data-tab="elements">Номерные элементы</button>
-    <button class="tab" data-tab="demolition">Демонтаж</button>
-    <button class="tab" data-tab="import">Импорт</button>
-    <button class="tab" data-tab="history">История</button>
-    <button class="tab" data-tab="settings">Настройки</button>
+
+    <button
+      class="tab active"
+      data-tab="dashboard">
+      Сводка
+    </button>
+
+    <button
+      class="tab"
+      data-tab="matrix">
+      Шахматка
+    </button>
+
+    <button
+      class="tab"
+      data-tab="gantt">
+      Гант
+    </button>
+
+    <button
+      class="tab"
+      data-tab="planfact">
+      План / факт
+    </button>
+
+    <button
+      class="tab"
+      data-tab="resources">
+      Ресурсы
+    </button>
+
+    <button
+      class="tab"
+      data-tab="organizations">
+      Организации
+    </button>
+
+    <button
+      class="tab"
+      data-tab="milestones">
+      Ключевые даты
+    </button>
+
+    <button
+      class="tab"
+      data-tab="elements">
+      Номерные элементы
+    </button>
+
+    <button
+      class="tab"
+      data-tab="demolition">
+      Демонтаж
+    </button>
+
+    <button
+      class="tab"
+      data-tab="import">
+      Импорт
+    </button>
+
+    <button
+      class="tab"
+      data-tab="history">
+      История
+    </button>
+
+    <button
+      class="tab"
+      data-tab="settings">
+      Настройки
+    </button>
+
   </nav>
 
-  <section id="tab-dashboard" class="panel">
+
+  <!-- =====================================================
+       СВОДКА
+       ===================================================== -->
+
+  <section
+    id="tab-dashboard"
+    class="panel">
+
     <section class="stats">
-      <div class="stat"><span>Фронтов</span><strong id="dTotal">0</strong></div>
-      <div class="stat"><span>В работе</span><strong id="dWork">0</strong></div>
-      <div class="stat"><span>Завершено</span><strong id="dDone">0</strong></div>
-      <div class="stat"><span>Сдано</span><strong id="dAccepted">0</strong></div>
-      <div class="stat"><span>Просрочено</span><strong id="dLate">0</strong></div>
-      <div class="stat"><span>Ограничения</span><strong id="dRisk">0</strong></div>
-    </section>
-    <section class="grid2">
-      <div class="card"><h2>Критичные фронты</h2><div id="dCritical"></div></div>
-      <div class="card"><h2>Текущие ресурсы</h2><div id="dResources"></div></div>
-    </section>
-  </section>
 
-  <section id="tab-matrix" class="panel hidden">
-    <section class="card toolbar no-print">
-      <div class="field"><label>Здание</label><select id="mfBuilding"></select></div>
-      <div class="field"><label>Блок</label><select id="mfBlock"></select></div>
-      <div class="field"><label>Этаж</label><select id="mfFloor"></select></div>
-      <div class="field"><label>Работа</label><select id="mfWork"></select></div>
-      <div class="field"><label>Организация</label><select id="mfOrg"></select></div>
-      <div class="field"><label>Статус</label><select id="mfStatus"><option value="all">Все статусы</option><option>Не начато</option><option>Фронт готов</option><option>В работе</option><option>Завершено</option><option>Приостановлено</option><option>Ограничение</option></select></div>
-      <button id="newFrontBtn" class="btn primary align-end">Добавить фронт</button>
-    </section>
-    <section class="card table-wrap"><table><thead id="matrixHead"></thead><tbody id="matrixBody"></tbody></table></section>
-  </section>
-
-  <section id="tab-gantt" class="panel hidden">
-    <section class="card toolbar no-print">
-      <div class="field"><label>Здание</label><select id="gBuilding"></select></div>
-      <div class="field"><label>Работа</label><select id="gWork"></select></div>
-      <div class="field"><label>Слой</label><select id="gMode"><option value="contract">Договорный</option><option value="baseline">Базовый</option><option value="plan" selected>Рабочий</option><option value="fact">Фактический</option><option value="forecast">Прогнозный</option></select></div>
-    </section>
-    <section class="card"><div id="gantt"></div></section>
-  </section>
-
-  <section id="tab-planfact" class="panel hidden">
-    <section class="card toolbar no-print">
-      <div class="field"><label>С</label><input id="pfFrom" type="date"></div>
-      <div class="field"><label>По</label><input id="pfTo" type="date"></div>
-      <div class="field"><label>Здание</label><select id="pfBuilding"></select></div>
-      <div class="field"><label>Работа</label><select id="pfWork"></select></div>
-      <button id="newPlanRow" class="btn align-end">+ План</button>
-      <button id="newFactRow" class="btn primary align-end">+ Факт</button>
-    </section>
-    <section class="stats">
-      <div class="stat"><span>План за период</span><strong id="pfPlanPeriod">0</strong></div>
-      <div class="stat"><span>Факт за период</span><strong id="pfFactPeriod">0</strong></div>
-      <div class="stat"><span>Отклонение</span><strong id="pfVarPeriod">0</strong></div>
-      <div class="stat"><span>План накопительно</span><strong id="pfPlanCum">0</strong></div>
-      <div class="stat"><span>Факт накопительно</span><strong id="pfFactCum">0</strong></div>
-      <div class="stat"><span>Отклонение, п.п.</span><strong id="pfPp">0</strong></div>
-    </section>
-    <section class="grid2">
-      <div class="card table-wrap"><h2>План</h2><table><thead><tr><th>Дата</th><th>Фронт</th><th>Объем</th><th>Люди</th></tr></thead><tbody id="planRows"></tbody></table></div>
-      <div class="card table-wrap"><h2>Факт</h2><table><thead><tr><th>Дата</th><th>Фронт</th><th>Объем</th><th>Накоп.</th><th>Люди</th></tr></thead><tbody id="factRows"></tbody></table></div>
-    </section>
-  </section>
-
-  <section id="tab-resources" class="panel hidden">
-    <section class="card no-print">
-      <div class="tabs" id="resourceSubTabs">
-        <button class="tab active" data-rview="journal">Журнал</button>
-        <button class="tab" data-rview="daily">Ежедневная сводка</button>
-        <button class="tab" data-rview="dynamics">Диаграммы</button>
-        <button class="tab" data-rview="analytics">Месячная аналитика</button>
-        <button class="tab" data-rview="planfact">План / факт ресурсов</button>
+      <div class="stat">
+        <span>Фронтов</span>
+        <strong id="dTotal">0</strong>
       </div>
+
+      <div class="stat">
+        <span>В работе</span>
+        <strong id="dWork">0</strong>
+      </div>
+
+      <div class="stat">
+        <span>Завершено</span>
+        <strong id="dDone">0</strong>
+      </div>
+
+      <div class="stat">
+        <span>Сдано</span>
+        <strong id="dAccepted">0</strong>
+      </div>
+
+      <div class="stat">
+        <span>Просрочено</span>
+        <strong id="dLate">0</strong>
+      </div>
+
+      <div class="stat">
+        <span>Ограничения</span>
+        <strong id="dRisk">0</strong>
+      </div>
+
     </section>
 
-    <section class="card toolbar no-print">
-      <div class="field"><label>С</label><input id="rFrom" type="date"></div>
-      <div class="field"><label>По</label><input id="rTo" type="date"></div>
-      <div class="field"><label>Организация</label><select id="rOrg"></select></div>
-      <div class="field"><label>Здание</label><select id="rBuilding"></select></div>
-      <div class="field"><label>Работа</label><select id="rWork"></select></div>
-      <div class="field"><label>Фронт</label><select id="rFront"></select></div>
-      <button id="newResourceBtn" class="btn primary align-end">Добавить ресурсы</button>
+
+    <section class="grid2">
+
+      <div class="card">
+
+        <h2>
+          Критичные фронты
+        </h2>
+
+        <div id="dCritical"></div>
+
+      </div>
+
+
+      <div class="card">
+
+        <h2>
+          Текущие ресурсы
+        </h2>
+
+        <div id="dResources"></div>
+
+      </div>
+
     </section>
 
-    <section id="rview-journal" class="resource-view">
-      <section class="stats">
-        <div class="stat"><span>ИТР-дни</span><strong id="rItr">0</strong></div>
-        <div class="stat"><span>Рабочие-дни</span><strong id="rWorkers">0</strong></div>
-        <div class="stat"><span>Механизаторы-дни</span><strong id="rMech">0</strong></div>
-        <div class="stat"><span>Всего чел.-дней</span><strong id="rTotalPeople">0</strong></div>
-        <div class="stat"><span>Пик людей</span><strong id="rPeak">0</strong></div>
-        <div class="stat"><span>Технико-дни</span><strong id="rEquipDays">0</strong></div>
-      </section>
+  </section>
 
-      <section class="card no-print">
-        <div class="editor-actions left-actions">
-          <button id="resourceColumnsBtn" class="btn">Колонки</button>
-        </div>
-        <div id="resourceColumnsPanel" class="hidden"></div>
-      </section>
 
-      <section class="card table-wrap">
-        <table>
-          <thead id="resourceHead"></thead>
-          <tbody id="resourceRows"></tbody>
-        </table>
-      </section>
-    </section>
+  <!-- =====================================================
+       РЕСУРСЫ
+       ===================================================== -->
 
-    <section id="rview-daily" class="resource-view hidden">
-      <section class="card toolbar no-print">
-        <div class="field">
-          <label>Дата сводки</label>
-          <input id="rDailyDate" type="date">
-        </div>
-      </section>
+  <section
+    id="tab-resources"
+    class="panel hidden">
 
-      <section class="stats">
-        <div class="stat"><span>Сотрудников на объекте</span><strong id="rdPeopleTotal">0</strong></div>
-        <div class="stat"><span>Техники на объекте</span><strong id="rdEquipmentTotal">0</strong></div>
-      </section>
 
-      <section class="grid2">
-        <div class="card table-wrap">
-          <h2>Люди</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>№</th>
-                <th>Организация</th>
-                <th>ИТР</th>
-                <th>Подсобные рабочие</th>
-                <th>Механизаторы</th>
-                <th>Всего, чел</th>
-              </tr>
-            </thead>
-            <tbody id="rdPeopleBody"></tbody>
-          </table>
-        </div>
+    <section class="card no-print">
 
-        <div class="card table-wrap">
-          <h2>Техника</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>№</th>
-                <th>Организация</th>
-                <th>Наименование техники</th>
-                <th>Количество, ед.</th>
-              </tr>
-            </thead>
-            <tbody id="rdEquipmentBody"></tbody>
-            <tfoot>
-              <tr>
-                <th colspan="3">Итого</th>
-                <th id="rdEquipmentFoot">0</th>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </section>
-    </section>
+      <div class="resource-tabs">
 
-    <section id="rview-dynamics" class="resource-view hidden">
-      <section class="card toolbar no-print">
-        <div class="field">
-          <label>Что показывать</label>
-          <select id="rDynType">
-            <option value="people">Люди</option>
-            <option value="equipment">Техника</option>
-          </select>
-        </div>
-
-        <div class="field">
-          <label>Организация</label>
-          <select id="rDynOrg"></select>
-        </div>
-      </section>
-
-      <section id="resourceCharts" class="grid2"></section>
-    </section>
-
-    <section id="rview-analytics" class="resource-view hidden">
-      <section class="card toolbar no-print">
-        <div class="field">
-          <label>Метод среднего</label>
-
-          <select id="rAvgMethod">
-            <option value="reported_with_zero">По отчетным датам, включая нули</option>
-            <option value="nonzero">Только по ненулевым значениям</option>
-            <option value="calendar">По всем календарным дням</option>
-            <option value="workdays">По рабочим дням</option>
-            <option value="project_report_days">По дням, где есть отчет по объекту</option>
-          </select>
-        </div>
-
-        <div class="field">
-          <label>Если записи нет</label>
-
-          <select id="rMissingRule">
-            <option value="skip">Не учитывать</option>
-            <option value="zero">Считать как 0</option>
-          </select>
-        </div>
-
-        <button id="saveResourceViewBtn" class="btn align-end">
-          Сохранить представление
+        <button
+          class="resource-tab active"
+          data-resource-view="journal">
+          Журнал
         </button>
-      </section>
+
+        <button
+          class="resource-tab"
+          data-resource-view="daily">
+          Ежедневная сводка
+        </button>
+
+        <button
+          class="resource-tab"
+          data-resource-view="charts">
+          Диаграммы
+        </button>
+
+        <button
+          class="resource-tab"
+          data-resource-view="analytics">
+          Месячная аналитика
+        </button>
+
+        <button
+          class="resource-tab"
+          data-resource-view="planfact">
+          План / факт ресурсов
+        </button>
+
+      </div>
+
+    </section>
+
+
+    <!-- ОБЩИЕ ФИЛЬТРЫ -->
+
+    <section class="card resource-filter-bar no-print">
+
+      <div class="field">
+
+        <label>
+          С
+        </label>
+
+        <input
+          id="resourceFrom"
+          type="date"
+        >
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          По
+        </label>
+
+        <input
+          id="resourceTo"
+          type="date"
+        >
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Организации
+        </label>
+
+        <div
+          id="resourceOrganizationFilter"
+          class="multi-filter">
+        </div>
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Здания
+        </label>
+
+        <div
+          id="resourceBuildingFilter"
+          class="multi-filter">
+        </div>
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Работы
+        </label>
+
+        <div
+          id="resourceWorkFilter"
+          class="multi-filter">
+        </div>
+
+      </div>
+
+
+      <button
+        id="newResourceBtn"
+        class="btn primary align-end">
+        Добавить ресурсы
+      </button>
+
+    </section>
+
+
+    <!-- ЖУРНАЛ -->
+
+    <section
+      id="resource-view-journal"
+      class="resource-view">
 
       <section class="stats">
-        <div class="stat"><span>Среднее сотрудников</span><strong id="raPeopleAvg">0</strong></div>
-        <div class="stat"><span>Среднее техники</span><strong id="raEquipmentAvg">0</strong></div>
-        <div class="stat"><span>Дней в расчете</span><strong id="raDaysCount">0</strong></div>
+
+        <div class="stat">
+          <span>ИТР-дни</span>
+          <strong id="rItrDays">0</strong>
+        </div>
+
+        <div class="stat">
+          <span>Рабочие-дни</span>
+          <strong id="rWorkerDays">0</strong>
+        </div>
+
+        <div class="stat">
+          <span>Механизаторы-дни</span>
+          <strong id="rMechanizerDays">0</strong>
+        </div>
+
+        <div class="stat">
+          <span>Всего чел.-дней</span>
+          <strong id="rPeopleDays">0</strong>
+        </div>
+
+        <div class="stat">
+          <span>Пик людей</span>
+          <strong id="rPeoplePeak">0</strong>
+        </div>
+
+        <div class="stat">
+          <span>Технико-дни</span>
+          <strong id="rEquipmentDays">0</strong>
+        </div>
+
       </section>
 
+
       <section class="card table-wrap">
-        <h2>Среднее количество сотрудников</h2>
 
         <table>
+
           <thead>
+
             <tr>
-              <th>Организация</th>
-              <th>ИТР</th>
-              <th>Механизаторы</th>
-              <th>Подсобные рабочие</th>
-              <th>Итого</th>
+
+              <th>
+                Дата
+              </th>
+
+              <th>
+                Организация
+              </th>
+
+              <th>
+                Здание
+              </th>
+
+              <th>
+                Работа
+              </th>
+
+              <th>
+                ИТР
+              </th>
+
+              <th>
+                Рабочие
+              </th>
+
+              <th>
+                Механизаторы
+              </th>
+
+              <th>
+                Техника
+              </th>
+
+              <th>
+                Кол.
+              </th>
+
+              <th>
+                Комментарий
+              </th>
+
+              <th></th>
+
             </tr>
+
           </thead>
 
-          <tbody id="raPeopleBody"></tbody>
-          <tfoot id="raPeopleFoot"></tfoot>
+
+          <tbody id="resourceJournalBody"></tbody>
+
         </table>
+
       </section>
 
-      <section class="card table-wrap">
-        <h2>Среднее количество строительной техники</h2>
-
-        <table>
-          <thead id="raEquipmentHead"></thead>
-          <tbody id="raEquipmentBody"></tbody>
-        </table>
-      </section>
     </section>
 
-    <section id="rview-planfact" class="resource-view hidden">
+
+    <!-- ЕЖЕДНЕВНАЯ СВОДКА -->
+
+    <section
+      id="resource-view-daily"
+      class="resource-view hidden">
+
       <section class="card toolbar no-print">
-        <button id="newResourcePlanBtn" class="btn primary">
+
+        <div class="field">
+
+          <label>
+            Дата сводки
+          </label>
+
+          <input
+            id="resourceDailyDate"
+            type="date"
+          >
+
+        </div>
+
+      </section>
+
+
+      <section class="stats">
+
+        <div class="stat">
+
+          <span>
+            Сотрудников на объекте
+          </span>
+
+          <strong id="dailyPeopleTotal">
+            0
+          </strong>
+
+        </div>
+
+
+        <div class="stat">
+
+          <span>
+            Техники на объекте
+          </span>
+
+          <strong id="dailyEquipmentTotal">
+            0
+          </strong>
+
+        </div>
+
+      </section>
+
+
+      <section class="grid2">
+
+        <div class="card table-wrap">
+
+          <h2>
+            Люди
+          </h2>
+
+          <table>
+
+            <thead>
+
+              <tr>
+
+                <th>№</th>
+
+                <th>
+                  Организация
+                </th>
+
+                <th>
+                  ИТР
+                </th>
+
+                <th>
+                  Подсобные рабочие
+                </th>
+
+                <th>
+                  Механизаторы
+                </th>
+
+                <th>
+                  Всего, чел
+                </th>
+
+              </tr>
+
+            </thead>
+
+            <tbody id="dailyPeopleBody"></tbody>
+
+          </table>
+
+        </div>
+
+
+        <div class="card table-wrap">
+
+          <h2>
+            Техника
+          </h2>
+
+          <table>
+
+            <thead>
+
+              <tr>
+
+                <th>№</th>
+
+                <th>
+                  Организация
+                </th>
+
+                <th>
+                  Наименование техники
+                </th>
+
+                <th>
+                  Количество, ед.
+                </th>
+
+              </tr>
+
+            </thead>
+
+            <tbody id="dailyEquipmentBody"></tbody>
+
+            <tfoot>
+
+              <tr>
+
+                <th colspan="3">
+                  Итого
+                </th>
+
+                <th id="dailyEquipmentFooter">
+                  0
+                </th>
+
+              </tr>
+
+            </tfoot>
+
+          </table>
+
+        </div>
+
+      </section>
+
+    </section>
+
+
+    <!-- ДИАГРАММЫ -->
+
+    <section
+      id="resource-view-charts"
+      class="resource-view hidden">
+
+      <section class="card">
+
+        <div class="resource-section-head">
+
+          <div>
+
+            <h2>
+              Динамика численности
+            </h2>
+
+            <p class="muted">
+              По каждой организации выводятся две линии:
+              ИТР и рабочие.
+            </p>
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <section
+        id="resourceCharts"
+        class="resource-chart-grid">
+      </section>
+
+    </section>
+
+
+    <!-- МЕСЯЧНАЯ АНАЛИТИКА -->
+
+    <section
+      id="resource-view-analytics"
+      class="resource-view hidden">
+
+      <section class="card resource-analysis-settings no-print">
+
+        <div class="field">
+
+          <label>
+            Метод среднего
+          </label>
+
+          <select id="resourceAverageMethod">
+
+            <option value="reported">
+              По отчетным датам, включая нули
+            </option>
+
+            <option value="nonzero">
+              Только по ненулевым значениям
+            </option>
+
+            <option value="calendar">
+              По календарным дням
+            </option>
+
+            <option value="workdays">
+              По рабочим дням
+            </option>
+
+            <option value="project-report-days">
+              По дням, где есть отчет по объекту
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Если записи нет
+          </label>
+
+          <select id="resourceMissingRule">
+
+            <option value="skip">
+              Не учитывать
+            </option>
+
+            <option value="zero">
+              Считать как 0
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <button
+          id="saveResourceViewBtn"
+          class="btn align-end">
+          Сохранить представление
+        </button>
+
+      </section>
+
+
+      <section class="stats">
+
+        <div class="stat">
+
+          <span>
+            Среднее сотрудников
+          </span>
+
+          <strong id="averagePeopleTotal">
+            0
+          </strong>
+
+        </div>
+
+
+        <div class="stat">
+
+          <span>
+            Среднее техники
+          </span>
+
+          <strong id="averageEquipmentTotal">
+            0
+          </strong>
+
+        </div>
+
+
+        <div class="stat">
+
+          <span>
+            Дней в расчете
+          </span>
+
+          <strong id="averageDaysCount">
+            0
+          </strong>
+
+        </div>
+
+      </section>
+
+
+      <section class="card table-wrap">
+
+        <h2>
+          Среднее количество сотрудников
+        </h2>
+
+        <table>
+
+          <thead>
+
+            <tr>
+
+              <th>
+                Организация
+              </th>
+
+              <th>
+                ИТР
+              </th>
+
+              <th>
+                Механизаторы
+              </th>
+
+              <th>
+                Подсобные рабочие
+              </th>
+
+              <th>
+                Итого
+              </th>
+
+            </tr>
+
+          </thead>
+
+
+          <tbody id="averagePeopleBody"></tbody>
+
+        </table>
+
+      </section>
+
+
+      <section class="card table-wrap">
+
+        <h2>
+          Среднее количество строительной техники
+        </h2>
+
+        <table>
+
+          <thead id="averageEquipmentHead"></thead>
+
+          <tbody id="averageEquipmentBody"></tbody>
+
+        </table>
+
+      </section>
+
+    </section>
+
+
+    <!-- ПЛАН / ФАКТ -->
+
+    <section
+      id="resource-view-planfact"
+      class="resource-view hidden">
+
+      <section class="card toolbar no-print">
+
+        <button
+          id="newResourcePlanBtn"
+          class="btn primary">
           Добавить план ресурсов
         </button>
 
-        <div class="field">
-          <label>Шаг</label>
 
-          <select id="rpStep">
-            <option value="day">По дням</option>
-            <option value="week" selected>По неделям</option>
+        <div class="field">
+
+          <label>
+            Шаг
+          </label>
+
+          <select id="resourcePlanStep">
+
+            <option value="day">
+              По дням
+            </option>
+
+            <option
+              value="week"
+              selected>
+              По неделям
+            </option>
+
           </select>
+
         </div>
+
       </section>
+
 
       <section class="stats">
-        <div class="stat"><span>План, чел.-дни</span><strong id="rpPlanSum">0</strong></div>
-        <div class="stat"><span>Факт, чел.-дни</span><strong id="rpFactSum">0</strong></div>
-        <div class="stat"><span>Отклонение</span><strong id="rpDeviation">0</strong></div>
+
+        <div class="stat">
+
+          <span>
+            План, чел.-дни
+          </span>
+
+          <strong id="resourcePlanTotal">
+            0
+          </strong>
+
+        </div>
+
+
+        <div class="stat">
+
+          <span>
+            Факт, чел.-дни
+          </span>
+
+          <strong id="resourceFactTotal">
+            0
+          </strong>
+
+        </div>
+
+
+        <div class="stat">
+
+          <span>
+            Отклонение
+          </span>
+
+          <strong id="resourceDeviation">
+            0
+          </strong>
+
+        </div>
+
       </section>
+
 
       <section class="card table-wrap">
+
         <table>
-          <thead id="rpHead"></thead>
-          <tbody id="rpBody"></tbody>
-          <tfoot id="rpFoot"></tfoot>
-        </table>
-      </section>
 
-      <section class="card">
-        <canvas id="resourcePlanFactChart" height="110"></canvas>
-      </section>
-    </section>
-  </section>
-
-  <section id="tab-milestones" class="panel hidden">
-    <section class="card no-print">
-      <button id="newMilestoneBtn" class="btn primary">Добавить ключевую дату</button>
-    </section>
-
-    <section class="card table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Здание</th>
-            <th>Наименование</th>
-            <th>Договор</th>
-            <th>Рабочая</th>
-            <th>Прогноз</th>
-            <th>Факт</th>
-            <th>Статус</th>
-          </tr>
-        </thead>
-        <tbody id="milestoneRows"></tbody>
-      </table>
-    </section>
-  </section>
-
-  <section id="tab-elements" class="panel hidden">
-    <section class="card toolbar no-print">
-      <div class="field"><label>Здание</label><select id="elBuilding"></select></div>
-      <div class="field"><label>Тип элемента</label><select id="elType"></select></div>
-      <div class="field"><label>Поиск номера</label><input id="elSearch" placeholder="Например 37"></div>
-      <button id="newElementBtn" class="btn primary align-end">Добавить элемент</button>
-    </section>
-
-    <section class="card">
-      <p class="muted">
-        Для свай, анкеров, шпунта и других номерных элементов.
-        Повтор номера в одном контексте блокируется.
-      </p>
-
-      <div class="table-wrap">
-        <table>
           <thead>
+
             <tr>
-              <th>Тип</th>
-              <th>№</th>
-              <th>Здание</th>
-              <th>Захватка</th>
-              <th>Зона</th>
-              <th>Работа</th>
-              <th>Статус</th>
-              <th>Комментарий</th>
-              <th></th>
+
+              <th>
+                Период
+              </th>
+
+              <th>
+                План
+              </th>
+
+              <th>
+                Факт
+              </th>
+
+              <th>
+                Отклонение
+              </th>
+
             </tr>
+
           </thead>
 
-          <tbody id="elementRows"></tbody>
+          <tbody id="resourcePlanFactBody"></tbody>
+
         </table>
-      </div>
+
+      </section>
+
+
+      <section class="card">
+
+        <canvas
+          id="resourcePlanFactChart"
+          height="100">
+        </canvas>
+
+      </section>
+
     </section>
+
   </section>
 
-  <section id="tab-demolition" class="panel hidden">
-    <section class="card table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Объект</th>
-            <th>Статус</th>
-            <th>План окончание</th>
-            <th>Прогноз</th>
-            <th>Факт</th>
-            <th>Комментарий</th>
-          </tr>
-        </thead>
-        <tbody id="demolitionRows"></tbody>
-      </table>
-    </section>
-  </section>
 
-  <section id="tab-import" class="panel hidden">
-    <section class="card no-print">
-      <h2>Импорт Excel / CSV</h2>
+  <!-- =====================================================
+       ОРГАНИЗАЦИИ
+       ===================================================== -->
 
-      <p class="muted">
-        Файл сначала анализируется.
-        До нажатия «Импортировать выбранное»
-        рабочая база не меняется.
-      </p>
+  <section
+    id="tab-organizations"
+    class="panel hidden">
 
-      <div class="import-grid">
-        <div class="field">
-          <label>Файл</label>
-          <input id="importFile" type="file" accept=".xlsx,.xls,.csv">
-        </div>
+    <section class="card toolbar no-print">
 
-        <div class="field">
-          <label>Лист</label>
-          <select id="importSheet" disabled></select>
-        </div>
+      <div class="field">
 
-        <div class="field">
-          <label>Что импортируем</label>
-
-          <select id="importMode">
-            <option value="auto">Определить автоматически</option>
-            <option value="fronts">Фронты / рабочий график</option>
-            <option value="fact">Факт выполненных работ</option>
-            <option value="resources">Ресурсы</option>
-            <option value="elements">Сваи / анкеры / номерные элементы</option>
-            <option value="milestones">Ключевые даты</option>
-          </select>
-        </div>
-
-        <label class="check-line">
-          <input id="importFillDown" type="checkbox" checked>
-          Наследовать пустые группирующие ячейки сверху
+        <label>
+          Организация
         </label>
+
+        <select id="organizationCardSelect"></select>
+
       </div>
 
-      <div class="editor-actions left-actions">
-        <button id="analyzeImportBtn" class="btn" disabled>Анализировать</button>
-        <button id="commitImportBtn" class="btn primary" disabled>Импортировать выбранное</button>
-        <button id="rollbackImportBtn" class="btn danger">Отменить последний импорт</button>
-      </div>
-
-      <div id="importInfo" class="notice hidden"></div>
     </section>
 
-    <section id="importMappingCard" class="card hidden">
-      <h2>Сопоставление колонок</h2>
+
+    <section id="organizationCard">
+
+      <div class="card">
+
+        <h2 id="organizationCardName">
+          Организация
+        </h2>
+
+      </div>
+
+
+      <section class="stats">
+
+        <div class="stat">
+
+          <span>
+            Текущая численность
+          </span>
+
+          <strong id="organizationPeople">
+            0
+          </strong>
+
+        </div>
+
+
+        <div class="stat">
+
+          <span>
+            Техника
+          </span>
+
+          <strong id="organizationEquipment">
+            0
+          </strong>
+
+        </div>
+
+
+        <div class="stat">
+
+          <span>
+            Активных фронтов
+          </span>
+
+          <strong id="organizationFronts">
+            0
+          </strong>
+
+        </div>
+
+
+        <div class="stat">
+
+          <span>
+            Ключевых дат
+          </span>
+
+          <strong id="organizationMilestones">
+            0
+          </strong>
+
+        </div>
+
+      </section>
+
+
+      <section class="grid2">
+
+        <div class="card">
+
+          <h2>
+            Что выполняет
+          </h2>
+
+          <div id="organizationWorks"></div>
+
+        </div>
+
+
+        <div class="card">
+
+          <h2>
+            Ключевые даты
+          </h2>
+
+          <div id="organizationMilestoneList"></div>
+
+        </div>
+
+      </section>
+
+
+      <section class="card">
+
+        <h2>
+          Динамика численности
+        </h2>
+
+        <canvas
+          id="organizationPeopleChart"
+          height="80">
+        </canvas>
+
+      </section>
+
+    </section>
+
+  </section>
+
+
+  <!-- =====================================================
+       ВРЕМЕННЫЕ СЕКЦИИ СТАРЫХ МОДУЛЕЙ
+       ===================================================== -->
+
+  <section
+    id="tab-matrix"
+    class="panel hidden">
+
+    <div class="card">
+
+      <h2>
+        Шахматка
+      </h2>
 
       <p class="muted">
-        Система предложила соответствия.
-        При необходимости поменяй их
-        и нажми «Анализировать» повторно.
+        Модуль будет вынесен в отдельный файл следующим этапом.
+        Данные проекта сохранены.
       </p>
 
-      <div id="importMapping" class="mapping-grid"></div>
-    </section>
+    </div>
 
-    <section class="card table-wrap">
-      <table>
-        <thead id="importHead"></thead>
-        <tbody id="importBody"></tbody>
-      </table>
-    </section>
   </section>
 
-  <section id="tab-history" class="panel hidden">
-    <section class="card table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Дата</th>
-            <th>Действие</th>
-            <th>Сущность</th>
-            <th>Описание</th>
-          </tr>
-        </thead>
-        <tbody id="historyRows"></tbody>
-      </table>
-    </section>
+
+  <section
+    id="tab-gantt"
+    class="panel hidden">
+
+    <div class="card">
+
+      <h2>
+        Гант
+      </h2>
+
+      <p class="muted">
+        Модуль будет вынесен в отдельный файл следующим этапом.
+      </p>
+
+    </div>
+
   </section>
 
-  <section id="tab-settings" class="panel hidden">
-    <section class="grid3">
-      <div class="card">
-        <h2>Здания</h2>
-        <div class="inline-add">
-          <input id="newBuilding" placeholder="Новое здание">
-          <button id="addBuildingBtn" class="btn">Добавить</button>
-        </div>
-        <div id="buildingList" class="list"></div>
-      </div>
 
-      <div class="card">
-        <h2>Виды работ</h2>
-        <div class="inline-add">
-          <input id="newWork" placeholder="Новый вид работ">
-          <button id="addWorkBtn" class="btn">Добавить</button>
-        </div>
-        <div id="workList" class="list"></div>
-      </div>
+  <section
+    id="tab-planfact"
+    class="panel hidden">
 
-      <div class="card">
-        <h2>Организации</h2>
-        <div class="inline-add">
-          <input id="newOrg" placeholder="Организация">
-          <button id="addOrgBtn" class="btn">Добавить</button>
-        </div>
-        <div id="orgList" class="list"></div>
-      </div>
-    </section>
+    <div class="card">
+
+      <h2>
+        План / факт
+      </h2>
+
+      <p class="muted">
+        Модуль будет вынесен в отдельный файл следующим этапом.
+      </p>
+
+    </div>
+
+  </section>
+
+
+  <section
+    id="tab-milestones"
+    class="panel hidden">
+
+    <div class="card">
+
+      <h2>
+        Ключевые даты
+      </h2>
+
+      <p class="muted">
+        Данные ключевых дат сохранены.
+        Следующим этапом модуль будет вынесен отдельно.
+      </p>
+
+    </div>
+
+  </section>
+
+
+  <section
+    id="tab-elements"
+    class="panel hidden">
+
+    <div class="card">
+
+      <h2>
+        Номерные элементы
+      </h2>
+
+    </div>
+
+  </section>
+
+
+  <section
+    id="tab-demolition"
+    class="panel hidden">
+
+    <div class="card">
+
+      <h2>
+        Демонтаж
+      </h2>
+
+    </div>
+
+  </section>
+
+
+  <!-- =====================================================
+       ИМПОРТ
+       ===================================================== -->
+
+  <section
+    id="tab-import"
+    class="panel hidden">
 
     <section class="card">
-      <h2>Состояние проекта</h2>
-      <div id="projectMeta"></div>
 
-      <div class="editor-actions no-print">
-        <button id="clearProjectBtn" class="btn danger">
-          Очистить рабочие данные
-        </button>
+      <h2>
+        Импорт Excel
+      </h2>
+
+
+      <div class="import-grid">
+
+        <div class="field">
+
+          <label>
+            Файл
+          </label>
+
+          <input
+            id="importFile"
+            type="file"
+            accept=".xlsx,.xls,.csv"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Лист
+          </label>
+
+          <select
+            id="importSheet"
+            disabled>
+          </select>
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Что импортируем
+          </label>
+
+          <select id="importMode">
+
+            <option value="resources">
+              Ресурсы
+            </option>
+
+          </select>
+
+        </div>
+
       </div>
+
+
+      <div class="editor-actions left-actions">
+
+        <button
+          id="analyzeImportBtn"
+          class="btn"
+          disabled>
+          Анализировать
+        </button>
+
+        <button
+          id="commitImportBtn"
+          class="btn primary"
+          disabled>
+          Импортировать
+        </button>
+
+        <button
+          id="rollbackImportBtn"
+          class="btn danger">
+          Отменить последний импорт
+        </button>
+
+      </div>
+
     </section>
+
+
+    <section
+      id="importMappingCard"
+      class="card hidden">
+
+      <h2>
+        Сопоставление колонок
+      </h2>
+
+      <div
+        id="importMapping"
+        class="mapping-grid">
+      </div>
+
+    </section>
+
+
+    <section class="card">
+
+      <div
+        id="importInfo"
+        class="notice hidden">
+      </div>
+
+    </section>
+
+
+    <section class="card table-wrap">
+
+      <table>
+
+        <thead id="importHead"></thead>
+
+        <tbody id="importBody"></tbody>
+
+      </table>
+
+    </section>
+
   </section>
+
+
+  <!-- =====================================================
+       ИСТОРИЯ
+       ===================================================== -->
+
+  <section
+    id="tab-history"
+    class="panel hidden">
+
+    <section class="card table-wrap">
+
+      <table>
+
+        <thead>
+
+          <tr>
+
+            <th>
+              Дата
+            </th>
+
+            <th>
+              Действие
+            </th>
+
+            <th>
+              Сущность
+            </th>
+
+            <th>
+              Описание
+            </th>
+
+          </tr>
+
+        </thead>
+
+        <tbody id="historyBody"></tbody>
+
+      </table>
+
+    </section>
+
+  </section>
+
+
+  <!-- =====================================================
+       НАСТРОЙКИ
+       ===================================================== -->
+
+  <section
+    id="tab-settings"
+    class="panel hidden">
+
+    <section class="card">
+
+      <h2>
+        О системе
+      </h2>
+
+      <div id="systemInfo"></div>
+
+    </section>
+
+  </section>
+
 </main>
 
-<div id="modal" class="modal hidden no-print">
+
+<div
+  id="modal"
+  class="modal hidden no-print">
+
   <div class="modal-card">
+
     <div class="modal-head">
-      <h2 id="modalTitle">Редактор</h2>
-      <button id="modalClose" class="icon-btn">×</button>
+
+      <h2 id="modalTitle">
+        Редактор
+      </h2>
+
+      <button
+        id="modalClose"
+        class="icon-btn">
+        ×
+      </button>
+
     </div>
+
     <div id="modalBody"></div>
+
   </div>
+
 </div>
 
-<script src="app.js?v=20261008-5"></script>
+
+<script
+  src="js/core.js?v=20261008-1"
+  defer>
+</script>
+
+<script
+  src="js/storage.js?v=20261008-1"
+  defer>
+</script>
+
+<script
+  src="js/filters.js?v=20261008-1"
+  defer>
+</script>
+
+<script
+  src="js/resources.js?v=20261008-1"
+  defer>
+</script>
+
+<script
+  src="js/organizations.js?v=20261008-1"
+  defer>
+</script>
+
+<script
+  src="js/import.js?v=20261008-1"
+  defer>
+</script>
+
+<script
+  src="js/app.js?v=20261008-1"
+  defer>
+</script>
+
 </body>
 </html>
