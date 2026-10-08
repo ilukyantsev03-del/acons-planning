@@ -2962,50 +2962,78 @@ function renderResourceAnalytics(){
   }
 
 
-  const equipmentTypes =
-    uniq(
-      rows
-        .map(
-          row =>
-            normText(
-              row.equipmentType
-            )
-        )
-        .filter(
-          Boolean
-        )
-    )
-      .sort(
-        (
-          a,
-          b
-        ) =>
-          a.localeCompare(
-            b,
-            'ru'
-          )
+  const equipmentTypeTotals =
+  new Map();
+
+
+rows.forEach(
+  row => {
+
+    const type =
+      normText(
+        row.equipmentType
       );
 
 
-  if (
-    $('raEquipmentHead')
-  ) {
+    if (
+      !type
+    ) {
+      return;
+    }
 
-    $('raEquipmentHead').innerHTML =
-      `
-        <tr>
-          <th>Организация</th>
-          ${
-            equipmentTypes
-              .map(
-                type =>
-                  `<th>${esc(type)}</th>`
-              )
-              .join('')
-          }
-        </tr>
-      `;
+
+    equipmentTypeTotals.set(
+      type,
+
+      (
+        equipmentTypeTotals.get(
+          type
+        ) ||
+        0
+      ) +
+
+      num(
+        row.equipmentQty
+      )
+    );
   }
+);
+
+
+const equipmentTypes =
+  [
+    ...equipmentTypeTotals
+      .entries()
+  ]
+    .filter(
+      (
+        [
+          type,
+          total
+        ]
+      ) =>
+        resourceShowZero() ||
+        total !==
+          0
+    )
+    .map(
+      (
+        [
+          type
+        ]
+      ) =>
+        type
+    )
+    .sort(
+      (
+        a,
+        b
+      ) =>
+        a.localeCompare(
+          b,
+          'ru'
+        )
+    );
 
 
   const equipmentBody =

@@ -1454,3 +1454,327 @@ tbody tr:hover {
     grid-template-columns: repeat(3, 1fr);
   }
 }
+/* =========================================================
+   LIV Planning — универсальный конструктор
+   ========================================================= */
+
+.liv-builder-hidden,
+.liv-mode-hidden{
+  display:none!important;
+}
+
+.view-builder-intro{
+  margin-bottom:18px;
+  padding:12px 14px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#f8fafc;
+  color:var(--muted);
+  line-height:1.45;
+}
+
+.view-builder-group{
+  margin-top:18px;
+}
+
+.view-builder-group h3{
+  margin:0 0 10px;
+  font-size:15px;
+}
+
+.view-builder-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+}
+
+.view-builder-option{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  min-height:42px;
+  padding:9px 11px;
+  border:1px solid var(--line);
+  border-radius:9px;
+  background:#fff;
+  cursor:pointer;
+}
+
+.view-builder-option:hover{
+  background:#f8fafc;
+}
+
+.view-builder-option input{
+  margin:0;
+}
+
+
+/* =========================================================
+   LIV Planning — красивый печатный отчет
+   ========================================================= */
+
+.liv-print-root{
+  display:none;
+}
+
+.print-report-header{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:20px;
+  padding-bottom:14px;
+  border-bottom:2px solid #142033;
+}
+
+.print-report-brand{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+.print-report-logo{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:46px;
+  height:46px;
+  border-radius:9px;
+  background:#142033;
+  color:#fff;
+  font-size:19px;
+  font-weight:800;
+  letter-spacing:.04em;
+}
+
+.print-report-brand-name{
+  font-size:17px;
+  font-weight:800;
+  color:#142033;
+}
+
+.print-report-brand-subtitle{
+  margin-top:3px;
+  max-width:430px;
+  font-size:9px;
+  line-height:1.35;
+  color:#667085;
+}
+
+.print-report-date{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:3px;
+  font-size:9px;
+}
+
+.print-report-date span{
+  color:#667085;
+}
+
+.print-report-date strong{
+  color:#182230;
+  font-size:10px;
+}
+
+.print-report-title{
+  padding:18px 0 15px;
+}
+
+.print-report-eyebrow{
+  margin-bottom:5px;
+  font-size:8px;
+  font-weight:800;
+  letter-spacing:.16em;
+  color:#667085;
+}
+
+.print-report-title h1{
+  margin:0;
+  font-size:24px;
+  line-height:1.15;
+  color:#142033;
+}
+
+.print-report-filters{
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px;
+  margin-top:10px;
+}
+
+.print-report-filters span{
+  display:inline-flex;
+  padding:5px 8px;
+  border:1px solid #d9dee7;
+  border-radius:20px;
+  background:#f8fafc;
+  font-size:8px;
+  color:#475467;
+}
+
+.print-report-content{
+  width:100%;
+}
+
+.print-report-content .panel,
+.print-report-content .resource-view{
+  display:block!important;
+}
+
+.print-report-content .stats{
+  gap:6px;
+  margin-bottom:10px;
+}
+
+.print-report-content .stat{
+  padding:9px 10px;
+  border:1px solid #d9dee7;
+  border-radius:7px;
+  box-shadow:none;
+}
+
+.print-report-content .stat span{
+  margin-bottom:4px;
+  font-size:8px;
+  color:#667085;
+}
+
+.print-report-content .stat strong{
+  font-size:18px;
+  color:#142033;
+}
+
+.print-report-content .card{
+  margin-bottom:10px;
+  padding:10px 12px;
+  border:1px solid #d9dee7;
+  border-radius:8px;
+  box-shadow:none;
+  break-inside:avoid;
+}
+
+.print-report-content .card h2{
+  margin:0 0 8px;
+  padding-bottom:5px;
+  border-bottom:1px solid #e7eaf0;
+  font-size:13px;
+  color:#142033;
+}
+
+.print-report-content .table-wrap{
+  overflow:visible!important;
+}
+
+.print-report-table{
+  width:100%!important;
+  min-width:0!important;
+  border-collapse:collapse!important;
+  table-layout:auto;
+}
+
+.print-report-table thead{
+  display:table-header-group;
+}
+
+.print-report-table tr{
+  break-inside:avoid;
+}
+
+.print-report-table th{
+  position:static!important;
+  padding:5px 5px!important;
+  border-bottom:1px solid #cfd5df!important;
+  background:#f1f4f8!important;
+  color:#344054!important;
+  font-size:7.3px!important;
+  font-weight:700!important;
+  line-height:1.2!important;
+  vertical-align:middle!important;
+}
+
+.print-report-table td{
+  padding:5px 5px!important;
+  border-bottom:1px solid #e7eaf0!important;
+  color:#182230!important;
+  font-size:7.3px!important;
+  line-height:1.25!important;
+  vertical-align:middle!important;
+}
+
+.print-report-table th:not(:first-child),
+.print-report-table td:not(:first-child){
+  text-align:center;
+}
+
+.print-report-table th:first-child,
+.print-report-table td:first-child{
+  text-align:left;
+}
+
+.print-chart-image{
+  display:block;
+  max-width:100%;
+  max-height:165mm;
+  margin:0 auto;
+}
+
+.print-report-footer{
+  display:flex;
+  justify-content:space-between;
+  margin-top:12px;
+  padding-top:6px;
+  border-top:1px solid #d9dee7;
+  font-size:7px;
+  color:#98a2b3;
+}
+
+
+@page{
+  size:A4 landscape;
+  margin:10mm;
+}
+
+
+@media print{
+
+  html,
+  body{
+    width:auto!important;
+    min-width:0!important;
+    margin:0!important;
+    padding:0!important;
+    background:#fff!important;
+  }
+
+  body > *{
+    display:none!important;
+  }
+
+  body > #livPrintRoot{
+    display:block!important;
+  }
+
+  #livPrintRoot{
+    width:100%;
+    font-family:Arial,sans-serif;
+    color:#182230;
+  }
+
+  .no-print,
+  .modal,
+  button,
+  input,
+  select,
+  textarea{
+    display:none!important;
+  }
+}
+
+
+@media(max-width:800px){
+
+  .view-builder-grid{
+    grid-template-columns:1fr;
+  }
+}

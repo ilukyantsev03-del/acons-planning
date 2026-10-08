@@ -6507,7 +6507,209 @@ function renderAll() {
   }
 
 
-  rebuildCustomSections();
+  if (
+    typeof rebuildCustomSections ===
+    'function'
+  ) {
+
+    rebuildCustomSections();
+  }
+
+
+  /*
+    После любой перерисовки
+    повторно применяем настройки конструктора
+    текущей страницы.
+  */
+
+  if (
+    typeof livApplyViewConstructor ===
+    'function'
+  ) {
+
+    livApplyViewConstructor();
+  }
+}
+
+
+/* =========================================================
+   ЗАПУСК
+   ========================================================= */
+
+
+async function init() {
+
+  /*
+    Открываем локальную базу IndexedDB.
+  */
+
+  db =
+    await openDb();
+
+
+  /*
+    Загружаем текущий проект.
+  */
+
+  const raw =
+    await dbGetKey();
+
+
+  /*
+    Нормализуем структуру.
+    Существующие данные не очищаем.
+  */
+
+  project =
+    await migrateIfNeeded(
+      raw
+    );
+
+
+  validateLoadedProject();
+
+
+  /*
+    Если база новая или структура была обновлена,
+    сохраняем нормализованное состояние.
+  */
+
+  if (
+    !raw ||
+    raw.schemaVersion !==
+      SCHEMA_VERSION
+  ) {
+
+    await saveProject();
+  }
+
+
+  /*
+    Обычные выпадающие списки.
+  */
+
+  initSelects();
+
+
+  /*
+    Мультифильтры ресурсов.
+  */
+
+  if (
+    typeof initResourceMultiFilters ===
+    'function'
+  ) {
+
+    initResourceMultiFilters();
+  }
+
+
+  /*
+    Основные события интерфейса.
+  */
+
+  bindUi();
+
+
+  /*
+    Начальные даты.
+  */
+
+  initDefaultDates();
+
+
+  /*
+    Excel.
+  */
+
+  if (
+    typeof ensureExcelButton ===
+    'function'
+  ) {
+
+    ensureExcelButton();
+  }
+
+
+  /*
+    Пользовательские разделы.
+  */
+
+  if (
+    typeof rebuildCustomSections ===
+    'function'
+  ) {
+
+    rebuildCustomSections();
+  }
+
+
+  /*
+    Информация о резервной копии.
+  */
+
+  if (
+    typeof renderBackupNotice ===
+    'function'
+  ) {
+
+    renderBackupNotice();
+  }
+
+
+  /*
+    По умолчанию нулевые значения скрыты,
+    если в config.js не задано обратное.
+  */
+
+  if (
+    $('rShowZero')
+  ) {
+
+    $('rShowZero').checked =
+      Boolean(
+        cfg(
+          'SHOW_ZERO_ORGANIZATIONS_BY_DEFAULT',
+          false
+        )
+      );
+  }
+
+
+  /*
+    Первая полная отрисовка.
+  */
+
+  renderAll();
+
+
+  /*
+    Универсальный конструктор страниц
+    + красивый печатный режим.
+  */
+
+  if (
+    typeof initLivViewBuilder ===
+    'function'
+  ) {
+
+    initLivViewBuilder();
+  }
+
+
+  /*
+    После инициализации конструктора
+    еще раз применяем сохраненную конфигурацию
+    текущей страницы.
+  */
+
+  if (
+    typeof livApplyViewConstructor ===
+    'function'
+  ) {
+
+    livApplyViewConstructor();
+  }
 }
 
 
