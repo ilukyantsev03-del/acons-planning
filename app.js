@@ -6,8 +6,7 @@ const DB_NAME = 'acons_planning_local';
 const DB_VERSION = 2;
 const STORE = 'project';
 const PROJECT_KEY = 'main';
-
-const SCHEMA_VERSION = '2.0.0';
+const SCHEMA_VERSION = '2.1.0';
 
 const STATUS_LIST = [
   'Не начато',
@@ -27,7 +26,7 @@ const ELEMENT_STATUS_LIST = [
   'Ограничение'
 ];
 
-const BUILDINGS = [
+const DEFAULT_BUILDINGS = [
   'Главный корпус',
   'Грязелечебница',
   'Ресторан с банкетным залом',
@@ -43,7 +42,7 @@ const BUILDINGS = [
   'Аэрарий'
 ];
 
-const WORKS = [
+const DEFAULT_WORKS = [
   ['Кладка наружных стен', 'АР', 'м²'],
   ['Вертикальное армирование', 'КР', 'т'],
   ['Штукатурка', 'АР', 'м²'],
@@ -51,39 +50,39 @@ const WORKS = [
   ['Передача фронта', 'Организация работ', 'шт.']
 ];
 
-const DEMOLITION = [
+const DEFAULT_DEMOLITION = [
   "Склад (ангар) литера Д'",
-  "Нежилое здание, Корпус №10 литера Д",
-  "Нежилое здание, Корпус №9 литера Г",
-  "Нежилое здание №11 литера Е",
-  "Демонтаж «фонтана с оленем»",
-  "Аэрарий",
-  "Нежилое здание Корпус №12 литера З",
-  "Нежилое здание Корпус №1 литера Б",
+  'Нежилое здание, Корпус №10 литера Д',
+  'Нежилое здание, Корпус №9 литера Г',
+  'Нежилое здание №11 литера Е',
+  'Демонтаж «фонтана с оленем»',
+  'Аэрарий',
+  'Нежилое здание Корпус №12 литера З',
+  'Нежилое здание Корпус №1 литера Б',
   "Котельная литера Ф'",
   "Склад литера Б', 90:25:020102:170",
   "Коттедж 1 литера Ш'",
-  "Парники",
-  "Коммунальная столовая литера Ц",
-  "Управление (бытовые помещения) литера Р",
-  "Теплица в ООПТ",
+  'Парники',
+  'Коммунальная столовая литера Ц',
+  'Управление (бытовые помещения) литера Р',
+  'Теплица в ООПТ',
   "Сауна литера Л'",
-  "Склад",
+  'Склад',
   "Кладовая / Аккумуляторная литера Т'",
   "Гараж литера Ж'",
   "Гараж литера С'",
   "Нежилое здание КТП / Диспетчерская литера П'",
-  "Нежилое здание, Корпус №4 литера В",
-  "Библиотека литера Ю",
-  "Нежилое здание Корпус №32 литера И",
-  "Спортивная площадка",
+  'Нежилое здание, Корпус №4 литера В',
+  'Библиотека литера Ю',
+  'Нежилое здание Корпус №32 литера И',
+  'Спортивная площадка',
   "Нежилое здание (Коттедж 3) литера Ц'",
-  "Приемная, спортзал литера Т (ЛФК)",
-  "Прачечная литера А (ОКН)",
+  'Приемная, спортзал литера Т (ЛФК)',
+  'Прачечная литера А (ОКН)',
   "Нежилое здание литера У' (Склад ген.подрядчика)",
-  "Офис, нежилое здание литера Ф (штаб тех.заказчика)",
-  "Нежилое здание Корпус №35 литера Л (штаб ген.подрядчика)",
-  "Нежилое здание, Корпус №34 литера К (ООПТ)"
+  'Офис, нежилое здание литера Ф (штаб тех.заказчика)',
+  'Нежилое здание Корпус №35 литера Л (штаб ген.подрядчика)',
+  'Нежилое здание, Корпус №34 литера К (ООПТ)'
 ];
 
 let db = null;
@@ -95,16 +94,15 @@ let compareItems = [];
 let importWorkbook = null;
 let importFileName = '';
 let importSheetName = '';
-let importMatrix = [];
 let importHeaders = [];
 let importRawRows = [];
 let importRows = [];
 let importMapping = {};
-let importDetectedMode = 'fronts';
+let importModeResolved = 'fronts';
 let importMappingMode = '';
 
 const uid = prefix =>
-  prefix + '-' + crypto.randomUUID();
+  `${prefix}-${crypto.randomUUID()}`;
 
 const today = () =>
   new Date().toISOString().slice(0, 10);
@@ -129,45 +127,14 @@ const esc = value =>
   String(value ?? '')
     .replace(
       /[&<>"']/g,
-      char => ({
+      c => ({
         '&': '&amp;',
         '<': '&lt;',
         '>': '&gt;',
         '"': '&quot;',
         "'": '&#039;'
-      })[char]
+      })[c]
     );
-
-const uniq = array =>
-  [
-    ...new Set(
-      array.filter(
-        value =>
-          value !== '' &&
-          value !== null &&
-          value !== undefined
-      )
-    )
-  ];
-
-const byId = (list, id) =>
-  (list || []).find(
-    item =>
-      String(item.id) === String(id)
-  );
-
-const nameById = (list, id) =>
-  byId(list, id)?.name || '';
-
-const diffDays = (a, b) =>
-  a && b
-    ? Math.round(
-        (
-          Date.parse(b) -
-          Date.parse(a)
-        ) / 86400000
-      )
-    : null;
 
 const normText = value =>
   String(value ?? '')
@@ -187,31 +154,53 @@ const normKey = value =>
 const sameText = (a, b) =>
   normKey(a) === normKey(b);
 
+const uniq = arr =>
+  [
+    ...new Set(
+      (arr || [])
+        .filter(
+          value =>
+            value !== '' &&
+            value !== null &&
+            value !== undefined
+        )
+    )
+  ];
+
+const byId = (list, id) =>
+  (list || [])
+    .find(
+      item =>
+        String(item.id) === String(id)
+    );
+
+const nameById = (list, id) =>
+  byId(list, id)?.name || '';
+
+const diffDays = (a, b) =>
+  a && b
+    ? Math.round(
+        (
+          Date.parse(b) -
+          Date.parse(a)
+        ) / 86400000
+      )
+    : null;
+
 
 function normalizeStatus(value) {
 
-  const text = normKey(value);
+  const text =
+    normKey(value);
 
   if (!text) {
     return '';
   }
 
   if (
-    /заверш|оконч|выполн/.test(text)
+    /не начат/.test(text)
   ) {
-    return 'Завершено';
-  }
-
-  if (
-    /начат|в работе|производ/.test(text)
-  ) {
-    return 'В работе';
-  }
-
-  if (
-    /фронт готов|готово к старт/.test(text)
-  ) {
-    return 'Фронт готов';
+    return 'Не начато';
   }
 
   if (
@@ -227,9 +216,21 @@ function normalizeStatus(value) {
   }
 
   if (
-    /не начат/.test(text)
+    /фронт готов|готово к старт/.test(text)
   ) {
-    return 'Не начато';
+    return 'Фронт готов';
+  }
+
+  if (
+    /заверш|оконч|выполн/.test(text)
+  ) {
+    return 'Завершено';
+  }
+
+  if (
+    /начат|в работе|производ/.test(text)
+  ) {
+    return 'В работе';
   }
 
   return normText(value);
@@ -261,8 +262,9 @@ function emptyProject() {
     },
 
     buildings:
-      BUILDINGS.map(
+      DEFAULT_BUILDINGS.map(
         (name, index) => ({
+
           id:
             `BLD-${String(index + 1)
               .padStart(3, '0')}`,
@@ -281,8 +283,9 @@ function emptyProject() {
       [],
 
     works:
-      WORKS.map(
+      DEFAULT_WORKS.map(
         (row, index) => ({
+
           id:
             `WRK-${String(index + 1)
               .padStart(3, '0')}`,
@@ -322,42 +325,13 @@ function emptyProject() {
     milestones:
       [],
 
-    customFields:
-      [],
-
-    views:
-      [],
-
-    history:
-      [],
-
     numberedElements:
       [],
 
-    importHistory:
-      [],
-
-    contracts:
-      [],
-
-    constraints:
-      [],
-
-    diagrams:
-      [],
-
-    diagramMarks:
-      [],
-
-    scheduleVersions:
-      [],
-
-    importProfiles:
-      [],
-
     demolition:
-      DEMOLITION.map(
+      DEFAULT_DEMOLITION.map(
         (name, index) => ({
+
           id:
             `DEM-${String(index + 1)
               .padStart(3, '0')}`,
@@ -388,8 +362,121 @@ function emptyProject() {
           active:
             true
         })
-      )
+      ),
+
+    contracts:
+      [],
+
+    constraints:
+      [],
+
+    diagrams:
+      [],
+
+    diagramMarks:
+      [],
+
+    scheduleVersions:
+      [],
+
+    customFields:
+      [],
+
+    views:
+      [],
+
+    importProfiles:
+      [],
+
+    importHistory:
+      [],
+
+    history:
+      []
   };
+}
+
+
+function normalizeProject(data) {
+
+  const base =
+    emptyProject();
+
+  const result = {
+    ...base,
+    ...(data || {})
+  };
+
+  result.meta = {
+    ...base.meta,
+    ...((data || {}).meta || {})
+  };
+
+  const arrays = [
+    'buildings',
+    'organizations',
+    'works',
+    'structures',
+    'fronts',
+    'planLog',
+    'factLog',
+    'resources',
+    'milestones',
+    'numberedElements',
+    'demolition',
+    'contracts',
+    'constraints',
+    'diagrams',
+    'diagramMarks',
+    'scheduleVersions',
+    'customFields',
+    'views',
+    'importProfiles',
+    'importHistory',
+    'history'
+  ];
+
+  arrays.forEach(
+    key => {
+
+      if (
+        Array.isArray(
+          data?.[key]
+        )
+      ) {
+        result[key] =
+          data[key];
+      }
+    }
+  );
+
+  result.fronts =
+    result.fronts.map(
+      front => ({
+        active:
+          true,
+
+        ...front
+      })
+    );
+
+  result.numberedElements =
+    result.numberedElements.map(
+      item => ({
+        active:
+          true,
+
+        uniqueScope:
+          'context',
+
+        ...item
+      })
+    );
+
+  result.schemaVersion =
+    SCHEMA_VERSION;
+
+  return result;
 }
 
 
@@ -414,9 +501,10 @@ async function openDb() {
             !database.objectStoreNames
               .contains(STORE)
           ) {
-            database.createObjectStore(
-              STORE
-            );
+            database
+              .createObjectStore(
+                STORE
+              );
           }
         };
 
@@ -457,7 +545,8 @@ async function dbGetKey(
       request.onsuccess =
         () =>
           resolve(
-            request.result || null
+            request.result ||
+            null
           );
 
       request.onerror =
@@ -505,6 +594,65 @@ async function dbPutKey(
 }
 
 
+async function migrateIfNeeded(raw) {
+
+  if (!raw) {
+    return emptyProject();
+  }
+
+  const oldVersion =
+    raw.schemaVersion ||
+    '0.0.0';
+
+  if (
+    oldVersion ===
+    SCHEMA_VERSION
+  ) {
+    return normalizeProject(raw);
+  }
+
+  const backupKey =
+    `migration-backup-${Date.now()}`;
+
+  await dbPutKey(
+    clone(raw),
+    backupKey
+  );
+
+  const migrated =
+    normalizeProject(raw);
+
+  migrated.meta.lastMigrationAt =
+    nowIso();
+
+  migrated.meta.migrationFrom =
+    oldVersion;
+
+  migrated.meta.migrationBackupKey =
+    backupKey;
+
+  migrated.history.unshift({
+
+    id:
+      uid('H'),
+
+    at:
+      nowIso(),
+
+    action:
+      'Миграция',
+
+    entity:
+      'Проект',
+
+    description:
+      `Структура обновлена ${oldVersion} → ${SCHEMA_VERSION}. Создана защитная копия.`
+  });
+
+  return migrated;
+}
+
+
 async function saveProject() {
 
   project.meta.updatedAt =
@@ -529,6 +677,7 @@ function log(
 ) {
 
   project.history.unshift({
+
     id:
       uid('H'),
 
@@ -545,161 +694,11 @@ function log(
   });
 
   project.history =
-    project.history.slice(
-      0,
-      10000
-    );
-}
-
-
-function normalizeProject(data) {
-
-  const base =
-    emptyProject();
-
-  const result = {
-    ...base,
-    ...(data || {})
-  };
-
-  result.meta = {
-    ...base.meta,
-    ...((data || {}).meta || {})
-  };
-
-  const arrayFields = [
-    'buildings',
-    'organizations',
-    'works',
-    'structures',
-    'fronts',
-    'planLog',
-    'factLog',
-    'resources',
-    'milestones',
-    'customFields',
-    'views',
-    'history',
-    'numberedElements',
-    'importHistory',
-    'contracts',
-    'constraints',
-    'diagrams',
-    'diagramMarks',
-    'scheduleVersions',
-    'importProfiles',
-    'demolition'
-  ];
-
-  for (
-    const field
-    of arrayFields
-  ) {
-
-    if (
-      Array.isArray(
-        data?.[field]
-      )
-    ) {
-      result[field] =
-        data[field];
-    }
-  }
-
-  result.fronts =
-    result.fronts.map(
-      front => ({
-        active:
-          true,
-
-        ...front
-      })
-    );
-
-  result.numberedElements =
-    result.numberedElements.map(
-      item => ({
-        active:
-          true,
-
-        uniqueScope:
-          'context',
-
-        ...item
-      })
-    );
-
-  result.schemaVersion =
-    SCHEMA_VERSION;
-
-  return result;
-}
-
-
-async function migrateIfNeeded(
-  rawProject
-) {
-
-  if (!rawProject) {
-    return emptyProject();
-  }
-
-  const oldVersion =
-    rawProject.schemaVersion ||
-    '0.0.0';
-
-  if (
-    oldVersion ===
-    SCHEMA_VERSION
-  ) {
-    return normalizeProject(
-      rawProject
-    );
-  }
-
-  const backupKey =
-    `migration-backup-${Date.now()}`;
-
-  await dbPutKey(
-    rawProject,
-    backupKey
-  );
-
-  const migrated =
-    normalizeProject(
-      rawProject
-    );
-
-  migrated.meta.lastMigrationAt =
-    nowIso();
-
-  migrated.meta.migrationFrom =
-    oldVersion;
-
-  migrated.meta.migrationBackupKey =
-    backupKey;
-
-  migrated.history =
-    migrated.history || [];
-
-  migrated.history.unshift({
-    id:
-      uid('H'),
-
-    at:
-      nowIso(),
-
-    action:
-      'Миграция',
-
-    entity:
-      'Проект',
-
-    description:
-      `Структура обновлена ${oldVersion} → ${SCHEMA_VERSION}. Создана локальная защитная копия.`
-  });
-
-  return migrated;
+    project.history
+      .slice(
+        0,
+        10000
+      );
 }
 
 
@@ -716,14 +715,10 @@ function download(
     );
 
   const url =
-    URL.createObjectURL(
-      blob
-    );
+    URL.createObjectURL(blob);
 
   const link =
-    document.createElement(
-      'a'
-    );
+    document.createElement('a');
 
   link.href =
     url;
@@ -740,11 +735,19 @@ function download(
 
   setTimeout(
     () =>
-      URL.revokeObjectURL(
-        url
-      ),
+      URL.revokeObjectURL(url),
     1000
   );
+}
+
+
+function activeFronts() {
+
+  return project.fronts
+    .filter(
+      front =>
+        front.active !== false
+    );
 }
 
 
@@ -761,6 +764,7 @@ function hydrateFront(front) {
     ) || {};
 
   return {
+
     ...front,
 
     structure,
@@ -821,7 +825,6 @@ function frontLabel(front) {
 
   return [
     hydrated.building,
-
     hydrated.block,
 
     hydrated.floor !== ''
@@ -837,7 +840,6 @@ function frontLabel(front) {
       : '',
 
     hydrated.side,
-
     hydrated.zone,
 
     hydrated.roomNo
@@ -851,16 +853,6 @@ function frontLabel(front) {
 }
 
 
-function activeFronts() {
-
-  return project.fronts
-    .filter(
-      front =>
-        front.active !== false
-    );
-}
-
-
 function fill(
   element,
   items,
@@ -871,7 +863,7 @@ function fill(
     return;
   }
 
-  const currentValue =
+  const current =
     element.value;
 
   element.innerHTML =
@@ -907,12 +899,14 @@ function fill(
 
       option.value =
         String(
-          item.id ?? item
+          item.id ??
+          item
         );
 
       option.textContent =
         String(
-          item.name ?? item
+          item.name ??
+          item
         );
 
       element.appendChild(
@@ -926,11 +920,11 @@ function fill(
       .some(
         option =>
           option.value ===
-          currentValue
+          current
       )
   ) {
     element.value =
-      currentValue;
+      current;
   }
 }
 
@@ -964,39 +958,42 @@ function initSelects() {
     'pfBuilding',
     'rBuilding',
     'elBuilding'
-  ].forEach(
-    id =>
-      fill(
-        $(id),
-        buildings,
-        'Все здания'
-      )
-  );
+  ]
+    .forEach(
+      id =>
+        fill(
+          $(id),
+          buildings,
+          'Все здания'
+        )
+    );
 
   [
     'mfWork',
     'gWork',
     'pfWork'
-  ].forEach(
-    id =>
-      fill(
-        $(id),
-        works,
-        'Все работы'
-      )
-  );
+  ]
+    .forEach(
+      id =>
+        fill(
+          $(id),
+          works,
+          'Все работы'
+        )
+    );
 
   [
     'mfOrg',
     'rOrg'
-  ].forEach(
-    id =>
-      fill(
-        $(id),
-        organizations,
-        'Все организации'
-      )
-  );
+  ]
+    .forEach(
+      id =>
+        fill(
+          $(id),
+          organizations,
+          'Все организации'
+        )
+    );
 
   const elementTypes =
     uniq(
@@ -1029,7 +1026,8 @@ function initSelects() {
 function updateMatrixDependent() {
 
   const buildingId =
-    $('mfBuilding').value;
+    $('mfBuilding')?.value ||
+    'all';
 
   const structures =
     project.structures
@@ -1044,18 +1042,20 @@ function updateMatrixDependent() {
     $('mfBlock'),
 
     uniq(
-      structures.map(
-        item =>
-          item.block
-      )
-    ).map(
-      name => ({
-        id:
-          name,
+      structures
+        .map(
+          item =>
+            item.block
+        )
+    )
+      .map(
+        name => ({
+          id:
+            name,
 
-        name
-      })
-    ),
+          name
+        })
+      ),
 
     'Все блоки'
   );
@@ -1064,14 +1064,16 @@ function updateMatrixDependent() {
     $('mfFloor'),
 
     uniq(
-      structures.map(
-        item =>
-          item.floor
-      )
+      structures
+        .map(
+          item =>
+            item.floor
+        )
     )
       .sort(
         (a, b) =>
-          num(a) - num(b)
+          num(a) -
+          num(b)
       )
       .map(
         name => ({
@@ -1087,259 +1089,7 @@ function updateMatrixDependent() {
 }
 
 
-function renderAll() {
-
-  initSelects();
-
-  renderDashboard();
-
-  renderMatrix();
-
-  renderGantt();
-
-  renderPlanFact();
-
-  renderResources();
-
-  renderMilestones();
-
-  renderElements();
-
-  renderDemolition();
-
-  renderHistory();
-
-  renderSettings();
-}
-
-
-function renderDashboard() {
-
-  const fronts =
-    activeFronts()
-      .map(
-        hydrateFront
-      );
-
-  $('dTotal').textContent =
-    fronts.length;
-
-  $('dWork').textContent =
-    fronts.filter(
-      front =>
-        front.status ===
-        'В работе'
-    ).length;
-
-  $('dDone').textContent =
-    fronts.filter(
-      front =>
-        front.status ===
-          'Завершено' ||
-        front.completed
-    ).length;
-
-  $('dAccepted').textContent =
-    fronts.filter(
-      front =>
-        front.accepted
-    ).length;
-
-  $('dLate').textContent =
-    fronts.filter(
-      front =>
-        front.contractEnd &&
-        !front.accepted &&
-        front.contractEnd <
-          today()
-    ).length;
-
-  $('dRisk').textContent =
-    fronts.filter(
-      front =>
-        [
-          'Ограничение',
-          'Приостановлено'
-        ].includes(
-          front.status
-        )
-    ).length;
-
-  const critical =
-    fronts
-      .filter(
-        front =>
-          (
-            front.contractEnd &&
-            !front.accepted &&
-            front.contractEnd <
-              today()
-          ) ||
-          [
-            'Ограничение',
-            'Приостановлено'
-          ].includes(
-            front.status
-          )
-      )
-      .slice(
-        0,
-        20
-      );
-
-  $('dCritical').innerHTML =
-    critical
-      .map(
-        front =>
-          `
-            <div class="item">
-              <span>
-                ${esc(
-                  frontLabel(
-                    front
-                  )
-                )}
-              </span>
-
-              <strong>
-                ${esc(
-                  front.status
-                )}
-              </strong>
-            </div>
-          `
-      )
-      .join('') ||
-    '<div class="muted">Нет критичных фронтов</div>';
-
-  const lastDate =
-    [...project.resources]
-      .sort(
-        (a, b) =>
-          String(a.date)
-            .localeCompare(
-              String(b.date)
-            )
-      )
-      .slice(-1)[0]
-      ?.date;
-
-  const resources =
-    project.resources
-      .filter(
-        row =>
-          row.date ===
-          lastDate
-      );
-
-  const people =
-    resources.reduce(
-      (sum, row) =>
-        sum +
-        num(row.itr) +
-        num(row.workers) +
-        num(row.mechanizers),
-      0
-    );
-
-  const equipment =
-    resources.reduce(
-      (sum, row) =>
-        sum +
-        num(
-          row.equipmentQty
-        ),
-      0
-    );
-
-  $('dResources').innerHTML =
-    lastDate
-      ? `
-          <div class="item">
-            <span>Дата</span>
-            <strong>${lastDate}</strong>
-          </div>
-
-          <div class="item">
-            <span>Людей</span>
-            <strong>${people}</strong>
-          </div>
-
-          <div class="item">
-            <span>Техники</span>
-            <strong>${equipment}</strong>
-          </div>
-        `
-      : '<div class="muted">Нет данных</div>';
-}
-
-
-function matrixFiltered() {
-
-  return activeFronts()
-    .map(
-      hydrateFront
-    )
-    .filter(
-      front =>
-
-        (
-          $('mfBuilding').value ===
-            'all' ||
-
-          front.structure
-            .buildingId ===
-            $('mfBuilding').value
-        ) &&
-
-        (
-          $('mfBlock').value ===
-            'all' ||
-
-          front.block ===
-            $('mfBlock').value
-        ) &&
-
-        (
-          $('mfFloor').value ===
-            'all' ||
-
-          String(
-            front.floor
-          ) ===
-            $('mfFloor').value
-        ) &&
-
-        (
-          $('mfWork').value ===
-            'all' ||
-
-          front.workId ===
-            $('mfWork').value
-        ) &&
-
-        (
-          $('mfOrg').value ===
-            'all' ||
-
-          front.organizationId ===
-            $('mfOrg').value
-        ) &&
-
-        (
-          $('mfStatus').value ===
-            'all' ||
-
-          front.status ===
-            $('mfStatus').value
-        )
-    );
-}
-
-
-function statusRowClass(
-  status
-) {
+function statusRowClass(status) {
 
   if (
     status ===
@@ -1380,6 +1130,205 @@ function statusRowClass(
 }
 
 
+function renderDashboard() {
+
+  const fronts =
+    activeFronts()
+      .map(hydrateFront);
+
+  $('dTotal').textContent =
+    fronts.length;
+
+  $('dWork').textContent =
+    fronts.filter(
+      front =>
+        front.status ===
+        'В работе'
+    ).length;
+
+  $('dDone').textContent =
+    fronts.filter(
+      front =>
+        front.status ===
+          'Завершено' ||
+        front.completed
+    ).length;
+
+  $('dAccepted').textContent =
+    fronts.filter(
+      front =>
+        front.accepted
+    ).length;
+
+  $('dLate').textContent =
+    fronts.filter(
+      front =>
+        front.contractEnd &&
+        !front.accepted &&
+        front.contractEnd <
+          today()
+    ).length;
+
+  $('dRisk').textContent =
+    fronts.filter(
+      front =>
+        [
+          'Ограничение',
+          'Приостановлено'
+        ]
+          .includes(
+            front.status
+          )
+    ).length;
+
+  const critical =
+    fronts
+      .filter(
+        front =>
+          (
+            front.contractEnd &&
+            !front.accepted &&
+            front.contractEnd <
+              today()
+          ) ||
+          [
+            'Ограничение',
+            'Приостановлено'
+          ]
+            .includes(
+              front.status
+            )
+      )
+      .slice(
+        0,
+        20
+      );
+
+  $('dCritical').innerHTML =
+    critical
+      .map(
+        front =>
+          `
+            <div class="item">
+              <span>
+                ${esc(frontLabel(front))}
+              </span>
+
+              <strong>
+                ${esc(front.status)}
+              </strong>
+            </div>
+          `
+      )
+      .join('') ||
+    '<div class="muted">Нет критичных фронтов</div>';
+
+  const lastDate =
+    [...project.resources]
+      .sort(
+        (a, b) =>
+          String(a.date)
+            .localeCompare(
+              String(b.date)
+            )
+      )
+      .slice(-1)[0]
+      ?.date;
+
+  const rows =
+    project.resources
+      .filter(
+        row =>
+          row.date ===
+          lastDate
+      );
+
+  const people =
+    rows.reduce(
+      (sum, row) =>
+        sum +
+        num(row.itr) +
+        num(row.workers) +
+        num(row.mechanizers),
+      0
+    );
+
+  const equipment =
+    rows.reduce(
+      (sum, row) =>
+        sum +
+        num(row.equipmentQty),
+      0
+    );
+
+  $('dResources').innerHTML =
+    lastDate
+      ? `
+          <div class="item">
+            <span>Дата</span>
+            <strong>${lastDate}</strong>
+          </div>
+
+          <div class="item">
+            <span>Людей</span>
+            <strong>${people}</strong>
+          </div>
+
+          <div class="item">
+            <span>Техники</span>
+            <strong>${equipment}</strong>
+          </div>
+        `
+      : '<div class="muted">Нет данных</div>';
+}
+
+
+function matrixFiltered() {
+
+  return activeFronts()
+    .map(hydrateFront)
+    .filter(
+      front =>
+        (
+          $('mfBuilding').value ===
+            'all' ||
+          front.structure.buildingId ===
+            $('mfBuilding').value
+        ) &&
+        (
+          $('mfBlock').value ===
+            'all' ||
+          front.block ===
+            $('mfBlock').value
+        ) &&
+        (
+          $('mfFloor').value ===
+            'all' ||
+          String(front.floor) ===
+            $('mfFloor').value
+        ) &&
+        (
+          $('mfWork').value ===
+            'all' ||
+          front.workId ===
+            $('mfWork').value
+        ) &&
+        (
+          $('mfOrg').value ===
+            'all' ||
+          front.organizationId ===
+            $('mfOrg').value
+        ) &&
+        (
+          $('mfStatus').value ===
+            'all' ||
+          front.status ===
+            $('mfStatus').value
+        )
+    );
+}
+
+
 function renderMatrix() {
 
   updateMatrixDependent();
@@ -1408,9 +1357,7 @@ function renderMatrix() {
       .map(
         front =>
           `
-            <tr class="${statusRowClass(
-              front.status
-            )}">
+            <tr class="${statusRowClass(front.status)}">
 
               <td>${esc(front.building)}</td>
               <td>${esc(front.block)}</td>
@@ -1424,7 +1371,7 @@ function renderMatrix() {
 
               <td>
                 <span class="badge">
-                  ${esc(front.status)}
+                  ${esc(front.status || '')}
                 </span>
               </td>
 
@@ -1456,12 +1403,14 @@ function renderMatrix() {
       '[data-edit-front]'
     )
     .forEach(
-      button =>
+      button => {
+
         button.onclick =
           () =>
             openFrontEditor(
               button.dataset.editFront
-            )
+            );
+      }
     );
 }
 
@@ -1479,9 +1428,7 @@ function openModal(
 
   $('modal')
     .classList
-    .remove(
-      'hidden'
-    );
+    .remove('hidden');
 }
 
 
@@ -1489,16 +1436,14 @@ function closeModal() {
 
   $('modal')
     .classList
-    .add(
-      'hidden'
-    );
+    .add('hidden');
 
   $('modalBody').innerHTML =
     '';
 }
 
 
-function options(
+function selectOptions(
   list,
   value,
   allowBlank = false
@@ -1555,9 +1500,8 @@ function frontForm(
 
       <div class="field">
         <label>Здание</label>
-
         <select id="eBuilding">
-          ${options(
+          ${selectOptions(
             project.buildings,
             structure.buildingId
           )}
@@ -1566,81 +1510,48 @@ function frontForm(
 
       <div class="field">
         <label>Блок</label>
-        <input
-          id="eBlock"
-          value="${esc(
-            structure.block || ''
-          )}">
+        <input id="eBlock" value="${esc(structure.block || '')}">
       </div>
 
       <div class="field">
         <label>Этаж</label>
-        <input
-          id="eFloor"
-          value="${esc(
-            structure.floor ?? ''
-          )}">
+        <input id="eFloor" value="${esc(structure.floor ?? '')}">
       </div>
 
       <div class="field">
         <label>Захватка</label>
-        <input
-          id="eCapture"
-          value="${esc(
-            structure.capture || ''
-          )}">
+        <input id="eCapture" value="${esc(structure.capture || '')}">
       </div>
 
       <div class="field">
         <label>Ось</label>
-        <input
-          id="eAxis"
-          value="${esc(
-            structure.axis || ''
-          )}">
+        <input id="eAxis" value="${esc(structure.axis || '')}">
       </div>
 
       <div class="field">
         <label>Сторона</label>
-        <input
-          id="eSide"
-          value="${esc(
-            structure.side || ''
-          )}">
+        <input id="eSide" value="${esc(structure.side || '')}">
       </div>
 
       <div class="field">
         <label>Зона</label>
-        <input
-          id="eZone"
-          value="${esc(
-            structure.zone || ''
-          )}">
+        <input id="eZone" value="${esc(structure.zone || '')}">
       </div>
 
       <div class="field">
         <label>№ помещения</label>
-        <input
-          id="eRoomNo"
-          value="${esc(
-            structure.roomNo || ''
-          )}">
+        <input id="eRoomNo" value="${esc(structure.roomNo || '')}">
       </div>
 
       <div class="field">
         <label>Помещение</label>
-        <input
-          id="eRoomName"
-          value="${esc(
-            structure.roomName || ''
-          )}">
+        <input id="eRoomName" value="${esc(structure.roomName || '')}">
       </div>
 
       <div class="field">
         <label>Вид работы</label>
-
         <select id="eWork">
-          ${options(
+          ${selectOptions(
             project.works,
             front.workId
           )}
@@ -1649,9 +1560,8 @@ function frontForm(
 
       <div class="field">
         <label>Организация</label>
-
         <select id="eOrg">
-          ${options(
+          ${selectOptions(
             project.organizations,
             front.organizationId,
             true
@@ -1661,55 +1571,44 @@ function frontForm(
 
       <div class="field">
         <label>Ответственный</label>
-
-        <input
-          id="eResponsible"
-          value="${esc(
-            front.responsible || ''
-          )}">
+        <input id="eResponsible" value="${esc(front.responsible || '')}">
       </div>
 
       <div class="field">
         <label>Статус</label>
 
         <select id="eStatus">
-
           ${
-            STATUS_LIST.map(
-              status =>
-                `
-                  <option
-                    ${
-                      status ===
-                      (
-                        front.status ||
-                        'Не начато'
-                      )
-                        ? 'selected'
-                        : ''
-                    }>
-                    ${status}
-                  </option>
-                `
-            ).join('')
+            STATUS_LIST
+              .map(
+                status =>
+                  `
+                    <option
+                      ${
+                        status ===
+                        (
+                          front.status ||
+                          'Не начато'
+                        )
+                          ? 'selected'
+                          : ''
+                      }>
+                      ${status}
+                    </option>
+                  `
+              )
+              .join('')
           }
-
         </select>
       </div>
 
       <div class="field">
         <label>Ед. изм.</label>
-
-        <input
-          id="eUnit"
-          value="${esc(
-            front.unit || ''
-          )}">
+        <input id="eUnit" value="${esc(front.unit || '')}">
       </div>
 
       <div class="field">
         <label>Общий объем</label>
-
         <input
           id="eTotal"
           type="number"
@@ -1719,7 +1618,6 @@ function frontForm(
 
       <div class="field">
         <label>Накопительно выполнено</label>
-
         <input
           id="eDone"
           type="number"
@@ -1729,7 +1627,6 @@ function frontForm(
 
       <div class="field">
         <label>Договор начало</label>
-
         <input
           id="eContractStart"
           type="date"
@@ -1738,7 +1635,6 @@ function frontForm(
 
       <div class="field">
         <label>Договор окончание</label>
-
         <input
           id="eContractEnd"
           type="date"
@@ -1747,7 +1643,6 @@ function frontForm(
 
       <div class="field">
         <label>База начало</label>
-
         <input
           id="eBaselineStart"
           type="date"
@@ -1756,7 +1651,6 @@ function frontForm(
 
       <div class="field">
         <label>База окончание</label>
-
         <input
           id="eBaselineEnd"
           type="date"
@@ -1765,7 +1659,6 @@ function frontForm(
 
       <div class="field">
         <label>Рабочий план начало</label>
-
         <input
           id="ePlanStart"
           type="date"
@@ -1774,7 +1667,6 @@ function frontForm(
 
       <div class="field">
         <label>Рабочий план окончание</label>
-
         <input
           id="ePlanEnd"
           type="date"
@@ -1783,7 +1675,6 @@ function frontForm(
 
       <div class="field">
         <label>Факт начало</label>
-
         <input
           id="eFactStart"
           type="date"
@@ -1792,7 +1683,6 @@ function frontForm(
 
       <div class="field">
         <label>Факт окончание</label>
-
         <input
           id="eFactEnd"
           type="date"
@@ -1801,7 +1691,6 @@ function frontForm(
 
       <div class="field">
         <label>Прогноз окончание</label>
-
         <input
           id="eForecastEnd"
           type="date"
@@ -1812,18 +1701,12 @@ function frontForm(
 
     <div class="field">
       <label>Ограничение</label>
-
-      <textarea id="eConstraint">${esc(
-        front.constraint || ''
-      )}</textarea>
+      <textarea id="eConstraint">${esc(front.constraint || '')}</textarea>
     </div>
 
     <div class="field">
       <label>Комментарий / факт</label>
-
-      <textarea id="eComment">${esc(
-        front.comment || ''
-      )}</textarea>
+      <textarea id="eComment">${esc(front.comment || '')}</textarea>
     </div>
 
     <div class="editor-actions">
@@ -1867,30 +1750,40 @@ function openFrontEditor(
       ? 'Карточка фронта'
       : 'Новый фронт',
 
-    frontForm(
-      front
-    )
+    frontForm(front)
   );
 
   $('saveFront').onclick =
     () =>
-      saveFrontFromModal(
-        id
-      );
+      saveFrontFromModal(id);
 
   if (id) {
     $('deleteFront').onclick =
       () =>
-        archiveFront(
-          id
-        );
+        archiveFront(id);
   }
 }
 
 
-async function saveFrontFromModal(
-  id
-) {
+function structureSignature(structure) {
+
+  return [
+    structure.buildingId || '',
+    structure.block || '',
+    structure.floor ?? '',
+    structure.capture || '',
+    structure.axis || '',
+    structure.side || '',
+    structure.zone || '',
+    structure.roomNo || '',
+    structure.roomName || ''
+  ]
+    .map(normKey)
+    .join('|');
+}
+
+
+async function saveFrontFromModal(id) {
 
   const buildingId =
     $('eBuilding').value;
@@ -2094,9 +1987,7 @@ async function saveFrontFromModal(
 
     'Фронт',
 
-    frontLabel(
-      front
-    )
+    frontLabel(front)
   );
 
   await saveProject();
@@ -2107,9 +1998,7 @@ async function saveFrontFromModal(
 }
 
 
-async function archiveFront(
-  id
-) {
+async function archiveFront(id) {
 
   if (
     !confirm(
@@ -2219,9 +2108,7 @@ function renderGantt() {
 
   const items =
     activeFronts()
-      .map(
-        hydrateFront
-      )
+      .map(hydrateFront)
       .filter(
         front =>
           (
@@ -2283,6 +2170,7 @@ function renderGantt() {
   const total =
     Math.max(
       1,
+
       diffDays(
         min,
         max
@@ -2320,23 +2208,15 @@ function renderGantt() {
             <div class="gantt-row">
 
               <div class="gantt-name">
-
                 <b>
-                  ${esc(
-                    item.front.work
-                  )}
+                  ${esc(item.front.work)}
                 </b>
 
                 <br>
 
                 <small>
-                  ${esc(
-                    frontLabel(
-                      item.front
-                    )
-                  )}
+                  ${esc(frontLabel(item.front))}
                 </small>
-
               </div>
 
               <div class="gantt-line">
@@ -2413,39 +2293,27 @@ function renderPlanFact() {
   const to =
     $('pfTo').value;
 
+  const inPeriod =
+    row =>
+      ids.has(
+        row.frontId
+      ) &&
+      (
+        !from ||
+        row.date >= from
+      ) &&
+      (
+        !to ||
+        row.date <= to
+      );
+
   const plan =
     project.planLog
-      .filter(
-        row =>
-          ids.has(
-            row.frontId
-          ) &&
-          (
-            !from ||
-            row.date >= from
-          ) &&
-          (
-            !to ||
-            row.date <= to
-          )
-      );
+      .filter(inPeriod);
 
   const fact =
     project.factLog
-      .filter(
-        row =>
-          ids.has(
-            row.frontId
-          ) &&
-          (
-            !from ||
-            row.date >= from
-          ) &&
-          (
-            !to ||
-            row.date <= to
-          )
-      );
+      .filter(inPeriod);
 
   const planPeriod =
     plan.reduce(
@@ -2519,14 +2387,10 @@ function renderPlanFact() {
       );
 
   $('pfPlanPeriod').textContent =
-    fmt(
-      planPeriod
-    );
+    fmt(planPeriod);
 
   $('pfFactPeriod').textContent =
-    fmt(
-      factPeriod
-    );
+    fmt(factPeriod);
 
   $('pfVarPeriod').textContent =
     fmt(
@@ -2535,14 +2399,10 @@ function renderPlanFact() {
     );
 
   $('pfPlanCum').textContent =
-    fmt(
-      planCumulative
-    );
+    fmt(planCumulative);
 
   $('pfFactCum').textContent =
-    fmt(
-      factCumulative
-    );
+    fmt(factCumulative);
 
   $('pfPp').textContent =
     fmt(
@@ -2557,7 +2417,7 @@ function renderPlanFact() {
     );
 
   $('planRows').innerHTML =
-    plan
+    [...plan]
       .sort(
         (a, b) =>
           b.date.localeCompare(
@@ -2581,20 +2441,15 @@ function renderPlanFact() {
                 )}
               </td>
 
-              <td>
-                ${fmt(row.qty)}
-              </td>
-
-              <td>
-                ${fmt(row.people)}
-              </td>
+              <td>${fmt(row.qty)}</td>
+              <td>${fmt(row.people)}</td>
             </tr>
           `
       )
       .join('');
 
   $('factRows').innerHTML =
-    fact
+    [...fact]
       .sort(
         (a, b) =>
           b.date.localeCompare(
@@ -2618,19 +2473,9 @@ function renderPlanFact() {
                 )}
               </td>
 
-              <td>
-                ${fmt(row.qty)}
-              </td>
-
-              <td>
-                ${fmt(
-                  row.cumulative
-                )}
-              </td>
-
-              <td>
-                ${fmt(row.people)}
-              </td>
+              <td>${fmt(row.qty)}</td>
+              <td>${fmt(row.cumulative)}</td>
+              <td>${fmt(row.people)}</td>
             </tr>
           `
       )
@@ -2638,9 +2483,7 @@ function renderPlanFact() {
 }
 
 
-function openLogEditor(
-  mode
-) {
+function openLogEditor(mode) {
 
   const frontOptions =
     activeFronts()
@@ -2648,9 +2491,7 @@ function openLogEditor(
         front =>
           `
             <option value="${front.id}">
-              ${esc(
-                frontLabel(front)
-              )}
+              ${esc(frontLabel(front))}
             </option>
           `
       )
@@ -2674,28 +2515,17 @@ function openLogEditor(
 
         <div class="field">
           <label>Дата</label>
-
-          <input
-            id="lDate"
-            type="date"
-            value="${today()}">
+          <input id="lDate" type="date" value="${today()}">
         </div>
 
         <div class="field">
           <label>Объем</label>
-
-          <input
-            id="lQty"
-            type="number"
-            step="any">
+          <input id="lQty" type="number" step="any">
         </div>
 
         <div class="field">
           <label>Люди</label>
-
-          <input
-            id="lPeople"
-            type="number">
+          <input id="lPeople" type="number">
         </div>
 
         ${
@@ -2737,15 +2567,11 @@ function openLogEditor(
 
   $('lSave').onclick =
     () =>
-      saveLog(
-        mode
-      );
+      saveLog(mode);
 }
 
 
-async function saveLog(
-  mode
-) {
+async function saveLog(mode) {
 
   const frontId =
     $('lFront').value;
@@ -2753,7 +2579,7 @@ async function saveLog(
   const date =
     $('lDate').value;
 
-  const qty =
+  const quantity =
     num(
       $('lQty').value
     );
@@ -2786,6 +2612,7 @@ async function saveLog(
   ) {
 
     project.planLog.push({
+
       id:
         uid('P'),
 
@@ -2793,7 +2620,8 @@ async function saveLog(
 
       date,
 
-      qty,
+      qty:
+        quantity,
 
       people,
 
@@ -2806,17 +2634,18 @@ async function saveLog(
     log(
       'Добавлено',
       'План',
+
       `${date} · ${frontLabel(
         byId(
           project.fronts,
           frontId
         )
-      )} · ${qty}`
+      )} · ${quantity}`
     );
 
   } else {
 
-    const previous =
+    const current =
       project.factLog
         .filter(
           row =>
@@ -2834,12 +2663,14 @@ async function saveLog(
 
     const cumulative =
       $('lCum').value === ''
-        ? previous + qty
+        ? current +
+          quantity
         : num(
             $('lCum').value
           );
 
     project.factLog.push({
+
       id:
         uid('FCT'),
 
@@ -2847,7 +2678,8 @@ async function saveLog(
 
       date,
 
-      qty,
+      qty:
+        quantity,
 
       cumulative,
 
@@ -2886,7 +2718,7 @@ async function saveLog(
     log(
       'Добавлено',
       'Факт',
-      `${date} · ${frontLabel(front)} · ${qty}`
+      `${date} · ${frontLabel(front)} · ${quantity}`
     );
   }
 
@@ -2917,13 +2749,11 @@ function resourceFiltered() {
       row =>
         (
           !from ||
-          row.date >=
-            from
+          row.date >= from
         ) &&
         (
           !to ||
-          row.date <=
-            to
+          row.date <= to
         ) &&
         (
           organizationId ===
@@ -2991,18 +2821,14 @@ function renderResources() {
   $('rPeak').textContent =
     Math.max(
       0,
-      ...Object.values(
-        daily
-      )
+      ...Object.values(daily)
     );
 
   $('rEquipDays').textContent =
-    sum(
-      'equipmentQty'
-    );
+    sum('equipmentQty');
 
   $('resourceRows').innerHTML =
-    rows
+    [...rows]
       .sort(
         (a, b) =>
           b.date.localeCompare(
@@ -3058,9 +2884,9 @@ function renderResources() {
                 )}
               </td>
 
-              <td>${row.itr}</td>
-              <td>${row.workers}</td>
-              <td>${row.mechanizers}</td>
+              <td>${num(row.itr)}</td>
+              <td>${num(row.workers)}</td>
+              <td>${num(row.mechanizers)}</td>
 
               <td>
                 ${esc(
@@ -3070,7 +2896,7 @@ function renderResources() {
               </td>
 
               <td>
-                ${row.equipmentQty}
+                ${num(row.equipmentQty)}
               </td>
 
               <td>
@@ -3095,9 +2921,7 @@ function openResourceEditor() {
         front =>
           `
             <option value="${front.id}">
-              ${esc(
-                frontLabel(front)
-              )}
+              ${esc(frontLabel(front))}
             </option>
           `
       )
@@ -3111,7 +2935,6 @@ function openResourceEditor() {
 
         <div class="field">
           <label>Дата</label>
-
           <input
             id="rrDate"
             type="date"
@@ -3122,7 +2945,7 @@ function openResourceEditor() {
           <label>Организация</label>
 
           <select id="rrOrg">
-            ${options(
+            ${selectOptions(
               project.organizations,
               '',
               true
@@ -3131,12 +2954,10 @@ function openResourceEditor() {
         </div>
 
         <div class="field">
-          <label>
-            Здание (необязательно)
-          </label>
+          <label>Здание (необязательно)</label>
 
           <select id="rrBuilding">
-            ${options(
+            ${selectOptions(
               project.buildings,
               '',
               true
@@ -3145,12 +2966,10 @@ function openResourceEditor() {
         </div>
 
         <div class="field">
-          <label>
-            Вид работ (необязательно)
-          </label>
+          <label>Вид работ (необязательно)</label>
 
           <select id="rrWork">
-            ${options(
+            ${selectOptions(
               project.works,
               '',
               true
@@ -3159,9 +2978,7 @@ function openResourceEditor() {
         </div>
 
         <div class="field">
-          <label>
-            Фронт (необязательно)
-          </label>
+          <label>Фронт (необязательно)</label>
 
           <select id="rrFront">
             <option value="">—</option>
@@ -3171,26 +2988,17 @@ function openResourceEditor() {
 
         <div class="field">
           <label>ИТР</label>
-
-          <input
-            id="rrItr"
-            type="number">
+          <input id="rrItr" type="number">
         </div>
 
         <div class="field">
           <label>Рабочие</label>
-
-          <input
-            id="rrWorkers"
-            type="number">
+          <input id="rrWorkers" type="number">
         </div>
 
         <div class="field">
           <label>Механизаторы</label>
-
-          <input
-            id="rrMech"
-            type="number">
+          <input id="rrMech" type="number">
         </div>
 
         <div class="field">
@@ -3200,10 +3008,7 @@ function openResourceEditor() {
 
         <div class="field">
           <label>Количество техники</label>
-
-          <input
-            id="rrEqQty"
-            type="number">
+          <input id="rrEqQty" type="number">
         </div>
 
       </div>
@@ -3233,6 +3038,7 @@ function openResourceEditor() {
 async function saveResource() {
 
   const row = {
+
     id:
       uid('R'),
 
@@ -3301,6 +3107,7 @@ async function saveResource() {
   log(
     'Добавлено',
     'Ресурсы',
+
     `${row.date} · ${
       nameById(
         project.organizations,
@@ -3338,7 +3145,8 @@ function renderMilestones() {
 
               <td>
                 ${esc(
-                  milestone.title
+                  milestone.title ||
+                  ''
                 )}
               </td>
 
@@ -3391,12 +3199,14 @@ function renderMilestones() {
       '[data-ms]'
     )
     .forEach(
-      button =>
+      button => {
+
         button.onclick =
           () =>
             openMilestoneEditor(
               button.dataset.ms
-            )
+            );
+      }
     );
 }
 
@@ -3425,7 +3235,7 @@ function openMilestoneEditor(
           <label>Здание</label>
 
           <select id="mBuilding">
-            ${options(
+            ${selectOptions(
               project.buildings,
               milestone.buildingId,
               true
@@ -3435,18 +3245,13 @@ function openMilestoneEditor(
 
         <div class="field">
           <label>Наименование</label>
-
           <input
             id="mTitle"
-            value="${esc(
-              milestone.title ||
-              ''
-            )}">
+            value="${esc(milestone.title || '')}">
         </div>
 
         <div class="field">
           <label>Статус</label>
-
           <input
             id="mStatus"
             value="${esc(
@@ -3457,7 +3262,6 @@ function openMilestoneEditor(
 
         <div class="field">
           <label>Договорная дата</label>
-
           <input
             id="mContract"
             type="date"
@@ -3466,7 +3270,6 @@ function openMilestoneEditor(
 
         <div class="field">
           <label>Рабочая дата</label>
-
           <input
             id="mWork"
             type="date"
@@ -3475,7 +3278,6 @@ function openMilestoneEditor(
 
         <div class="field">
           <label>Прогноз</label>
-
           <input
             id="mForecast"
             type="date"
@@ -3484,7 +3286,6 @@ function openMilestoneEditor(
 
         <div class="field">
           <label>Факт</label>
-
           <input
             id="mFact"
             type="date"
@@ -3495,36 +3296,26 @@ function openMilestoneEditor(
 
       <div class="field">
         <label>Комментарий</label>
-
-        <textarea id="mComment">${esc(
-          milestone.comment ||
-          ''
-        )}</textarea>
+        <textarea id="mComment">${esc(milestone.comment || '')}</textarea>
       </div>
 
       <div class="editor-actions">
-
         <button
           id="mSave"
           class="btn primary">
           Сохранить
         </button>
-
       </div>
     `
   );
 
   $('mSave').onclick =
     () =>
-      saveMilestone(
-        id
-      );
+      saveMilestone(id);
 }
 
 
-async function saveMilestone(
-  id
-) {
+async function saveMilestone(id) {
 
   let milestone =
     id
@@ -3578,9 +3369,7 @@ async function saveMilestone(
     }
   );
 
-  if (
-    !milestone.title
-  ) {
+  if (!milestone.title) {
 
     alert(
       'Укажи наименование ключевой даты.'
@@ -3613,9 +3402,7 @@ async function saveMilestone(
 }
 
 
-function elementContextKey(
-  element
-) {
+function elementContextKey(element) {
 
   const scope =
     element.uniqueScope ||
@@ -3635,7 +3422,6 @@ function elementContextKey(
     scope ===
     'project'
   ) {
-
     return [
       type,
       number
@@ -3646,7 +3432,6 @@ function elementContextKey(
     scope ===
     'building'
   ) {
-
     return [
       type,
       element.buildingId || '',
@@ -3677,8 +3462,7 @@ function findElementDuplicate(
   return project.numberedElements
     .find(
       element =>
-        element.active !==
-          false &&
+        element.active !== false &&
         element.id !==
           excludeId &&
         elementContextKey(
@@ -3705,8 +3489,7 @@ function renderElements() {
     project.numberedElements
       .filter(
         element =>
-          element.active !==
-            false &&
+          element.active !== false &&
           (
             buildingId ===
               'all' ||
@@ -3723,9 +3506,8 @@ function renderElements() {
             !search ||
             normKey(
               element.elementNo
-            ).includes(
-              search
             )
+              .includes(search)
           )
       );
 
@@ -3737,16 +3519,12 @@ function renderElements() {
             <tr>
 
               <td>
-                ${esc(
-                  element.elementType
-                )}
+                ${esc(element.elementType)}
               </td>
 
               <td>
                 <b>
-                  ${esc(
-                    element.elementNo
-                  )}
+                  ${esc(element.elementNo)}
                 </b>
               </td>
 
@@ -3814,12 +3592,14 @@ function renderElements() {
       '[data-el]'
     )
     .forEach(
-      button =>
+      button => {
+
         button.onclick =
           () =>
             openElementEditor(
               button.dataset.el
-            )
+            );
+      }
     );
 }
 
@@ -3836,6 +3616,25 @@ function openElementEditor(
         )
       : {};
 
+  const frontOptions =
+    activeFronts()
+      .map(
+        front =>
+          `
+            <option
+              value="${front.id}"
+              ${
+                front.id ===
+                element.frontId
+                  ? 'selected'
+                  : ''
+              }>
+              ${esc(frontLabel(front))}
+            </option>
+          `
+      )
+      .join('');
+
   openModal(
     id
       ? 'Номерной элемент'
@@ -3846,29 +3645,20 @@ function openElementEditor(
 
         <div class="field">
           <label>Тип элемента</label>
-
           <input
             id="neType"
-            value="${esc(
-              element.elementType ||
-              ''
-            )}"
+            value="${esc(element.elementType || '')}"
             placeholder="Свая / Анкер / Шпунт">
         </div>
 
         <div class="field">
           <label>Номер</label>
-
           <input
             id="neNo"
-            value="${esc(
-              element.elementNo ||
-              ''
-            )}">
+            value="${esc(element.elementNo || '')}">
         </div>
 
         <div class="field">
-
           <label>Область уникальности</label>
 
           <select id="neScope">
@@ -3876,10 +3666,12 @@ function openElementEditor(
             <option
               value="context"
               ${
-                element.uniqueScope !==
-                  'project' &&
-                element.uniqueScope !==
+                ![
+                  'project',
                   'building'
+                ].includes(
+                  element.uniqueScope
+                )
                   ? 'selected'
                   : ''
               }>
@@ -3909,65 +3701,50 @@ function openElementEditor(
             </option>
 
           </select>
-
         </div>
 
         <div class="field">
-
           <label>Здание</label>
 
           <select id="neBuilding">
-            ${options(
+            ${selectOptions(
               project.buildings,
               element.buildingId,
               true
             )}
           </select>
-
         </div>
 
         <div class="field">
           <label>Захватка</label>
-
           <input
             id="neCapture"
-            value="${esc(
-              element.capture ||
-              ''
-            )}">
+            value="${esc(element.capture || '')}">
         </div>
 
         <div class="field">
           <label>Зона / ряд</label>
-
           <input
             id="neZone"
-            value="${esc(
-              element.zone ||
-              ''
-            )}">
+            value="${esc(element.zone || '')}">
         </div>
 
         <div class="field">
-
           <label>Вид работ</label>
 
           <select id="neWork">
-            ${options(
+            ${selectOptions(
               project.works,
               element.workId,
               true
             )}
           </select>
-
         </div>
 
         <div class="field">
-
           <label>Статус</label>
 
           <select id="neStatus">
-
             ${
               ELEMENT_STATUS_LIST
                 .map(
@@ -3989,60 +3766,23 @@ function openElementEditor(
                 )
                 .join('')
             }
-
           </select>
-
         </div>
 
         <div class="field">
-
-          <label>
-            Фронт (необязательно)
-          </label>
+          <label>Фронт (необязательно)</label>
 
           <select id="neFront">
-
-            <option value="">
-              —
-            </option>
-
-            ${
-              activeFronts()
-                .map(
-                  front =>
-                    `
-                      <option
-                        value="${front.id}"
-                        ${
-                          front.id ===
-                          element.frontId
-                            ? 'selected'
-                            : ''
-                        }>
-                        ${esc(
-                          frontLabel(
-                            front
-                          )
-                        )}
-                      </option>
-                    `
-                )
-                .join('')
-            }
-
+            <option value="">—</option>
+            ${frontOptions}
           </select>
-
         </div>
 
       </div>
 
       <div class="field">
         <label>Комментарий</label>
-
-        <textarea id="neComment">${esc(
-          element.comment ||
-          ''
-        )}</textarea>
+        <textarea id="neComment">${esc(element.comment || '')}</textarea>
       </div>
 
       <div class="editor-actions">
@@ -4070,24 +3810,17 @@ function openElementEditor(
 
   $('neSave').onclick =
     () =>
-      saveElement(
-        id
-      );
+      saveElement(id);
 
   if (id) {
-
     $('neArchive').onclick =
       () =>
-        archiveElement(
-          id
-        );
+        archiveElement(id);
   }
 }
 
 
-async function saveElement(
-  id
-) {
+async function saveElement(id) {
 
   const candidate = {
 
@@ -4162,10 +3895,12 @@ async function saveElement(
     alert(
       `Такой номер уже существует.\n` +
       `${duplicate.elementType} №${duplicate.elementNo}\n` +
-      `${nameById(
-        project.buildings,
-        duplicate.buildingId
-      ) || ''} ` +
+      `${
+        nameById(
+          project.buildings,
+          duplicate.buildingId
+        ) || ''
+      } ` +
       `${duplicate.capture || ''} ` +
       `${duplicate.zone || ''}`
     );
@@ -4189,13 +3924,12 @@ async function saveElement(
 
   } else {
 
-    candidate.createdAt =
-      nowIso();
+    project.numberedElements.push({
+      ...candidate,
 
-    project.numberedElements
-      .push(
-        candidate
-      );
+      createdAt:
+        nowIso()
+    });
   }
 
   log(
@@ -4216,9 +3950,7 @@ async function saveElement(
 }
 
 
-async function archiveElement(
-  id
-) {
+async function archiveElement(id) {
 
   if (
     !confirm(
@@ -4243,6 +3975,7 @@ async function archiveElement(
   log(
     'Архивировано',
     'Номерной элемент',
+
     `${element.elementType} №${element.elementNo}`
   );
 
@@ -4330,10 +4063,7 @@ function renderDemolition() {
               <td>
                 <input
                   data-dem-comment="${item.id}"
-                  value="${esc(
-                    item.comment ||
-                    ''
-                  )}">
+                  value="${esc(item.comment || '')}">
               </td>
 
             </tr>
@@ -4346,12 +4076,14 @@ function renderDemolition() {
       '[data-dem]'
     )
     .forEach(
-      element =>
+      element => {
+
         element.onchange =
           () =>
             saveDemolitionRow(
               element.dataset.dem
-            )
+            );
+      }
     );
 
   document
@@ -4362,7 +4094,8 @@ function renderDemolition() {
       '[data-dem-comment]'
     )
     .forEach(
-      element =>
+      element => {
+
         element.onchange =
           () =>
             saveDemolitionRow(
@@ -4370,14 +4103,13 @@ function renderDemolition() {
               element.dataset.demForecast ||
               element.dataset.demFact ||
               element.dataset.demComment
-            )
+            );
+      }
     );
 }
 
 
-async function saveDemolitionRow(
-  id
-) {
+async function saveDemolitionRow(id) {
 
   const item =
     byId(
@@ -4462,9 +4194,7 @@ function renderHistory() {
               </td>
 
               <td>
-                ${esc(
-                  item.description
-                )}
+                ${esc(item.description)}
               </td>
 
             </tr>
@@ -4476,82 +4206,50 @@ function renderHistory() {
 
 function renderSettings() {
 
+  const renderList =
+    list =>
+      list
+        .map(
+          item =>
+            `
+              <div class="item">
+
+                <span>
+                  ${esc(item.name)}
+                  ${
+                    item.unit
+                      ? ` · ${esc(item.unit)}`
+                      : ''
+                  }
+                </span>
+
+                <small>
+                  ${
+                    item.active === false
+                      ? 'архив'
+                      : 'активно'
+                  }
+                </small>
+
+              </div>
+            `
+        )
+        .join('');
+
   $('buildingList').innerHTML =
-    project.buildings
-      .map(
-        item =>
-          `
-            <div class="item">
-
-              <span>
-                ${esc(item.name)}
-              </span>
-
-              <small>
-                ${
-                  item.active === false
-                    ? 'архив'
-                    : 'активно'
-                }
-              </small>
-
-            </div>
-          `
-      )
-      .join('');
+    renderList(
+      project.buildings
+    );
 
   $('workList').innerHTML =
-    project.works
-      .map(
-        item =>
-          `
-            <div class="item">
-
-              <span>
-                ${esc(item.name)}
-                ${
-                  item.unit
-                    ? ` · ${esc(item.unit)}`
-                    : ''
-                }
-              </span>
-
-              <small>
-                ${
-                  item.active === false
-                    ? 'архив'
-                    : 'активно'
-                }
-              </small>
-
-            </div>
-          `
-      )
-      .join('');
+    renderList(
+      project.works
+    );
 
   $('orgList').innerHTML =
-    project.organizations
-      .map(
-        item =>
-          `
-            <div class="item">
-
-              <span>
-                ${esc(item.name)}
-              </span>
-
-              <small>
-                ${
-                  item.active === false
-                    ? 'архив'
-                    : 'активно'
-                }
-              </small>
-
-            </div>
-          `
-      )
-      .join('');
+    renderList(
+      project.organizations
+    );
 
   $('projectMeta').innerHTML =
     `
@@ -4562,7 +4260,6 @@ function renderSettings() {
 
       <div class="item">
         <span>Последнее изменение</span>
-
         <strong>
           ${new Date(
             project.meta.updatedAt
@@ -4619,58 +4316,38 @@ function renderSettings() {
 }
 
 
-async function addSimple(
-  type
-) {
+async function addSimple(type) {
 
-  let input;
-  let list;
-  let prefix;
+  const config = {
 
-  if (
-    type ===
-    'building'
-  ) {
+    building: [
+      'newBuilding',
+      project.buildings,
+      'BLD'
+    ],
 
-    input =
-      $('newBuilding');
+    work: [
+      'newWork',
+      project.works,
+      'WRK'
+    ],
 
-    list =
-      project.buildings;
+    org: [
+      'newOrg',
+      project.organizations,
+      'ORG'
+    ]
 
-    prefix =
-      'BLD';
-  }
+  }[type];
 
-  if (
-    type ===
-    'work'
-  ) {
+  const [
+    inputId,
+    list,
+    prefix
+  ] = config;
 
-    input =
-      $('newWork');
-
-    list =
-      project.works;
-
-    prefix =
-      'WRK';
-  }
-
-  if (
-    type ===
-    'org'
-  ) {
-
-    input =
-      $('newOrg');
-
-    list =
-      project.organizations;
-
-    prefix =
-      'ORG';
-  }
+  const input =
+    $(inputId);
 
   const name =
     input.value.trim();
@@ -4697,6 +4374,7 @@ async function addSimple(
   }
 
   list.push({
+
     id:
       uid(prefix),
 
@@ -4721,6 +4399,45 @@ async function addSimple(
 }
 
 
+function renderBackupNotice() {
+
+  const last =
+    project?.meta
+      ?.lastBackupAt;
+
+  const version =
+    ` · структура ${project?.schemaVersion || '—'}`;
+
+  if (!last) {
+
+    $('backupNotice').textContent =
+      'Резервная копия проекта еще не создавалась' +
+      version;
+
+    return;
+  }
+
+  const days =
+    Math.floor(
+      (
+        Date.now() -
+        Date.parse(last)
+      ) /
+      86400000
+    );
+
+  $('backupNotice').textContent =
+    `Последняя резервная копия: ` +
+    `${new Date(last).toLocaleString('ru-RU')}` +
+    `${
+      days >= 7
+        ? ' · рекомендуется создать новую копию'
+        : ''
+    }` +
+    version;
+}
+
+
 async function exportBackup() {
 
   project.meta.lastBackupAt =
@@ -4729,6 +4446,7 @@ async function exportBackup() {
   await saveProject();
 
   const payload = {
+
     ...clone(project),
 
     exportedAt:
@@ -4758,30 +4476,14 @@ async function exportBackup() {
 }
 
 
-function readJsonFile(
-  file
-) {
-
-  return file.text()
-    .then(
-      text =>
-        JSON.parse(
-          text
-        )
-    );
-}
-
-
-async function restoreProject(
-  file
-) {
+async function restoreProject(file) {
 
   try {
 
     const data =
       normalizeProject(
-        await readJsonFile(
-          file
+        JSON.parse(
+          await file.text()
         )
       );
 
@@ -4796,7 +4498,7 @@ async function restoreProject(
     }
 
     await dbPutKey(
-      project,
+      clone(project),
       `restore-backup-${Date.now()}`
     );
 
@@ -4834,8 +4536,7 @@ async function restoreProject(
 
 function compareCollections(
   current,
-  incoming,
-  key = 'id'
+  incoming
 ) {
 
   const currentMap =
@@ -4843,9 +4544,7 @@ function compareCollections(
       (current || [])
         .map(
           item => [
-            String(
-              item[key]
-            ),
+            String(item.id),
             item
           ]
         )
@@ -4856,9 +4555,7 @@ function compareCollections(
       (incoming || [])
         .map(
           item => [
-            String(
-              item[key]
-            ),
+            String(item.id),
             item
           ]
         )
@@ -4885,20 +4582,17 @@ function compareCollections(
       !currentMap.has(id)
     ) {
 
-      added.push(
-        row
-      );
+      added.push(row);
 
     } else if (
       JSON.stringify(
         currentMap.get(id)
       ) !==
-      JSON.stringify(
-        row
-      )
+      JSON.stringify(row)
     ) {
 
       changed.push({
+
         before:
           currentMap.get(id),
 
@@ -4919,10 +4613,7 @@ function compareCollections(
     if (
       !incomingMap.has(id)
     ) {
-
-      missing.push(
-        row
-      );
+      missing.push(row);
     }
   }
 
@@ -4948,11 +4639,13 @@ function diffFields(
 
   return uniq([
     ...Object.keys(
-      before || {}
+      before ||
+      {}
     ),
 
     ...Object.keys(
-      after || {}
+      after ||
+      {}
     )
   ])
     .filter(
@@ -4967,6 +4660,7 @@ function diffFields(
     )
     .map(
       key => ({
+
         key,
 
         before:
@@ -4988,48 +4682,30 @@ function recordLabel(
     key ===
     'fronts'
   ) {
-    return frontLabel(
-      row
-    );
+    return frontLabel(row);
   }
 
   if (
     key ===
-    'factLog'
-  ) {
-
-    return (
-      `${row.date || ''} · ` +
-      frontLabel(
-        byId(
-          project.fronts,
-          row.frontId
-        ) ||
-        byId(
-          compareIncoming?.fronts || [],
-          row.frontId
-        )
-      )
-    );
-  }
-
-  if (
+      'factLog' ||
     key ===
-    'planLog'
+      'planLog'
   ) {
+
+    const front =
+      byId(
+        project.fronts,
+        row.frontId
+      ) ||
+      byId(
+        compareIncoming?.fronts ||
+        [],
+        row.frontId
+      );
 
     return (
       `${row.date || ''} · ` +
-      frontLabel(
-        byId(
-          project.fronts,
-          row.frontId
-        ) ||
-        byId(
-          compareIncoming?.fronts || [],
-          row.frontId
-        )
-      )
+      frontLabel(front)
     );
   }
 
@@ -5046,7 +4722,8 @@ function recordLabel(
           row.organizationId
         ) ||
         nameById(
-          compareIncoming?.organizations || [],
+          compareIncoming?.organizations ||
+          [],
           row.organizationId
         ) ||
         'Ресурсы'
@@ -5058,7 +4735,6 @@ function recordLabel(
     key ===
     'milestones'
   ) {
-
     return (
       row.title ||
       row.id
@@ -5080,7 +4756,6 @@ function recordLabel(
     key ===
     'demolition'
   ) {
-
     return (
       row.name ||
       row.id
@@ -5095,156 +4770,124 @@ function recordLabel(
 }
 
 
-function buildComparison(
-  incoming
-) {
-
-  const sets = [
-    ['fronts', 'Фронты'],
-    ['structures', 'Структуры'],
-    ['planLog', 'План'],
-    ['factLog', 'Факт'],
-    ['resources', 'Ресурсы'],
-    ['milestones', 'Ключевые даты'],
-    ['numberedElements', 'Номерные элементы'],
-    ['demolition', 'Демонтаж'],
-    ['buildings', 'Здания'],
-    ['works', 'Виды работ'],
-    ['organizations', 'Организации']
-  ];
-
-  compareItems =
-    [];
-
-  const summary =
-    [];
-
-  for (
-    const [
-      key,
-      label
-    ]
-    of sets
-  ) {
-
-    const comparison =
-      compareCollections(
-        project[key],
-        incoming[key],
-        'id'
-      );
-
-    comparison.added
-      .forEach(
-        row =>
-          compareItems.push({
-            token:
-              uid('CMP'),
-
-            key,
-
-            label,
-
-            type:
-              'added',
-
-            id:
-              row.id,
-
-            after:
-              row,
-
-            diffs:
-              []
-          })
-      );
-
-    comparison.changed
-      .forEach(
-        pair =>
-          compareItems.push({
-            token:
-              uid('CMP'),
-
-            key,
-
-            label,
-
-            type:
-              'changed',
-
-            id:
-              pair.after.id,
-
-            before:
-              pair.before,
-
-            after:
-              pair.after,
-
-            diffs:
-              diffFields(
-                pair.before,
-                pair.after
-              )
-          })
-      );
-
-    summary.push({
-      key,
-      label,
-      ...comparison
-    });
-  }
-
-  return summary;
-}
-
-
-async function compareProjectFile(
-  file
-) {
+async function compareProjectFile(file) {
 
   try {
 
     compareIncoming =
       normalizeProject(
-        await readJsonFile(
-          file
+        JSON.parse(
+          await file.text()
         )
       );
 
-    const comparison =
-      buildComparison(
-        compareIncoming
-      );
+    const sets = [
+      ['fronts', 'Фронты'],
+      ['structures', 'Структуры'],
+      ['planLog', 'План'],
+      ['factLog', 'Факт'],
+      ['resources', 'Ресурсы'],
+      ['milestones', 'Ключевые даты'],
+      ['numberedElements', 'Номерные элементы'],
+      ['demolition', 'Демонтаж'],
+      ['buildings', 'Здания'],
+      ['works', 'Виды работ'],
+      ['organizations', 'Организации']
+    ];
 
-    const totals =
-      comparison.reduce(
-        (result, section) => ({
-          added:
-            result.added +
-            section.added.length,
+    compareItems =
+      [];
 
-          changed:
-            result.changed +
-            section.changed.length,
+    let added =
+      0;
 
-          missing:
-            result.missing +
-            section.missing.length
-        }),
-        {
-          added:
-            0,
+    let changed =
+      0;
 
-          changed:
-            0,
+    let missing =
+      0;
 
-          missing:
-            0
-        }
-      );
+    for (
+      const [
+        key,
+        label
+      ]
+      of sets
+    ) {
+
+      const comparison =
+        compareCollections(
+          project[key],
+          compareIncoming[key]
+        );
+
+      added +=
+        comparison.added.length;
+
+      changed +=
+        comparison.changed.length;
+
+      missing +=
+        comparison.missing.length;
+
+      comparison.added
+        .forEach(
+          row =>
+            compareItems.push({
+
+              token:
+                uid('CMP'),
+
+              key,
+
+              label,
+
+              type:
+                'added',
+
+              id:
+                row.id,
+
+              after:
+                row,
+
+              diffs:
+                []
+            })
+        );
+
+      comparison.changed
+        .forEach(
+          pair =>
+            compareItems.push({
+
+              token:
+                uid('CMP'),
+
+              key,
+
+              label,
+
+              type:
+                'changed',
+
+              id:
+                pair.after.id,
+
+              before:
+                pair.before,
+
+              after:
+                pair.after,
+
+              diffs:
+                diffFields(
+                  pair.before,
+                  pair.after
+                )
+            })
+        );
+    }
 
     const detail =
       compareItems
@@ -5332,38 +4975,26 @@ async function compareProjectFile(
 
           <div class="compare-box">
             <span>Новых</span>
-            <h2>${totals.added}</h2>
+            <h2>${added}</h2>
           </div>
 
           <div class="compare-box">
             <span>Изменено</span>
-            <h2>${totals.changed}</h2>
+            <h2>${changed}</h2>
           </div>
 
           <div class="compare-box">
             <span>Есть только у меня</span>
-            <h2>${totals.missing}</h2>
+            <h2>${missing}</h2>
           </div>
 
         </div>
 
         <div class="compare-details">
-
           ${
             detail ||
             '<div class="muted">Различий для применения нет.</div>'
           }
-
-          ${
-            compareItems.length > 500
-              ? `
-                  <div class="notice warn">
-                    Показаны первые 500 изменений.
-                  </div>
-                `
-              : ''
-          }
-
         </div>
 
         <p class="muted">
@@ -5423,53 +5054,54 @@ async function acceptSelectedCompared() {
         ...document.querySelectorAll(
           '[data-cmp]:checked'
         )
-      ].map(
-        checkbox =>
-          checkbox.dataset.cmp
-      )
+      ]
+        .map(
+          checkbox =>
+            checkbox.dataset.cmp
+        )
     );
 
   const chosen =
-    compareItems.filter(
-      item =>
-        selected.has(
-          item.token
-        )
-    );
-
-  for (
-    const item
-    of chosen
-  ) {
-
-    const list =
-      project[item.key];
-
-    const index =
-      list.findIndex(
-        row =>
-          String(row.id) ===
-          String(item.id)
+    compareItems
+      .filter(
+        item =>
+          selected.has(
+            item.token
+          )
       );
 
-    if (
-      index >= 0
-    ) {
+  chosen.forEach(
+    item => {
 
-      list[index] =
-        clone(
-          item.after
+      const list =
+        project[item.key];
+
+      const index =
+        list.findIndex(
+          row =>
+            String(row.id) ===
+            String(item.id)
         );
 
-    } else {
+      if (
+        index >= 0
+      ) {
 
-      list.push(
-        clone(
-          item.after
-        )
-      );
+        list[index] =
+          clone(
+            item.after
+          );
+
+      } else {
+
+        list.push(
+          clone(
+            item.after
+          )
+        );
+      }
     }
-  }
+  );
 
   log(
     'Сравнение',
@@ -5497,11 +5129,8 @@ async function acceptSelectedCompared() {
 
 async function replaceCompared() {
 
-  if (!compareIncoming) {
-    return;
-  }
-
   if (
+    !compareIncoming ||
     !confirm(
       'Полностью заменить текущий проект версией из файла?'
     )
@@ -5510,7 +5139,7 @@ async function replaceCompared() {
   }
 
   await dbPutKey(
-    project,
+    clone(project),
     `compare-replace-backup-${Date.now()}`
   );
 
@@ -5537,46 +5166,6 @@ async function replaceCompared() {
 }
 
 
-function renderBackupNotice() {
-
-  const last =
-    project?.meta
-      ?.lastBackupAt;
-
-  const migration =
-    ` · структура ${project?.schemaVersion || '—'}`;
-
-  if (!last) {
-
-    $('backupNotice').textContent =
-      'Резервная копия проекта еще не создавалась' +
-      migration;
-
-    return;
-  }
-
-  const days =
-    Math.floor(
-      (
-        Date.now() -
-        Date.parse(last)
-      ) /
-      86400000
-    );
-
-  $('backupNotice').textContent =
-    `Последняя резервная копия: ` +
-    `${new Date(last).toLocaleString('ru-RU')}` +
-    `${days >= 7 ? ' · рекомендуется создать новую копию' : ''}` +
-    migration;
-}
-
-
-/* =========================================================
-   ИМПОРТ
-   ========================================================= */
-
-
 function normDate(value) {
 
   if (
@@ -5596,8 +5185,12 @@ function normDate(value) {
 
     return (
       `${value.getFullYear()}-` +
-      `${String(value.getMonth() + 1).padStart(2, '0')}-` +
-      `${String(value.getDate()).padStart(2, '0')}`
+      `${String(
+        value.getMonth() + 1
+      ).padStart(2, '0')}-` +
+      `${String(
+        value.getDate()
+      ).padStart(2, '0')}`
     );
   }
 
@@ -5605,7 +5198,8 @@ function normDate(value) {
     typeof value ===
       'number' &&
     value > 20000 &&
-    value < 80000
+    value < 80000 &&
+    window.XLSX
   ) {
 
     const parsed =
@@ -5624,9 +5218,7 @@ function normDate(value) {
   }
 
   const text =
-    normText(
-      value
-    );
+    normText(value);
 
   let match =
     text.match(
@@ -5673,9 +5265,7 @@ function ensureNamed(
 ) {
 
   const clean =
-    normText(
-      name
-    );
+    normText(name);
 
   if (!clean) {
     return null;
@@ -5693,6 +5283,7 @@ function ensureNamed(
   if (!item) {
 
     item = {
+
       id:
         uid(prefix),
 
@@ -5705,43 +5296,14 @@ function ensureNamed(
       ...extra
     };
 
-    list.push(
-      item
-    );
+    list.push(item);
   }
 
   return item;
 }
 
 
-function structureSignature(
-  structure
-) {
-
-  return [
-    structure.buildingId || '',
-    structure.block || '',
-    structure.floor ?? '',
-    structure.capture || '',
-    structure.axis || '',
-    structure.side || '',
-    structure.zone || '',
-    structure.roomNo || '',
-    structure.roomName || ''
-  ]
-    .map(
-      value =>
-        normKey(
-          value
-        )
-    )
-    .join('|');
-}
-
-
-function ensureStructure(
-  data
-) {
+function ensureStructure(data) {
 
   const candidate = {
 
@@ -5749,44 +5311,28 @@ function ensureStructure(
       data.buildingId || '',
 
     block:
-      normText(
-        data.block
-      ),
+      normText(data.block),
 
     floor:
-      normText(
-        data.floor
-      ),
+      normText(data.floor),
 
     capture:
-      normText(
-        data.capture
-      ),
+      normText(data.capture),
 
     axis:
-      normText(
-        data.axis
-      ),
+      normText(data.axis),
 
     side:
-      normText(
-        data.side
-      ),
+      normText(data.side),
 
     zone:
-      normText(
-        data.zone
-      ),
+      normText(data.zone),
 
     roomNo:
-      normText(
-        data.roomNo
-      ),
+      normText(data.roomNo),
 
     roomName:
-      normText(
-        data.roomName
-      )
+      normText(data.roomName)
   };
 
   const signature =
@@ -5800,16 +5346,14 @@ function ensureStructure(
         row =>
           (
             row.signature ||
-            structureSignature(
-              row
-            )
-          ) ===
-          signature
+            structureSignature(row)
+          ) === signature
       );
 
   if (!structure) {
 
     structure = {
+
       id:
         uid('STR'),
 
@@ -6160,29 +5704,30 @@ const FIELD_DEFS = {
       'количество людей'
     ]
   },
+
   peopleQty: {
-  label:
-    'Количество человек',
+    label:
+      'Количество человек',
 
-  aliases: [
-    'количество человек',
-    'кол-во человек',
-    'кол во человек',
-    'численность человек'
-  ]
-},
+    aliases: [
+      'количество человек',
+      'кол-во человек',
+      'кол во человек',
+      'численность человек'
+    ]
+  },
 
-specialization: {
-  label:
-    'Специализация',
+  specialization: {
+    label:
+      'Специализация',
 
-  aliases: [
-    'специализация',
-    'категория персонала',
-    'категория работников',
-    'вид персонала'
-  ]
-},
+    aliases: [
+      'специализация',
+      'категория персонала',
+      'категория работников',
+      'вид персонала'
+    ]
+  },
 
   itr: {
     label:
@@ -6222,7 +5767,8 @@ specialization: {
       'тип техники',
       'техника',
       'механизм',
-      'механизмы'
+      'механизмы',
+      'наименование техники'
     ]
   },
 
@@ -6344,19 +5890,19 @@ const MODE_FIELDS = {
   ],
 
   resources: [
-  'date',
-  'organization',
-  'building',
-  'work',
-  'peopleQty',
-  'specialization',
-  'itr',
-  'workers',
-  'mechanizers',
-  'equipmentType',
-  'equipmentQty',
-  'comment'
-],
+    'date',
+    'organization',
+    'building',
+    'work',
+    'peopleQty',
+    'specialization',
+    'itr',
+    'workers',
+    'mechanizers',
+    'equipmentType',
+    'equipmentQty',
+    'comment'
+  ],
 
   elements: [
     'elementType',
@@ -6383,6 +5929,7 @@ const MODE_FIELDS = {
 
 
 const MODE_LABELS = {
+
   fronts:
     'Фронты / рабочий график',
 
@@ -6406,9 +5953,7 @@ function matchField(
 ) {
 
   const normalizedHeader =
-    normKey(
-      header
-    );
+    normKey(header);
 
   let best =
     '';
@@ -6418,15 +5963,12 @@ function matchField(
 
   for (
     const key
-    of MODE_FIELDS[mode] || []
+    of MODE_FIELDS[mode] ||
+    []
   ) {
 
     const definition =
       FIELD_DEFS[key];
-
-    if (!definition) {
-      continue;
-    }
 
     for (
       const alias
@@ -6437,9 +5979,7 @@ function matchField(
     ) {
 
       const normalizedAlias =
-        normKey(
-          alias
-        );
+        normKey(alias);
 
       let score =
         0;
@@ -6473,11 +6013,11 @@ function matchField(
         bestScore
       ) {
 
-        best =
-          key;
-
         bestScore =
           score;
+
+        best =
+          key;
       }
     }
   }
@@ -6488,51 +6028,42 @@ function matchField(
 }
 
 
-function headerScore(
-  row
-) {
+function headerScore(row) {
 
   let score =
     0;
 
   for (
     const cell
-    of row || []
+    of row ||
+    []
   ) {
 
     const normalized =
-      normKey(
-        cell
-      );
+      normKey(cell);
 
     if (!normalized) {
       continue;
     }
 
-    for (
-      const definition
-      of Object.values(
+    if (
+      Object.values(
         FIELD_DEFS
       )
+        .some(
+          definition =>
+            [
+              definition.label,
+              ...definition.aliases
+            ]
+              .some(
+                alias =>
+                  normKey(alias) ===
+                  normalized
+              )
+        )
     ) {
-
-      const found =
-        [
-          definition.label,
-          ...definition.aliases
-        ]
-          .some(
-            alias =>
-              normKey(alias) ===
-              normalized
-          );
-
-      if (found) {
-
-        score++;
-
-        break;
-      }
+      score++;
     }
   }
 
@@ -6540,9 +6071,7 @@ function headerScore(
 }
 
 
-function detectHeaderRow(
-  matrix
-) {
+function detectHeaderRow(matrix) {
 
   let best = {
     index:
@@ -6583,14 +6112,15 @@ function detectHeaderRow(
 }
 
 
-function uniqueHeaders(
-  row
-) {
+function uniqueHeaders(row) {
 
   const used =
     new Map();
 
-  return (row || [])
+  return (
+    row ||
+    []
+  )
     .map(
       (value, index) => {
 
@@ -6598,7 +6128,7 @@ function uniqueHeaders(
           normText(value) ||
           `Колонка ${index + 1}`;
 
-        const number =
+        const count =
           (
             used.get(header) ||
             0
@@ -6606,15 +6136,14 @@ function uniqueHeaders(
 
         used.set(
           header,
-          number
+          count
         );
 
         if (
-          number > 1
+          count > 1
         ) {
-
           header =
-            `${header} (${number})`;
+            `${header} (${count})`;
         }
 
         return header;
@@ -6623,23 +6152,19 @@ function uniqueHeaders(
 }
 
 
-function detectImportMode(
-  headers
-) {
+function detectImportMode(headers) {
 
   const text =
     headers
-      .map(
-        normKey
-      )
+      .map(normKey)
       .join(' | ');
 
   if (
-  /итр|механизатор|количество техники|рабочие|количество человек|специализация/.test(text) &&
-  /дата/.test(text)
-) {
-  return 'resources';
-}
+    /итр|механизатор|количество техники|рабочие|количество человек|специализация/.test(text) &&
+    /дата/.test(text)
+  ) {
+    return 'resources';
+  }
 
   if (
     /порядковый номер|номер сваи|номер анкера|тип элемента/.test(text)
@@ -6664,11 +6189,9 @@ function detectImportMode(
 }
 
 
-function buildAutoMapping(
-  mode
-) {
+function buildAutoMapping(mode) {
 
-  const mapping =
+  const result =
     {};
 
   for (
@@ -6682,23 +6205,15 @@ function buildAutoMapping(
         mode
       );
 
-    if (
+    result[header] =
       key &&
-      !Object.values(mapping)
+      !Object.values(result)
         .includes(key)
-    ) {
-
-      mapping[header] =
-        key;
-
-    } else {
-
-      mapping[header] =
-        '';
-    }
+        ? key
+        : '';
   }
 
-  return mapping;
+  return result;
 }
 
 
@@ -6727,13 +6242,11 @@ function mappingOptions(
                     ? 'selected'
                     : ''
                 }>
-                ${
-                  esc(
-                    FIELD_DEFS[key]
-                      ?.label ||
-                    key
-                  )
-                }
+                ${esc(
+                  FIELD_DEFS[key]
+                    ?.label ||
+                  key
+                )}
               </option>
             `
         )
@@ -6747,9 +6260,7 @@ function renderImportMapping() {
 
   $('importMappingCard')
     .classList
-    .remove(
-      'hidden'
-    );
+    .remove('hidden');
 
   $('importMapping').innerHTML =
     importHeaders
@@ -6766,7 +6277,7 @@ function renderImportMapping() {
                 data-map-header="${index}">
 
                 ${mappingOptions(
-                  importDetectedMode,
+                  importModeResolved,
                   importMapping[header] ||
                   ''
                 )}
@@ -6783,7 +6294,8 @@ function renderImportMapping() {
       '[data-map-header]'
     )
     .forEach(
-      select =>
+      select => {
+
         select.onchange =
           () => {
 
@@ -6800,33 +6312,29 @@ function renderImportMapping() {
 
             if (chosen) {
 
-              for (
-                const key
-                of Object.keys(
-                  importMapping
-                )
-              ) {
+              Object.keys(
+                importMapping
+              )
+                .forEach(
+                  key => {
 
-                if (
-                  importMapping[key] ===
-                  chosen
-                ) {
-                  importMapping[key] =
-                    '';
-                }
-              }
-
-              importMapping[header] =
-                chosen;
-
-            } else {
-
-              importMapping[header] =
-                '';
+                    if (
+                      importMapping[key] ===
+                      chosen
+                    ) {
+                      importMapping[key] =
+                        '';
+                    }
+                  }
+                );
             }
 
+            importMapping[header] =
+              chosen;
+
             renderImportMapping();
-          }
+          };
+      }
     );
 }
 
@@ -6864,120 +6372,240 @@ function applyFillDown(
   }
 
   const keys =
-    mode === 'fronts'
+    mode === 'fronts' ||
+    mode === 'fact'
       ? [
           'building',
           'block',
           'work'
         ]
-      : mode === 'fact'
+      : mode === 'elements'
         ? [
-            'building',
-            'block',
-            'work'
+            'elementType',
+            'building'
           ]
-        : mode === 'elements'
+        : mode === 'resources'
           ? [
-              'elementType',
+              'organization',
               'building'
             ]
-          : mode === 'resources'
-            ? [
-                'organization',
-                'building'
-              ]
-            : [
-                'building',
-                'title'
-              ];
+          : [
+              'building',
+              'title'
+            ];
 
   const last =
     {};
 
-  return rows.map(
-    row => {
+  return rows
+    .map(
+      row => {
 
-      const output = {
-        ...row
-      };
+        const output = {
+          ...row
+        };
 
-      for (
-        const key
-        of keys
-      ) {
+        keys.forEach(
+          key => {
 
-        const header =
-          Object.keys(
-            importMapping
-          )
-            .find(
-              item =>
-                importMapping[item] ===
-                key
-            );
+            const header =
+              Object.keys(
+                importMapping
+              )
+                .find(
+                  item =>
+                    importMapping[item] ===
+                    key
+                );
 
-        if (!header) {
-          continue;
-        }
+            if (!header) {
+              return;
+            }
 
-        if (
-          normText(
-            output[header]
-          )
-        ) {
+            if (
+              normText(
+                output[header]
+              )
+            ) {
 
-          last[key] =
-            output[header];
+              last[key] =
+                output[header];
 
-        } else if (
-          last[key] !==
-          undefined
-        ) {
+            } else if (
+              last[key] !==
+              undefined
+            ) {
 
-          output[header] =
-            last[key];
-        }
+              output[header] =
+                last[key];
+            }
+          }
+        );
+
+        return output;
       }
-
-      return output;
-    }
-  );
+    );
 }
 
 
-function importRowObject(
-  row,
-  index
-) {
+function readSelectedSheet() {
 
-  return {
-    raw:
-      row,
+  if (!importWorkbook) {
+    return;
+  }
 
-    rowNumber:
-      index + 1,
+  importSheetName =
+    $('importSheet').value ||
+    importWorkbook.SheetNames[0];
 
-    status:
-      '',
+  const sheet =
+    importWorkbook.Sheets[
+      importSheetName
+    ];
 
-    message:
-      '',
+  const matrix =
+    XLSX.utils.sheet_to_json(
+      sheet,
+      {
+        header:
+          1,
 
-    selected:
-      true,
+        defval:
+          '',
 
-    action:
-      '',
+        raw:
+          true,
 
-    resolved:
-      null
-  };
+        blankrows:
+          false
+      }
+    );
+
+  const headerIndex =
+    detectHeaderRow(matrix);
+
+  importHeaders =
+    uniqueHeaders(
+      matrix[
+        headerIndex
+      ] || []
+    );
+
+  importRawRows =
+    matrix
+      .slice(
+        headerIndex + 1
+      )
+      .filter(
+        row =>
+          row.some(
+            value =>
+              normText(value) !==
+              ''
+          )
+      )
+      .map(
+        row =>
+          Object.fromEntries(
+            importHeaders.map(
+              (header, index) => [
+                header,
+                row[index] ?? ''
+              ]
+            )
+          )
+      );
 }
 
 
-function findMatchingFrontByMapped(
-  row
-) {
+async function readImportFile(event) {
+
+  const file =
+    event.target.files[0];
+
+  if (!file) {
+    return;
+  }
+
+  try {
+
+    importWorkbook =
+      XLSX.read(
+        await file.arrayBuffer(),
+        {
+          type:
+            'array',
+
+          cellDates:
+            true,
+
+          cellNF:
+            false,
+
+          cellText:
+            false
+        }
+      );
+
+    importFileName =
+      file.name;
+
+    $('importSheet').innerHTML =
+      importWorkbook.SheetNames
+        .map(
+          name =>
+            `<option>${esc(name)}</option>`
+        )
+        .join('');
+
+    $('importSheet').disabled =
+      false;
+
+    importSheetName =
+      importWorkbook
+        .SheetNames[0] ||
+      '';
+
+    $('analyzeImportBtn').disabled =
+      !importSheetName;
+
+    $('commitImportBtn').disabled =
+      true;
+
+    importMapping =
+      {};
+
+    importMappingMode =
+      '';
+
+    importRows =
+      [];
+
+    $('importInfo')
+      .classList
+      .remove('hidden');
+
+    $('importInfo').className =
+      'notice';
+
+    $('importInfo').textContent =
+      `Файл прочитан. ` +
+      `Листов: ${importWorkbook.SheetNames.length}. ` +
+      `Выбери лист и нажми «Анализировать».`;
+
+    readSelectedSheet();
+
+  } catch (error) {
+
+    alert(
+      'Ошибка чтения файла: ' +
+      error.message
+    );
+  }
+}
+
+
+function findMatchingFrontByMapped(row) {
 
   const buildingName =
     normText(
@@ -7031,6 +6659,7 @@ function findMatchingFrontByMapped(
 
   const signature =
     structureSignature({
+
       buildingId:
         building.id,
 
@@ -7089,9 +6718,7 @@ function findMatchingFrontByMapped(
         item =>
           (
             item.signature ||
-            structureSignature(
-              item
-            )
+            structureSignature(item)
           ) ===
           signature
       );
@@ -7113,436 +6740,459 @@ function findMatchingFrontByMapped(
 }
 
 
-function previewFrontRow(
-  item
+function previewImportRow(
+  raw,
+  index
 ) {
 
-  const row =
-    item.raw;
+  const item = {
 
-  const building =
-    normText(
-      mappedValue(
-        row,
-        'building'
-      )
-    );
+    raw,
 
-  const work =
-    normText(
-      mappedValue(
-        row,
-        'work'
-      )
-    );
+    rowNumber:
+      index + 1,
 
-  if (
-    !building ||
-    !work
-  ) {
-
-    item.status =
-      'Ошибка';
-
-    item.message =
-      'Нужны «Здание» и «Работа»';
-
-    item.selected =
-      false;
-
-    return;
-  }
-
-  if (
-    /ключев|контрольн/.test(
-      normKey(work)
-    )
-  ) {
-
-    item.status =
-      'Похоже на КД';
-
-    item.message =
-      'Строка не будет импортирована как обычный фронт';
-
-    item.selected =
-      false;
-
-    item.action =
-      'milestone-candidate';
-
-    return;
-  }
-
-  const found =
-    findMatchingFrontByMapped(
-      row
-    );
-
-  item.action =
-    found
-      ? 'update'
-      : 'create';
-
-  item.status =
-    found
-      ? 'Обновление'
-      : 'Новый фронт';
-
-  item.message =
-    found
-      ? frontLabel(found)
-      : `${building} · ${work}`;
-
-  item.resolved =
-    found;
-}
-
-
-function previewFactRow(
-  item
-) {
-
-  const row =
-    item.raw;
-
-  const date =
-    normDate(
-      mappedValue(
-        row,
-        'date'
-      )
-    );
-
-  const work =
-    normText(
-      mappedValue(
-        row,
-        'work'
-      )
-    );
-
-  const building =
-    normText(
-      mappedValue(
-        row,
-        'building'
-      )
-    );
-
-  if (
-    !date ||
-    !work ||
-    !building
-  ) {
-
-    item.status =
-      'Ошибка';
-
-    item.message =
-      'Нужны дата, здание и работа';
-
-    item.selected =
-      false;
-
-    return;
-  }
-
-  const found =
-    findMatchingFrontByMapped(
-      row
-    );
-
-  item.action =
-    found
-      ? 'append'
-      : 'create-front-and-append';
-
-  item.status =
-    found
-      ? 'Добавить факт'
-      : 'Новый фронт + факт';
-
-  item.message =
-    found
-      ? frontLabel(found)
-      : `${building} · ${work}`;
-
-  item.resolved =
-    found;
-}
-
-
-function previewResourceRow(
-  item
-) {
-
-  const row =
-    item.raw;
-
-  const date =
-    normDate(
-      mappedValue(
-        row,
-        'date'
-      )
-    );
-
-  if (!date) {
-
-    item.status =
-      'Ошибка';
-
-    item.message =
-      'Не распознана дата';
-
-    item.selected =
-      false;
-
-    return;
-  }
-
-  item.action =
-    'append';
-
-  item.status =
-    'Добавить ресурсы';
-
-  item.message =
-    normText(
-      mappedValue(
-        row,
-        'organization'
-      )
-    ) ||
-    'Без организации';
-}
-
-
-function previewElementRow(
-  item
-) {
-
-  const row =
-    item.raw;
-
-  const type =
-    normText(
-      mappedValue(
-        row,
-        'elementType'
-      )
-    ) ||
-    normText(
-      mappedValue(
-        row,
-        'work'
-      )
-    );
-
-  const number =
-    normText(
-      mappedValue(
-        row,
-        'elementNo'
-      )
-    );
-
-  if (
-    !type ||
-    !number
-  ) {
-
-    item.status =
-      'Ошибка';
-
-    item.message =
-      'Нужны тип элемента и номер';
-
-    item.selected =
-      false;
-
-    return;
-  }
-
-  const buildingName =
-    normText(
-      mappedValue(
-        row,
-        'building'
-      )
-    );
-
-  const building =
-    project.buildings
-      .find(
-        value =>
-          sameText(
-            value.name,
-            buildingName
-          )
-      );
-
-  const candidate = {
-    elementType:
-      type,
-
-    elementNo:
-      number,
-
-    buildingId:
-      building?.id ||
+    status:
       '',
 
-    capture:
-      normText(
-        mappedValue(
-          row,
-          'capture'
-        )
-      ),
+    message:
+      '',
 
-    zone:
-      normText(
-        mappedValue(
-          row,
-          'zone'
-        )
-      ),
+    selected:
+      true,
 
-    uniqueScope:
-      'context'
+    action:
+      '',
+
+    resolved:
+      null
   };
 
-  const duplicate =
-    findElementDuplicate(
-      candidate
-    );
 
-  if (duplicate) {
+  if (
+    importModeResolved ===
+    'fronts'
+  ) {
 
-    item.status =
-      'Дубль';
-
-    item.message =
-      `Уже есть: ${duplicate.elementType} №${duplicate.elementNo}`;
-
-    item.selected =
-      false;
-
-    item.action =
-      'duplicate';
-
-    return;
-  }
-
-  item.status =
-    'Новый элемент';
-
-  item.message =
-    `${type} №${number}`;
-
-  item.action =
-    'create';
-}
-
-
-function previewMilestoneRow(
-  item
-) {
-
-  const row =
-    item.raw;
-
-  const title =
-    normText(
-      mappedValue(
-        row,
-        'title'
-      )
-    ) ||
-    normText(
-      mappedValue(
-        row,
-        'work'
-      )
-    );
-
-  if (!title) {
-
-    item.status =
-      'Ошибка';
-
-    item.message =
-      'Не найдено наименование ключевой даты';
-
-    item.selected =
-      false;
-
-    return;
-  }
-
-  const buildingName =
-    normText(
-      mappedValue(
-        row,
-        'building'
-      )
-    );
-
-  const building =
-    project.buildings
-      .find(
-        value =>
-          sameText(
-            value.name,
-            buildingName
-          )
+    const building =
+      normText(
+        mappedValue(
+          raw,
+          'building'
+        )
       );
 
-  const contractDate =
-    normDate(
-      mappedValue(
-        row,
-        'contractEnd'
-      )
-    );
-
-  const found =
-    project.milestones
-      .find(
-        milestone =>
-          sameText(
-            milestone.title,
-            title
-          ) &&
-          (
-            !building ||
-            milestone.buildingId ===
-              building.id
-          ) &&
-          (
-            !contractDate ||
-            milestone.contractDate ===
-              contractDate
-          )
+    const work =
+      normText(
+        mappedValue(
+          raw,
+          'work'
+        )
       );
 
-  item.status =
-    found
-      ? 'Обновление'
-      : 'Новая КД';
+    if (
+      !building ||
+      !work
+    ) {
 
-  item.message =
-    title;
+      Object.assign(
+        item,
+        {
+          status:
+            'Ошибка',
 
-  item.action =
-    found
-      ? 'update'
-      : 'create';
+          message:
+            'Нужны «Здание» и «Работа»',
 
-  item.resolved =
-    found;
+          selected:
+            false
+        }
+      );
+
+    } else if (
+      /ключев|контрольн/.test(
+        normKey(work)
+      )
+    ) {
+
+      Object.assign(
+        item,
+        {
+          status:
+            'Похоже на КД',
+
+          message:
+            'Не импортируется как обычный фронт',
+
+          selected:
+            false
+        }
+      );
+
+    } else {
+
+      const found =
+        findMatchingFrontByMapped(
+          raw
+        );
+
+      Object.assign(
+        item,
+        {
+          status:
+            found
+              ? 'Обновление'
+              : 'Новый фронт',
+
+          message:
+            found
+              ? frontLabel(found)
+              : `${building} · ${work}`,
+
+          action:
+            found
+              ? 'update'
+              : 'create',
+
+          resolved:
+            found
+        }
+      );
+    }
+  }
+
+
+  if (
+    importModeResolved ===
+    'fact'
+  ) {
+
+    const date =
+      normDate(
+        mappedValue(
+          raw,
+          'date'
+        )
+      );
+
+    const building =
+      normText(
+        mappedValue(
+          raw,
+          'building'
+        )
+      );
+
+    const work =
+      normText(
+        mappedValue(
+          raw,
+          'work'
+        )
+      );
+
+    if (
+      !date ||
+      !building ||
+      !work
+    ) {
+
+      Object.assign(
+        item,
+        {
+          status:
+            'Ошибка',
+
+          message:
+            'Нужны дата, здание и работа',
+
+          selected:
+            false
+        }
+      );
+
+    } else {
+
+      const found =
+        findMatchingFrontByMapped(
+          raw
+        );
+
+      Object.assign(
+        item,
+        {
+          status:
+            found
+              ? 'Добавить факт'
+              : 'Новый фронт + факт',
+
+          message:
+            found
+              ? frontLabel(found)
+              : `${building} · ${work}`,
+
+          action:
+            found
+              ? 'append'
+              : 'create-front-and-append',
+
+          resolved:
+            found
+        }
+      );
+    }
+  }
+
+
+  if (
+    importModeResolved ===
+    'resources'
+  ) {
+
+    const date =
+      normDate(
+        mappedValue(
+          raw,
+          'date'
+        )
+      );
+
+    if (!date) {
+
+      Object.assign(
+        item,
+        {
+          status:
+            'Ошибка',
+
+          message:
+            'Не распознана дата',
+
+          selected:
+            false
+        }
+      );
+
+    } else {
+
+      Object.assign(
+        item,
+        {
+          status:
+            'Добавить ресурсы',
+
+          message:
+            normText(
+              mappedValue(
+                raw,
+                'organization'
+              )
+            ) ||
+            'Без организации',
+
+          action:
+            'append'
+        }
+      );
+    }
+  }
+
+
+  if (
+    importModeResolved ===
+    'elements'
+  ) {
+
+    const type =
+      normText(
+        mappedValue(
+          raw,
+          'elementType'
+        )
+      ) ||
+      normText(
+        mappedValue(
+          raw,
+          'work'
+        )
+      );
+
+    const number =
+      normText(
+        mappedValue(
+          raw,
+          'elementNo'
+        )
+      );
+
+    if (
+      !type ||
+      !number
+    ) {
+
+      Object.assign(
+        item,
+        {
+          status:
+            'Ошибка',
+
+          message:
+            'Нужны тип элемента и номер',
+
+          selected:
+            false
+        }
+      );
+
+    } else {
+
+      const buildingName =
+        normText(
+          mappedValue(
+            raw,
+            'building'
+          )
+        );
+
+      const building =
+        project.buildings
+          .find(
+            value =>
+              sameText(
+                value.name,
+                buildingName
+              )
+          );
+
+      const candidate = {
+
+        elementType:
+          type,
+
+        elementNo:
+          number,
+
+        buildingId:
+          building?.id ||
+          '',
+
+        capture:
+          normText(
+            mappedValue(
+              raw,
+              'capture'
+            )
+          ),
+
+        zone:
+          normText(
+            mappedValue(
+              raw,
+              'zone'
+            )
+          ),
+
+        uniqueScope:
+          'context'
+      };
+
+      const duplicate =
+        findElementDuplicate(
+          candidate
+        );
+
+      if (duplicate) {
+
+        Object.assign(
+          item,
+          {
+            status:
+              'Дубль',
+
+            message:
+              `Уже есть: ` +
+              `${duplicate.elementType} ` +
+              `№${duplicate.elementNo}`,
+
+            selected:
+              false
+          }
+        );
+
+      } else {
+
+        Object.assign(
+          item,
+          {
+            status:
+              'Новый элемент',
+
+            message:
+              `${type} №${number}`,
+
+            action:
+              'create'
+          }
+        );
+      }
+    }
+  }
+
+
+  if (
+    importModeResolved ===
+    'milestones'
+  ) {
+
+    const title =
+      normText(
+        mappedValue(
+          raw,
+          'title'
+        )
+      ) ||
+      normText(
+        mappedValue(
+          raw,
+          'work'
+        )
+      );
+
+    if (!title) {
+
+      Object.assign(
+        item,
+        {
+          status:
+            'Ошибка',
+
+          message:
+            'Не найдено наименование ключевой даты',
+
+          selected:
+            false
+        }
+      );
+
+    } else {
+
+      Object.assign(
+        item,
+        {
+          status:
+            'КД',
+
+          message:
+            title,
+
+          action:
+            'create-or-update'
+        }
+      );
+    }
+  }
+
+  return item;
 }
 
 
@@ -7584,66 +7234,19 @@ function analyzeImport() {
       nextMode;
   }
 
-  importDetectedMode =
+  importModeResolved =
     nextMode;
 
   renderImportMapping();
 
-  const filled =
+  importRows =
     applyFillDown(
       importRawRows,
-      importDetectedMode
-    );
-
-  importRows =
-    filled.map(
-      (row, index) =>
-        importRowObject(
-          row,
-          index
-        )
-    );
-
-  for (
-    const item
-    of importRows
-  ) {
-
-    if (
-      importDetectedMode ===
-      'fronts'
-    ) {
-      previewFrontRow(item);
-    }
-
-    if (
-      importDetectedMode ===
-      'fact'
-    ) {
-      previewFactRow(item);
-    }
-
-    if (
-      importDetectedMode ===
-      'resources'
-    ) {
-      previewResourceRow(item);
-    }
-
-    if (
-      importDetectedMode ===
-      'elements'
-    ) {
-      previewElementRow(item);
-    }
-
-    if (
-      importDetectedMode ===
-      'milestones'
-    ) {
-      previewMilestoneRow(item);
-    }
-  }
+      importModeResolved
+    )
+      .map(
+        previewImportRow
+      );
 
   renderImportPreview();
 }
@@ -7667,9 +7270,7 @@ function renderImportPreview() {
 
   $('importInfo')
     .classList
-    .remove(
-      'hidden'
-    );
+    .remove('hidden');
 
   $('importInfo').className =
     'notice';
@@ -7677,7 +7278,7 @@ function renderImportPreview() {
   $('importInfo').textContent =
     `Файл: ${importFileName}\n` +
     `Лист: ${importSheetName}\n` +
-    `Режим: ${MODE_LABELS[importDetectedMode]}\n` +
+    `Режим: ${MODE_LABELS[importModeResolved]}\n` +
     `Строк после заголовка: ${importRows.length}\n` +
     `${
       Object.entries(counts)
@@ -7689,22 +7290,27 @@ function renderImportPreview() {
     }`;
 
   $('importHead').innerHTML =
-    '<tr>' +
-    '<th></th>' +
-    '<th>Строка</th>' +
-    '<th>Результат</th>' +
-    '<th>Что найдено</th>' +
-    importHeaders
-      .slice(
-        0,
-        10
-      )
-      .map(
-        header =>
-          `<th>${esc(header)}</th>`
-      )
-      .join('') +
-    '</tr>';
+    `
+      <tr>
+        <th></th>
+        <th>Строка</th>
+        <th>Результат</th>
+        <th>Что найдено</th>
+
+        ${
+          importHeaders
+            .slice(
+              0,
+              10
+            )
+            .map(
+              header =>
+                `<th>${esc(header)}</th>`
+            )
+            .join('')
+        }
+      </tr>
+    `;
 
   $('importBody').innerHTML =
     importRows
@@ -7723,8 +7329,12 @@ function renderImportPreview() {
                   data-import-row="${index}"
                   ${item.selected ? 'checked' : ''}
                   ${
-                    item.status === 'Ошибка' ||
-                    item.status === 'Дубль'
+                    [
+                      'Ошибка',
+                      'Дубль'
+                    ].includes(
+                      item.status
+                    )
                       ? 'disabled'
                       : ''
                   }>
@@ -7735,23 +7345,9 @@ function renderImportPreview() {
               </td>
 
               <td>
-
-                <span
-                  class="import-status ${
-                    item.status === 'Ошибка' ||
-                    item.status === 'Дубль'
-                      ? 'st-error'
-                      : item.status.includes('Обнов')
-                        ? 'st-update'
-                        : item.status.includes('Нов')
-                          ? 'st-new'
-                          : 'st-warn'
-                  }">
-
+                <span class="import-status">
                   ${esc(item.status)}
-
                 </span>
-
               </td>
 
               <td>
@@ -7766,13 +7362,7 @@ function renderImportPreview() {
                   )
                   .map(
                     header =>
-                      `
-                        <td>
-                          ${esc(
-                            item.raw[header]
-                          )}
-                        </td>
-                      `
+                      `<td>${esc(item.raw[header])}</td>`
                   )
                   .join('')
               }
@@ -7787,7 +7377,8 @@ function renderImportPreview() {
       '[data-import-row]'
     )
     .forEach(
-      checkbox =>
+      checkbox => {
+
         checkbox.onchange =
           () => {
 
@@ -7798,189 +7389,28 @@ function renderImportPreview() {
               )
             ].selected =
               checkbox.checked;
-          }
+          };
+      }
     );
 
   $('commitImportBtn').disabled =
     !importRows.some(
       item =>
         item.selected &&
-        item.status !==
-          'Ошибка' &&
-        item.status !==
+        ![
+          'Ошибка',
           'Дубль'
-    );
-}
-
-
-async function readImportFile(
-  event
-) {
-
-  const file =
-    event.target.files[0];
-
-  if (!file) {
-    return;
-  }
-
-  try {
-
-    const data =
-      await file.arrayBuffer();
-
-    importWorkbook =
-      XLSX.read(
-        data,
-        {
-          type:
-            'array',
-
-          cellDates:
-            true,
-
-          cellNF:
-            false,
-
-          cellText:
-            false
-        }
-      );
-
-    importFileName =
-      file.name;
-
-    $('importSheet').innerHTML =
-      importWorkbook.SheetNames
-        .map(
-          name =>
-            `<option>${esc(name)}</option>`
+        ].includes(
+          item.status
         )
-        .join('');
-
-    $('importSheet').disabled =
-      false;
-
-    importSheetName =
-      importWorkbook
-        .SheetNames[0] ||
-      '';
-
-    $('analyzeImportBtn').disabled =
-      !importSheetName;
-
-    $('commitImportBtn').disabled =
-      true;
-
-    importMapping =
-      {};
-
-    importMappingMode =
-      '';
-
-    importRows =
-      [];
-
-    $('importInfo')
-      .classList
-      .remove(
-        'hidden'
-      );
-
-    $('importInfo').textContent =
-      `Файл прочитан. ` +
-      `Листов: ${importWorkbook.SheetNames.length}. ` +
-      `Выбери лист и нажми «Анализировать».`;
-
-    readSelectedSheet();
-
-  } catch (error) {
-
-    alert(
-      'Ошибка чтения файла: ' +
-      error.message
     );
-  }
 }
 
 
-function readSelectedSheet() {
-
-  if (!importWorkbook) {
-    return;
-  }
-
-  importSheetName =
-    $('importSheet').value ||
-    importWorkbook.SheetNames[0];
-
-  const sheet =
-    importWorkbook.Sheets[
-      importSheetName
-    ];
-
-  importMatrix =
-    XLSX.utils.sheet_to_json(
-      sheet,
-      {
-        header:
-          1,
-
-        defval:
-          '',
-
-        raw:
-          true,
-
-        blankrows:
-          false
-      }
-    );
-
-  const headerIndex =
-    detectHeaderRow(
-      importMatrix
-    );
-
-  importHeaders =
-    uniqueHeaders(
-      importMatrix[
-        headerIndex
-      ] || []
-    );
-
-  importRawRows =
-    importMatrix
-      .slice(
-        headerIndex + 1
-      )
-      .filter(
-        row =>
-          row.some(
-            value =>
-              normText(value) !==
-              ''
-          )
-      )
-      .map(
-        row =>
-          Object.fromEntries(
-            importHeaders.map(
-              (header, index) => [
-                header,
-                row[index] ?? ''
-              ]
-            )
-          )
-      );
-}
-
-
-function importSource(
-  item
-) {
+function importSource(item) {
 
   return {
+
     file:
       importFileName,
 
@@ -7996,69 +7426,7 @@ function importSource(
 }
 
 
-function buildStructureDataFromRow(
-  row,
-  buildingId
-) {
-
-  return {
-
-    buildingId,
-
-    block:
-      mappedValue(
-        row,
-        'block'
-      ),
-
-    floor:
-      mappedValue(
-        row,
-        'floor'
-      ),
-
-    capture:
-      mappedValue(
-        row,
-        'capture'
-      ),
-
-    axis:
-      mappedValue(
-        row,
-        'axis'
-      ),
-
-    side:
-      mappedValue(
-        row,
-        'side'
-      ),
-
-    zone:
-      mappedValue(
-        row,
-        'zone'
-      ),
-
-    roomNo:
-      mappedValue(
-        row,
-        'roomNo'
-      ),
-
-    roomName:
-      mappedValue(
-        row,
-        'roomName'
-      )
-  };
-}
-
-
-function ensureFrontFromImport(
-  row
-) {
+function ensureFrontFromImport(row) {
 
   const building =
     ensureNamed(
@@ -8097,19 +7465,65 @@ function ensureFrontFromImport(
   }
 
   const structure =
-    ensureStructure(
-      buildStructureDataFromRow(
-        row,
-        building.id
-      )
-    );
+    ensureStructure({
+
+      buildingId:
+        building.id,
+
+      block:
+        mappedValue(
+          row,
+          'block'
+        ),
+
+      floor:
+        mappedValue(
+          row,
+          'floor'
+        ),
+
+      capture:
+        mappedValue(
+          row,
+          'capture'
+        ),
+
+      axis:
+        mappedValue(
+          row,
+          'axis'
+        ),
+
+      side:
+        mappedValue(
+          row,
+          'side'
+        ),
+
+      zone:
+        mappedValue(
+          row,
+          'zone'
+        ),
+
+      roomNo:
+        mappedValue(
+          row,
+          'roomNo'
+        ),
+
+      roomName:
+        mappedValue(
+          row,
+          'roomName'
+        )
+    });
 
   let front =
     project.fronts
       .find(
         item =>
-          item.active !==
-            false &&
+          item.active !== false &&
           item.structureId ===
             structure.id &&
           item.workId ===
@@ -8119,6 +7533,7 @@ function ensureFrontFromImport(
   if (!front) {
 
     front = {
+
       id:
         uid('F'),
 
@@ -8197,9 +7612,7 @@ function assignIfPresent(
   ) {
 
     object[key] =
-      converter(
-        value
-      );
+      converter(value);
   }
 }
 
@@ -8211,10 +7624,12 @@ async function commitImport() {
       .filter(
         item =>
           item.selected &&
-          item.status !==
-            'Ошибка' &&
-          item.status !==
+          ![
+            'Ошибка',
             'Дубль'
+          ].includes(
+            item.status
+          )
       );
 
   if (!selected.length) {
@@ -8230,9 +7645,12 @@ async function commitImport() {
     return;
   }
 
+  const preImportBackupKey =
+    `pre-import-${Date.now()}`;
+
   await dbPutKey(
-    project,
-    `pre-import-${Date.now()}`
+    clone(project),
+    preImportBackupKey
   );
 
   let created =
@@ -8260,12 +7678,10 @@ async function commitImport() {
       item.raw;
 
 
-    /* -----------------------------------------
-       ФРОНТЫ / РАБОЧИЙ ГРАФИК
-       ----------------------------------------- */
+    /* ФРОНТЫ */
 
     if (
-      importDetectedMode ===
+      importModeResolved ===
       'fronts'
     ) {
 
@@ -8435,9 +7851,7 @@ async function commitImport() {
 
       front.lastImport = {
         batchId,
-        ...importSource(
-          item
-        )
+        ...importSource(item)
       };
 
       if (existed) {
@@ -8448,12 +7862,10 @@ async function commitImport() {
     }
 
 
-    /* -----------------------------------------
-       ФАКТ
-       ----------------------------------------- */
+    /* ФАКТ */
 
     if (
-      importDetectedMode ===
+      importModeResolved ===
       'fact'
     ) {
 
@@ -8477,7 +7889,7 @@ async function commitImport() {
           )
         );
 
-      const qty =
+      const quantity =
         num(
           mappedValue(
             row,
@@ -8505,7 +7917,7 @@ async function commitImport() {
         [
           front.id,
           date,
-          qty,
+          quantity,
           people,
           comment
         ].join('|');
@@ -8551,9 +7963,10 @@ async function commitImport() {
                   num(fact.qty),
                 0
               ) +
-            qty;
+            quantity;
 
       project.factLog.push({
+
         id:
           uid('FCT'),
 
@@ -8562,7 +7975,8 @@ async function commitImport() {
 
         date,
 
-        qty,
+        qty:
+          quantity,
 
         cumulative,
 
@@ -8586,17 +8000,13 @@ async function commitImport() {
 
         source: {
           batchId,
-          ...importSource(
-            item
-          )
+          ...importSource(item)
         }
       });
 
       front.doneQty =
         Math.max(
-          num(
-            front.doneQty
-          ),
+          num(front.doneQty),
           cumulative
         );
 
@@ -8605,7 +8015,6 @@ async function commitImport() {
         date <
           front.factStart
       ) {
-
         front.factStart =
           date;
       }
@@ -8627,309 +8036,306 @@ async function commitImport() {
     }
 
 
-    /* -----------------------------------------
-       РЕСУРСЫ
-       ----------------------------------------- */
-
-   if (
-  importDetectedMode ===
-  'resources'
-) {
-
-  const date =
-    normDate(
-      mappedValue(
-        row,
-        'date'
-      )
-    );
-
-  const organizationName =
-    normText(
-      mappedValue(
-        row,
-        'organization'
-      )
-    );
-
-  const buildingName =
-    normText(
-      mappedValue(
-        row,
-        'building'
-      )
-    );
-
-  const workName =
-    normText(
-      mappedValue(
-        row,
-        'work'
-      )
-    );
-
-  const organization =
-    organizationName
-      ? ensureNamed(
-          project.organizations,
-          'ORG',
-          organizationName
-        )
-      : null;
-
-  const building =
-    buildingName
-      ? ensureNamed(
-          project.buildings,
-          'BLD',
-          buildingName
-        )
-      : null;
-
-  const work =
-    workName
-      ? ensureNamed(
-          project.works,
-          'WRK',
-          workName
-        )
-      : null;
-
-
-  /*
-    ДВА ПОДДЕРЖИВАЕМЫХ ФОРМАТА:
-
-    1. Отдельные колонки:
-       ИТР | Рабочие | Механизаторы
-
-    2. Твой фактический формат:
-       Количество человек | Специализация
-  */
-
-  let itr =
-    num(
-      mappedValue(
-        row,
-        'itr'
-      )
-    );
-
-  let workers =
-    num(
-      mappedValue(
-        row,
-        'workers'
-      )
-    );
-
-  let mechanizers =
-    num(
-      mappedValue(
-        row,
-        'mechanizers'
-      )
-    );
-
-  const peopleQty =
-    num(
-      mappedValue(
-        row,
-        'peopleQty'
-      )
-    );
-
-  const specialization =
-    normText(
-      mappedValue(
-        row,
-        'specialization'
-      )
-    );
-
-  const specializationKey =
-    normKey(
-      specialization
-    );
-
-
-  if (
-    peopleQty > 0
-  ) {
+    /* РЕСУРСЫ */
 
     if (
-      specializationKey === 'итр' ||
-      specializationKey.includes(
-        'инженерно техничес'
-      )
+      importModeResolved ===
+      'resources'
     ) {
 
-      itr +=
-        peopleQty;
+      const date =
+        normDate(
+          mappedValue(
+            row,
+            'date'
+          )
+        );
 
-    } else if (
-      specializationKey.includes(
-        'механизатор'
-      ) ||
-      specializationKey.includes(
-        'машинист'
-      )
-    ) {
+      const organizationName =
+        normText(
+          mappedValue(
+            row,
+            'organization'
+          )
+        );
 
-      mechanizers +=
-        peopleQty;
+      const buildingName =
+        normText(
+          mappedValue(
+            row,
+            'building'
+          )
+        );
 
-    } else if (
-      specializationKey.includes(
-        'рабоч'
-      )
-    ) {
+      const workName =
+        normText(
+          mappedValue(
+            row,
+            'work'
+          )
+        );
 
-      workers +=
-        peopleQty;
+      /*
+        ВАЖНО:
+        ООО «Пауэр Проджектс»
+        ООО «Пауэр Проджектс» (кладка)
+        ООО «Пауэр Проджектс» - сети
+
+        остаются РАЗНЫМИ организациями.
+        ensureNamed сравнивает полное название.
+      */
+
+      const organization =
+        organizationName
+          ? ensureNamed(
+              project.organizations,
+              'ORG',
+              organizationName
+            )
+          : null;
+
+      const building =
+        buildingName
+          ? ensureNamed(
+              project.buildings,
+              'BLD',
+              buildingName
+            )
+          : null;
+
+      const work =
+        workName
+          ? ensureNamed(
+              project.works,
+              'WRK',
+              workName
+            )
+          : null;
+
+
+      /*
+        Поддерживаются два формата:
+
+        1. ИТР | Рабочие | Механизаторы
+
+        2. Количество человек | Специализация
+      */
+
+      let itr =
+        num(
+          mappedValue(
+            row,
+            'itr'
+          )
+        );
+
+      let workers =
+        num(
+          mappedValue(
+            row,
+            'workers'
+          )
+        );
+
+      let mechanizers =
+        num(
+          mappedValue(
+            row,
+            'mechanizers'
+          )
+        );
+
+      const peopleQty =
+        num(
+          mappedValue(
+            row,
+            'peopleQty'
+          )
+        );
+
+      const specialization =
+        normText(
+          mappedValue(
+            row,
+            'specialization'
+          )
+        );
+
+      const specializationKey =
+        normKey(
+          specialization
+        );
+
+
+      if (
+        peopleQty > 0
+      ) {
+
+        if (
+          specializationKey ===
+            'итр' ||
+          specializationKey.includes(
+            'инженерно техничес'
+          )
+        ) {
+
+          itr +=
+            peopleQty;
+
+        } else if (
+          specializationKey.includes(
+            'механизатор'
+          ) ||
+          specializationKey.includes(
+            'машинист'
+          )
+        ) {
+
+          mechanizers +=
+            peopleQty;
+
+        } else if (
+          specializationKey.includes(
+            'рабоч'
+          )
+        ) {
+
+          workers +=
+            peopleQty;
+        }
+      }
+
+
+      const resource = {
+
+        id:
+          uid('R'),
+
+        date,
+
+        organizationId:
+          organization?.id ||
+          '',
+
+        buildingId:
+          building?.id ||
+          '',
+
+        workId:
+          work?.id ||
+          '',
+
+        frontId:
+          '',
+
+        itr,
+
+        workers,
+
+        mechanizers,
+
+        specialization,
+
+        peopleQty,
+
+        equipmentType:
+          normText(
+            mappedValue(
+              row,
+              'equipmentType'
+            )
+          ),
+
+        equipmentQty:
+          num(
+            mappedValue(
+              row,
+              'equipmentQty'
+            )
+          ),
+
+        comment:
+          normText(
+            mappedValue(
+              row,
+              'comment'
+            )
+          ),
+
+        createdAt:
+          nowIso(),
+
+        source: {
+          batchId,
+          ...importSource(item)
+        }
+      };
+
+
+      const hasPeople =
+        resource.itr > 0 ||
+        resource.workers > 0 ||
+        resource.mechanizers > 0;
+
+      const hasEquipment =
+        !!resource.equipmentType ||
+        resource.equipmentQty > 0;
+
+      if (
+        !hasPeople &&
+        !hasEquipment
+      ) {
+
+        skipped++;
+
+        continue;
+      }
+
+
+      resource.importFingerprint =
+        [
+          resource.date,
+          resource.organizationId,
+          resource.buildingId,
+          resource.workId,
+          resource.itr,
+          resource.workers,
+          resource.mechanizers,
+          resource.specialization,
+          resource.peopleQty,
+          resource.equipmentType,
+          resource.equipmentQty,
+          resource.comment
+        ].join('|');
+
+
+      if (
+        project.resources
+          .some(
+            existing =>
+              existing.importFingerprint ===
+              resource.importFingerprint
+          )
+      ) {
+
+        skipped++;
+
+        continue;
+      }
+
+
+      project.resources.push(
+        resource
+      );
+
+      appended++;
     }
-  }
 
 
-  const resource = {
-
-    id:
-      uid('R'),
-
-    date,
-
-    organizationId:
-      organization?.id ||
-      '',
-
-    buildingId:
-      building?.id ||
-      '',
-
-    workId:
-      work?.id ||
-      '',
-
-    frontId:
-      '',
-
-    itr,
-
-    workers,
-
-    mechanizers,
-
-    specialization,
-
-    peopleQty,
-
-    equipmentType:
-      normText(
-        mappedValue(
-          row,
-          'equipmentType'
-        )
-      ),
-
-    equipmentQty:
-      num(
-        mappedValue(
-          row,
-          'equipmentQty'
-        )
-      ),
-
-    comment:
-      normText(
-        mappedValue(
-          row,
-          'comment'
-        )
-      ),
-
-    createdAt:
-      nowIso(),
-
-    source: {
-      batchId,
-      ...importSource(
-        item
-      )
-    }
-  };
-
-
-  /*
-    Не записываем полностью пустые строки ресурсов.
-  */
-
-  const hasPeople =
-    resource.itr > 0 ||
-    resource.workers > 0 ||
-    resource.mechanizers > 0;
-
-  const hasEquipment =
-    resource.equipmentType ||
-    resource.equipmentQty > 0;
-
-  if (
-    !hasPeople &&
-    !hasEquipment
-  ) {
-
-    skipped++;
-
-    continue;
-  }
-
-
-  const fingerprint =
-    [
-      resource.date,
-      resource.organizationId,
-      resource.buildingId,
-      resource.workId,
-      resource.itr,
-      resource.workers,
-      resource.mechanizers,
-      resource.specialization,
-      resource.peopleQty,
-      resource.equipmentType,
-      resource.equipmentQty,
-      resource.comment
-    ].join('|');
-
-
-  if (
-    project.resources
-      .some(
-        existing =>
-          existing.importFingerprint ===
-          fingerprint
-      )
-  ) {
-
-    skipped++;
-
-    continue;
-  }
-
-
-  resource.importFingerprint =
-    fingerprint;
-
-  project.resources.push(
-    resource
-  );
-
-  appended++;
-}
-
-    /* -----------------------------------------
-       НОМЕРНЫЕ ЭЛЕМЕНТЫ
-       ----------------------------------------- */
+    /* НОМЕРНЫЕ ЭЛЕМЕНТЫ */
 
     if (
-      importDetectedMode ===
+      importModeResolved ===
       'elements'
     ) {
 
@@ -9055,9 +8461,7 @@ async function commitImport() {
 
         source: {
           batchId,
-          ...importSource(
-            item
-          )
+          ...importSource(item)
         }
       };
 
@@ -9081,12 +8485,10 @@ async function commitImport() {
     }
 
 
-    /* -----------------------------------------
-       КЛЮЧЕВЫЕ ДАТЫ
-       ----------------------------------------- */
+    /* КЛЮЧЕВЫЕ ДАТЫ */
 
     if (
-      importDetectedMode ===
+      importModeResolved ===
       'milestones'
     ) {
 
@@ -9155,6 +8557,7 @@ async function commitImport() {
       if (!milestone) {
 
         milestone = {
+
           id:
             uid('M'),
 
@@ -9238,9 +8641,7 @@ async function commitImport() {
 
           lastImport: {
             batchId,
-            ...importSource(
-              item
-            )
+            ...importSource(item)
           }
         }
       );
@@ -9254,48 +8655,25 @@ async function commitImport() {
   }
 
 
- project.importHistory.unshift({
+  project.importHistory.unshift({
 
-  id:
-    batchId,
+    id:
+      batchId,
 
-  backupKey:
-    preImportBackupKey,
+    backupKey:
+      preImportBackupKey,
 
-  at:
-    nowIso(),
+    at:
+      nowIso(),
 
-  fileName:
-    importFileName,
-
-  sheetName:
-    importSheetName,
-
-  mode:
-    importDetectedMode,
-
-  selected:
-    selected.length,
-
-  created,
-
-  updated,
-
-  appended,
-
-  skipped,
-
-  mapping:
-    clone(
-      importMapping
-    )
-});
+    fileName:
+      importFileName,
 
     sheetName:
       importSheetName,
 
     mode:
-      importDetectedMode,
+      importModeResolved,
 
     selected:
       selected.length,
@@ -9309,9 +8687,7 @@ async function commitImport() {
     skipped,
 
     mapping:
-      clone(
-        importMapping
-      )
+      clone(importMapping)
   });
 
 
@@ -9349,14 +8725,14 @@ async function commitImport() {
   $('commitImportBtn').disabled =
     true;
 }
+
+
 async function rollbackLastImport() {
 
   const lastImport =
     project.importHistory?.[0];
 
-  if (
-    !lastImport
-  ) {
+  if (!lastImport) {
 
     alert(
       'В истории проекта нет импортов для отмены.'
@@ -9365,29 +8741,24 @@ async function rollbackLastImport() {
     return;
   }
 
-
   if (
     !lastImport.backupKey
   ) {
 
     alert(
-      'Этот импорт был сделан до появления функции автоматического отката.\n\n' +
-      'Для него безопасный автоматический откат пока недоступен.'
+      'Этот импорт был сделан до появления автоматического отката. ' +
+      'Для него безопасный откат недоступен.'
     );
 
     return;
   }
-
 
   const backup =
     await dbGetKey(
       lastImport.backupKey
     );
 
-
-  if (
-    !backup
-  ) {
+  if (!backup) {
 
     alert(
       'Защитная копия перед импортом не найдена.'
@@ -9395,7 +8766,6 @@ async function rollbackLastImport() {
 
     return;
   }
-
 
   const text =
     `Отменить последний импорт?\n\n` +
@@ -9413,64 +8783,48 @@ async function rollbackLastImport() {
     `Проект вернется ровно в состояние до этого импорта.`;
 
   if (
-    !confirm(
-      text
-    )
+    !confirm(text)
   ) {
     return;
   }
-
-
-  /*
-    Сохраняем и текущее состояние,
-    чтобы даже сам откат можно было восстановить.
-  */
 
   await dbPutKey(
     clone(project),
     `before-rollback-${Date.now()}`
   );
 
-
   project =
     normalizeProject(
       backup
     );
 
-
   log(
     'Отмена импорта',
     'Проект',
-    `Восстановлено состояние до импорта ${lastImport.fileName || ''}`
-  );
 
+    `Восстановлено состояние до импорта ` +
+    `${lastImport.fileName || ''}`
+  );
 
   await saveProject();
 
   renderAll();
 
-
   $('importInfo')
     .classList
-    .remove(
-      'hidden'
-    );
+    .remove('hidden');
 
   $('importInfo').className =
     'notice good';
 
   $('importInfo').textContent =
-    'Последний импорт отменен. Проект восстановлен из защитной копии.';
-
+    'Последний импорт отменен. ' +
+    'Проект восстановлен из защитной копии.';
 
   alert(
     'Последний импорт отменен.'
   );
 }
-
-/* =========================================================
-   ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК
-   ========================================================= */
 
 
 function printCurrent() {
@@ -9493,7 +8847,6 @@ function printCurrent() {
     );
 
   if (active) {
-
     active.classList
       .add(
         'print-active'
@@ -9513,9 +8866,7 @@ function printCurrent() {
 }
 
 
-function switchTab(
-  name
-) {
+function switchTab(name) {
 
   document
     .querySelectorAll(
@@ -9538,16 +8889,12 @@ function switchTab(
     .forEach(
       panel =>
         panel.classList
-          .add(
-            'hidden'
-          )
+          .add('hidden')
     );
 
   $(`tab-${name}`)
     .classList
-    .remove(
-      'hidden'
-    );
+    .remove('hidden');
 
   if (
     name ===
@@ -9614,9 +8961,30 @@ function switchTab(
 }
 
 
-/* =========================================================
-   СОБЫТИЯ
-   ========================================================= */
+function renderAll() {
+
+  initSelects();
+
+  renderDashboard();
+
+  renderMatrix();
+
+  renderGantt();
+
+  renderPlanFact();
+
+  renderResources();
+
+  renderMilestones();
+
+  renderElements();
+
+  renderDemolition();
+
+  renderHistory();
+
+  renderSettings();
+}
 
 
 function bindUi() {
@@ -9627,6 +8995,7 @@ function bindUi() {
     )
     .forEach(
       button =>
+
         button.onclick =
           () =>
             switchTab(
@@ -9634,8 +9003,10 @@ function bindUi() {
             )
     );
 
+
   $('modalClose').onclick =
     closeModal;
+
 
   $('modal').onclick =
     event => {
@@ -9656,22 +9027,24 @@ function bindUi() {
     'mfWork',
     'mfOrg',
     'mfStatus'
-  ].forEach(
-    id =>
-      $(id).onchange =
-        renderMatrix
-  );
+  ]
+    .forEach(
+      id =>
+        $(id).onchange =
+          renderMatrix
+    );
 
 
   [
     'gBuilding',
     'gWork',
     'gMode'
-  ].forEach(
-    id =>
-      $(id).onchange =
-        renderGantt
-  );
+  ]
+    .forEach(
+      id =>
+        $(id).onchange =
+          renderGantt
+    );
 
 
   [
@@ -9679,11 +9052,12 @@ function bindUi() {
     'pfTo',
     'pfBuilding',
     'pfWork'
-  ].forEach(
-    id =>
-      $(id).onchange =
-        renderPlanFact
-  );
+  ]
+    .forEach(
+      id =>
+        $(id).onchange =
+          renderPlanFact
+    );
 
 
   [
@@ -9691,21 +9065,24 @@ function bindUi() {
     'rTo',
     'rOrg',
     'rBuilding'
-  ].forEach(
-    id =>
-      $(id).onchange =
-        renderResources
-  );
+  ]
+    .forEach(
+      id =>
+        $(id).onchange =
+          renderResources
+    );
 
 
   [
     'elBuilding',
     'elType'
-  ].forEach(
-    id =>
-      $(id).onchange =
-        renderElements
-  );
+  ]
+    .forEach(
+      id =>
+        $(id).onchange =
+          renderElements
+    );
+
 
   $('elSearch').oninput =
     renderElements;
@@ -9715,11 +9092,13 @@ function bindUi() {
     () =>
       openFrontEditor();
 
+
   $('newPlanRow').onclick =
     () =>
       openLogEditor(
         'plan'
       );
+
 
   $('newFactRow').onclick =
     () =>
@@ -9727,12 +9106,15 @@ function bindUi() {
         'fact'
       );
 
+
   $('newResourceBtn').onclick =
     openResourceEditor;
+
 
   $('newMilestoneBtn').onclick =
     () =>
       openMilestoneEditor();
+
 
   $('newElementBtn').onclick =
     () =>
@@ -9745,11 +9127,13 @@ function bindUi() {
         'building'
       );
 
+
   $('addWorkBtn').onclick =
     () =>
       addSimple(
         'work'
       );
+
 
   $('addOrgBtn').onclick =
     () =>
@@ -9761,31 +9145,24 @@ function bindUi() {
   $('backupBtn').onclick =
     exportBackup;
 
+
   $('restoreInput').onchange =
-    event => {
+    event =>
 
-      if (
+      event.target.files[0] &&
+      restoreProject(
         event.target.files[0]
-      ) {
+      );
 
-        restoreProject(
-          event.target.files[0]
-        );
-      }
-    };
 
   $('compareInput').onchange =
-    event => {
+    event =>
 
-      if (
+      event.target.files[0] &&
+      compareProjectFile(
         event.target.files[0]
-      ) {
+      );
 
-        compareProjectFile(
-          event.target.files[0]
-        );
-      }
-    };
 
   $('pdfBtn').onclick =
     printCurrent;
@@ -9834,8 +9211,10 @@ function bindUi() {
 
   $('commitImportBtn').onclick =
     commitImport;
+
+
   $('rollbackImportBtn').onclick =
-  rollbackLastImport;
+    rollbackLastImport;
 
 
   $('clearProjectBtn').onclick =
@@ -9843,31 +9222,39 @@ function bindUi() {
 
       if (
         !confirm(
-          'Очистить рабочие данные? Справочники зданий и видов работ останутся. Перед очисткой будет создана локальная защитная копия.'
+          'Очистить рабочие данные? ' +
+          'Справочники зданий, видов работ и организаций останутся. ' +
+          'Перед очисткой будет создана защитная копия.'
         )
       ) {
         return;
       }
 
-      const preImportBackupKey =
-  `pre-import-${Date.now()}`;
+      const preClearBackupKey =
+        `pre-clear-${Date.now()}`;
 
-await dbPutKey(
-  clone(project),
-  preImportBackupKey
-);
+      await dbPutKey(
+        clone(project),
+        preClearBackupKey
+      );
 
       const fresh =
         emptyProject();
 
       fresh.organizations =
-        project.organizations;
+        clone(
+          project.organizations
+        );
 
       fresh.buildings =
-        project.buildings;
+        clone(
+          project.buildings
+        );
 
       fresh.works =
-        project.works;
+        clone(
+          project.works
+        );
 
       project =
         fresh;
@@ -9883,11 +9270,6 @@ await dbPutKey(
       renderAll();
     };
 }
-
-
-/* =========================================================
-   ЗАПУСК
-   ========================================================= */
 
 
 async function init() {
@@ -9908,28 +9290,28 @@ async function init() {
     raw.schemaVersion !==
       SCHEMA_VERSION
   ) {
-
     await saveProject();
   }
 
   bindUi();
-
-  renderBackupNotice();
-
-  renderAll();
 
   $('pfTo').value =
     today();
 
   $('rTo').value =
     today();
+
+  renderBackupNotice();
+
+  renderAll();
 }
 
 
 document.addEventListener(
   'DOMContentLoaded',
 
-  () =>
+  () => {
+
     init()
       .catch(
         error => {
@@ -9943,5 +9325,6 @@ document.addEventListener(
             error.message
           );
         }
-      )
+      );
+  }
 );
