@@ -65,8 +65,12 @@ function livVBDefaultViewSettings() {
     hiddenCharts: [],
     chartOrder: [],
     tables: {},
+
     print: {
       orientation: 'landscape',
+
+      scaleMode: 'fit-width',
+
       showReportHeader: true,
       showFilters: true,
       showFooter: true,
@@ -1539,6 +1543,7 @@ async function livVBSaveModalSettings() {
               .map(
                 row => [
                   row.dataset.columnId,
+
                   row
                     .querySelector(
                       '[data-column-title]'
@@ -1568,6 +1573,14 @@ async function livVBSaveModalSettings() {
         )
         ?.value ||
       'landscape',
+
+    scaleMode:
+      document
+        .getElementById(
+          'livPrintScale'
+        )
+        ?.value ||
+      'fit-width',
 
     showReportHeader:
       document
@@ -1828,9 +1841,9 @@ function livOpenViewBuilder() {
               </h3>
 
               <div class="liv-builder-help">
-                PDF строится как отдельный отчет
-                из текущего представления,
-                а не как скрин страницы.
+                Отчет формируется отдельно от экрана.
+                Здесь можно выбрать ориентацию,
+                масштаб и состав печатного отчета.
               </div>
 
             </div>
@@ -1867,6 +1880,87 @@ function livOpenViewBuilder() {
                       : ''
                   }>
                   Книжная
+                </option>
+
+              </select>
+
+            </div>
+
+            <div class="field">
+
+              <label>
+                Масштаб
+              </label>
+
+              <select id="livPrintScale">
+
+                <option
+                  value="normal"
+                  ${
+                    settings.print.scaleMode ===
+                    'normal'
+                      ? 'selected'
+                      : ''
+                  }>
+                  Обычный размер
+                </option>
+
+                <option
+                  value="fit-width"
+                  ${
+                    (
+                      settings.print.scaleMode ||
+                      'fit-width'
+                    ) ===
+                    'fit-width'
+                      ? 'selected'
+                      : ''
+                  }>
+                  Уместить по ширине
+                </option>
+
+                <option
+                  value="fit-page"
+                  ${
+                    settings.print.scaleMode ===
+                    'fit-page'
+                      ? 'selected'
+                      : ''
+                  }>
+                  Уместить на 1 лист
+                </option>
+
+                <option
+                  value="90"
+                  ${
+                    settings.print.scaleMode ===
+                    '90'
+                      ? 'selected'
+                      : ''
+                  }>
+                  90%
+                </option>
+
+                <option
+                  value="80"
+                  ${
+                    settings.print.scaleMode ===
+                    '80'
+                      ? 'selected'
+                      : ''
+                  }>
+                  80%
+                </option>
+
+                <option
+                  value="70"
+                  ${
+                    settings.print.scaleMode ===
+                    '70'
+                      ? 'selected'
+                      : ''
+                  }>
+                  70%
                 </option>
 
               </select>
@@ -2151,6 +2245,23 @@ function livPrintCss(settings) {
     settings.print.compact ===
     true;
 
+  const scaleMode =
+    settings.print.scaleMode ||
+    'fit-width';
+
+  const manualZoom =
+    scaleMode === '90'
+      ? 0.90
+      : scaleMode === '80'
+        ? 0.80
+        : scaleMode === '70'
+          ? 0.70
+          : 1;
+
+  const fitWidth =
+    scaleMode ===
+    'fit-width';
+
   return `
     @page{
       size:A4 ${orientation};
@@ -2178,6 +2289,17 @@ function livPrintCss(settings) {
 
     .liv-report{
       width:100%;
+      transform-origin:top left;
+    }
+
+    ${
+      manualZoom !== 1
+        ? `
+            .liv-report{
+              zoom:${manualZoom};
+            }
+          `
+        : ''
     }
 
     .liv-report-header{
@@ -2303,7 +2425,11 @@ function livPrintCss(settings) {
     table{
       width:100%;
       border-collapse:collapse;
-      table-layout:auto;
+      table-layout:${
+        fitWidth
+          ? 'fixed'
+          : 'auto'
+      };
     }
 
     thead{
@@ -2326,6 +2452,16 @@ function livPrintCss(settings) {
       line-height:1.2;
       vertical-align:middle;
       background:#fff;
+
+      ${
+        fitWidth
+          ? `
+              white-space:normal;
+              overflow-wrap:anywhere;
+              word-break:break-word;
+            `
+          : ''
+      }
     }
 
     th{
@@ -2339,6 +2475,7 @@ function livPrintCss(settings) {
     .num-head{
       text-align:center;
       font-variant-numeric:tabular-nums;
+      white-space:nowrap;
     }
 
     .total,
@@ -2417,6 +2554,14 @@ function livBuildPrintDocument() {
       .toLocaleString(
         'ru-RU'
       );
+
+  const scaleMode =
+    settings.print.scaleMode ||
+    'fit-width';
+
+  const orientation =
+    settings.print.orientation ||
+    'landscape';
 
   return `
     <!doctype html>
@@ -2550,6 +2695,168 @@ function livBuildPrintDocument() {
           }
 
         </div>
+
+        <script>
+
+          (function () {
+
+            const mode =
+              ${JSON.stringify(scaleMode)};
+
+            const orientation =
+              ${JSON.stringify(orientation)};
+
+
+            function applyFitPage() {
+
+              if (
+                mode !==
+                'fit-page'
+              ) {
+                return;
+              }
+
+
+              const report =
+                document.querySelector(
+                  '.liv-report'
+                );
+
+
+              if (
+                !report
+              ) {
+                return;
+              }
+
+
+              const ruler =
+                document.createElement(
+                  'div'
+                );
+
+
+              ruler.style.position =
+                'absolute';
+
+
+              ruler.style.visibility =
+                'hidden';
+
+
+              ruler.style.width =
+                '100mm';
+
+
+              ruler.style.height =
+                '100mm';
+
+
+              document.body.appendChild(
+                ruler
+              );
+
+
+              const pxPerMm =
+                ruler
+                  .getBoundingClientRect()
+                  .width /
+                100;
+
+
+              ruler.remove();
+
+
+              const targetWidthMm =
+                orientation ===
+                'portrait'
+                  ? 192
+                  : 279;
+
+
+              const targetHeightMm =
+                orientation ===
+                'portrait'
+                  ? 277
+                  : 190;
+
+
+              const targetWidth =
+                targetWidthMm *
+                pxPerMm;
+
+
+              const targetHeight =
+                targetHeightMm *
+                pxPerMm;
+
+
+              const reportWidth =
+                report.scrollWidth;
+
+
+              const reportHeight =
+                report.scrollHeight;
+
+
+              if (
+                !reportWidth ||
+                !reportHeight
+              ) {
+                return;
+              }
+
+
+              const widthScale =
+                targetWidth /
+                reportWidth;
+
+
+              const heightScale =
+                targetHeight /
+                reportHeight;
+
+
+              const scale =
+                Math.min(
+                  1,
+                  widthScale,
+                  heightScale
+                );
+
+
+              report.style.zoom =
+                String(
+                  Math.max(
+                    0.20,
+                    scale
+                  )
+                );
+            }
+
+
+            if (
+              document.readyState ===
+              'complete'
+            ) {
+
+              applyFitPage();
+
+            } else {
+
+              window.addEventListener(
+                'load',
+                applyFitPage,
+                {
+                  once:
+                    true
+                }
+              );
+            }
+
+          })();
+
+        </script>
 
       </body>
 
