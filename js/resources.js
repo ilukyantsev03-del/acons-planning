@@ -9,444 +9,104 @@ let livResourceView = 'journal';
 let livResourceCharts = [];
 let livResourcePlanFactChart = null;
 let livResourceSelectedIds = new Set();
-
-/* =========================================================
-   КОЛОНКИ
-   ========================================================= */
+let livResourceJournalLimit = 250;
+let livResourceSchemasRegistered = false;
+let livResourceUiBound = false;
+let livResourceRenderToken = 0;
 
 const RESOURCE_JOURNAL_COLUMNS = [
-  {
-    id:
-      'select',
-
-    title:
-      'Выбор',
-
-    role:
-      'system',
-
-    print:
-      false
-  },
-
-  {
-    id:
-      'date',
-
-    title:
-      'Дата'
-  },
-
-  {
-    id:
-      'organization',
-
-    title:
-      'Организация'
-  },
-
-  {
-    id:
-      'building',
-
-    title:
-      'Здание'
-  },
-
-  {
-    id:
-      'work',
-
-    title:
-      'Работа'
-  },
-
-  {
-    id:
-      'front',
-
-    title:
-      'Фронт'
-  },
-
-  {
-    id:
-      'itr',
-
-    title:
-      'ИТР',
-
-    numeric:
-      true
-  },
-
-  {
-    id:
-      'workers',
-
-    title:
-      'Рабочие',
-
-    numeric:
-      true
-  },
-
-  {
-    id:
-      'mechanizers',
-
-    title:
-      'Механизаторы',
-
-    numeric:
-      true
-  },
-
-  {
-    id:
-      'equipmentType',
-
-    title:
-      'Наименование техники'
-  },
-
-  {
-    id:
-      'equipmentQty',
-
-    title:
-      'Количество техники',
-
-    numeric:
-      true
-  },
-
-  {
-    id:
-      'comment',
-
-    title:
-      'Комментарий'
-  },
-
-  {
-    id:
-      'actions',
-
-    title:
-      'Действия',
-
-    role:
-      'system',
-
-    print:
-      false
-  }
+  { id: 'select', title: 'Выбор', role: 'system', print: false },
+  { id: 'date', title: 'Дата' },
+  { id: 'organization', title: 'Организация' },
+  { id: 'building', title: 'Здание' },
+  { id: 'work', title: 'Работа' },
+  { id: 'front', title: 'Фронт' },
+  { id: 'itr', title: 'ИТР', numeric: true },
+  { id: 'workers', title: 'Рабочие', numeric: true },
+  { id: 'mechanizers', title: 'Механизаторы', numeric: true },
+  { id: 'equipmentType', title: 'Наименование техники' },
+  { id: 'equipmentQty', title: 'Количество техники', numeric: true },
+  { id: 'comment', title: 'Комментарий' },
+  { id: 'actions', title: 'Действия', role: 'system', print: false }
 ];
 
 const RESOURCE_DAILY_PEOPLE_COLUMNS = [
-  {
-    id:
-      'number',
-
-    title:
-      '№',
-
-    role:
-      'rowNumber',
-
-    numeric:
-      true
-  },
-
-  {
-    id:
-      'organization',
-
-    title:
-      'Организация'
-  },
-
-  {
-    id:
-      'itr',
-
-    title:
-      'ИТР',
-
-    numeric:
-      true
-  },
-
-  {
-    id:
-      'workers',
-
-    title:
-      'Рабочие',
-
-    numeric:
-      true
-  },
-
-  {
-    id:
-      'mechanizers',
-
-    title:
-      'Механизаторы',
-
-    numeric:
-      true
-  },
-
-  {
-    id:
-      'total',
-
-    title:
-      'Всего, чел',
-
-    numeric:
-      true,
-
-    total:
-      true
-  }
+  { id: 'number', title: '№', role: 'rowNumber', numeric: true },
+  { id: 'organization', title: 'Организация' },
+  { id: 'itr', title: 'ИТР', numeric: true },
+  { id: 'workers', title: 'Рабочие', numeric: true },
+  { id: 'mechanizers', title: 'Механизаторы', numeric: true },
+  { id: 'total', title: 'Всего, чел', numeric: true, total: true }
 ];
 
 const RESOURCE_DAILY_EQUIPMENT_COLUMNS = [
-  {
-    id:
-      'number',
-
-    title:
-      '№',
-
-    role:
-      'rowNumber',
-
-    numeric:
-      true
-  },
-
-  {
-    id:
-      'organization',
-
-    title:
-      'Организация'
-  },
-
-  {
-    id:
-      'equipmentType',
-
-    title:
-      'Наименование техники'
-  },
-
-  {
-    id:
-      'quantity',
-
-    title:
-      'Количество, ед.',
-
-    numeric:
-      true,
-
-    total:
-      true
-  }
+  { id: 'number', title: '№', role: 'rowNumber', numeric: true },
+  { id: 'organization', title: 'Организация' },
+  { id: 'equipmentType', title: 'Наименование техники' },
+  { id: 'quantity', title: 'Количество, ед.', numeric: true, total: true }
 ];
 
 const RESOURCE_ANALYTICS_PEOPLE_COLUMNS = [
-  {
-    id:
-      'organization',
-
-    title:
-      'Организация'
-  },
-
-  {
-    id:
-      'itr',
-
-    title:
-      'ИТР',
-
-    numeric:
-      true
-  },
-
-  {
-    id:
-      'mechanizers',
-
-    title:
-      'Механизаторы',
-
-    numeric:
-      true
-  },
-
-  {
-    id:
-      'workers',
-
-    title:
-      'Рабочие',
-
-    numeric:
-      true
-  },
-
-  {
-    id:
-      'total',
-
-    title:
-      'Итого',
-
-    numeric:
-      true,
-
-    total:
-      true
-  }
+  { id: 'organization', title: 'Организация' },
+  { id: 'itr', title: 'ИТР', numeric: true },
+  { id: 'mechanizers', title: 'Механизаторы', numeric: true },
+  { id: 'workers', title: 'Рабочие', numeric: true },
+  { id: 'total', title: 'Итого', numeric: true, total: true }
 ];
 
 const RESOURCE_PLANFACT_COLUMNS = [
-  {
-    id:
-      'period',
-
-    title:
-      'Период'
-  },
-
-  {
-    id:
-      'plan',
-
-    title:
-      'План',
-
-    numeric:
-      true
-  },
-
-  {
-    id:
-      'fact',
-
-    title:
-      'Факт',
-
-    numeric:
-      true
-  },
-
-  {
-    id:
-      'deviation',
-
-    title:
-      'Отклонение',
-
-    numeric:
-      true,
-
-    total:
-      true
-  }
+  { id: 'period', title: 'Период' },
+  { id: 'plan', title: 'План', numeric: true },
+  { id: 'fact', title: 'Факт', numeric: true },
+  { id: 'deviation', title: 'Отклонение', numeric: true, total: true }
 ];
 
-/* =========================================================
-   БАЗОВЫЕ ФУНКЦИИ
-   ========================================================= */
-
-function resourceHasOwn(
-  object,
-  key
-) {
-  return Object.prototype
-    .hasOwnProperty
-    .call(
-      object ||
-      {},
-      key
-    );
+function resourceHasOwn(object, key) {
+  return Object.prototype.hasOwnProperty.call(
+    object || {},
+    key
+  );
 }
 
 function resourceShowZero() {
   return (
-    document
-      .getElementById(
-        'rShowZero'
-      )
-      ?.checked ===
-    true
+    document.getElementById(
+      'rShowZero'
+    )?.checked === true
   );
 }
 
-function resourceTotalPeople(
-  row
-) {
+function resourceTotalPeople(row) {
   return (
-    num(
-      row?.itr
-    ) +
-    num(
-      row?.workers
-    ) +
-    num(
-      row?.mechanizers
-    )
+    num(row?.itr) +
+    num(row?.workers) +
+    num(row?.mechanizers)
   );
 }
 
-function resourceActivityTotal(
-  rows
-) {
+function resourceActivityTotal(rows) {
   return (
+    rows || []
+  ).reduce(
     (
-      rows ||
-      []
-    )
-      .reduce(
-        (
-          sum,
-          row
-        ) =>
-          sum +
-          resourceTotalPeople(
-            row
-          ) +
-          num(
-            row.equipmentQty
-          ),
-        0
-      )
+      sum,
+      row
+    ) =>
+      sum +
+      resourceTotalPeople(row) +
+      num(row.equipmentQty),
+    0
   );
 }
 
 function resourceViewKey(
-  viewName =
-    livResourceView
+  viewName = livResourceView
 ) {
   return `resources:${viewName}`;
 }
 
-/* =========================================================
-   ФИЛЬТРАЦИЯ
-   ========================================================= */
-
 function resourceFiltered(
-  options =
-    {}
+  options = {}
 ) {
   const from =
     resourceHasOwn(
@@ -455,11 +115,9 @@ function resourceFiltered(
     )
       ? options.from
       : (
-          document
-            .getElementById(
-              'rFrom'
-            )
-            ?.value ||
+          document.getElementById(
+            'rFrom'
+          )?.value ||
           ''
         );
 
@@ -470,11 +128,9 @@ function resourceFiltered(
     )
       ? options.to
       : (
-          document
-            .getElementById(
-              'rTo'
-            )
-            ?.value ||
+          document.getElementById(
+            'rTo'
+          )?.value ||
           ''
         );
 
@@ -535,140 +191,110 @@ function resourceFiltered(
       }
 
       if (
-        Array.isArray(
-          values
-        ) &&
-        values.length ===
-        0
+        Array.isArray(values) &&
+        values.length === 0
       ) {
         return false;
       }
 
       return (
-        Array.isArray(
-          values
-        ) &&
+        Array.isArray(values) &&
         values.includes(
-          String(
-            value ||
-            ''
-          )
+          String(value || '')
         )
       );
     };
 
   return (
-    project.resources ||
-    []
-  )
-    .filter(
-      row => {
-        if (
-          from &&
-          row.date <
-          from
-        ) {
-          return false;
-        }
+    project.resources || []
+  ).filter(row => {
+    if (
+      from &&
+      row.date < from
+    ) {
+      return false;
+    }
 
-        if (
-          to &&
-          row.date >
-          to
-        ) {
-          return false;
-        }
+    if (
+      to &&
+      row.date > to
+    ) {
+      return false;
+    }
 
-        if (
-          !matches(
-            organizationIds,
-            row.organizationId
-          )
-        ) {
-          return false;
-        }
+    if (
+      !matches(
+        organizationIds,
+        row.organizationId
+      )
+    ) {
+      return false;
+    }
 
-        if (
-          !matches(
-            buildingIds,
-            row.buildingId
-          )
-        ) {
-          return false;
-        }
+    if (
+      !matches(
+        buildingIds,
+        row.buildingId
+      )
+    ) {
+      return false;
+    }
 
-        if (
-          !matches(
-            workIds,
-            row.workId
-          )
-        ) {
-          return false;
-        }
+    if (
+      !matches(
+        workIds,
+        row.workId
+      )
+    ) {
+      return false;
+    }
 
-        if (
-          !matches(
-            frontIds,
-            row.frontId
-          )
-        ) {
-          return false;
-        }
+    if (
+      !matches(
+        frontIds,
+        row.frontId
+      )
+    ) {
+      return false;
+    }
 
-        if (
-          !ignoreZeroFilter &&
-          !resourceShowZero() &&
-          resourceTotalPeople(
-            row
-          ) === 0 &&
-          num(
-            row.equipmentQty
-          ) === 0
-        ) {
-          return false;
-        }
+    if (
+      !ignoreZeroFilter &&
+      !resourceShowZero() &&
+      resourceTotalPeople(row) === 0 &&
+      num(row.equipmentQty) === 0
+    ) {
+      return false;
+    }
 
-        return true;
-      }
-    );
+    return true;
+  });
 }
-
-/* =========================================================
-   ДИНАМИЧЕСКАЯ ТЕХНИКА
-   ========================================================= */
 
 function resourceAnalyticsEquipmentColumns() {
   const totals =
     new Map();
 
   resourceFiltered()
-    .forEach(
-      row => {
-        const type =
-          normText(
-            row.equipmentType
-          );
-
-        if (
-          !type
-        ) {
-          return;
-        }
-
-        totals.set(
-          type,
-          (
-            totals.get(
-              type
-            ) ||
-            0
-          ) +
-          num(
-            row.equipmentQty
-          )
+    .forEach(row => {
+      const type =
+        normText(
+          row.equipmentType
         );
+
+      if (!type) {
+        return;
       }
-    );
+
+      totals.set(
+        type,
+        (
+          totals.get(type) ||
+          0
+        ) +
+        num(row.equipmentQty)
+      );
+    });
 
   const types =
     [
@@ -682,8 +308,7 @@ function resourceAnalyticsEquipmentColumns() {
           ]
         ) =>
           resourceShowZero() ||
-          total !==
-          0
+          total !== 0
       )
       .map(
         (
@@ -706,48 +331,32 @@ function resourceAnalyticsEquipmentColumns() {
 
   return [
     {
-      id:
-        'organization',
-
-      title:
-        'Организация'
+      id: 'organization',
+      title: 'Организация'
     },
 
-    ...types.map(
-      type => ({
-        id:
-          `equipment:${normKey(type)}`,
-
-        title:
-          type,
-
-        equipmentType:
-          type,
-
-        numeric:
-          true
-      })
-    ),
-
-    {
+    ...types.map(type => ({
       id:
-        'total',
+        `equipment:${normKey(type)}`,
 
       title:
-        'Итого',
+        type,
+
+      equipmentType:
+        type,
 
       numeric:
-        true,
-
-      total:
         true
+    })),
+
+    {
+      id: 'total',
+      title: 'Итого',
+      numeric: true,
+      total: true
     }
   ];
 }
-
-/* =========================================================
-   СХЕМЫ ТАБЛИЦ
-   ========================================================= */
 
 function resourceTableSchema(
   viewName,
@@ -756,159 +365,75 @@ function resourceTableSchema(
   const schemas = {
     journal: {
       journal: {
-        id:
-          'journal',
-
-        title:
-          'Журнал ресурсов',
-
-        showTitle:
-          false,
-
-        showHeader:
-          true,
-
-        showFooter:
-          false,
-
-        showRowNumbers:
-          false,
-
-        columns:
-          RESOURCE_JOURNAL_COLUMNS
+        id: 'journal',
+        title: 'Журнал ресурсов',
+        showTitle: false,
+        showHeader: true,
+        showFooter: false,
+        showRowNumbers: false,
+        columns: RESOURCE_JOURNAL_COLUMNS
       }
     },
 
     daily: {
       people: {
-        id:
-          'people',
-
-        title:
-          'Люди',
-
-        showTitle:
-          true,
-
-        showHeader:
-          true,
-
-        showFooter:
-          true,
-
-        showRowNumbers:
-          true,
-
-        columns:
-          RESOURCE_DAILY_PEOPLE_COLUMNS
+        id: 'people',
+        title: 'Люди',
+        showTitle: true,
+        showHeader: true,
+        showFooter: true,
+        showRowNumbers: true,
+        columns: RESOURCE_DAILY_PEOPLE_COLUMNS
       },
 
       equipment: {
-        id:
-          'equipment',
-
-        title:
-          'Техника',
-
-        showTitle:
-          true,
-
-        showHeader:
-          true,
-
-        showFooter:
-          true,
-
-        showRowNumbers:
-          true,
-
-        columns:
-          RESOURCE_DAILY_EQUIPMENT_COLUMNS
+        id: 'equipment',
+        title: 'Техника',
+        showTitle: true,
+        showHeader: true,
+        showFooter: true,
+        showRowNumbers: true,
+        columns: RESOURCE_DAILY_EQUIPMENT_COLUMNS
       }
     },
 
     analytics: {
       people: {
-        id:
-          'people',
-
-        title:
-          'Среднее количество сотрудников',
-
-        showTitle:
-          true,
-
-        showHeader:
-          true,
-
-        showFooter:
-          true,
-
-        showRowNumbers:
-          false,
-
-        columns:
-          RESOURCE_ANALYTICS_PEOPLE_COLUMNS
+        id: 'people',
+        title: 'Среднее количество сотрудников',
+        showTitle: true,
+        showHeader: true,
+        showFooter: true,
+        showRowNumbers: false,
+        columns: RESOURCE_ANALYTICS_PEOPLE_COLUMNS
       },
 
       equipment: {
-        id:
-          'equipment',
-
-        title:
-          'Среднее количество строительной техники',
-
-        showTitle:
-          true,
-
-        showHeader:
-          true,
-
-        showFooter:
-          true,
-
-        showRowNumbers:
-          false,
-
-        columns:
-          resourceAnalyticsEquipmentColumns
+        id: 'equipment',
+        title: 'Среднее количество строительной техники',
+        showTitle: true,
+        showHeader: true,
+        showFooter: true,
+        showRowNumbers: false,
+        columns: resourceAnalyticsEquipmentColumns
       }
     },
 
     planfact: {
       planfact: {
-        id:
-          'planfact',
-
-        title:
-          'План / факт ресурсов',
-
-        showTitle:
-          false,
-
-        showHeader:
-          true,
-
-        showFooter:
-          true,
-
-        showRowNumbers:
-          false,
-
-        columns:
-          RESOURCE_PLANFACT_COLUMNS
+        id: 'planfact',
+        title: 'План / факт ресурсов',
+        showTitle: false,
+        showHeader: true,
+        showFooter: true,
+        showRowNumbers: false,
+        columns: RESOURCE_PLANFACT_COLUMNS
       }
     }
   };
 
   return (
-    schemas
-      ?.[
-        viewName
-      ]
-      ?.[
-        tableId
-      ] ||
+    schemas?.[viewName]?.[tableId] ||
     null
   );
 }
@@ -923,26 +448,18 @@ function resourceTableConfig(
       tableId
     );
 
-  if (
-    !schema
-  ) {
+  if (!schema) {
     return null;
   }
 
   if (
-    window
-      .LIV_VIEW_BUILDER
-      ?.tableConfig
+    window.LIV_VIEW_BUILDER?.tableConfig
   ) {
-    return window
-      .LIV_VIEW_BUILDER
-      .tableConfig(
-        resourceViewKey(
-          viewName
-        ),
-        tableId,
-        schema
-      );
+    return window.LIV_VIEW_BUILDER.tableConfig(
+      resourceViewKey(viewName),
+      tableId,
+      schema
+    );
   }
 
   const columns =
@@ -953,24 +470,19 @@ function resourceTableConfig(
 
   return {
     title:
-      schema.title ||
-      '',
+      schema.title || '',
 
     showTitle:
-      schema.showTitle !==
-      false,
+      schema.showTitle !== false,
 
     showHeader:
-      schema.showHeader !==
-      false,
+      schema.showHeader !== false,
 
     showFooter:
-      schema.showFooter !==
-      false,
+      schema.showFooter !== false,
 
     showRowNumbers:
-      schema.showRowNumbers !==
-      false,
+      schema.showRowNumbers !== false,
 
     hiddenColumns:
       [],
@@ -989,8 +501,7 @@ function resourceTableConfig(
 function resourceVisibleColumns(
   viewName,
   tableId,
-  forPrint =
-    false
+  forPrint = false
 ) {
   const schema =
     resourceTableSchema(
@@ -998,29 +509,21 @@ function resourceVisibleColumns(
       tableId
     );
 
-  if (
-    !schema
-  ) {
+  if (!schema) {
     return [];
   }
 
   let columns;
 
   if (
-    window
-      .LIV_VIEW_BUILDER
-      ?.visibleColumns
+    window.LIV_VIEW_BUILDER?.visibleColumns
   ) {
     columns =
-      window
-        .LIV_VIEW_BUILDER
-        .visibleColumns(
-          resourceViewKey(
-            viewName
-          ),
-          tableId,
-          schema
-        );
+      window.LIV_VIEW_BUILDER.visibleColumns(
+        resourceViewKey(viewName),
+        tableId,
+        schema
+      );
   } else {
     columns =
       typeof schema.columns ===
@@ -1029,36 +532,25 @@ function resourceVisibleColumns(
         : schema.columns;
   }
 
-  return (
-    forPrint
-      ? columns.filter(
-          column =>
-            column.print !==
-              false &&
-            column.role !==
-              'system'
-        )
-      : columns
-  );
+  return forPrint
+    ? columns.filter(
+        column =>
+          column.print !== false &&
+          column.role !== 'system'
+      )
+    : columns;
 }
 
-/* =========================================================
-   DOM ТАБЛИЦЫ
-   ========================================================= */
-
-function resourceEnsureTable(
-  bodyId
-) {
+function resourceEnsureTable(bodyId) {
   const body =
     document.getElementById(
       bodyId
     );
 
   const table =
-    body
-      ?.closest(
-        'table'
-      );
+    body?.closest(
+      'table'
+    );
 
   if (
     !body ||
@@ -1072,9 +564,7 @@ function resourceEnsureTable(
       'thead'
     );
 
-  if (
-    !head
-  ) {
+  if (!head) {
     head =
       document.createElement(
         'thead'
@@ -1091,9 +581,7 @@ function resourceEnsureTable(
       'tfoot'
     );
 
-  if (
-    !foot
-  ) {
+  if (!foot) {
     foot =
       document.createElement(
         'tfoot'
@@ -1110,10 +598,9 @@ function resourceEnsureTable(
     );
 
   const title =
-    card
-      ?.querySelector(
-        'h2,h3'
-      ) ||
+    card?.querySelector(
+      'h2,h3'
+    ) ||
     null;
 
   return {
@@ -1142,9 +629,7 @@ function resourceApplyTableChrome(
       bodyId
     );
 
-  if (
-    !config
-  ) {
+  if (!config) {
     return {
       config:
         null,
@@ -1161,8 +646,7 @@ function resourceApplyTableChrome(
       resourceTableSchema(
         viewName,
         tableId
-      )
-        ?.title ||
+      )?.title ||
       elements.title.textContent;
 
     elements.title.style.display =
@@ -1195,28 +679,23 @@ function resourceApplyTableChrome(
   };
 }
 
-/* =========================================================
-   HTML ТАБЛИЦ
-   ========================================================= */
-
-function resourceHeaderHtml(
-  columns
-) {
+function resourceHeaderHtml(columns) {
   return `
     <tr>
 
       ${
         columns
           .map(
-            column => `
-              <th
-                class="${column.numeric ? 'num-head' : ''}"
-                data-liv-col="${esc(column.id)}">
+            column =>
+              `
+                <th
+                  class="${column.numeric ? 'num-head' : ''}"
+                  data-liv-col="${esc(column.id)}">
 
-                ${esc(column.title)}
+                  ${esc(column.title)}
 
-              </th>
-            `
+                </th>
+              `
           )
           .join('')
       }
@@ -1228,8 +707,7 @@ function resourceHeaderHtml(
 function resourceCellHtml(
   column,
   value,
-  rawHtml =
-    false
+  rawHtml = false
 ) {
   const classes =
     [
@@ -1241,12 +719,8 @@ function resourceCellHtml(
         ? 'total-cell'
         : ''
     ]
-      .filter(
-        Boolean
-      )
-      .join(
-        ' '
-      );
+      .filter(Boolean)
+      .join(' ');
 
   return `
     <td
@@ -1256,10 +730,7 @@ function resourceCellHtml(
       ${
         rawHtml
           ? value
-          : esc(
-              value ??
-              ''
-            )
+          : esc(value ?? '')
       }
 
     </td>
@@ -1271,9 +742,7 @@ function resourceFooterHtml(
   values,
   label
 ) {
-  if (
-    !columns.length
-  ) {
+  if (!columns.length) {
     return '';
   }
 
@@ -1281,15 +750,12 @@ function resourceFooterHtml(
     columns.findIndex(
       column =>
         !column.numeric &&
-        column.role !==
-          'rowNumber' &&
-        column.role !==
-          'system'
+        column.role !== 'rowNumber' &&
+        column.role !== 'system'
     );
 
   const labelIndex =
-    textColumnIndex >=
-    0
+    textColumnIndex >= 0
       ? textColumnIndex
       : 0;
 
@@ -1304,10 +770,9 @@ function resourceFooterHtml(
               index
             ) => {
               const value =
-                values
-                  ?.[
-                    column.id
-                  ];
+                values?.[
+                  column.id
+                ];
 
               const classes =
                 [
@@ -1319,12 +784,8 @@ function resourceFooterHtml(
                     ? 'total-cell'
                     : ''
                 ]
-                  .filter(
-                    Boolean
-                  )
-                  .join(
-                    ' '
-                  );
+                  .filter(Boolean)
+                  .join(' ');
 
               if (
                 index ===
@@ -1372,10 +833,6 @@ function resourceFooterHtml(
     </tr>
   `;
 }
-
-/* =========================================================
-   ЖУРНАЛ
-   ========================================================= */
 
 function resourceJournalValue(
   row,
@@ -1476,6 +933,108 @@ function resourceJournalValue(
   );
 }
 
+function resourceEnsureJournalPager(
+  total,
+  shown
+) {
+  const body =
+    $('resourceRows');
+
+  const card =
+    body?.closest(
+      '.card'
+    );
+
+  if (!card) {
+    return;
+  }
+
+  let pager =
+    $('resourceJournalPager');
+
+  if (!pager) {
+    pager =
+      document.createElement(
+        'div'
+      );
+
+    pager.id =
+      'resourceJournalPager';
+
+    pager.className =
+      'resource-journal-pager';
+
+    card.appendChild(
+      pager
+    );
+  }
+
+  if (
+    total <= shown
+  ) {
+    pager.innerHTML =
+      `
+        <span>
+          Показано: ${shown} из ${total}
+        </span>
+      `;
+
+    return;
+  }
+
+  pager.innerHTML = `
+    <span>
+      Показано: ${shown} из ${total}
+    </span>
+
+    <button
+      type="button"
+      class="btn"
+      id="resourceJournalMoreBtn">
+      Показать еще
+    </button>
+
+    <button
+      type="button"
+      class="btn"
+      id="resourceJournalAllBtn">
+      Показать все
+    </button>
+  `;
+
+  $('resourceJournalMoreBtn')
+    .onclick =
+      () => {
+        livResourceJournalLimit =
+          Math.min(
+            total,
+            livResourceJournalLimit +
+            250
+          );
+
+        resourceRenderJournal();
+      };
+
+  $('resourceJournalAllBtn')
+    .onclick =
+      () => {
+        if (
+          total >
+            5000 &&
+          !confirm(
+            `Показать все ${total} строк? Это может замедлить браузер. Для обычной работы лучше использовать фильтры.`
+          )
+        ) {
+          return;
+        }
+
+        livResourceJournalLimit =
+          total;
+
+        resourceRenderJournal();
+      };
+}
+
 function resourceRenderJournal() {
   const rows =
     resourceFiltered();
@@ -1508,40 +1067,29 @@ function resourceRenderJournal() {
         0
       );
 
-  const daily =
-    {};
+  const daily = {};
 
-  rows.forEach(
-    row => {
-      if (
-        !row.date
-      ) {
-        return;
-      }
-
-      daily[
-        row.date
-      ] =
-        (
-          daily[
-            row.date
-          ] ||
-          0
-        ) +
-        resourceTotalPeople(
-          row
-        );
+  rows.forEach(row => {
+    if (!row.date) {
+      return;
     }
-  );
+
+    daily[row.date] =
+      (
+        daily[row.date] ||
+        0
+      ) +
+      resourceTotalPeople(
+        row
+      );
+  });
 
   if (
     $('rItr')
   ) {
     $('rItr').textContent =
       Math.round(
-        sum(
-          'itr'
-        )
+        sum('itr')
       );
   }
 
@@ -1550,9 +1098,7 @@ function resourceRenderJournal() {
   ) {
     $('rWorkers').textContent =
       Math.round(
-        sum(
-          'workers'
-        )
+        sum('workers')
       );
   }
 
@@ -1561,9 +1107,7 @@ function resourceRenderJournal() {
   ) {
     $('rMech').textContent =
       Math.round(
-        sum(
-          'mechanizers'
-        )
+        sum('mechanizers')
       );
   }
 
@@ -1572,15 +1116,9 @@ function resourceRenderJournal() {
   ) {
     $('rTotalPeople').textContent =
       Math.round(
-        sum(
-          'itr'
-        ) +
-        sum(
-          'workers'
-        ) +
-        sum(
-          'mechanizers'
-        )
+        sum('itr') +
+        sum('workers') +
+        sum('mechanizers')
       );
   }
 
@@ -1591,9 +1129,7 @@ function resourceRenderJournal() {
       Math.round(
         Math.max(
           0,
-          ...Object.values(
-            daily
-          )
+          ...Object.values(daily)
         )
       );
   }
@@ -1603,9 +1139,7 @@ function resourceRenderJournal() {
   ) {
     $('rEquipDays').textContent =
       Math.round(
-        sum(
-          'equipmentQty'
-        )
+        sum('equipmentQty')
       );
   }
 
@@ -1626,9 +1160,7 @@ function resourceRenderJournal() {
       ]
         .filter(
           id =>
-            visibleIds.has(
-              id
-            )
+            visibleIds.has(id)
         )
     );
 
@@ -1636,9 +1168,7 @@ function resourceRenderJournal() {
     $('resourceHead')
   ) {
     $('resourceHead').style.display =
-      config
-        ?.showHeader ===
-      false
+      config?.showHeader === false
         ? 'none'
         : '';
 
@@ -1648,29 +1178,39 @@ function resourceRenderJournal() {
       );
   }
 
+  const sortedRows =
+    [
+      ...rows
+    ]
+      .sort(
+        (
+          a,
+          b
+        ) =>
+          String(
+            b.date || ''
+          )
+            .localeCompare(
+              String(
+                a.date || ''
+              )
+            )
+      );
+
+  const renderedRows =
+    sortedRows.slice(
+      0,
+      Math.max(
+        1,
+        livResourceJournalLimit
+      )
+    );
+
   if (
     $('resourceRows')
   ) {
     $('resourceRows').innerHTML =
-      [
-        ...rows
-      ]
-        .sort(
-          (
-            a,
-            b
-          ) =>
-            String(
-              b.date ||
-              ''
-            )
-              .localeCompare(
-                String(
-                  a.date ||
-                  ''
-                )
-              )
-        )
+      renderedRows
         .map(
           row => `
             <tr>
@@ -1692,9 +1232,7 @@ function resourceRenderJournal() {
                               data-resource-select="${esc(row.id)}"
                               ${
                                 livResourceSelectedIds.has(
-                                  String(
-                                    row.id
-                                  )
+                                  String(row.id)
                                 )
                                   ? 'checked'
                                   : ''
@@ -1753,66 +1291,62 @@ function resourceRenderJournal() {
         .join('');
   }
 
+  resourceEnsureJournalPager(
+    sortedRows.length,
+    renderedRows.length
+  );
+
   document
     .querySelectorAll(
       '[data-resource-select]'
     )
-    .forEach(
-      checkbox => {
-        checkbox.onchange =
-          () => {
-            const id =
-              String(
-                checkbox.dataset
-                  .resourceSelect
-              );
+    .forEach(checkbox => {
+      checkbox.onchange =
+        () => {
+          const id =
+            String(
+              checkbox.dataset.resourceSelect
+            );
 
-            if (
-              checkbox.checked
-            ) {
-              livResourceSelectedIds.add(
-                id
-              );
-            } else {
-              livResourceSelectedIds.delete(
-                id
-              );
-            }
+          if (
+            checkbox.checked
+          ) {
+            livResourceSelectedIds.add(
+              id
+            );
+          } else {
+            livResourceSelectedIds.delete(
+              id
+            );
+          }
 
-            updateResourceSelectionBar();
-          };
-      }
-    );
+          updateResourceSelectionBar();
+        };
+    });
 
   document
     .querySelectorAll(
       '[data-resource-edit]'
     )
-    .forEach(
-      button => {
-        button.onclick =
-          () =>
-            openResourceEditor(
-              button.dataset
-                .resourceEdit
-            );
-      }
-    );
+    .forEach(button => {
+      button.onclick =
+        () =>
+          openResourceEditor(
+            button.dataset.resourceEdit
+          );
+    });
 
   document
     .querySelectorAll(
       '[data-resource-delete]'
     )
-    .forEach(
-      button => {
-        button.onclick =
-          () =>
-            deleteResource(
-              button.dataset
-                .resourceDelete
-            );
-      }
-    );
+    .forEach(button => {
+      button.onclick =
+        () =>
+          deleteResource(
+            button.dataset.resourceDelete
+          );
+    });
 
   updateResourceSelectionBar();
 }
@@ -1822,8 +1356,7 @@ function updateResourceSelectionBar() {
     $('resourceSelectedCount')
   ) {
     $('resourceSelectedCount').textContent =
-      livResourceSelectedIds
-        .size
+      livResourceSelectedIds.size
         ? `Выбрано: ${livResourceSelectedIds.size}`
         : 'Ничего не выбрано';
   }
@@ -1832,16 +1365,14 @@ function updateResourceSelectionBar() {
     $('resourceDeleteSelectedBtn')
   ) {
     $('resourceDeleteSelectedBtn').disabled =
-      livResourceSelectedIds
-        .size ===
+      livResourceSelectedIds.size ===
       0;
   }
 }
 
 async function deleteSelectedResources() {
   if (
-    !livResourceSelectedIds
-      .size
+    !livResourceSelectedIds.size
   ) {
     return;
   }
@@ -1855,9 +1386,7 @@ async function deleteSelectedResources() {
   }
 
   await dbPutKey(
-    clone(
-      project
-    ),
+    clone(project),
     `pre-resource-delete-${Date.now()}`
   );
 
@@ -1865,8 +1394,7 @@ async function deleteSelectedResources() {
     (
       project.resources ||
       []
-    )
-      .length;
+    ).length;
 
   project.resources =
     (
@@ -1876,19 +1404,15 @@ async function deleteSelectedResources() {
       .filter(
         row =>
           !livResourceSelectedIds.has(
-            String(
-              row.id
-            )
+            String(row.id)
           )
       );
 
   const deleted =
     before -
-    project.resources
-      .length;
+    project.resources.length;
 
-  livResourceSelectedIds
-    .clear();
+  livResourceSelectedIds.clear();
 
   log(
     'Удалено',
@@ -1908,9 +1432,7 @@ async function deleteFilteredResources() {
         true
     });
 
-  if (
-    !rows.length
-  ) {
+  if (!rows.length) {
     return;
   }
 
@@ -1923,9 +1445,7 @@ async function deleteFilteredResources() {
   }
 
   await dbPutKey(
-    clone(
-      project
-    ),
+    clone(project),
     `pre-resource-filter-delete-${Date.now()}`
   );
 
@@ -1933,9 +1453,7 @@ async function deleteFilteredResources() {
     new Set(
       rows.map(
         row =>
-          String(
-            row.id
-          )
+          String(row.id)
       )
     );
 
@@ -1947,14 +1465,11 @@ async function deleteFilteredResources() {
       .filter(
         row =>
           !ids.has(
-            String(
-              row.id
-            )
+            String(row.id)
           )
       );
 
-  livResourceSelectedIds
-    .clear();
+  livResourceSelectedIds.clear();
 
   log(
     'Удалено',
@@ -1967,13 +1482,8 @@ async function deleteFilteredResources() {
   renderResourceCurrentView();
 }
 
-/* =========================================================
-   РЕДАКТОР
-   ========================================================= */
-
 function openResourceEditor(
-  id =
-    null
+  id = null
 ) {
   const row =
     id
@@ -1989,23 +1499,25 @@ function openResourceEditor(
   const frontOptions =
     activeFronts()
       .map(
-        front => `
-          <option
-            value="${esc(front.id)}"
-            ${
-              String(
-                front.id
-              ) ===
-              String(
-                row.frontId ||
-                ''
-              )
-                ? 'selected'
-                : ''
-            }>
-            ${esc(frontLabel(front))}
-          </option>
-        `
+        front =>
+          `
+            <option
+              value="${esc(front.id)}"
+              ${
+                String(front.id) ===
+                String(
+                  row.frontId || ''
+                )
+                  ? 'selected'
+                  : ''
+              }>
+
+              ${esc(
+                frontLabel(front)
+              )}
+
+            </option>
+          `
       )
       .join('');
 
@@ -2019,79 +1531,147 @@ function openResourceEditor(
 
         <div class="field">
           <label>Дата</label>
-          <input id="rrDate" type="date" value="${esc(row.date || today())}">
+          <input
+            id="rrDate"
+            type="date"
+            value="${esc(
+              row.date ||
+              today()
+            )}">
         </div>
 
         <div class="field">
           <label>Организация</label>
           <select id="rrOrg">
-            ${selectOptions(project.organizations,row.organizationId || '',true)}
+            ${
+              selectOptions(
+                project.organizations,
+                row.organizationId || '',
+                true
+              )
+            }
           </select>
         </div>
 
         <div class="field">
           <label>Здание</label>
           <select id="rrBuilding">
-            ${selectOptions(project.buildings,row.buildingId || '',true)}
+            ${
+              selectOptions(
+                project.buildings,
+                row.buildingId || '',
+                true
+              )
+            }
           </select>
         </div>
 
         <div class="field">
           <label>Вид работ</label>
           <select id="rrWork">
-            ${selectOptions(project.works,row.workId || '',true)}
+            ${
+              selectOptions(
+                project.works,
+                row.workId || '',
+                true
+              )
+            }
           </select>
         </div>
 
         <div class="field">
           <label>Фронт</label>
           <select id="rrFront">
-            <option value="">—</option>
+
+            <option value="">
+              —
+            </option>
+
             ${frontOptions}
+
           </select>
         </div>
 
         <div class="field">
           <label>ИТР</label>
-          <input id="rrItr" type="number" step="1" min="0" value="${row.itr ?? ''}">
+          <input
+            id="rrItr"
+            type="number"
+            step="1"
+            min="0"
+            value="${row.itr ?? ''}">
         </div>
 
         <div class="field">
           <label>Подсобные рабочие</label>
-          <input id="rrWorkers" type="number" step="1" min="0" value="${row.workers ?? ''}">
+          <input
+            id="rrWorkers"
+            type="number"
+            step="1"
+            min="0"
+            value="${row.workers ?? ''}">
         </div>
 
         <div class="field">
           <label>Механизаторы</label>
-          <input id="rrMech" type="number" step="1" min="0" value="${row.mechanizers ?? ''}">
+          <input
+            id="rrMech"
+            type="number"
+            step="1"
+            min="0"
+            value="${row.mechanizers ?? ''}">
         </div>
 
         <div class="field">
           <label>Наименование техники</label>
-          <input id="rrEqType" value="${esc(row.equipmentType || '')}">
+          <input
+            id="rrEqType"
+            value="${esc(
+              row.equipmentType || ''
+            )}">
         </div>
 
         <div class="field">
           <label>Количество техники</label>
-          <input id="rrEqQty" type="number" step="1" min="0" value="${row.equipmentQty ?? ''}">
+          <input
+            id="rrEqQty"
+            type="number"
+            step="1"
+            min="0"
+            value="${row.equipmentQty ?? ''}">
         </div>
 
       </div>
 
       <div class="field">
-        <label>Комментарий</label>
-        <textarea id="rrComment">${esc(row.comment || '')}</textarea>
+
+        <label>
+          Комментарий
+        </label>
+
+        <textarea id="rrComment">${esc(
+          row.comment || ''
+        )}</textarea>
+
       </div>
 
       <div class="editor-actions">
 
         ${
           id
-            ? '<button id="rrDelete" class="btn danger">Удалить</button>'
+            ? `
+                <button
+                  id="rrDelete"
+                  class="btn danger">
+                  Удалить
+                </button>
+              `
             : ''
         }
 
-        <button id="rrSave" class="btn primary">
+        <button
+          id="rrSave"
+          class="btn primary">
           Сохранить
         </button>
 
@@ -2101,9 +1681,7 @@ function openResourceEditor(
 
   $('rrSave').onclick =
     () =>
-      saveResource(
-        id
-      );
+      saveResource(id);
 
   if (
     id &&
@@ -2111,15 +1689,11 @@ function openResourceEditor(
   ) {
     $('rrDelete').onclick =
       () =>
-        deleteResource(
-          id
-        );
+        deleteResource(id);
   }
 }
 
-async function saveResource(
-  id
-) {
+async function saveResource(id) {
   const existing =
     id
       ? byId(
@@ -2131,9 +1705,7 @@ async function saveResource(
   const row = {
     id:
       existing?.id ||
-      uid(
-        'R'
-      ),
+      uid('R'),
 
     date:
       $('rrDate').value,
@@ -2196,9 +1768,7 @@ async function saveResource(
       ''
   };
 
-  if (
-    !row.date
-  ) {
+  if (!row.date) {
     alert(
       'Укажи дату.'
     );
@@ -2206,9 +1776,7 @@ async function saveResource(
     return;
   }
 
-  if (
-    existing
-  ) {
+  if (existing) {
     Object.assign(
       existing,
       row
@@ -2223,8 +1791,16 @@ async function saveResource(
     existing
       ? 'Изменено'
       : 'Добавлено',
+
     'Ресурсы',
-    `${row.date} · ${nameById(project.organizations,row.organizationId) || 'без организации'}`
+
+    `${row.date} · ${
+      nameById(
+        project.organizations,
+        row.organizationId
+      ) ||
+      'без организации'
+    }`
   );
 
   await saveProject();
@@ -2241,18 +1817,14 @@ async function saveResource(
   }
 }
 
-async function deleteResource(
-  id
-) {
+async function deleteResource(id) {
   const row =
     byId(
       project.resources,
       id
     );
 
-  if (
-    !row
-  ) {
+  if (!row) {
     return;
   }
 
@@ -2271,18 +1843,21 @@ async function deleteResource(
     )
       .filter(
         item =>
-          String(
-            item.id
-          ) !==
-          String(
-            id
-          )
+          String(item.id) !==
+          String(id)
       );
 
   log(
     'Удалено',
     'Ресурсы',
-    `${row.date} · ${nameById(project.organizations,row.organizationId) || 'без организации'}`
+
+    `${row.date} · ${
+      nameById(
+        project.organizations,
+        row.organizationId
+      ) ||
+      'без организации'
+    }`
   );
 
   await saveProject();
@@ -2299,16 +1874,10 @@ async function deleteResource(
   }
 }
 
-/* =========================================================
-   ЕЖЕДНЕВНАЯ СВОДКА
-   ========================================================= */
-
 function resourceDailyModel() {
   const date =
-    $('rDailyDate')
-      ?.value ||
-    $('rTo')
-      ?.value ||
+    $('rDailyDate')?.value ||
+    $('rTo')?.value ||
     today();
 
   if (
@@ -2333,97 +1902,83 @@ function resourceDailyModel() {
   const equipmentMap =
     new Map();
 
-  rows.forEach(
-    row => {
-      const organizationId =
-        String(
-          row.organizationId ||
-          ''
-        );
+  rows.forEach(row => {
+    const organizationId =
+      String(
+        row.organizationId || ''
+      );
+
+    if (
+      !peopleMap.has(
+        organizationId
+      )
+    ) {
+      peopleMap.set(
+        organizationId,
+        {
+          organizationId,
+          itr: 0,
+          workers: 0,
+          mechanizers: 0
+        }
+      );
+    }
+
+    const people =
+      peopleMap.get(
+        organizationId
+      );
+
+    people.itr +=
+      num(row.itr);
+
+    people.workers +=
+      num(row.workers);
+
+    people.mechanizers +=
+      num(row.mechanizers);
+
+    const type =
+      normText(
+        row.equipmentType
+      );
+
+    const quantity =
+      num(
+        row.equipmentQty
+      );
+
+    if (
+      type &&
+      (
+        resourceShowZero() ||
+        quantity !== 0
+      )
+    ) {
+      const key =
+        `${organizationId}|${normKey(type)}`;
 
       if (
-        !peopleMap.has(
-          organizationId
-        )
+        !equipmentMap.has(key)
       ) {
-        peopleMap.set(
-          organizationId,
+        equipmentMap.set(
+          key,
           {
             organizationId,
-            itr: 0,
-            workers: 0,
-            mechanizers: 0
+            equipmentType:
+              type,
+            quantity:
+              0
           }
         );
       }
 
-      const people =
-        peopleMap.get(
-          organizationId
-        );
-
-      people.itr +=
-        num(
-          row.itr
-        );
-
-      people.workers +=
-        num(
-          row.workers
-        );
-
-      people.mechanizers +=
-        num(
-          row.mechanizers
-        );
-
-      const type =
-        normText(
-          row.equipmentType
-        );
-
-      const quantity =
-        num(
-          row.equipmentQty
-        );
-
-      if (
-        type &&
-        (
-          resourceShowZero() ||
-          quantity !==
-          0
-        )
-      ) {
-        const key =
-          `${organizationId}|${normKey(type)}`;
-
-        if (
-          !equipmentMap.has(
-            key
-          )
-        ) {
-          equipmentMap.set(
-            key,
-            {
-              organizationId,
-              equipmentType:
-                type,
-              quantity:
-                0
-            }
-          );
-        }
-
-        equipmentMap
-          .get(
-            key
-          )
-          .quantity +=
-            quantity;
-      }
+      equipmentMap
+        .get(key)
+        .quantity +=
+          quantity;
     }
-  );
+  });
 
   let people =
     [
@@ -2528,14 +2083,9 @@ function resourceDailyModel() {
         return result;
       },
       {
-        itr:
-          0,
-
-        workers:
-          0,
-
-        mechanizers:
-          0
+        itr: 0,
+        workers: 0,
+        mechanizers: 0
       }
     );
 
@@ -2551,9 +2101,7 @@ function resourceDailyModel() {
         item
       ) =>
         sum +
-        num(
-          item.quantity
-        ),
+        num(item.quantity),
       0
     );
 
@@ -2635,8 +2183,7 @@ function renderResourceDaily() {
                             'number'
                           ) {
                             value =
-                              index +
-                              1;
+                              index + 1;
                           } else if (
                             column.id ===
                             'organization'
@@ -2683,11 +2230,15 @@ function renderResourceDaily() {
             .join('')
         : `
             <tr>
+
               <td
                 colspan="${Math.max(1,peopleColumns.length)}"
                 class="resource-empty">
+
                 Нет данных за выбранную дату
+
               </td>
+
             </tr>
           `;
   }
@@ -2770,8 +2321,7 @@ function renderResourceDaily() {
                             'number'
                           ) {
                             value =
-                              index +
-                              1;
+                              index + 1;
                           } else if (
                             column.id ===
                             'organization'
@@ -2813,11 +2363,15 @@ function renderResourceDaily() {
             .join('')
         : `
             <tr>
+
               <td
                 colspan="${Math.max(1,equipmentColumns.length)}"
                 class="resource-empty">
+
                 Нет техники за выбранную дату
+
               </td>
+
             </tr>
           `;
   }
@@ -2839,24 +2393,15 @@ function renderResourceDaily() {
   }
 }
 
-/* =========================================================
-   ДИНАМИКА
-   ========================================================= */
-
 function destroyResourceCharts() {
-  livResourceCharts.forEach(
-    chart => {
-      try {
-        chart.destroy();
-      } catch (
-        error
-      ) {
-      }
+  livResourceCharts.forEach(chart => {
+    try {
+      chart.destroy();
+    } catch (error) {
     }
-  );
+  });
 
-  livResourceCharts =
-    [];
+  livResourceCharts = [];
 }
 
 function resourceBucketKey(
@@ -2864,26 +2409,17 @@ function resourceBucketKey(
   step
 ) {
   if (
-    step ===
-    'week'
+    step === 'week'
   ) {
-    return startOfWeek(
-      date
-    );
+    return startOfWeek(date);
   }
 
   if (
-    step ===
-    'month'
+    step === 'month'
   ) {
     return (
-      String(
-        date
-      )
-        .slice(
-          0,
-          7
-        ) +
+      String(date)
+        .slice(0,7) +
       '-01'
     );
   }
@@ -2896,46 +2432,37 @@ function resourceBucketLabel(
   step
 ) {
   if (
-    step ===
-    'month'
+    step === 'month'
   ) {
     const [
       year,
       month
     ] =
-      key.split(
-        '-'
-      );
+      key.split('-');
 
     return `${month}.${year}`;
   }
 
   if (
-    step ===
-    'week'
+    step === 'week'
   ) {
     return `с ${shortDate(key)}`;
   }
 
-  return shortDate(
-    key
-  );
+  return shortDate(key);
 }
 
 function resourceDynamicsModel() {
   const metric =
-    $('rDynType')
-      ?.value ||
+    $('rDynType')?.value ||
     'total';
 
   const step =
-    $('rDynStep')
-      ?.value ||
+    $('rDynStep')?.value ||
     'week';
 
   const quick =
-    $('rDynOrg')
-      ?.value ||
+    $('rDynOrg')?.value ||
     'all';
 
   const rows =
@@ -2946,21 +2473,18 @@ function resourceDynamicsModel() {
       rows.map(
         row =>
           String(
-            row.organizationId ||
-            ''
+            row.organizationId || ''
           )
       )
     );
 
   if (
-    quick !==
-    'all'
+    quick !== 'all'
   ) {
     organizationIds =
       organizationIds.filter(
         id =>
-          id ===
-          quick
+          id === quick
       );
   }
 
@@ -2974,10 +2498,8 @@ function resourceDynamicsModel() {
             rows.filter(
               row =>
                 String(
-                  row.organizationId ||
-                  ''
-                ) ===
-                id
+                  row.organizationId || ''
+                ) === id
             )
           ) !==
           0
@@ -3015,68 +2537,47 @@ function resourceDynamicsModel() {
         .filter(
           row =>
             String(
-              row.organizationId ||
-              ''
-            ) ===
-            organizationId
+              row.organizationId || ''
+            ) === organizationId
         )
-        .forEach(
-          row => {
-            if (
-              !row.date
-            ) {
-              return;
-            }
-
-            if (
-              !daily.has(
-                row.date
-              )
-            ) {
-              daily.set(
-                row.date,
-                {
-                  itr:
-                    0,
-
-                  workers:
-                    0,
-
-                  mechanizers:
-                    0,
-
-                  equipment:
-                    0
-                }
-              );
-            }
-
-            const item =
-              daily.get(
-                row.date
-              );
-
-            item.itr +=
-              num(
-                row.itr
-              );
-
-            item.workers +=
-              num(
-                row.workers
-              );
-
-            item.mechanizers +=
-              num(
-                row.mechanizers
-              );
-
-            item.equipment +=
-              num(
-                row.equipmentQty
-              );
+        .forEach(row => {
+          if (!row.date) {
+            return;
           }
-        );
+
+          if (
+            !daily.has(
+              row.date
+            )
+          ) {
+            daily.set(
+              row.date,
+              {
+                itr: 0,
+                workers: 0,
+                mechanizers: 0,
+                equipment: 0
+              }
+            );
+          }
+
+          const item =
+            daily.get(
+              row.date
+            );
+
+          item.itr +=
+            num(row.itr);
+
+          item.workers +=
+            num(row.workers);
+
+          item.mechanizers +=
+            num(row.mechanizers);
+
+          item.equipment +=
+            num(row.equipmentQty);
+        });
 
       const bucket =
         new Map();
@@ -3098,9 +2599,7 @@ function resourceDynamicsModel() {
               );
 
             if (
-              !bucket.has(
-                key
-              )
+              !bucket.has(key)
             ) {
               bucket.set(
                 key,
@@ -3109,12 +2608,8 @@ function resourceDynamicsModel() {
             }
 
             bucket
-              .get(
-                key
-              )
-              .push(
-                value
-              );
+              .get(key)
+              .push(value);
           }
         );
 
@@ -3124,7 +2619,7 @@ function resourceDynamicsModel() {
         ]
           .sort();
 
-      const average =
+      const avg =
         (
           array,
           field
@@ -3138,9 +2633,7 @@ function resourceDynamicsModel() {
                   ) =>
                     sum +
                     num(
-                      item[
-                        field
-                      ]
+                      item[field]
                     ),
                   0
                 ) /
@@ -3167,12 +2660,10 @@ function resourceDynamicsModel() {
               )
             : null;
 
-      const series =
-        [];
+      const series = [];
 
       if (
-        metric ===
-        'total'
+        metric === 'total'
       ) {
         series.push({
           label:
@@ -3182,17 +2673,14 @@ function resourceDynamicsModel() {
             keys.map(
               key =>
                 total(
-                  bucket.get(
-                    key
-                  )
+                  bucket.get(key)
                 )
             )
         });
       }
 
       if (
-        metric ===
-        'itr'
+        metric === 'itr'
       ) {
         series.push({
           label:
@@ -3201,10 +2689,8 @@ function resourceDynamicsModel() {
           data:
             keys.map(
               key =>
-                average(
-                  bucket.get(
-                    key
-                  ),
+                avg(
+                  bucket.get(key),
                   'itr'
                 )
             )
@@ -3212,8 +2698,7 @@ function resourceDynamicsModel() {
       }
 
       if (
-        metric ===
-        'workers'
+        metric === 'workers'
       ) {
         series.push({
           label:
@@ -3222,10 +2707,8 @@ function resourceDynamicsModel() {
           data:
             keys.map(
               key =>
-                average(
-                  bucket.get(
-                    key
-                  ),
+                avg(
+                  bucket.get(key),
                   'workers'
                 )
             )
@@ -3233,8 +2716,7 @@ function resourceDynamicsModel() {
       }
 
       if (
-        metric ===
-        'both'
+        metric === 'both'
       ) {
         series.push({
           label:
@@ -3243,10 +2725,8 @@ function resourceDynamicsModel() {
           data:
             keys.map(
               key =>
-                average(
-                  bucket.get(
-                    key
-                  ),
+                avg(
+                  bucket.get(key),
                   'itr'
                 )
             )
@@ -3259,10 +2739,8 @@ function resourceDynamicsModel() {
           data:
             keys.map(
               key =>
-                average(
-                  bucket.get(
-                    key
-                  ),
+                avg(
+                  bucket.get(key),
                   'workers'
                 )
             )
@@ -3270,8 +2748,7 @@ function resourceDynamicsModel() {
       }
 
       if (
-        metric ===
-        'equipment'
+        metric === 'equipment'
       ) {
         series.push({
           label:
@@ -3280,10 +2757,8 @@ function resourceDynamicsModel() {
           data:
             keys.map(
               key =>
-                average(
-                  bucket.get(
-                    key
-                  ),
+                avg(
+                  bucket.get(key),
                   'equipment'
                 )
             )
@@ -3321,9 +2796,7 @@ function renderResourceDynamics() {
   const container =
     $('resourceCharts');
 
-  if (
-    !container
-  ) {
+  if (!container) {
     return;
   }
 
@@ -3335,7 +2808,11 @@ function renderResourceDynamics() {
     'undefined'
   ) {
     container.innerHTML =
-      '<div class="card muted">Библиотека диаграмм не загрузилась.</div>';
+      `
+        <div class="card muted">
+          Библиотека диаграмм не загрузилась.
+        </div>
+      `;
 
     return;
   }
@@ -3343,127 +2820,123 @@ function renderResourceDynamics() {
   const models =
     resourceDynamicsModel();
 
-  if (
-    !models.length
-  ) {
+  if (!models.length) {
     container.innerHTML =
-      '<div class="card muted">Нет данных для диаграмм.</div>';
+      `
+        <div class="card muted">
+          Нет данных для диаграмм.
+        </div>
+      `;
 
     return;
   }
 
-  models.forEach(
-    model => {
-      const card =
-        document.createElement(
-          'div'
-        );
-
-      card.className =
-        'card resource-chart-card';
-
-      card.innerHTML = `
-        <div class="chart-head">
-          <h2>${esc(model.title)}</h2>
-        </div>
-
-        <div class="chart-box">
-          <canvas></canvas>
-        </div>
-      `;
-
-      container.appendChild(
-        card
+  models.forEach(model => {
+    const card =
+      document.createElement(
+        'div'
       );
 
-      const datasets =
-        model.series.map(
-          series => ({
-            label:
-              series.label,
+    card.className =
+      'card resource-chart-card';
 
-            data:
-              series.data,
+    card.innerHTML = `
+      <div class="chart-head">
 
-            borderWidth:
-              2,
+        <h2>
+          ${esc(model.title)}
+        </h2>
 
-            tension:
-              0,
+      </div>
 
-            spanGaps:
-              false
-          })
-        );
+      <div class="chart-box">
+        <canvas></canvas>
+      </div>
+    `;
 
-      livResourceCharts.push(
-        new Chart(
-          card.querySelector(
-            'canvas'
-          ),
-          {
-            type:
-              'line',
+    container.appendChild(card);
 
-            data: {
-              labels:
-                model.labels,
+    const datasets =
+      model.series.map(
+        series => ({
+          label:
+            series.label,
 
-              datasets
+          data:
+            series.data,
+
+          borderWidth:
+            2,
+
+          tension:
+            0,
+
+          spanGaps:
+            false
+        })
+      );
+
+    livResourceCharts.push(
+      new Chart(
+        card.querySelector(
+          'canvas'
+        ),
+        {
+          type:
+            'line',
+
+          data: {
+            labels:
+              model.labels,
+
+            datasets
+          },
+
+          options: {
+            responsive:
+              true,
+
+            maintainAspectRatio:
+              false,
+
+            interaction: {
+              mode:
+                'index',
+
+              intersect:
+                false
             },
 
-            options: {
-              responsive:
-                true,
+            scales: {
+              y: {
+                beginAtZero:
+                  true,
 
-              maintainAspectRatio:
-                false,
-
-              interaction: {
-                mode:
-                  'index',
-
-                intersect:
-                  false
-              },
-
-              scales: {
-                y: {
-                  beginAtZero:
-                    true,
-
-                  ticks: {
-                    precision:
-                      0
-                  }
+                ticks: {
+                  precision:
+                    0
                 }
-              },
+              }
+            },
 
-              plugins: {
-                legend: {
-                  display:
-                    datasets.length >
-                    1,
+            plugins: {
+              legend: {
+                display:
+                  datasets.length >
+                  1,
 
-                  position:
-                    'top'
-                }
+                position:
+                  'top'
               }
             }
           }
-        )
-      );
-    }
-  );
+        }
+      )
+    );
+  });
 }
 
-/* =========================================================
-   АНАЛИТИКА
-   ========================================================= */
-
-function groupResourcesByOrganizationAndDay(
-  rows
-) {
+function groupResourcesByOrganizationAndDay(rows) {
   const map =
     new Map();
 
@@ -3471,93 +2944,71 @@ function groupResourcesByOrganizationAndDay(
     rows ||
     []
   )
-    .forEach(
-      row => {
-        const key =
-          `${row.organizationId || ''}|${row.date || ''}`;
+    .forEach(row => {
+      const key =
+        `${row.organizationId || ''}|${row.date || ''}`;
 
-        if (
-          !map.has(
-            key
-          )
-        ) {
-          map.set(
-            key,
-            {
-              organizationId:
-                row.organizationId ||
-                '',
+      if (
+        !map.has(key)
+      ) {
+        map.set(
+          key,
+          {
+            organizationId:
+              row.organizationId ||
+              '',
 
-              date:
-                row.date ||
-                '',
+            date:
+              row.date ||
+              '',
 
-              itr:
-                0,
+            itr:
+              0,
 
-              workers:
-                0,
+            workers:
+              0,
 
-              mechanizers:
-                0,
+            mechanizers:
+              0,
 
-              equipment:
-                0,
+            equipment:
+              0,
 
-              equipmentTypes:
-                {}
-            }
-          );
-        }
-
-        const item =
-          map.get(
-            key
-          );
-
-        item.itr +=
-          num(
-            row.itr
-          );
-
-        item.workers +=
-          num(
-            row.workers
-          );
-
-        item.mechanizers +=
-          num(
-            row.mechanizers
-          );
-
-        item.equipment +=
-          num(
-            row.equipmentQty
-          );
-
-        const type =
-          normText(
-            row.equipmentType
-          );
-
-        if (
-          type
-        ) {
-          item.equipmentTypes[
-            type
-          ] =
-            (
-              item.equipmentTypes[
-                type
-              ] ||
-              0
-            ) +
-            num(
-              row.equipmentQty
-            );
-        }
+            equipmentTypes:
+              {}
+          }
+        );
       }
-    );
+
+      const item =
+        map.get(key);
+
+      item.itr +=
+        num(row.itr);
+
+      item.workers +=
+        num(row.workers);
+
+      item.mechanizers +=
+        num(row.mechanizers);
+
+      item.equipment +=
+        num(row.equipmentQty);
+
+      const type =
+        normText(
+          row.equipmentType
+        );
+
+      if (type) {
+        item.equipmentTypes[type] =
+          (
+            item.equipmentTypes[type] ||
+            0
+          ) +
+          num(row.equipmentQty);
+      }
+    });
 
   return [
     ...map.values()
@@ -3569,18 +3020,15 @@ function analyticsDates(
   organizationId
 ) {
   const method =
-    $('rAvgMethod')
-      ?.value ||
+    $('rAvgMethod')?.value ||
     'reported';
 
   const from =
-    $('rFrom')
-      ?.value ||
+    $('rFrom')?.value ||
     '';
 
   const to =
-    $('rTo')
-      ?.value ||
+    $('rTo')?.value ||
     '';
 
   const organizationDates =
@@ -3589,26 +3037,20 @@ function analyticsDates(
         .filter(
           row =>
             String(
-              row.organizationId ||
-              ''
+              row.organizationId || ''
             ) ===
-            String(
-              organizationId
-            )
+            String(organizationId)
         )
         .map(
           row =>
             row.date
         )
-        .filter(
-          Boolean
-        )
+        .filter(Boolean)
     )
       .sort();
 
   if (
-    method ===
-    'calendar'
+    method === 'calendar'
   ) {
     return dateRange(
       from,
@@ -3617,8 +3059,7 @@ function analyticsDates(
   }
 
   if (
-    method ===
-    'workdays'
+    method === 'workdays'
   ) {
     return dateRange(
       from,
@@ -3639,9 +3080,7 @@ function analyticsDates(
           row =>
             row.date
         )
-        .filter(
-          Boolean
-        )
+        .filter(Boolean)
     )
       .sort();
   }
@@ -3656,25 +3095,20 @@ function averageByDate(
   metric
 ) {
   const method =
-    $('rAvgMethod')
-      ?.value ||
+    $('rAvgMethod')?.value ||
     'reported';
 
   const missingRule =
-    $('rMissingRule')
-      ?.value ||
+    $('rMissingRule')?.value ||
     'skip';
 
   const own =
     daily.filter(
       item =>
         String(
-          item.organizationId ||
-          ''
+          item.organizationId || ''
         ) ===
-        String(
-          organizationId
-        )
+        String(organizationId)
     );
 
   const map =
@@ -3683,17 +3117,14 @@ function averageByDate(
         item => [
           item.date,
           num(
-            item[
-              metric
-            ]
+            item[metric]
           )
         ]
       )
     );
 
   if (
-    method ===
-    'nonzero'
+    method === 'nonzero'
   ) {
     const values =
       [
@@ -3701,8 +3132,7 @@ function averageByDate(
       ]
         .filter(
           value =>
-            value !==
-            0
+            value !== 0
         );
 
     return {
@@ -3725,35 +3155,26 @@ function averageByDate(
     };
   }
 
-  const values =
-    [];
+  const values = [];
 
   analyticsDates(
     allRows,
     organizationId
   )
-    .forEach(
-      date => {
-        if (
-          map.has(
-            date
-          )
-        ) {
-          values.push(
-            map.get(
-              date
-            )
-          );
-        } else if (
-          missingRule ===
-          'zero'
-        ) {
-          values.push(
-            0
-          );
-        }
+    .forEach(date => {
+      if (
+        map.has(date)
+      ) {
+        values.push(
+          map.get(date)
+        );
+      } else if (
+        missingRule ===
+        'zero'
+      ) {
+        values.push(0);
       }
-    );
+    });
 
   return {
     average:
@@ -3789,8 +3210,7 @@ function resourceAnalyticsModel() {
       rows.map(
         row =>
           String(
-            row.organizationId ||
-            ''
+            row.organizationId || ''
           )
       )
     )
@@ -3826,10 +3246,8 @@ function resourceAnalyticsModel() {
             rows.filter(
               row =>
                 String(
-                  row.organizationId ||
-                  ''
-                ) ===
-                id
+                  row.organizationId || ''
+                ) === id
             )
           ) !==
           0
@@ -3845,8 +3263,7 @@ function resourceAnalyticsModel() {
               .filter(
                 item =>
                   String(
-                    item.organizationId ||
-                    ''
+                    item.organizationId || ''
                   ) ===
                   organizationId
               )
@@ -3870,8 +3287,7 @@ function resourceAnalyticsModel() {
                 rows,
                 organizationId,
                 'itr'
-              )
-                .average,
+              ).average,
 
             workers:
               averageByDate(
@@ -3879,8 +3295,7 @@ function resourceAnalyticsModel() {
                 rows,
                 organizationId,
                 'workers'
-              )
-                .average,
+              ).average,
 
             mechanizers:
               averageByDate(
@@ -3888,8 +3303,7 @@ function resourceAnalyticsModel() {
                 rows,
                 organizationId,
                 'mechanizers'
-              )
-                .average,
+              ).average,
 
             total:
               averageByDate(
@@ -3897,8 +3311,7 @@ function resourceAnalyticsModel() {
                 rows,
                 organizationId,
                 'totalPeople'
-              )
-                .average
+              ).average
           };
         }
       )
@@ -3922,8 +3335,7 @@ function resourceAnalyticsModel() {
     organizationIds
       .map(
         organizationId => {
-          const cells =
-            {};
+          const cells = {};
 
           equipmentTypeColumns.forEach(
             column => {
@@ -3932,8 +3344,7 @@ function resourceAnalyticsModel() {
                   .filter(
                     item =>
                       String(
-                        item.organizationId ||
-                        ''
+                        item.organizationId || ''
                       ) ===
                       organizationId
                   )
@@ -3943,45 +3354,37 @@ function resourceAnalyticsModel() {
 
                       metric:
                         num(
-                          item
-                            .equipmentTypes[
-                              column.equipmentType
-                            ]
+                          item.equipmentTypes[
+                            column.equipmentType
+                          ]
                         )
                     })
                   );
 
-              cells[
-                column.id
-              ] =
+              cells[column.id] =
                 averageByDate(
                   own,
                   rows,
                   organizationId,
                   'metric'
-                )
-                  .average;
+                ).average;
             }
           );
 
           return {
             organizationId,
+
             cells,
 
             total:
-              Object
-                .values(
-                  cells
-                )
+              Object.values(cells)
                 .reduce(
                   (
                     sum,
                     value
                   ) =>
                     sum +
-                    num(
-                      value
-                    ),
+                    num(value),
                   0
                 )
           };
@@ -4007,9 +3410,7 @@ function resourceAnalyticsModel() {
             ) =>
               sum +
               num(
-                getter(
-                  item
-                )
+                getter(item)
               ),
             0
           ) /
@@ -4054,14 +3455,11 @@ function resourceAnalyticsModel() {
       )
   };
 
-  const equipmentFooter =
-    {};
+  const equipmentFooter = {};
 
   equipmentTypeColumns.forEach(
     column => {
-      equipmentFooter[
-        column.id
-      ] =
+      equipmentFooter[column.id] =
         Math.round(
           mean(
             equipment,
@@ -4086,47 +3484,36 @@ function resourceAnalyticsModel() {
   const global =
     new Map();
 
-  rows.forEach(
-    row => {
-      if (
-        !row.date
-      ) {
-        return;
-      }
-
-      if (
-        !global.has(
-          row.date
-        )
-      ) {
-        global.set(
-          row.date,
-          {
-            people:
-              0,
-
-            equipment:
-              0
-          }
-        );
-      }
-
-      const item =
-        global.get(
-          row.date
-        );
-
-      item.people +=
-        resourceTotalPeople(
-          row
-        );
-
-      item.equipment +=
-        num(
-          row.equipmentQty
-        );
+  rows.forEach(row => {
+    if (!row.date) {
+      return;
     }
-  );
+
+    if (
+      !global.has(
+        row.date
+      )
+    ) {
+      global.set(
+        row.date,
+        {
+          people: 0,
+          equipment: 0
+        }
+      );
+    }
+
+    const item =
+      global.get(
+        row.date
+      );
+
+    item.people +=
+      resourceTotalPeople(row);
+
+    item.equipment +=
+      num(row.equipmentQty);
+  });
 
   let dates =
     [
@@ -4135,18 +3522,15 @@ function resourceAnalyticsModel() {
       .sort();
 
   const method =
-    $('rAvgMethod')
-      ?.value ||
+    $('rAvgMethod')?.value ||
     'reported';
 
   const missing =
-    $('rMissingRule')
-      ?.value ||
+    $('rMissingRule')?.value ||
     'skip';
 
   if (
-    method ===
-    'calendar'
+    method === 'calendar'
   ) {
     dates =
       dateRange(
@@ -4154,8 +3538,7 @@ function resourceAnalyticsModel() {
         $('rTo').value
       );
   } else if (
-    method ===
-    'workdays'
+    method === 'workdays'
   ) {
     dates =
       dateRange(
@@ -4167,57 +3550,38 @@ function resourceAnalyticsModel() {
         );
   }
 
-  const peopleValues =
-    [];
+  const peopleValues = [];
+  const equipmentValues = [];
 
-  const equipmentValues =
-    [];
+  dates.forEach(date => {
+    const item =
+      global.get(date);
 
-  dates.forEach(
-    date => {
-      const item =
-        global.get(
-          date
-        );
-
+    if (item) {
       if (
-        item
-      ) {
-        if (
-          method !==
-            'nonzero' ||
-          item.people !==
-            0
-        ) {
-          peopleValues.push(
-            item.people
-          );
-        }
-
-        if (
-          method !==
-            'nonzero' ||
-          item.equipment !==
-            0
-        ) {
-          equipmentValues.push(
-            item.equipment
-          );
-        }
-      } else if (
-        missing ===
-        'zero'
+        method !== 'nonzero' ||
+        item.people !== 0
       ) {
         peopleValues.push(
-          0
-        );
-
-        equipmentValues.push(
-          0
+          item.people
         );
       }
+
+      if (
+        method !== 'nonzero' ||
+        item.equipment !== 0
+      ) {
+        equipmentValues.push(
+          item.equipment
+        );
+      }
+    } else if (
+      missing === 'zero'
+    ) {
+      peopleValues.push(0);
+      equipmentValues.push(0);
     }
-  );
+  });
 
   const average =
     values =>
@@ -4339,9 +3703,7 @@ function renderResourceAnalytics() {
                                 )
                               : Math.round(
                                   num(
-                                    item[
-                                      column.id
-                                    ]
+                                    item[column.id]
                                   )
                                 );
 
@@ -4364,7 +3726,9 @@ function renderResourceAnalytics() {
               <td
                 colspan="${Math.max(1,peopleColumns.length)}"
                 class="resource-empty">
+
                 Нет данных
+
               </td>
 
             </tr>
@@ -4469,7 +3833,9 @@ function renderResourceAnalytics() {
               <td
                 colspan="${Math.max(1,equipmentColumns.length)}"
                 class="resource-empty">
+
                 Нет техники
+
               </td>
 
             </tr>
@@ -4488,9 +3854,19 @@ function renderResourceAnalytics() {
   }
 }
 
-/* =========================================================
-   ПЛАН / ФАКТ
-   ========================================================= */
+async function saveResourceView() {
+  if (
+    typeof livOpenViewBuilder ===
+    'function'
+  ) {
+    livOpenViewBuilder();
+    return;
+  }
+
+  alert(
+    'Конструктор представлений не загружен.'
+  );
+}
 
 function resourcePlanFiltered() {
   const organizations =
@@ -4514,13 +3890,11 @@ function resourcePlanFiltered() {
     );
 
   const from =
-    $('rFrom')
-      ?.value ||
+    $('rFrom')?.value ||
     '';
 
   const to =
-    $('rTo')
-      ?.value ||
+    $('rTo')?.value ||
     '';
 
   const matches =
@@ -4528,19 +3902,13 @@ function resourcePlanFiltered() {
       values,
       value
     ) =>
-      values ===
-      null
+      values === null
         ? true
         : (
-            Array.isArray(
-              values
-            ) &&
+            Array.isArray(values) &&
             values.length
               ? values.includes(
-                  String(
-                    value ||
-                    ''
-                  )
+                  String(value || '')
                 )
               : false
           );
@@ -4553,13 +3921,11 @@ function resourcePlanFiltered() {
       plan =>
         (
           !from ||
-          plan.endDate >=
-          from
+          plan.endDate >= from
         ) &&
         (
           !to ||
-          plan.startDate <=
-          to
+          plan.startDate <= to
         ) &&
         matches(
           organizations,
@@ -4581,8 +3947,7 @@ function resourcePlanFiltered() {
 }
 
 function openResourcePlanEditor(
-  id =
-    null
+  id = null
 ) {
   const plan =
     id
@@ -4602,17 +3967,18 @@ function openResourcePlanEditor(
           <option
             value="${esc(front.id)}"
             ${
+              String(front.id) ===
               String(
-                front.id
-              ) ===
-              String(
-                plan.frontId ||
-                ''
+                plan.frontId || ''
               )
                 ? 'selected'
                 : ''
             }>
-            ${esc(frontLabel(front))}
+
+            ${esc(
+              frontLabel(front)
+            )}
+
           </option>
         `
       )
@@ -4629,68 +3995,128 @@ function openResourcePlanEditor(
         <div class="field">
           <label>Организация</label>
           <select id="rpOrg">
-            ${selectOptions(project.organizations,plan.organizationId || '',true)}
+            ${
+              selectOptions(
+                project.organizations,
+                plan.organizationId || '',
+                true
+              )
+            }
           </select>
         </div>
 
         <div class="field">
           <label>Здание</label>
           <select id="rpBuilding">
-            ${selectOptions(project.buildings,plan.buildingId || '',true)}
+            ${
+              selectOptions(
+                project.buildings,
+                plan.buildingId || '',
+                true
+              )
+            }
           </select>
         </div>
 
         <div class="field">
           <label>Работа</label>
           <select id="rpWork">
-            ${selectOptions(project.works,plan.workId || '',true)}
+            ${
+              selectOptions(
+                project.works,
+                plan.workId || '',
+                true
+              )
+            }
           </select>
         </div>
 
         <div class="field">
           <label>Фронт</label>
           <select id="rpFront">
-            <option value="">—</option>
+
+            <option value="">
+              —
+            </option>
+
             ${frontOptions}
+
           </select>
         </div>
 
         <div class="field">
           <label>С</label>
-          <input id="rpStart" type="date" value="${esc(plan.startDate || today())}">
+          <input
+            id="rpStart"
+            type="date"
+            value="${esc(
+              plan.startDate ||
+              today()
+            )}">
         </div>
 
         <div class="field">
           <label>По</label>
-          <input id="rpEnd" type="date" value="${esc(plan.endDate || today())}">
+          <input
+            id="rpEnd"
+            type="date"
+            value="${esc(
+              plan.endDate ||
+              today()
+            )}">
         </div>
 
         <div class="field">
           <label>План, чел.</label>
-          <input id="rpPeople" type="number" step="1" min="0" value="${plan.people ?? ''}">
+          <input
+            id="rpPeople"
+            type="number"
+            step="1"
+            min="0"
+            value="${plan.people ?? ''}">
         </div>
 
         <div class="field">
           <label>Источник / метод</label>
-          <input id="rpMethod" value="${esc(plan.method || 'Ручной')}">
+          <input
+            id="rpMethod"
+            value="${esc(
+              plan.method ||
+              'Ручной'
+            )}">
         </div>
 
       </div>
 
       <div class="field">
-        <label>Комментарий</label>
-        <textarea id="rpComment">${esc(plan.comment || '')}</textarea>
+
+        <label>
+          Комментарий
+        </label>
+
+        <textarea id="rpComment">${esc(
+          plan.comment || ''
+        )}</textarea>
+
       </div>
 
       <div class="editor-actions">
 
         ${
           id
-            ? '<button id="rpDelete" class="btn danger">Удалить</button>'
+            ? `
+                <button
+                  id="rpDelete"
+                  class="btn danger">
+                  Удалить
+                </button>
+              `
             : ''
         }
 
-        <button id="rpSave" class="btn primary">
+        <button
+          id="rpSave"
+          class="btn primary">
           Сохранить
         </button>
 
@@ -4700,9 +4126,7 @@ function openResourcePlanEditor(
 
   $('rpSave').onclick =
     () =>
-      saveResourcePlan(
-        id
-      );
+      saveResourcePlan(id);
 
   if (
     id &&
@@ -4710,15 +4134,11 @@ function openResourcePlanEditor(
   ) {
     $('rpDelete').onclick =
       () =>
-        deleteResourcePlan(
-          id
-        );
+        deleteResourcePlan(id);
   }
 }
 
-async function saveResourcePlan(
-  id
-) {
+async function saveResourcePlan(id) {
   const existing =
     id
       ? byId(
@@ -4730,9 +4150,7 @@ async function saveResourcePlan(
   const row = {
     id:
       existing?.id ||
-      uid(
-        'RP'
-      ),
+      uid('RP'),
 
     organizationId:
       $('rpOrg').value,
@@ -4778,8 +4196,7 @@ async function saveResourcePlan(
   if (
     !row.startDate ||
     !row.endDate ||
-    row.endDate <
-    row.startDate
+    row.endDate < row.startDate
   ) {
     alert(
       'Проверь период плана.'
@@ -4788,9 +4205,7 @@ async function saveResourcePlan(
     return;
   }
 
-  if (
-    existing
-  ) {
+  if (existing) {
     Object.assign(
       existing,
       row
@@ -4805,7 +4220,9 @@ async function saveResourcePlan(
     existing
       ? 'Изменено'
       : 'Создано',
+
     'План ресурсов',
+
     `${row.startDate}—${row.endDate}`
   );
 
@@ -4816,9 +4233,7 @@ async function saveResourcePlan(
   renderResourcePlanFact();
 }
 
-async function deleteResourcePlan(
-  id
-) {
+async function deleteResourcePlan(id) {
   if (
     !confirm(
       'Удалить план ресурсов?'
@@ -4834,12 +4249,8 @@ async function deleteResourcePlan(
     )
       .filter(
         item =>
-          String(
-            item.id
-          ) !==
-          String(
-            id
-          )
+          String(item.id) !==
+          String(id)
       );
 
   log(
@@ -4863,18 +4274,15 @@ function resourcePlanFactModel() {
     resourceFiltered();
 
   const step =
-    $('rpStep')
-      ?.value ||
+    $('rpStep')?.value ||
     'week';
 
   const from =
-    $('rFrom')
-      ?.value ||
+    $('rFrom')?.value ||
     today();
 
   const to =
-    $('rTo')
-      ?.value ||
+    $('rTo')?.value ||
     today();
 
   const planMap =
@@ -4883,77 +4291,63 @@ function resourcePlanFactModel() {
   const factMap =
     new Map();
 
-  plans.forEach(
-    plan => {
-      dateRange(
-        plan.startDate,
-        plan.endDate
-      )
-        .forEach(
-          date => {
-            if (
-              (
-                from &&
-                date <
-                from
-              ) ||
-              (
-                to &&
-                date >
-                to
-              )
-            ) {
-              return;
-            }
+  plans.forEach(plan => {
+    dateRange(
+      plan.startDate,
+      plan.endDate
+    )
+      .forEach(date => {
+        if (
+          (
+            from &&
+            date < from
+          ) ||
+          (
+            to &&
+            date > to
+          )
+        ) {
+          return;
+        }
 
-            const key =
-              resourceBucketKey(
-                date,
-                step
-              );
+        const key =
+          resourceBucketKey(
+            date,
+            step
+          );
 
-            planMap.set(
-              key,
-              (
-                planMap.get(
-                  key
-                ) ||
-                0
-              ) +
-              num(
-                plan.people
-              )
-            );
-          }
+        planMap.set(
+          key,
+          (
+            planMap.get(key) ||
+            0
+          ) +
+          num(plan.people)
         );
-    }
-  );
+      });
+  });
 
   const factDaily =
     new Map();
 
-  facts.forEach(
-    row => {
-      if (
-        !row.date
-      ) {
-        return;
-      }
-
-      factDaily.set(
-        row.date,
-        (
-          factDaily.get(
-            row.date
-          ) ||
-          0
-        ) +
-        resourceTotalPeople(
-          row
-        )
-      );
+  facts.forEach(row => {
+    if (!row.date) {
+      return;
     }
-  );
+
+    factDaily.set(
+      row.date,
+      (
+        factDaily.get(
+          row.date
+        ) ||
+        0
+      ) +
+      resourceTotalPeople(
+        row
+      )
+    );
+  });
 
   [
     ...factDaily
@@ -4974,9 +4368,7 @@ function resourcePlanFactModel() {
         factMap.set(
           key,
           (
-            factMap.get(
-              key
-            ) ||
+            factMap.get(key) ||
             0
           ) +
           value
@@ -4994,47 +4386,37 @@ function resourcePlanFactModel() {
       .sort();
 
   const rows =
-    keys.map(
-      key => {
-        const plan =
-          num(
-            planMap.get(
-              key
-            )
-          );
+    keys.map(key => {
+      const plan =
+        num(
+          planMap.get(key)
+        );
 
-        const fact =
-          num(
-            factMap.get(
-              key
-            )
-          );
+      const fact =
+        num(
+          factMap.get(key)
+        );
 
-        return {
-          period:
-            resourceBucketLabel(
-              key,
-              step
-            ),
+      return {
+        period:
+          resourceBucketLabel(
+            key,
+            step
+          ),
 
-          plan:
-            Math.round(
-              plan
-            ),
+        plan:
+          Math.round(plan),
 
-          fact:
-            Math.round(
-              fact
-            ),
+        fact:
+          Math.round(fact),
 
-          deviation:
-            Math.round(
-              fact -
-              plan
-            )
-        };
-      }
-    );
+        deviation:
+          Math.round(
+            fact -
+            plan
+          )
+      };
+    });
 
   const totals =
     rows.reduce(
@@ -5054,14 +4436,9 @@ function resourcePlanFactModel() {
         return result;
       },
       {
-        plan:
-          0,
-
-        fact:
-          0,
-
-        deviation:
-          0
+        plan: 0,
+        fact: 0,
+        deviation: 0
       }
     );
 
@@ -5139,9 +4516,7 @@ function renderResourcePlanFact() {
                     column =>
                       resourceCellHtml(
                         column,
-                        row[
-                          column.id
-                        ]
+                        row[column.id]
                       )
                   )
                   .join('')
@@ -5169,9 +4544,7 @@ function renderResourcePlanFact() {
   ) {
     try {
       livResourcePlanFactChart.destroy();
-    } catch (
-      error
-    ) {
+    } catch (error) {
     }
   }
 
@@ -5258,10 +4631,6 @@ function renderResourcePlanFact() {
   }
 }
 
-/* =========================================================
-   СОХРАНЕНИЕ СОСТОЯНИЯ ФИЛЬТРОВ
-   ========================================================= */
-
 function resourceSetMultiFilter(
   selectId,
   values
@@ -5278,17 +4647,13 @@ function resourceSetMultiFilter(
       selectId
     );
 
-  if (
-    !state
-  ) {
+  if (!state) {
     return;
   }
 
   if (
-    values ===
-      null ||
-    values ===
-      undefined
+    values === null ||
+    values === undefined
   ) {
     state.mode =
       'all';
@@ -5304,9 +4669,7 @@ function resourceSetMultiFilter(
           values ||
           []
         )
-          .map(
-            String
-          )
+          .map(String)
       );
   }
 
@@ -5316,20 +4679,16 @@ function resourceSetMultiFilter(
     );
 
   const summary =
-    mount
-      ?.querySelector(
-        '.multi-filter-summary'
-      );
+    mount?.querySelector(
+      '.multi-filter-summary'
+    );
 
-  if (
-    !summary
-  ) {
+  if (!summary) {
     return;
   }
 
   if (
-    state.mode ===
-    'all'
+    state.mode === 'all'
   ) {
     summary.textContent =
       state.allLabel;
@@ -5346,9 +4705,7 @@ function resourceSetMultiFilter(
     const id =
       [
         ...state.selected
-      ][
-        0
-      ];
+      ][0];
 
     const option =
       [
@@ -5360,9 +4717,7 @@ function resourceSetMultiFilter(
       ]
         .find(
           item =>
-            String(
-              item.value
-            ) ===
+            String(item.value) ===
             id
         );
 
@@ -5395,13 +4750,11 @@ function resourceCaptureViewState(
 ) {
   return {
     from:
-      $('rFrom')
-        ?.value ||
+      $('rFrom')?.value ||
       '',
 
     to:
-      $('rTo')
-        ?.value ||
+      $('rTo')?.value ||
       '',
 
     organizations:
@@ -5428,50 +4781,39 @@ function resourceCaptureViewState(
       resourceShowZero(),
 
     dailyDate:
-      $('rDailyDate')
-        ?.value ||
+      $('rDailyDate')?.value ||
       '',
 
     dynType:
-      $('rDynType')
-        ?.value ||
+      $('rDynType')?.value ||
       'total',
 
     dynStep:
-      $('rDynStep')
-        ?.value ||
+      $('rDynStep')?.value ||
       'week',
 
     dynOrg:
-      $('rDynOrg')
-        ?.value ||
+      $('rDynOrg')?.value ||
       'all',
 
     avgMethod:
-      $('rAvgMethod')
-        ?.value ||
+      $('rAvgMethod')?.value ||
       'reported',
 
     missingRule:
-      $('rMissingRule')
-        ?.value ||
+      $('rMissingRule')?.value ||
       'skip',
 
     planFactStep:
-      $('rpStep')
-        ?.value ||
+      $('rpStep')?.value ||
       'week',
 
     viewName
   };
 }
 
-function resourceApplyViewState(
-  state
-) {
-  if (
-    !state
-  ) {
+function resourceApplyViewState(state) {
+  if (!state) {
     return;
   }
 
@@ -5479,16 +4821,14 @@ function resourceApplyViewState(
     $('rFrom')
   ) {
     $('rFrom').value =
-      state.from ||
-      '';
+      state.from || '';
   }
 
   if (
     $('rTo')
   ) {
     $('rTo').value =
-      state.to ||
-      '';
+      state.to || '';
   }
 
   resourceSetMultiFilter(
@@ -5580,18 +4920,12 @@ function resourceApplyViewState(
   }
 }
 
-/* =========================================================
-   ПЕЧАТЬ
-   ========================================================= */
-
 function resourcePrintTable(
   viewName,
   tableId,
   rows,
-  footerValues =
-    null,
-  footerLabel =
-    'Итого'
+  footerValues = null,
+  footerLabel = 'Итого'
 ) {
   const schema =
     resourceTableSchema(
@@ -5628,7 +4962,10 @@ function resourcePrintTable(
     )
       ? `
           <h2>
-            ${esc(config.title || schema.title)}
+            ${esc(
+              config.title ||
+              schema.title
+            )}
           </h2>
         `
       : '';
@@ -5658,9 +4995,7 @@ function resourcePrintTable(
                           column =>
                             resourceCellHtml(
                               column,
-                              row[
-                                column.id
-                              ]
+                              row[column.id]
                             )
                         )
                         .join('')
@@ -5672,11 +5007,15 @@ function resourcePrintTable(
               .join('')
           : `
               <tr>
+
                 <td
                   colspan="${columns.length}"
                   class="muted">
+
                   Нет данных
+
                 </td>
+
               </tr>
             `
       }
@@ -5689,6 +5028,7 @@ function resourcePrintTable(
     footerValues
       ? `
           <tfoot>
+
             ${
               resourceFooterHtml(
                 columns,
@@ -5696,18 +5036,26 @@ function resourcePrintTable(
                 footerLabel
               )
             }
+
           </tfoot>
         `
       : '';
 
   return `
     <section class="liv-report-section">
+
       ${title}
+
       <table>
+
         ${head}
+
         ${body}
+
         ${foot}
+
       </table>
+
     </section>
   `;
 }
@@ -5717,28 +5065,22 @@ function resourcePrintKpis(
   viewName
 ) {
   const settings =
-    window
-      .LIV_VIEW_BUILDER
-      ?.settings
-      ? window
-          .LIV_VIEW_BUILDER
-          .settings(
-            resourceViewKey(
-              viewName
-            )
+    window.LIV_VIEW_BUILDER?.settings
+      ? window.LIV_VIEW_BUILDER.settings(
+          resourceViewKey(
+            viewName
           )
+        )
       : null;
 
   const hidden =
     new Set(
-      settings
-        ?.hiddenKpis ||
+      settings?.hiddenKpis ||
       []
     );
 
   const order =
-    settings
-      ?.kpiOrder ||
+    settings?.kpiOrder ||
     [];
 
   const map =
@@ -5751,52 +5093,36 @@ function resourcePrintKpis(
       )
     );
 
-  const ordered =
-    [];
+  const ordered = [];
 
-  order.forEach(
-    id => {
-      if (
-        map.has(
-          id
-        )
-      ) {
-        ordered.push(
-          map.get(
-            id
-          )
-        );
-      }
+  order.forEach(id => {
+    if (
+      map.has(id)
+    ) {
+      ordered.push(
+        map.get(id)
+      );
     }
-  );
+  });
 
-  items.forEach(
-    item => {
-      if (
-        !ordered.some(
-          current =>
-            current.id ===
-            item.id
-        )
-      ) {
-        ordered.push(
-          item
-        );
-      }
+  items.forEach(item => {
+    if (
+      !ordered.some(
+        current =>
+          current.id === item.id
+      )
+    ) {
+      ordered.push(item);
     }
-  );
+  });
 
   const visible =
     ordered.filter(
       item =>
-        !hidden.has(
-          item.id
-        )
+        !hidden.has(item.id)
     );
 
-  if (
-    !visible.length
-  ) {
+  if (!visible.length) {
     return '';
   }
 
@@ -5832,31 +5158,24 @@ function resourcePrintJournal() {
     resourceFiltered();
 
   const printRows =
-    rows.map(
-      row => {
-        const result =
-          {};
+    rows.map(row => {
+      const result = {};
 
-        resourceVisibleColumns(
-          'journal',
-          'journal',
-          true
-        )
-          .forEach(
-            column => {
-              result[
-                column.id
-              ] =
-                resourceJournalValue(
-                  row,
-                  column.id
-                );
-            }
-          );
+      resourceVisibleColumns(
+        'journal',
+        'journal',
+        true
+      )
+        .forEach(column => {
+          result[column.id] =
+            resourceJournalValue(
+              row,
+              column.id
+            );
+        });
 
-        return result;
-      }
-    );
+      return result;
+    });
 
   return resourcePrintTable(
     'journal',
@@ -5876,8 +5195,7 @@ function resourcePrintDaily() {
         index
       ) => ({
         number:
-          index +
-          1,
+          index + 1,
 
         organization:
           nameById(
@@ -5917,8 +5235,7 @@ function resourcePrintDaily() {
         index
       ) => ({
         number:
-          index +
-          1,
+          index + 1,
 
         organization:
           nameById(
@@ -6009,8 +5326,7 @@ function resourcePrintDaily() {
       },
       'Итого'
     )
-  ]
-    .join('');
+  ].join('');
 }
 
 function resourcePrintAnalytics() {
@@ -6050,44 +5366,38 @@ function resourcePrintAnalytics() {
     );
 
   const equipmentRows =
-    model.equipment.map(
-      item => {
-        const row = {
-          organization:
-            nameById(
-              project.organizations,
-              item.organizationId
-            ) ||
-            '—',
+    model.equipment.map(item => {
+      const row = {
+        organization:
+          nameById(
+            project.organizations,
+            item.organizationId
+          ) ||
+          '—',
 
-          total:
-            Math.round(
-              item.total
-            )
-        };
+        total:
+          Math.round(
+            item.total
+          )
+      };
 
-        Object.entries(
-          item.cells
-        )
-          .forEach(
-            (
-              [
-                key,
-                value
-              ]
-            ) => {
-              row[
-                key
-              ] =
-                Math.round(
-                  value
-                );
-            }
-          );
+      Object.entries(
+        item.cells
+      )
+        .forEach(
+          (
+            [
+              key,
+              value
+            ]
+          ) => {
+            row[key] =
+              Math.round(value);
+          }
+        );
 
-        return row;
-      }
-    );
+      return row;
+    });
 
   return [
     resourcePrintKpis(
@@ -6143,8 +5453,7 @@ function resourcePrintAnalytics() {
       model.equipmentFooter,
       'Среднее по организациям'
     )
-  ]
-    .join('');
+  ].join('');
 }
 
 function resourcePrintDynamics() {
@@ -6155,9 +5464,7 @@ function resourcePrintDynamics() {
       )
     ];
 
-  if (
-    !cards.length
-  ) {
+  if (!cards.length) {
     return `
       <div class="muted">
         Нет данных для диаграмм.
@@ -6166,62 +5473,54 @@ function resourcePrintDynamics() {
   }
 
   return cards
-    .map(
-      card => {
-        const title =
-          card
-            .querySelector(
-              'h2'
-            )
-            ?.textContent
-            ?.trim() ||
-          'Диаграмма';
+    .map(card => {
+      const title =
+        card
+          .querySelector('h2')
+          ?.textContent
+          ?.trim() ||
+        'Диаграмма';
 
-        const canvas =
-          card.querySelector(
-            'canvas'
-          );
+      const canvas =
+        card.querySelector(
+          'canvas'
+        );
 
-        let src =
+      let src = '';
+
+      try {
+        src =
+          canvas?.toDataURL(
+            'image/png'
+          ) ||
           '';
-
-        try {
-          src =
-            canvas
-              ?.toDataURL(
-                'image/png'
-              ) ||
-            '';
-        } catch (
-          error
-        ) {
-        }
-
-        return `
-          <section class="liv-report-section">
-
-            <h2>
-              ${esc(title)}
-            </h2>
-
-            ${
-              src
-                ? `
-                    <img
-                      class="liv-report-chart"
-                      src="${src}">
-                  `
-                : `
-                    <div class="muted">
-                      Диаграмма недоступна для печати.
-                    </div>
-                  `
-            }
-
-          </section>
-        `;
+      } catch (error) {
       }
-    )
+
+      return `
+        <section class="liv-report-section">
+
+          <h2>
+            ${esc(title)}
+          </h2>
+
+          ${
+            src
+              ? `
+                  <img
+                    class="liv-report-chart"
+                    src="${src}">
+                `
+              : `
+                  <div class="muted">
+                    Диаграмма недоступна для печати.
+                  </div>
+                `
+          }
+
+        </section>
+      `;
+    })
     .join('');
 }
 
@@ -6229,8 +5528,7 @@ function resourcePrintPlanFact() {
   const model =
     resourcePlanFactModel();
 
-  let chart =
-    '';
+  let chart = '';
 
   try {
     const src =
@@ -6239,9 +5537,7 @@ function resourcePrintPlanFact() {
           'image/png'
         );
 
-    if (
-      src
-    ) {
+    if (src) {
       chart = `
         <section class="liv-report-section">
 
@@ -6256,9 +5552,7 @@ function resourcePrintPlanFact() {
         </section>
       `;
     }
-  } catch (
-    error
-  ) {
+  } catch (error) {
   }
 
   return [
@@ -6309,24 +5603,18 @@ function resourcePrintPlanFact() {
     ),
 
     chart
-  ]
-    .join('');
+  ].join('');
 }
 
-function resourceGetPrintMeta(
-  viewName
-) {
-  const result =
-    [];
+function resourceGetPrintMeta(viewName) {
+  const result = [];
 
   const from =
-    $('rFrom')
-      ?.value ||
+    $('rFrom')?.value ||
     '';
 
   const to =
-    $('rTo')
-      ?.value ||
+    $('rTo')?.value ||
     '';
 
   if (
@@ -6334,18 +5622,26 @@ function resourceGetPrintMeta(
     to
   ) {
     result.push(
-      `Период: ${from ? ruDate(from) : '—'} — ${to ? ruDate(to) : '—'}`
+      `Период: ${
+        from
+          ? ruDate(from)
+          : '—'
+      } — ${
+        to
+          ? ruDate(to)
+          : '—'
+      }`
     );
   }
 
   if (
-    viewName ===
-      'daily' &&
-    $('rDailyDate')
-      ?.value
+    viewName === 'daily' &&
+    $('rDailyDate')?.value
   ) {
     result.push(
-      `Дата сводки: ${ruDate($('rDailyDate').value)}`
+      `Дата сводки: ${ruDate(
+        $('rDailyDate').value
+      )}`
     );
   }
 
@@ -6387,9 +5683,7 @@ function resourceGetPrintMeta(
 
         if (
           text &&
-          !/^Все\b/i.test(
-            text
-          )
+          !/^Все\b/i.test(text)
         ) {
           result.push(
             `${label}: ${text}`
@@ -6401,65 +5695,36 @@ function resourceGetPrintMeta(
   return result;
 }
 
-/* =========================================================
-   СХЕМЫ КОНСТРУКТОРА
-   ========================================================= */
-
 function resourceSharedModes() {
   return [
     {
-      id:
-        'journal',
-
-      title:
-        'Журнал',
-
-      selector:
-        '[data-rview="journal"]'
+      id: 'journal',
+      title: 'Журнал',
+      selector: '[data-rview="journal"]'
     },
 
     {
-      id:
-        'daily',
-
-      title:
-        'Ежедневная сводка',
-
-      selector:
-        '[data-rview="daily"]'
+      id: 'daily',
+      title: 'Ежедневная сводка',
+      selector: '[data-rview="daily"]'
     },
 
     {
-      id:
-        'dynamics',
-
-      title:
-        'Динамика',
-
-      selector:
-        '[data-rview="dynamics"]'
+      id: 'dynamics',
+      title: 'Динамика',
+      selector: '[data-rview="dynamics"]'
     },
 
     {
-      id:
-        'analytics',
-
-      title:
-        'Месячная аналитика',
-
-      selector:
-        '[data-rview="analytics"]'
+      id: 'analytics',
+      title: 'Месячная аналитика',
+      selector: '[data-rview="analytics"]'
     },
 
     {
-      id:
-        'planfact',
-
-      title:
-        'План / факт ресурсов',
-
-      selector:
-        '[data-rview="planfact"]'
+      id: 'planfact',
+      title: 'План / факт ресурсов',
+      selector: '[data-rview="planfact"]'
     }
   ];
 }
@@ -6467,101 +5732,52 @@ function resourceSharedModes() {
 function resourceSharedFilters() {
   return [
     {
-      id:
-        'from',
-
-      title:
-        'С',
-
-      selector:
-        '#rFrom',
-
-      closest:
-        '.field'
+      id: 'from',
+      title: 'С',
+      selector: '#rFrom',
+      closest: '.field'
     },
 
     {
-      id:
-        'to',
-
-      title:
-        'По',
-
-      selector:
-        '#rTo',
-
-      closest:
-        '.field'
+      id: 'to',
+      title: 'По',
+      selector: '#rTo',
+      closest: '.field'
     },
 
     {
-      id:
-        'organizations',
-
-      title:
-        'Организации',
-
-      selector:
-        '#rOrgMulti',
-
-      closest:
-        '.field'
+      id: 'organizations',
+      title: 'Организации',
+      selector: '#rOrgMulti',
+      closest: '.field'
     },
 
     {
-      id:
-        'buildings',
-
-      title:
-        'Здания',
-
-      selector:
-        '#rBuildingMulti',
-
-      closest:
-        '.field'
+      id: 'buildings',
+      title: 'Здания',
+      selector: '#rBuildingMulti',
+      closest: '.field'
     },
 
     {
-      id:
-        'works',
-
-      title:
-        'Работы',
-
-      selector:
-        '#rWorkMulti',
-
-      closest:
-        '.field'
+      id: 'works',
+      title: 'Работы',
+      selector: '#rWorkMulti',
+      closest: '.field'
     },
 
     {
-      id:
-        'fronts',
-
-      title:
-        'Фронты',
-
-      selector:
-        '#rFrontMulti',
-
-      closest:
-        '.field'
+      id: 'fronts',
+      title: 'Фронты',
+      selector: '#rFrontMulti',
+      closest: '.field'
     },
 
     {
-      id:
-        'showZero',
-
-      title:
-        'Показывать нулевые',
-
-      selector:
-        '#rShowZero',
-
-      closest:
-        '.switch-line'
+      id: 'showZero',
+      title: 'Показывать нулевые',
+      selector: '#rShowZero',
+      closest: '.switch-line'
     }
   ];
 }
@@ -6569,33 +5785,22 @@ function resourceSharedFilters() {
 function resourceSharedActions() {
   return [
     {
-      id:
-        'resetFilters',
-
-      title:
-        'Сбросить фильтры',
-
-      selector:
-        '#resourceResetFiltersBtn'
+      id: 'resetFilters',
+      title: 'Сбросить фильтры',
+      selector: '#resourceResetFiltersBtn'
     },
 
     {
-      id:
-        'addResource',
-
-      title:
-        '+ Добавить запись',
-
-      selector:
-        '#newResourceBtn'
+      id: 'addResource',
+      title: '+ Добавить запись',
+      selector: '#newResourceBtn'
     }
   ];
 }
 
 function resourceSchemaBase(
   viewName,
-  extras =
-    {}
+  extras = {}
 ) {
   return {
     title:
@@ -6678,729 +5883,468 @@ function resourceSchemaBase(
 
 function registerResourceBuilderSchemas() {
   if (
-    !window
-      .LIV_VIEW_BUILDER
-      ?.register
+    !window.LIV_VIEW_BUILDER?.register
   ) {
     return;
   }
 
-  window
-    .LIV_VIEW_BUILDER
-    .register(
-      'resources:journal',
-
-      resourceSchemaBase(
-        'journal',
-        {
-          title:
-            'Журнал ресурсов',
-
-          kpis: [
-            {
-              id:
-                'itrDays',
-
-              title:
-                'ИТР-дни',
-
-              selector:
-                '#rItr',
-
-              closest:
-                '.stat'
-            },
-
-            {
-              id:
-                'workerDays',
-
-              title:
-                'Рабочие-дни',
-
-              selector:
-                '#rWorkers',
-
-              closest:
-                '.stat'
-            },
-
-            {
-              id:
-                'mechanizerDays',
-
-              title:
-                'Механизаторы-дни',
-
-              selector:
-                '#rMech',
-
-              closest:
-                '.stat'
-            },
-
-            {
-              id:
-                'peopleDays',
-
-              title:
-                'Всего чел.-дней',
-
-              selector:
-                '#rTotalPeople',
-
-              closest:
-                '.stat'
-            },
-
-            {
-              id:
-                'peakPeople',
-
-              title:
-                'Пик людей',
-
-              selector:
-                '#rPeak',
-
-              closest:
-                '.stat'
-            },
-
-            {
-              id:
-                'equipmentDays',
-
-              title:
-                'Технико-дни',
-
-              selector:
-                '#rEquipDays',
-
-              closest:
-                '.stat'
-            }
-          ],
-
-          actions: [
-            {
-              id:
-                'columns',
-
-              title:
-                'Настроить таблицу',
-
-              selector:
-                '#resourceColumnsBtn'
-            },
-
-            {
-              id:
-                'deleteSelected',
-
-              title:
-                'Удалить выбранное',
-
-              selector:
-                '#resourceDeleteSelectedBtn'
-            },
-
-            {
-              id:
-                'deleteFiltered',
-
-              title:
-                'Удалить по фильтру',
-
-              selector:
-                '#resourceDeleteFilteredBtn'
-            }
-          ],
-
-          blocks: [
-            {
-              id:
-                'journalTable',
-
-              title:
-                'Журнал',
-
-              selector:
-                '#resourceRows',
-
-              closest:
-                '.card'
-            }
-          ],
-
-          tables: [
-            {
-              ...resourceTableSchema(
-                'journal',
-                'journal'
-              ),
-
-              selector:
-                '#resourceRows',
-
-              closest:
-                'table'
-            }
-          ],
-
-          getPrintHtml:
-            resourcePrintJournal
-        }
-      )
-    );
-
-  window
-    .LIV_VIEW_BUILDER
-    .register(
-      'resources:daily',
-
-      resourceSchemaBase(
-        'daily',
-        {
-          title:
-            'Ежедневная сводка ресурсов',
-
-          filters: [
-            {
-              id:
-                'dailyDate',
-
-              title:
-                'Дата сводки',
-
-              selector:
-                '#rDailyDate',
-
-              closest:
-                '.field'
-            }
-          ],
-
-          kpis: [
-            {
-              id:
-                'peopleTotal',
-
-              title:
-                'Сотрудников на объекте',
-
-              selector:
-                '#rdPeopleTotal',
-
-              closest:
-                '.stat'
-            },
-
-            {
-              id:
-                'equipmentTotal',
-
-              title:
-                'Техники на объекте',
-
-              selector:
-                '#rdEquipmentTotal',
-
-              closest:
-                '.stat'
-            }
-          ],
-
-          blocks: [
-            {
-              id:
-                'peopleTable',
-
-              title:
-                'Люди',
-
-              selector:
-                '#rdPeopleBody',
-
-              closest:
-                '.card'
-            },
-
-            {
-              id:
-                'equipmentTable',
-
-              title:
-                'Техника',
-
-              selector:
-                '#rdEquipmentBody',
-
-              closest:
-                '.card'
-            }
-          ],
-
-          tables: [
-            {
-              ...resourceTableSchema(
-                'daily',
-                'people'
-              ),
-
-              selector:
-                '#rdPeopleBody',
-
-              closest:
-                'table'
-            },
-
-            {
-              ...resourceTableSchema(
-                'daily',
-                'equipment'
-              ),
-
-              selector:
-                '#rdEquipmentBody',
-
-              closest:
-                'table'
-            }
-          ],
-
-          getPrintHtml:
-            resourcePrintDaily
-        }
-      )
-    );
-
-  window
-    .LIV_VIEW_BUILDER
-    .register(
-      'resources:dynamics',
-
-      resourceSchemaBase(
-        'dynamics',
-        {
-          title:
-            'Динамика ресурсов',
-
-          filters: [
-            {
-              id:
-                'metric',
-
-              title:
-                'Показатель',
-
-              selector:
-                '#rDynType',
-
-              closest:
-                '.field'
-            },
-
-            {
-              id:
-                'step',
-
-              title:
-                'Шаг',
-
-              selector:
-                '#rDynStep',
-
-              closest:
-                '.field'
-            },
-
-            {
-              id:
-                'quickOrg',
-
-              title:
-                'Быстрый выбор организации',
-
-              selector:
-                '#rDynOrg',
-
-              closest:
-                '.field'
-            }
-          ],
-
-          blocks: [
-            {
-              id:
-                'chartsBlock',
-
-              title:
-                'Диаграммы',
-
-              selector:
-                '#resourceCharts'
-            }
-          ],
-
-          charts: [
-            {
-              id:
-                'resourceCharts',
-
-              title:
-                'Диаграммы ресурсов',
-
-              selector:
-                '#resourceCharts'
-            }
-          ],
-
-          getPrintHtml:
-            resourcePrintDynamics
-        }
-      )
-    );
-
-  window
-    .LIV_VIEW_BUILDER
-    .register(
-      'resources:analytics',
-
-      resourceSchemaBase(
-        'analytics',
-        {
-          title:
-            'Месячная аналитика ресурсов',
-
-          filters: [
-            {
-              id:
-                'averageMethod',
-
-              title:
-                'Метод среднего',
-
-              selector:
-                '#rAvgMethod',
-
-              closest:
-                '.field'
-            },
-
-            {
-              id:
-                'missingRule',
-
-              title:
-                'Если записи нет',
-
-              selector:
-                '#rMissingRule',
-
-              closest:
-                '.field'
-            }
-          ],
-
-          actions: [
-            {
-              id:
-                'saveView',
-
-              title:
-                'Сохранить представление',
-
-              selector:
-                '#saveResourceViewBtn'
-            }
-          ],
-
-          kpis: [
-            {
-              id:
-                'peopleAvg',
-
-              title:
-                'Среднее сотрудников',
-
-              selector:
-                '#raPeopleAvg',
-
-              closest:
-                '.stat'
-            },
-
-            {
-              id:
-                'equipmentAvg',
-
-              title:
-                'Среднее техники',
-
-              selector:
-                '#raEquipmentAvg',
-
-              closest:
-                '.stat'
-            },
-
-            {
-              id:
-                'daysCount',
-
-              title:
-                'Дней в расчете',
-
-              selector:
-                '#raDaysCount',
-
-              closest:
-                '.stat'
-            }
-          ],
-
-          blocks: [
-            {
-              id:
-                'peopleAnalytics',
-
-              title:
-                'Среднее количество сотрудников',
-
-              selector:
-                '#raPeopleBody',
-
-              closest:
-                '.card'
-            },
-
-            {
-              id:
-                'equipmentAnalytics',
-
-              title:
-                'Среднее количество строительной техники',
-
-              selector:
-                '#raEquipmentBody',
-
-              closest:
-                '.card'
-            }
-          ],
-
-          tables: [
-            {
-              ...resourceTableSchema(
-                'analytics',
-                'people'
-              ),
-
-              selector:
-                '#raPeopleBody',
-
-              closest:
-                'table'
-            },
-
-            {
-              ...resourceTableSchema(
-                'analytics',
-                'equipment'
-              ),
-
-              selector:
-                '#raEquipmentBody',
-
-              closest:
-                'table'
-            }
-          ],
-
-          getPrintHtml:
-            resourcePrintAnalytics
-        }
-      )
-    );
-
-  window
-    .LIV_VIEW_BUILDER
-    .register(
-      'resources:planfact',
-
-      resourceSchemaBase(
-        'planfact',
-        {
-          title:
-            'План / факт ресурсов',
-
-          filters: [
-            {
-              id:
-                'planfactStep',
-
-              title:
-                'Шаг',
-
-              selector:
-                '#rpStep',
-
-              closest:
-                '.field'
-            }
-          ],
-
-          actions: [
-            {
-              id:
-                'addPlan',
-
-              title:
-                '+ Добавить план ресурсов',
-
-              selector:
-                '#newResourcePlanBtn'
-            }
-          ],
-
-          kpis: [
-            {
-              id:
-                'planSum',
-
-              title:
-                'План, чел.-дни',
-
-              selector:
-                '#rpPlanSum',
-
-              closest:
-                '.stat'
-            },
-
-            {
-              id:
-                'factSum',
-
-              title:
-                'Факт, чел.-дни',
-
-              selector:
-                '#rpFactSum',
-
-              closest:
-                '.stat'
-            },
-
-            {
-              id:
-                'deviation',
-
-              title:
-                'Отклонение',
-
-              selector:
-                '#rpDeviation',
-
-              closest:
-                '.stat'
-            }
-          ],
-
-          blocks: [
-            {
-              id:
-                'planfactTable',
-
-              title:
-                'Таблица план / факт',
-
-              selector:
-                '#rpBody',
-
-              closest:
-                '.card'
-            },
-
-            {
-              id:
-                'planfactChart',
-
-              title:
-                'График план / факт',
-
-              selector:
-                '#resourcePlanFactChart',
-
-              closest:
-                '.card'
-            }
-          ],
-
-          charts: [
-            {
-              id:
-                'planfactChart',
-
-              title:
-                'График план / факт',
-
-              selector:
-                '#resourcePlanFactChart',
-
-              closest:
-                '.card'
-            }
-          ],
-
-          tables: [
-            {
-              ...resourceTableSchema(
-                'planfact',
-                'planfact'
-              ),
-
-              selector:
-                '#rpBody',
-
-              closest:
-                'table'
-            }
-          ],
-
-          getPrintHtml:
-            resourcePrintPlanFact
-        }
-      )
-    );
-}
-
-/* =========================================================
-   СОХРАНИТЬ ПРЕДСТАВЛЕНИЕ
-   ========================================================= */
-
-async function saveResourceView() {
   if (
-    typeof livOpenViewBuilder ===
-    'function'
+    livResourceSchemasRegistered
   ) {
-    livOpenViewBuilder();
     return;
   }
 
-  alert(
-    'Конструктор представлений не загружен.'
+  livResourceSchemasRegistered =
+    true;
+
+  window.LIV_VIEW_BUILDER.register(
+    'resources:journal',
+
+    resourceSchemaBase(
+      'journal',
+      {
+        title:
+          'Журнал ресурсов',
+
+        kpis: [
+          {
+            id: 'itrDays',
+            title: 'ИТР-дни',
+            selector: '#rItr',
+            closest: '.stat'
+          },
+
+          {
+            id: 'workerDays',
+            title: 'Рабочие-дни',
+            selector: '#rWorkers',
+            closest: '.stat'
+          },
+
+          {
+            id: 'mechanizerDays',
+            title: 'Механизаторы-дни',
+            selector: '#rMech',
+            closest: '.stat'
+          },
+
+          {
+            id: 'peopleDays',
+            title: 'Всего чел.-дней',
+            selector: '#rTotalPeople',
+            closest: '.stat'
+          },
+
+          {
+            id: 'peakPeople',
+            title: 'Пик людей',
+            selector: '#rPeak',
+            closest: '.stat'
+          },
+
+          {
+            id: 'equipmentDays',
+            title: 'Технико-дни',
+            selector: '#rEquipDays',
+            closest: '.stat'
+          }
+        ],
+
+        actions: [
+          {
+            id: 'columns',
+            title: 'Настроить таблицу',
+            selector: '#resourceColumnsBtn'
+          },
+
+          {
+            id: 'deleteSelected',
+            title: 'Удалить выбранное',
+            selector: '#resourceDeleteSelectedBtn'
+          },
+
+          {
+            id: 'deleteFiltered',
+            title: 'Удалить по фильтру',
+            selector: '#resourceDeleteFilteredBtn'
+          }
+        ],
+
+        blocks: [
+          {
+            id: 'journalTable',
+            title: 'Журнал',
+            selector: '#resourceRows',
+            closest: '.card'
+          }
+        ],
+
+        tables: [
+          {
+            ...resourceTableSchema(
+              'journal',
+              'journal'
+            ),
+
+            selector:
+              '#resourceRows',
+
+            closest:
+              'table'
+          }
+        ],
+
+        getPrintHtml:
+          resourcePrintJournal
+      }
+    )
+  );
+
+  window.LIV_VIEW_BUILDER.register(
+    'resources:daily',
+
+    resourceSchemaBase(
+      'daily',
+      {
+        title:
+          'Ежедневная сводка ресурсов',
+
+        filters: [
+          {
+            id: 'dailyDate',
+            title: 'Дата сводки',
+            selector: '#rDailyDate',
+            closest: '.field'
+          }
+        ],
+
+        kpis: [
+          {
+            id: 'peopleTotal',
+            title: 'Сотрудников на объекте',
+            selector: '#rdPeopleTotal',
+            closest: '.stat'
+          },
+
+          {
+            id: 'equipmentTotal',
+            title: 'Техники на объекте',
+            selector: '#rdEquipmentTotal',
+            closest: '.stat'
+          }
+        ],
+
+        blocks: [
+          {
+            id: 'peopleTable',
+            title: 'Люди',
+            selector: '#rdPeopleBody',
+            closest: '.card'
+          },
+
+          {
+            id: 'equipmentTable',
+            title: 'Техника',
+            selector: '#rdEquipmentBody',
+            closest: '.card'
+          }
+        ],
+
+        tables: [
+          {
+            ...resourceTableSchema(
+              'daily',
+              'people'
+            ),
+
+            selector:
+              '#rdPeopleBody',
+
+            closest:
+              'table'
+          },
+
+          {
+            ...resourceTableSchema(
+              'daily',
+              'equipment'
+            ),
+
+            selector:
+              '#rdEquipmentBody',
+
+            closest:
+              'table'
+          }
+        ],
+
+        getPrintHtml:
+          resourcePrintDaily
+      }
+    )
+  );
+
+  window.LIV_VIEW_BUILDER.register(
+    'resources:dynamics',
+
+    resourceSchemaBase(
+      'dynamics',
+      {
+        title:
+          'Динамика ресурсов',
+
+        filters: [
+          {
+            id: 'metric',
+            title: 'Показатель',
+            selector: '#rDynType',
+            closest: '.field'
+          },
+
+          {
+            id: 'step',
+            title: 'Шаг',
+            selector: '#rDynStep',
+            closest: '.field'
+          },
+
+          {
+            id: 'quickOrg',
+            title: 'Быстрый выбор организации',
+            selector: '#rDynOrg',
+            closest: '.field'
+          }
+        ],
+
+        blocks: [
+          {
+            id: 'chartsBlock',
+            title: 'Диаграммы',
+            selector: '#resourceCharts'
+          }
+        ],
+
+        charts: [
+          {
+            id: 'resourceCharts',
+            title: 'Диаграммы ресурсов',
+            selector: '#resourceCharts'
+          }
+        ],
+
+        getPrintHtml:
+          resourcePrintDynamics
+      }
+    )
+  );
+
+  window.LIV_VIEW_BUILDER.register(
+    'resources:analytics',
+
+    resourceSchemaBase(
+      'analytics',
+      {
+        title:
+          'Месячная аналитика ресурсов',
+
+        filters: [
+          {
+            id: 'averageMethod',
+            title: 'Метод среднего',
+            selector: '#rAvgMethod',
+            closest: '.field'
+          },
+
+          {
+            id: 'missingRule',
+            title: 'Если записи нет',
+            selector: '#rMissingRule',
+            closest: '.field'
+          }
+        ],
+
+        actions: [
+          {
+            id: 'saveView',
+            title: 'Сохранить представление',
+            selector: '#saveResourceViewBtn'
+          }
+        ],
+
+        kpis: [
+          {
+            id: 'peopleAvg',
+            title: 'Среднее сотрудников',
+            selector: '#raPeopleAvg',
+            closest: '.stat'
+          },
+
+          {
+            id: 'equipmentAvg',
+            title: 'Среднее техники',
+            selector: '#raEquipmentAvg',
+            closest: '.stat'
+          },
+
+          {
+            id: 'daysCount',
+            title: 'Дней в расчете',
+            selector: '#raDaysCount',
+            closest: '.stat'
+          }
+        ],
+
+        blocks: [
+          {
+            id: 'peopleAnalytics',
+            title: 'Среднее количество сотрудников',
+            selector: '#raPeopleBody',
+            closest: '.card'
+          },
+
+          {
+            id: 'equipmentAnalytics',
+            title: 'Среднее количество строительной техники',
+            selector: '#raEquipmentBody',
+            closest: '.card'
+          }
+        ],
+
+        tables: [
+          {
+            ...resourceTableSchema(
+              'analytics',
+              'people'
+            ),
+
+            selector:
+              '#raPeopleBody',
+
+            closest:
+              'table'
+          },
+
+          {
+            ...resourceTableSchema(
+              'analytics',
+              'equipment'
+            ),
+
+            selector:
+              '#raEquipmentBody',
+
+            closest:
+              'table'
+          }
+        ],
+
+        getPrintHtml:
+          resourcePrintAnalytics
+      }
+    )
+  );
+
+  window.LIV_VIEW_BUILDER.register(
+    'resources:planfact',
+
+    resourceSchemaBase(
+      'planfact',
+      {
+        title:
+          'План / факт ресурсов',
+
+        filters: [
+          {
+            id: 'planfactStep',
+            title: 'Шаг',
+            selector: '#rpStep',
+            closest: '.field'
+          }
+        ],
+
+        actions: [
+          {
+            id: 'addPlan',
+            title: '+ Добавить план ресурсов',
+            selector: '#newResourcePlanBtn'
+          }
+        ],
+
+        kpis: [
+          {
+            id: 'planSum',
+            title: 'План, чел.-дни',
+            selector: '#rpPlanSum',
+            closest: '.stat'
+          },
+
+          {
+            id: 'factSum',
+            title: 'Факт, чел.-дни',
+            selector: '#rpFactSum',
+            closest: '.stat'
+          },
+
+          {
+            id: 'deviation',
+            title: 'Отклонение',
+            selector: '#rpDeviation',
+            closest: '.stat'
+          }
+        ],
+
+        blocks: [
+          {
+            id: 'planfactTable',
+            title: 'Таблица план / факт',
+            selector: '#rpBody',
+            closest: '.card'
+          },
+
+          {
+            id: 'planfactChart',
+            title: 'График план / факт',
+            selector: '#resourcePlanFactChart',
+            closest: '.card'
+          }
+        ],
+
+        charts: [
+          {
+            id: 'planfactChart',
+            title: 'График план / факт',
+            selector: '#resourcePlanFactChart',
+            closest: '.card'
+          }
+        ],
+
+        tables: [
+          {
+            ...resourceTableSchema(
+              'planfact',
+              'planfact'
+            ),
+
+            selector:
+              '#rpBody',
+
+            closest:
+              'table'
+          }
+        ],
+
+        getPrintHtml:
+          resourcePrintPlanFact
+      }
+    )
   );
 }
 
-/* =========================================================
-   ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК
-   ========================================================= */
+function switchResourceView(view) {
+  if (!view) {
+    return;
+  }
 
-function switchResourceView(
-  view
-) {
   livResourceView =
     view;
 
@@ -7408,18 +6352,13 @@ function switchResourceView(
     .querySelectorAll(
       '[data-rview]'
     )
-    .forEach(
-      button => {
-        button
-          .classList
-          .toggle(
-            'active',
-            button.dataset
-              .rview ===
-              view
-          );
-      }
-    );
+    .forEach(button => {
+      button.classList.toggle(
+        'active',
+        button.dataset.rview ===
+        view
+      );
+    });
 
   document
     .querySelectorAll(
@@ -7427,11 +6366,9 @@ function switchResourceView(
     )
     .forEach(
       panel =>
-        panel
-          .classList
-          .add(
-            'hidden'
-          )
+        panel.classList.add(
+          'hidden'
+        )
     );
 
   document
@@ -7443,7 +6380,26 @@ function switchResourceView(
       'hidden'
     );
 
-  renderResourceCurrentView();
+  /*
+    Сначала отдаем браузеру кадр
+    на переключение вкладки,
+    потом считаем данные.
+  */
+  const token =
+    ++livResourceRenderToken;
+
+  requestAnimationFrame(
+    () => {
+      if (
+        token !==
+        livResourceRenderToken
+      ) {
+        return;
+      }
+
+      renderResourceCurrentView();
+    }
+  );
 }
 
 function renderResourceCurrentView() {
@@ -7477,20 +6433,13 @@ function renderResourceCurrentView() {
     typeof livApplyViewConstructor ===
     'function'
   ) {
-    setTimeout(
-      livApplyViewConstructor,
-      0
-    );
+    livApplyViewConstructor();
   }
 }
 
 function renderResourceJournal() {
   return resourceRenderJournal();
 }
-
-/* =========================================================
-   СТИЛИ
-   ========================================================= */
 
 function ensureResourceScreenStyles() {
   if (
@@ -7508,7 +6457,6 @@ function ensureResourceScreenStyles() {
     'livResourceScreenStyles';
 
   style.textContent = `
-
     #tab-resources .num-cell,
     #tab-resources .num-head{
       text-align:center!important;
@@ -7545,20 +6493,31 @@ function ensureResourceScreenStyles() {
       min-width:0;
     }
 
+    #tab-resources .resource-journal-pager{
+      display:flex;
+      align-items:center;
+      justify-content:flex-end;
+      gap:8px;
+      padding:10px 0 0;
+      color:var(--muted);
+    }
   `;
 
-  document
-    .head
-    .appendChild(
-      style
-    );
+  document.head.appendChild(
+    style
+  );
 }
 
-/* =========================================================
-   BIND
-   ========================================================= */
-
 function bindResourceUi() {
+  if (
+    livResourceUiBound
+  ) {
+    return;
+  }
+
+  livResourceUiBound =
+    true;
+
   ensureResourceScreenStyles();
 
   registerResourceBuilderSchemas();
@@ -7567,16 +6526,13 @@ function bindResourceUi() {
     .querySelectorAll(
       '[data-rview]'
     )
-    .forEach(
-      button => {
-        button.onclick =
-          () =>
-            switchResourceView(
-              button.dataset
-                .rview
-            );
-      }
-    );
+    .forEach(button => {
+      button.onclick =
+        () =>
+          switchResourceView(
+            button.dataset.rview
+          );
+    });
 
   [
     'rFrom',
@@ -7682,19 +6638,21 @@ function bindResourceUi() {
   );
 }
 
-/* =========================================================
-   АВТОИНИЦИАЛИЗАЦИЯ
-   ========================================================= */
-
 function resourceBootstrap(
-  attempt =
-    0
+  attempt = 0
 ) {
+  /*
+    Ждем, пока app.js закончит базовую инициализацию,
+    и один раз назначаем обработчики ресурсов.
+    Никаких повторных bind через 600 мс.
+  */
   if (
     typeof project !==
       'undefined' &&
     project &&
     typeof bindChange ===
+      'function' &&
+    typeof bindClick ===
       'function'
   ) {
     ensureResourceScreenStyles();
@@ -7710,41 +6668,19 @@ function resourceBootstrap(
       initLivViewBuilder();
     }
 
-    /*
-      Второй bind нужен намеренно:
-      старый app.js может назначить свои обработчики
-      после первого запуска ресурсов.
-      Через 600 мс ресурсы возвращают себе
-      управление только своими элементами.
-    */
-    setTimeout(
-      () => {
-        bindResourceUi();
-
-        if (
-          typeof initLivViewBuilder ===
-          'function'
-        ) {
-          initLivViewBuilder();
-        }
-      },
-      600
-    );
-
     return;
   }
 
   if (
     attempt <
-    40
+    80
   ) {
     setTimeout(
       () =>
         resourceBootstrap(
-          attempt +
-          1
+          attempt + 1
         ),
-      250
+      100
     );
   }
 }
@@ -7753,19 +6689,15 @@ if (
   document.readyState ===
   'loading'
 ) {
-  document.addEventListener(
-    'DOMContentLoaded',
-    () =>
-      setTimeout(
-        () =>
-          resourceBootstrap(),
-        50
-      )
-  );
-} else {
-  setTimeout(
+  window.addEventListener(
+    'load',
     () =>
       resourceBootstrap(),
-    50
+    {
+      once:
+        true
+    }
   );
+} else {
+  resourceBootstrap();
 }
