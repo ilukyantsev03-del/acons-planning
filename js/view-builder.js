@@ -2,227 +2,123 @@
 
 /* =========================================================
    LIV Planning — UNIVERSAL VIEW BUILDER
-   Единый конструктор представлений, таблиц и печати
+   Конструктор представлений + сохраненные виды + печать
    ========================================================= */
 
 let livViewBuilderInitialized = false;
 let livViewRegistry = new Map();
-let livPrintFrame = null;
-
-
-/* =========================================================
-   БАЗОВЫЕ ПОМОЩНИКИ
-   ========================================================= */
 
 function livVBArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
-
 function livVBText(value) {
   return String(value ?? '').trim();
 }
 
-
-function livVBKey(value) {
-  return normKey(
-    livVBText(value)
-  ) || 'item';
-}
-
-
 function livVBClone(value) {
-
   try {
-
-    return clone(
-      value
-    );
-
-  } catch (
-    error
-  ) {
-
-    return JSON.parse(
-      JSON.stringify(
-        value
-      )
-    );
+    return clone(value);
+  } catch (error) {
+    return JSON.parse(JSON.stringify(value));
   }
 }
-
 
 function livVBEnsureState() {
-
-  if (
-    !project
-  ) {
-    return;
-  }
-
+  if (typeof project === 'undefined' || !project) return false;
 
   if (
     !project.viewBuilder ||
-    typeof project.viewBuilder !==
-      'object' ||
-    Array.isArray(
-      project.viewBuilder
-    )
+    typeof project.viewBuilder !== 'object' ||
+    Array.isArray(project.viewBuilder)
   ) {
-
-    project.viewBuilder =
-      {};
+    project.viewBuilder = {};
   }
-
 
   if (
     !project.viewBuilder.views ||
-    typeof project.viewBuilder.views !==
-      'object' ||
-    Array.isArray(
-      project.viewBuilder.views
-    )
+    typeof project.viewBuilder.views !== 'object' ||
+    Array.isArray(project.viewBuilder.views)
   ) {
-
-    project.viewBuilder.views =
-      {};
+    project.viewBuilder.views = {};
   }
 
-
-  if (
-    !Array.isArray(
-      project.viewBuilder.profiles
-    )
-  ) {
-
-    project.viewBuilder.profiles =
-      [];
+  if (!Array.isArray(project.viewBuilder.profiles)) {
+    project.viewBuilder.profiles = [];
   }
+
+  return true;
 }
 
-
-/* =========================================================
-   НАСТРОЙКИ ПО УМОЛЧАНИЮ
-   ========================================================= */
-
-function livVBDefaultViewConfig() {
-
+function livVBDefaultViewSettings() {
   return {
+    hiddenModes: [],
+    modeOrder: [],
 
-    hiddenModes:
-      [],
+    hiddenFilters: [],
+    filterOrder: [],
 
-    modeOrder:
-      [],
+    hiddenActions: [],
+    actionOrder: [],
 
-    hiddenFilters:
-      [],
+    hiddenKpis: [],
+    kpiOrder: [],
 
-    filterOrder:
-      [],
+    hiddenBlocks: [],
+    blockOrder: [],
 
-    hiddenKpis:
-      [],
+    hiddenCharts: [],
+    chartOrder: [],
 
-    kpiOrder:
-      [],
-
-    hiddenBlocks:
-      [],
-
-    blockOrder:
-      [],
-
-    hiddenCharts:
-      [],
-
-    chartOrder:
-      [],
-
-    tables:
-      {},
+    tables: {},
 
     print: {
-
-      orientation:
-        'landscape',
-
-      showHeader:
-        true,
-
-      showFilters:
-        true,
-
-      showFooter:
-        true,
-
-      compact:
-        false
+      orientation: 'landscape',
+      showReportHeader: true,
+      showFilters: true,
+      showFooter: true,
+      compact: false
     }
   };
 }
 
-
 /* =========================================================
-   РЕЕСТР СХЕМ
+   РЕЕСТР
    ========================================================= */
 
-function livRegisterViewSchema(
-  viewKey,
-  schema
-) {
-
-  if (
-    !viewKey ||
-    !schema
-  ) {
-    return;
-  }
-
+function livRegisterViewSchema(viewKey, schema) {
+  if (!viewKey || !schema) return;
 
   livViewRegistry.set(
-    String(
-      viewKey
-    ),
+    String(viewKey),
     schema
   );
 }
 
-
-function livGetRegisteredViewSchema(
-  viewKey
-) {
-
+function livGetRegisteredViewSchema(viewKey) {
   return (
     livViewRegistry.get(
-      String(
-        viewKey
-      )
+      String(viewKey)
     ) ||
     null
   );
 }
 
-
 window.LIV_VIEW_BUILDER =
   window.LIV_VIEW_BUILDER ||
   {};
 
-
 window.LIV_VIEW_BUILDER.register =
   livRegisterViewSchema;
 
-
 window.LIV_VIEW_BUILDER.get =
   livGetRegisteredViewSchema;
-
 
 /* =========================================================
    ТЕКУЩИЙ РАЗДЕЛ
    ========================================================= */
 
 function livActiveMainTab() {
-
   return (
     document
       .querySelector(
@@ -234,9 +130,7 @@ function livActiveMainTab() {
   );
 }
 
-
 function livActiveResourceView() {
-
   return (
     document
       .querySelector(
@@ -244,16 +138,18 @@ function livActiveResourceView() {
       )
       ?.dataset
       .rview ||
-    'journal'
+    (
+      typeof livResourceView !==
+      'undefined'
+        ? livResourceView
+        : 'journal'
+    )
   );
 }
 
-
 function livCurrentViewKey() {
-
   const tab =
     livActiveMainTab();
-
 
   return (
     tab ===
@@ -263,152 +159,77 @@ function livCurrentViewKey() {
   );
 }
 
-
 function livCurrentPanel() {
-
   const tab =
     livActiveMainTab();
-
 
   if (
     tab ===
     'resources'
   ) {
-
     return (
-      $(
+      document.getElementById(
         `rview-${livActiveResourceView()}`
       ) ||
-      $('tab-resources')
+      document.getElementById(
+        'tab-resources'
+      )
     );
   }
 
-
-  return $(
+  return document.getElementById(
     `tab-${tab}`
   );
 }
-
 
 /* =========================================================
    НАЗВАНИЯ
    ========================================================= */
 
-function livMainTabTitle(
-  tab
-) {
-
-  const map = {
-
-    dashboard:
-      'Сводка проекта',
-
-    matrix:
-      'Шахматка',
-
-    gantt:
-      'График производства работ',
-
-    planfact:
-      'План / факт',
-
-    resources:
-      'Ресурсы',
-
-    organizations:
-      'Карточка организации',
-
-    milestones:
-      'Ключевые даты',
-
-    elements:
-      'Номерные элементы',
-
-    demolition:
-      'Демонтаж',
-
-    import:
-      'Импорт',
-
-    history:
-      'История изменений',
-
-    settings:
-      'Настройки'
+function livMainTabTitle(tab) {
+  const titles = {
+    dashboard: 'Сводка проекта',
+    matrix: 'Шахматка',
+    gantt: 'График производства работ',
+    planfact: 'План / факт',
+    resources: 'Ресурсы',
+    organizations: 'Карточка организации',
+    milestones: 'Ключевые даты',
+    elements: 'Номерные элементы',
+    demolition: 'Демонтаж',
+    import: 'Импорт',
+    history: 'История изменений',
+    settings: 'Настройки'
   };
 
-
-  if (
-    String(
-      tab
-    )
-      .startsWith(
-        'custom-'
-      )
-  ) {
-
-    const id =
-      String(
-        tab
-      )
-        .replace(
-          'custom-',
-          ''
-        );
-
-
-    return (
-      byId(
-        project.customSections ||
-        [],
-        id
-      )
-        ?.name ||
-      'Пользовательский раздел'
-    );
-  }
-
-
   return (
-    map[
+    titles[
       tab
     ] ||
     tab
   );
 }
 
+function livResourceViewTitle(view) {
+  const titles = {
+    journal: 'Журнал ресурсов',
+    daily: 'Ежедневная сводка ресурсов',
+    dynamics: 'Динамика ресурсов',
+    analytics: 'Аналитика ресурсов',
+    planfact: 'План / факт ресурсов'
+  };
 
-function livResourceViewTitle(
-  view
-) {
-
-  return ({
-    journal:
-      'Журнал ресурсов',
-
-    daily:
-      'Ежедневная сводка ресурсов',
-
-    dynamics:
-      'Динамика ресурсов',
-
-    analytics:
-      'Аналитика ресурсов',
-
-    planfact:
-      'План / факт ресурсов'
-  })[
-    view
-  ] ||
-  'Ресурсы';
+  return (
+    titles[
+      view
+    ] ||
+    'Ресурсы'
+  );
 }
 
-
 function livReportTitle() {
-
   const tab =
     livActiveMainTab();
-
 
   return (
     tab ===
@@ -422,7 +243,6 @@ function livReportTitle() {
   );
 }
 
-
 /* =========================================================
    СОСТОЯНИЕ ПРЕДСТАВЛЕНИЯ
    ========================================================= */
@@ -431,44 +251,29 @@ function livViewSettings(
   viewKey =
     livCurrentViewKey()
 ) {
-
-  livVBEnsureState();
-
-
   if (
-    !project.viewBuilder
-      .views[
-        viewKey
-      ]
+    !livVBEnsureState()
   ) {
-
-    project.viewBuilder
-      .views[
-        viewKey
-      ] =
-        livVBDefaultViewConfig();
+    return livVBDefaultViewSettings();
   }
 
-
   const defaults =
-    livVBDefaultViewConfig();
-
+    livVBDefaultViewSettings();
 
   const current =
-    project.viewBuilder
+    project
+      .viewBuilder
       .views[
         viewKey
       ] ||
     {};
 
-
-  project.viewBuilder
+  project
+    .viewBuilder
     .views[
       viewKey
     ] = {
-
       ...defaults,
-
       ...current,
 
       hiddenModes:
@@ -489,6 +294,16 @@ function livViewSettings(
       filterOrder:
         livVBArray(
           current.filterOrder
+        ),
+
+      hiddenActions:
+        livVBArray(
+          current.hiddenActions
+        ),
+
+      actionOrder:
+        livVBArray(
+          current.actionOrder
         ),
 
       hiddenKpis:
@@ -524,14 +339,15 @@ function livViewSettings(
       tables:
         current.tables &&
         typeof current.tables ===
-          'object'
+          'object' &&
+        !Array.isArray(
+          current.tables
+        )
           ? current.tables
           : {},
 
       print: {
-
         ...defaults.print,
-
         ...(
           current.print ||
           {}
@@ -539,76 +355,59 @@ function livViewSettings(
       }
     };
 
-
-  return project.viewBuilder
-    .views[
-      viewKey
-    ];
-}
-
-
-/* =========================================================
-   ПОРЯДОК ЭЛЕМЕНТОВ
-   ========================================================= */
-
-function livVBResolveItems(
-  items
-) {
-
-  return livVBArray(
-    items
-  )
-    .map(
-      (
-        item,
-        index
-      ) => ({
-
-        ...item,
-
-        id:
-          item.id ||
-          `item-${index + 1}`,
-
-        title:
-          item.title ||
-          item.label ||
-          item.id ||
-          `Элемент ${index + 1}`
-      })
-    );
-}
-
-
-function livVBResolveTableColumns(
-  tableSchema
-) {
-
-  const source =
-    typeof tableSchema
-      ?.columns ===
-    'function'
-      ? tableSchema.columns()
-      : tableSchema
-          ?.columns;
-
-
-  return livVBResolveItems(
-    source
+  return (
+    project
+      .viewBuilder
+      .views[
+        viewKey
+      ]
   );
 }
 
+/* =========================================================
+   ЭЛЕМЕНТЫ / ПОРЯДОК
+   ========================================================= */
+
+function livVBResolveItems(items) {
+  const source =
+    typeof items ===
+    'function'
+      ? items()
+      : items;
+
+  return (
+    livVBArray(
+      source
+    )
+      .map(
+        (
+          item,
+          index
+        ) => ({
+          ...item,
+
+          id:
+            item.id ||
+            `item-${index + 1}`,
+
+          title:
+            item.title ||
+            item.label ||
+            item.id ||
+            `Элемент ${index + 1}`
+        })
+      )
+  );
+}
 
 function livVBOrdered(
   items,
   order
 ) {
-
   const list =
     livVBResolveItems(
       items
     );
-
 
   const map =
     new Map(
@@ -620,42 +419,60 @@ function livVBOrdered(
       )
     );
 
+  const result =
+    [];
 
-  return [
-
-    ...livVBArray(
-      order
-    )
-      .filter(
-        id =>
+  livVBArray(
+    order
+  )
+    .forEach(
+      id => {
+        if (
           map.has(
             id
           )
-      )
-      .map(
-        id =>
-          map.get(
-            id
-          )
-      ),
-
-    ...list
-      .filter(
-        item =>
-          !livVBArray(
-            order
-          )
-            .includes(
-              item.id
+        ) {
+          result.push(
+            map.get(
+              id
             )
-      )
-  ];
+          );
+        }
+      }
+    );
+
+  list.forEach(
+    item => {
+      if (
+        !result.some(
+          current =>
+            current.id ===
+            item.id
+        )
+      ) {
+        result.push(
+          item
+        );
+      }
+    }
+  );
+
+  return result;
 }
 
-
 /* =========================================================
-   КОНФИГУРАЦИЯ ТАБЛИЦЫ
+   ТАБЛИЦЫ
    ========================================================= */
+
+function livVBResolveTableColumns(
+  tableSchema
+) {
+  return livVBResolveItems(
+    tableSchema
+      ?.columns ||
+    []
+  );
+}
 
 function livVBGetTableConfig(
   viewKey,
@@ -663,12 +480,10 @@ function livVBGetTableConfig(
   tableSchema =
     {}
 ) {
-
   const view =
     livViewSettings(
       viewKey
     );
-
 
   const existing =
     view.tables
@@ -677,50 +492,44 @@ function livVBGetTableConfig(
       ] ||
     {};
 
-
   const columns =
     livVBResolveTableColumns(
       tableSchema
     );
 
-
-  const defaultOrder =
-    columns.map(
-      item =>
-        item.id
-    );
-
-
   return {
-
-    showTitle:
-      existing.showTitle !==
-        false &&
-      tableSchema.showTitle !==
-        false,
-
-    showHeader:
-      existing.showHeader !==
-        false &&
-      tableSchema.showHeader !==
-        false,
-
-    showFooter:
-      existing.showFooter !==
-        false &&
-      tableSchema.showFooter !==
-        false,
-
-    showRowNumbers:
-      existing.showRowNumbers !==
-        false &&
-      tableSchema.showRowNumbers !==
-        false,
-
     title:
       existing.title ??
       tableSchema.title ??
       '',
+
+    showTitle:
+      existing.showTitle ??
+      (
+        tableSchema.showTitle !==
+        false
+      ),
+
+    showHeader:
+      existing.showHeader ??
+      (
+        tableSchema.showHeader !==
+        false
+      ),
+
+    showFooter:
+      existing.showFooter ??
+      (
+        tableSchema.showFooter !==
+        false
+      ),
+
+    showRowNumbers:
+      existing.showRowNumbers ??
+      (
+        tableSchema.showRowNumbers !==
+        false
+      ),
 
     hiddenColumns:
       livVBArray(
@@ -735,7 +544,10 @@ function livVBGetTableConfig(
         ? livVBArray(
             existing.columnOrder
           )
-        : defaultOrder,
+        : columns.map(
+            column =>
+              column.id
+          ),
 
     columnTitles:
       existing.columnTitles &&
@@ -746,14 +558,12 @@ function livVBGetTableConfig(
   };
 }
 
-
-function livVBResolveVisibleColumns(
+function livVBVisibleColumns(
   viewKey,
   tableId,
   tableSchema =
     {}
 ) {
-
   const config =
     livVBGetTableConfig(
       viewKey,
@@ -761,119 +571,366 @@ function livVBResolveVisibleColumns(
       tableSchema
     );
 
-
   const columns =
     livVBResolveTableColumns(
       tableSchema
     );
 
-
   const map =
     new Map(
       columns.map(
-        item => [
-          item.id,
-          item
+        column => [
+          column.id,
+          column
         ]
       )
     );
 
+  const ordered =
+    [];
 
-  const ordered = [
-
-    ...config.columnOrder
-      .filter(
-        id =>
+  config
+    .columnOrder
+    .forEach(
+      id => {
+        if (
           map.has(
             id
           )
-      )
-      .map(
-        id =>
-          map.get(
-            id
-          )
-      ),
+        ) {
+          ordered.push(
+            map.get(
+              id
+            )
+          );
+        }
+      }
+    );
 
-    ...columns
+  columns.forEach(
+    column => {
+      if (
+        !ordered.some(
+          item =>
+            item.id ===
+            column.id
+        )
+      ) {
+        ordered.push(
+          column
+        );
+      }
+    }
+  );
+
+  return (
+    ordered
       .filter(
-        item =>
-          !config.columnOrder
+        column =>
+          !config
+            .hiddenColumns
             .includes(
-              item.id
+              column.id
             )
       )
-  ];
+      .filter(
+        column =>
+          config.showRowNumbers ||
+          column.role !==
+            'rowNumber'
+      )
+      .map(
+        column => ({
+          ...column,
 
-
-  return ordered
-
-    .filter(
-      item =>
-        !config.hiddenColumns
-          .includes(
-            item.id
-          )
-    )
-
-    .filter(
-      item =>
-        config.showRowNumbers ||
-        item.role !==
-          'rowNumber'
-    )
-
-    .map(
-      item => ({
-
-        ...item,
-
-        title:
-          config.columnTitles[
-            item.id
-          ] ||
-          item.title
-      })
-    );
+          title:
+            config
+              .columnTitles[
+                column.id
+              ] ||
+            column.title
+        })
+      )
+  );
 }
-
 
 window.LIV_VIEW_BUILDER.tableConfig =
   livVBGetTableConfig;
 
-
 window.LIV_VIEW_BUILDER.visibleColumns =
-  livVBResolveVisibleColumns;
+  livVBVisibleColumns;
 
+window.LIV_VIEW_BUILDER.settings =
+  livViewSettings;
 
 /* =========================================================
-   АВТООПРЕДЕЛЕНИЕ СТРАНИЦ
-   ДЛЯ МОДУЛЕЙ БЕЗ ЯВНОЙ СХЕМЫ
+   DOM ЭЛЕМЕНТ
    ========================================================= */
 
-function livVBAutoSchema(
-  viewKey =
-    livCurrentViewKey()
-) {
+function livVBFindElement(item) {
+  if (
+    !item
+      ?.selector
+  ) {
+    return null;
+  }
 
-  const panel =
-    livCurrentPanel();
+  let element =
+    null;
 
-
-  const root =
-    livActiveMainTab() ===
-      'resources'
-      ? $('tab-resources')
-      : panel;
-
+  try {
+    element =
+      document.querySelector(
+        item.selector
+      );
+  } catch (
+    error
+  ) {
+    return null;
+  }
 
   if (
-    !panel ||
-    !root
+    !element
   ) {
+    return null;
+  }
 
-    return {
+  if (
+    item.closest
+  ) {
+    try {
+      return (
+        element.closest(
+          item.closest
+        ) ||
+        element
+      );
+    } catch (
+      error
+    ) {
+      return element;
+    }
+  }
 
+  return element;
+}
+
+/* =========================================================
+   ПРИМЕНЕНИЕ ГРУПП
+   ========================================================= */
+
+function livVBApplyGroup(
+  items,
+  hiddenIds,
+  orderIds
+) {
+  const ordered =
+    livVBOrdered(
+      items,
+      orderIds
+    );
+
+  const hidden =
+    new Set(
+      livVBArray(
+        hiddenIds
+      )
+    );
+
+  const groups =
+    new Map();
+
+  ordered.forEach(
+    item => {
+      const element =
+        livVBFindElement(
+          item
+        );
+
+      if (
+        !element
+      ) {
+        return;
+      }
+
+      element
+        .classList
+        .toggle(
+          'liv-builder-hidden',
+          hidden.has(
+            item.id
+          )
+        );
+
+      const parent =
+        element.parentElement;
+
+      if (
+        !parent
+      ) {
+        return;
+      }
+
+      if (
+        !groups.has(
+          parent
+        )
+      ) {
+        groups.set(
+          parent,
+          []
+        );
+      }
+
+      groups
+        .get(
+          parent
+        )
+        .push(
+          element
+        );
+    }
+  );
+
+  groups.forEach(
+    (
+      elements,
+      parent
+    ) => {
+      elements.forEach(
+        (
+          element,
+          index
+        ) => {
+          element.style.order =
+            String(
+              index
+            );
+
+          parent.appendChild(
+            element
+          );
+        }
+      );
+    }
+  );
+}
+
+/* =========================================================
+   ПРИМЕНЕНИЕ ТАБЛИЦ
+   ========================================================= */
+
+function livVBApplyTables(schema) {
+  livVBResolveItems(
+    schema.tables
+  )
+    .forEach(
+      tableSchema => {
+        const config =
+          livVBGetTableConfig(
+            livCurrentViewKey(),
+            tableSchema.id,
+            tableSchema
+          );
+
+        const anchor =
+          tableSchema.selector
+            ? document.querySelector(
+                tableSchema.selector
+              )
+            : null;
+
+        const table =
+          anchor
+            ?.matches
+            ?.(
+              'table'
+            )
+            ? anchor
+            : anchor
+                ?.closest
+                ?.(
+                  'table'
+                );
+
+        if (
+          !table
+        ) {
+          return;
+        }
+
+        const card =
+          table.closest(
+            '.card'
+          );
+
+        const title =
+          card
+            ?.querySelector(
+              'h2,h3'
+            );
+
+        const head =
+          table.querySelector(
+            'thead'
+          );
+
+        const foot =
+          table.querySelector(
+            'tfoot'
+          );
+
+        if (
+          title
+        ) {
+          title.textContent =
+            config.title ||
+            tableSchema.title ||
+            title.textContent;
+
+          title
+            .classList
+            .toggle(
+              'liv-builder-hidden',
+              !config.showTitle
+            );
+        }
+
+        if (
+          head
+        ) {
+          head
+            .classList
+            .toggle(
+              'liv-builder-hidden',
+              !config.showHeader
+            );
+        }
+
+        if (
+          foot
+        ) {
+          foot
+            .classList
+            .toggle(
+              'liv-builder-hidden',
+              !config.showFooter
+            );
+        }
+      }
+    );
+}
+
+/* =========================================================
+   СХЕМА
+   ========================================================= */
+
+function livGetCurrentSchema() {
+  return (
+    livGetRegisteredViewSchema(
+      livCurrentViewKey()
+    ) ||
+    {
       title:
         livReportTitle(),
 
@@ -881,6 +938,9 @@ function livVBAutoSchema(
         [],
 
       filters:
+        [],
+
+      actions:
         [],
 
       kpis:
@@ -894,633 +954,40 @@ function livVBAutoSchema(
 
       tables:
         []
-    };
-  }
-
-
-  const modes =
-    livActiveMainTab() ===
-    'resources'
-      ? [
-          ...document
-            .querySelectorAll(
-              '[data-rview]'
-            )
-        ]
-          .map(
-            button => ({
-
-              id:
-                button.dataset
-                  .rview,
-
-              title:
-                livVBText(
-                  button.textContent
-                ),
-
-              selector:
-                `[data-rview="${button.dataset.rview}"]`
-            })
-          )
-      : [];
-
-
-  const filters =
-    [
-      ...root
-        .querySelectorAll(
-          '.resource-toolbar .field,.resource-toolbar .switch-line,.toolbar .field,.section-toolbar.no-print .field'
-        )
-    ]
-      .map(
-        (
-          element,
-          index
-        ) => {
-
-          const control =
-            element.querySelector(
-              'input,select,textarea'
-            );
-
-
-          const id =
-            control?.id
-              ? `filter:${control.id}`
-              : `filter:auto-${index + 1}`;
-
-
-          if (
-            !element.dataset
-              .livAutoId
-          ) {
-
-            element.dataset
-              .livAutoId =
-                id;
-          }
-
-
-          return {
-
-            id,
-
-            title:
-              livVBText(
-                element
-                  .querySelector(
-                    'label'
-                  )
-                  ?.textContent ||
-                element.textContent
-              ) ||
-              `Фильтр ${index + 1}`,
-
-            selector:
-              `[data-liv-auto-id="${id}"]`
-          };
-        }
-      );
-
-
-  const kpis =
-    [
-      ...panel
-        .querySelectorAll(
-          '.stats > .stat'
-        )
-    ]
-      .map(
-        (
-          element,
-          index
-        ) => {
-
-          const id =
-            element
-              .querySelector(
-                'strong'
-              )
-              ?.id
-              ? `kpi:${element.querySelector('strong').id}`
-              : `kpi:auto-${index + 1}`;
-
-
-          if (
-            !element.dataset
-              .livAutoId
-          ) {
-
-            element.dataset
-              .livAutoId =
-                id;
-          }
-
-
-          return {
-
-            id,
-
-            title:
-              livVBText(
-                element
-                  .querySelector(
-                    'span'
-                  )
-                  ?.textContent
-              ) ||
-              `Показатель ${index + 1}`,
-
-            selector:
-              `[data-liv-auto-id="${id}"]`
-          };
-        }
-      );
-
-
-  const blocks =
-    [
-      ...panel.children
-    ]
-      .filter(
-        element =>
-          element.matches(
-            '.card,.grid2,.grid3,.resource-chart-grid,.chart-box-large'
-          )
-      )
-      .map(
-        (
-          element,
-          index
-        ) => {
-
-          const id =
-            element.id
-              ? `block:${element.id}`
-              : `block:auto-${index + 1}`;
-
-
-          if (
-            !element.dataset
-              .livAutoId
-          ) {
-
-            element.dataset
-              .livAutoId =
-                id;
-          }
-
-
-          return {
-
-            id,
-
-            title:
-              livVBText(
-                element
-                  .querySelector(
-                    'h2,h3'
-                  )
-                  ?.textContent
-              ) ||
-              `Блок ${index + 1}`,
-
-            selector:
-              `[data-liv-auto-id="${id}"]`
-          };
-        }
-      );
-
-
-  const charts =
-    [
-      ...panel
-        .querySelectorAll(
-          '.resource-chart-card,.chart-box-large'
-        )
-    ]
-      .map(
-        (
-          element,
-          index
-        ) => {
-
-          const id =
-            element.id
-              ? `chart:${element.id}`
-              : `chart:auto-${index + 1}`;
-
-
-          if (
-            !element.dataset
-              .livAutoId
-          ) {
-
-            element.dataset
-              .livAutoId =
-                id;
-          }
-
-
-          return {
-
-            id,
-
-            title:
-              livVBText(
-                element
-                  .querySelector(
-                    'h2,h3'
-                  )
-                  ?.textContent
-              ) ||
-              `График ${index + 1}`,
-
-            selector:
-              `[data-liv-auto-id="${id}"]`
-          };
-        }
-      );
-
-
-  return {
-
-    title:
-      livReportTitle(),
-
-    modes,
-
-    filters,
-
-    kpis,
-
-    blocks,
-
-    charts,
-
-    tables:
-      []
-  };
-}
-
-
-function livGetCurrentSchema() {
-
-  const key =
-    livCurrentViewKey();
-
-
-  return (
-    livGetRegisteredViewSchema(
-      key
-    ) ||
-    livVBAutoSchema(
-      key
-    )
-  );
-}
-
-
-/* =========================================================
-   ПОИСК ЭЛЕМЕНТА
-   ========================================================= */
-
-function livVBFind(
-  selector,
-  root =
-    document
-) {
-
-  if (
-    !selector
-  ) {
-    return null;
-  }
-
-
-  try {
-
-    return root.querySelector(
-      selector
-    );
-
-  } catch (
-    error
-  ) {
-
-    return null;
-  }
-}
-
-
-function livVBElementForItem(
-  item
-) {
-
-  const base =
-    livVBFind(
-      item
-        ?.selector
-    );
-
-
-  if (
-    !base
-  ) {
-    return null;
-  }
-
-
-  if (
-    item
-      ?.closest
-  ) {
-
-    try {
-
-      return (
-        base.closest(
-          item.closest
-        ) ||
-        base
-      );
-
-    } catch (
-      error
-    ) {
-
-      return base;
-    }
-  }
-
-
-  return base;
-}
-
-
-/* =========================================================
-   ПРИМЕНЕНИЕ ВИДИМОСТИ И ПОРЯДКА
-   ========================================================= */
-
-function livVBApplyGroup(
-  items,
-  hiddenIds,
-  orderIds
-) {
-
-  const resolved =
-    livVBResolveItems(
-      items
-    );
-
-
-  const hidden =
-    new Set(
-      livVBArray(
-        hiddenIds
-      )
-    );
-
-
-  resolved.forEach(
-    item => {
-
-      const element =
-        livVBElementForItem(
-          item
-        );
-
-
-      if (
-        element
-      ) {
-
-        element.classList
-          .toggle(
-            'liv-builder-hidden',
-
-            hidden.has(
-              item.id
-            )
-          );
-      }
-    }
-  );
-
-
-  const ordered =
-    livVBOrdered(
-      resolved,
-      orderIds
-    );
-
-
-  const groups =
-    new Map();
-
-
-  ordered.forEach(
-    item => {
-
-      const element =
-        livVBElementForItem(
-          item
-        );
-
-
-      if (
-        !element
-          ?.parentElement
-      ) {
-        return;
-      }
-
-
-      if (
-        !groups.has(
-          element.parentElement
-        )
-      ) {
-
-        groups.set(
-          element.parentElement,
-          []
-        );
-      }
-
-
-      groups
-        .get(
-          element.parentElement
-        )
-        .push(
-          element
-        );
-    }
-  );
-
-
-  groups.forEach(
-    (
-      elements,
-      parent
-    ) => {
-
-      elements.forEach(
-        element =>
-          parent.appendChild(
-            element
-          )
-      );
     }
   );
 }
-
-
-/* =========================================================
-   ПРИМЕНЕНИЕ ТАБЛИЦ
-   ========================================================= */
-
-function livVBApplyTables(
-  schema
-) {
-
-  livVBArray(
-    schema.tables
-  )
-    .forEach(
-      tableSchema => {
-
-        const config =
-          livVBGetTableConfig(
-            livCurrentViewKey(),
-            tableSchema.id,
-            tableSchema
-          );
-
-
-        const table =
-          tableSchema.selector
-            ? livVBFind(
-                tableSchema.selector
-              )
-            : null;
-
-
-        if (
-          !table
-        ) {
-          return;
-        }
-
-
-        const card =
-          table.closest(
-            '.card'
-          );
-
-
-        const title =
-          card
-            ?.querySelector(
-              'h2,h3'
-            );
-
-
-        if (
-          title
-        ) {
-
-          title.textContent =
-            config.title ||
-            tableSchema.title ||
-            title.textContent;
-
-
-          title.classList
-            .toggle(
-              'liv-builder-hidden',
-              !config.showTitle
-            );
-        }
-
-
-        const thead =
-          table.querySelector(
-            'thead'
-          );
-
-
-        const tfoot =
-          table.querySelector(
-            'tfoot'
-          );
-
-
-        if (
-          thead
-        ) {
-
-          thead.classList
-            .toggle(
-              'liv-builder-hidden',
-              !config.showHeader
-            );
-        }
-
-
-        if (
-          tfoot
-        ) {
-
-          tfoot.classList
-            .toggle(
-              'liv-builder-hidden',
-              !config.showFooter
-            );
-        }
-      }
-    );
-}
-
 
 /* =========================================================
    ГЛАВНОЕ ПРИМЕНЕНИЕ
    ========================================================= */
 
 function livApplyViewConstructor() {
-
   if (
-    !project
+    !livVBEnsureState()
   ) {
     return;
   }
 
-
   document
     .querySelectorAll(
-      '.liv-builder-hidden,.liv-mode-hidden'
+      '.liv-builder-hidden'
     )
     .forEach(
       element => {
-
-        element.classList
+        element
+          .classList
           .remove(
-            'liv-builder-hidden',
-            'liv-mode-hidden'
+            'liv-builder-hidden'
           );
       }
     );
 
-
   const schema =
     livGetCurrentSchema();
 
-
   const settings =
     livViewSettings();
-
 
   livVBApplyGroup(
     schema.modes,
@@ -1528,13 +995,17 @@ function livApplyViewConstructor() {
     settings.modeOrder
   );
 
-
   livVBApplyGroup(
     schema.filters,
     settings.hiddenFilters,
     settings.filterOrder
   );
 
+  livVBApplyGroup(
+    schema.actions,
+    settings.hiddenActions,
+    settings.actionOrder
+  );
 
   livVBApplyGroup(
     schema.kpis,
@@ -1542,13 +1013,11 @@ function livApplyViewConstructor() {
     settings.kpiOrder
   );
 
-
   livVBApplyGroup(
     schema.blocks,
     settings.hiddenBlocks,
     settings.blockOrder
   );
-
 
   livVBApplyGroup(
     schema.charts,
@@ -1556,56 +1025,10 @@ function livApplyViewConstructor() {
     settings.chartOrder
   );
 
-
   livVBApplyTables(
     schema
   );
-
-
-  if (
-    livActiveMainTab() ===
-    'resources'
-  ) {
-
-    const active =
-      livActiveResourceView();
-
-
-    if (
-      settings.hiddenModes
-        .includes(
-          active
-        )
-    ) {
-
-      const first =
-        livVBOrdered(
-          schema.modes,
-          settings.modeOrder
-        )
-          .find(
-            item =>
-              !settings.hiddenModes
-                .includes(
-                  item.id
-                )
-          );
-
-
-      if (
-        first &&
-        typeof switchResourceView ===
-          'function'
-      ) {
-
-        switchResourceView(
-          first.id
-        );
-      }
-    }
-  }
 }
-
 
 /* =========================================================
    СТРОКА КОНСТРУКТОРА
@@ -1616,7 +1039,6 @@ function livVBBuilderRow(
   group,
   checked
 ) {
-
   return `
     <div
       class="liv-builder-row"
@@ -1629,11 +1051,7 @@ function livVBBuilderRow(
           type="checkbox"
           data-builder-group="${esc(group)}"
           data-builder-id="${esc(item.id)}"
-          ${
-            checked
-              ? 'checked'
-              : ''
-          }
+          ${checked ? 'checked' : ''}
         >
 
         <span>
@@ -1642,14 +1060,13 @@ function livVBBuilderRow(
 
       </label>
 
-
       <div class="liv-builder-row-actions">
 
         <button
           type="button"
           class="liv-builder-arrow"
           data-move-up
-          title="Выше">
+          title="Переместить выше">
           ↑
         </button>
 
@@ -1657,7 +1074,7 @@ function livVBBuilderRow(
           type="button"
           class="liv-builder-arrow"
           data-move-down
-          title="Ниже">
+          title="Переместить ниже">
           ↓
         </button>
 
@@ -1667,52 +1084,57 @@ function livVBBuilderRow(
   `;
 }
 
-
-/* =========================================================
-   ГРУППА КОНСТРУКТОРА
-   ========================================================= */
-
 function livVBBuilderGroup(
   title,
+  help,
   group,
   items,
   hidden,
   order
 ) {
-
   const ordered =
     livVBOrdered(
       items,
       order
     );
 
-
   if (
     !ordered.length
   ) {
-
     return '';
   }
 
-
   const hiddenSet =
     new Set(
-      hidden ||
-      []
+      livVBArray(
+        hidden
+      )
     );
-
 
   return `
     <section class="liv-builder-section">
 
       <div class="liv-builder-section-head">
 
-        <h3>
-          ${esc(title)}
-        </h3>
+        <div>
+
+          <h3>
+            ${esc(title)}
+          </h3>
+
+          ${
+            help
+              ? `
+                  <div class="liv-builder-help">
+                    ${esc(help)}
+                  </div>
+                `
+              : ''
+          }
+
+        </div>
 
       </div>
-
 
       <div
         class="liv-builder-list"
@@ -1739,7 +1161,6 @@ function livVBBuilderGroup(
   `;
 }
 
-
 /* =========================================================
    ТАБЛИЦА В КОНСТРУКТОРЕ
    ========================================================= */
@@ -1747,14 +1168,12 @@ function livVBBuilderGroup(
 function livVBTableBuilderHtml(
   tableSchema
 ) {
-
   const config =
     livVBGetTableConfig(
       livCurrentViewKey(),
       tableSchema.id,
       tableSchema
     );
-
 
   const columns =
     livVBOrdered(
@@ -1764,12 +1183,10 @@ function livVBTableBuilderHtml(
       config.columnOrder
     );
 
-
   const hidden =
     new Set(
       config.hiddenColumns
     );
-
 
   return `
     <section
@@ -1778,17 +1195,25 @@ function livVBTableBuilderHtml(
 
       <div class="liv-builder-table-head">
 
-        <strong>
-          ${esc(
-            tableSchema.title ||
-            tableSchema.id
-          )}
-        </strong>
+        <div>
+
+          <strong>
+            ${esc(
+              tableSchema.title ||
+              tableSchema.id
+            )}
+          </strong>
+
+          <div class="liv-builder-help">
+            Сначала настрой вид таблицы,
+            затем состав и порядок колонок.
+          </div>
+
+        </div>
 
       </div>
 
-
-      <div class="form-grid liv-table-options">
+      <div class="liv-builder-table-options">
 
         <div class="field">
 
@@ -1807,81 +1232,59 @@ function livVBTableBuilderHtml(
 
         </div>
 
-
         <label class="check-line">
 
           <input
             type="checkbox"
             data-table-show-title
-            ${
-              config.showTitle
-                ? 'checked'
-                : ''
-            }
+            ${config.showTitle ? 'checked' : ''}
           >
 
-          Заголовок блока
+          Показывать название блока
 
         </label>
-
 
         <label class="check-line">
 
           <input
             type="checkbox"
             data-table-show-header
-            ${
-              config.showHeader
-                ? 'checked'
-                : ''
-            }
+            ${config.showHeader ? 'checked' : ''}
           >
 
-          Шапка таблицы
+          Показывать шапку таблицы
 
         </label>
-
 
         <label class="check-line">
 
           <input
             type="checkbox"
             data-table-show-footer
-            ${
-              config.showFooter
-                ? 'checked'
-                : ''
-            }
+            ${config.showFooter ? 'checked' : ''}
           >
 
-          Итоговая строка
+          Показывать итоговую строку
 
         </label>
-
 
         <label class="check-line">
 
           <input
             type="checkbox"
             data-table-row-numbers
-            ${
-              config.showRowNumbers
-                ? 'checked'
-                : ''
-            }
+            ${config.showRowNumbers ? 'checked' : ''}
           >
 
-          Нумерация строк
+          Показывать нумерацию строк
 
         </label>
 
       </div>
 
-
-      <div class="liv-builder-column-head">
+      <div class="liv-builder-subtitle">
         Колонки
       </div>
-
 
       <div
         class="liv-builder-list"
@@ -1891,9 +1294,8 @@ function livVBTableBuilderHtml(
           columns
             .map(
               column => `
-
                 <div
-                  class="liv-builder-row"
+                  class="liv-builder-row liv-builder-column-row"
                   data-column-row
                   data-column-id="${esc(column.id)}">
 
@@ -1902,13 +1304,7 @@ function livVBTableBuilderHtml(
                     <input
                       type="checkbox"
                       data-column-visible
-                      ${
-                        hidden.has(
-                          column.id
-                        )
-                          ? ''
-                          : 'checked'
-                      }
+                      ${hidden.has(column.id) ? '' : 'checked'}
                     >
 
                     <span>
@@ -1917,19 +1313,18 @@ function livVBTableBuilderHtml(
 
                   </label>
 
-
                   <input
                     class="liv-builder-title-input"
                     data-column-title
                     value="${esc(
-                      config.columnTitles[
-                        column.id
-                      ] ||
+                      config
+                        .columnTitles[
+                          column.id
+                        ] ||
                       column.title
                     )}"
                     title="Название колонки"
                   >
-
 
                   <div class="liv-builder-row-actions">
 
@@ -1937,7 +1332,7 @@ function livVBTableBuilderHtml(
                       type="button"
                       class="liv-builder-arrow"
                       data-move-up
-                      title="Выше">
+                      title="Переместить выше">
                       ↑
                     </button>
 
@@ -1945,7 +1340,7 @@ function livVBTableBuilderHtml(
                       type="button"
                       class="liv-builder-arrow"
                       data-move-down
-                      title="Ниже">
+                      title="Переместить ниже">
                       ↓
                     </button>
 
@@ -1963,49 +1358,105 @@ function livVBTableBuilderHtml(
   `;
 }
 
-
 /* =========================================================
-   СОХРАНЕННЫЕ ПРЕДСТАВЛЕНИЯ
+   ПРОФИЛИ
    ========================================================= */
 
 function livVBProfilesForCurrentView() {
+  if (
+    !livVBEnsureState()
+  ) {
+    return [];
+  }
 
-  livVBEnsureState();
-
-
-  const key =
+  const viewKey =
     livCurrentViewKey();
 
-
   return (
-    project.viewBuilder
-      .profiles ||
-    []
-  )
-    .filter(
-      item =>
-        item.viewKey ===
-        key
-    );
+    project
+      .viewBuilder
+      .profiles
+      .filter(
+        profile =>
+          profile.viewKey ===
+          viewKey
+      )
+  );
 }
 
+async function livVBSaveProfile() {
+  const schema =
+    livGetCurrentSchema();
+
+  const name =
+    prompt(
+      'Название представления:',
+      schema.title ||
+      livReportTitle()
+    );
+
+  if (
+    !name
+  ) {
+    return;
+  }
+
+  const profile = {
+    id:
+      uid(
+        'VIEW'
+      ),
+
+    viewKey:
+      livCurrentViewKey(),
+
+    name:
+      name.trim(),
+
+    settings:
+      livVBClone(
+        livViewSettings()
+      ),
+
+    dataState:
+      typeof schema.captureState ===
+        'function'
+        ? livVBClone(
+            schema.captureState()
+          )
+        : null,
+
+    createdAt:
+      nowIso(),
+
+    updatedAt:
+      nowIso()
+  };
+
+  project
+    .viewBuilder
+    .profiles
+    .push(
+      profile
+    );
+
+  await saveProject();
+
+  livOpenViewBuilder();
+}
 
 async function livVBLoadProfile(
-  id
+  profileId
 ) {
-
   const profile =
-    (
-      project.viewBuilder
-        .profiles ||
-      []
-    )
-      .find(
+    project
+      .viewBuilder
+      ?.profiles
+      ?.find(
         item =>
           item.id ===
-          id
+          profileId
       );
-
 
   if (
     !profile
@@ -2013,8 +1464,8 @@ async function livVBLoadProfile(
     return;
   }
 
-
-  project.viewBuilder
+  project
+    .viewBuilder
     .views[
       profile.viewKey
     ] =
@@ -2022,45 +1473,51 @@ async function livVBLoadProfile(
         profile.settings
       );
 
+  const schema =
+    livGetRegisteredViewSchema(
+      profile.viewKey
+    );
+
+  if (
+    schema &&
+    typeof schema.applyState ===
+      'function' &&
+    profile.dataState
+  ) {
+    schema.applyState(
+      livVBClone(
+        profile.dataState
+      )
+    );
+  }
 
   await saveProject();
 
-
   closeModal();
 
-
   if (
-    typeof renderResourceCurrentView ===
-      'function' &&
-    livActiveMainTab() ===
-      'resources'
+    schema &&
+    typeof schema.rerender ===
+      'function'
   ) {
-
-    renderResourceCurrentView();
-
+    schema.rerender();
   } else {
-
     livApplyViewConstructor();
   }
 }
 
-
 async function livVBDeleteProfile(
-  id
+  profileId
 ) {
-
   const profile =
-    (
-      project.viewBuilder
-        .profiles ||
-      []
-    )
-      .find(
+    project
+      .viewBuilder
+      ?.profiles
+      ?.find(
         item =>
           item.id ===
-          id
+          profileId
       );
-
 
   if (
     !profile
@@ -2068,64 +1525,57 @@ async function livVBDeleteProfile(
     return;
   }
 
-
   if (
     !confirm(
       `Удалить представление «${profile.name}»?`
     )
   ) {
-
     return;
   }
 
-
-  project.viewBuilder.profiles =
-    project.viewBuilder
-      .profiles
-      .filter(
-        item =>
-          item.id !==
-          id
-      );
-
+  project
+    .viewBuilder
+    .profiles =
+      project
+        .viewBuilder
+        .profiles
+        .filter(
+          item =>
+            item.id !==
+            profileId
+        );
 
   await saveProject();
-
 
   livOpenViewBuilder();
 }
 
-
 /* =========================================================
-   СТРЕЛКИ ПЕРЕМЕЩЕНИЯ
+   ПЕРЕМЕЩЕНИЕ
    ========================================================= */
 
 function livVBBindMoveButtons(
   root
 ) {
-
   root
     .querySelectorAll(
       '[data-move-up]'
     )
     .forEach(
       button => {
-
         button.onclick =
           () => {
-
             const row =
               button.closest(
                 '.liv-builder-row'
               );
 
-
             if (
               row
                 ?.previousElementSibling
             ) {
-
-              row.parentElement
+              row
+                .parentElement
                 .insertBefore(
                   row,
                   row.previousElementSibling
@@ -2135,34 +1585,29 @@ function livVBBindMoveButtons(
       }
     );
 
-
   root
     .querySelectorAll(
       '[data-move-down]'
     )
     .forEach(
       button => {
-
         button.onclick =
           () => {
-
             const row =
               button.closest(
                 '.liv-builder-row'
               );
 
-
             const next =
               row
                 ?.nextElementSibling;
-
 
             if (
               row &&
               next
             ) {
-
-              row.parentElement
+              row
+                .parentElement
                 .insertBefore(
                   next,
                   row
@@ -2173,540 +1618,75 @@ function livVBBindMoveButtons(
     );
 }
 
-
 /* =========================================================
-   ОТКРЫТИЕ КОНСТРУКТОРА
+   ЧТЕНИЕ НАСТРОЕК
    ========================================================= */
 
-function livOpenViewBuilder() {
-
-  const schema =
-    livGetCurrentSchema();
-
-
-  const settings =
-    livViewSettings();
-
-
-  const profiles =
-    livVBProfilesForCurrentView();
-
-
-  openModal(
-    `Конструктор · ${schema.title || livReportTitle()}`,
-
-    `
-      <div class="liv-builder-shell">
-
-        <div class="liv-builder-intro">
-
-          Собери текущий вид под себя:
-          режимы, фильтры, показатели,
-          блоки, таблицы, колонки,
-          графики и печать.
-
-          Порядок меняется стрелками.
-          Настройки сохраняются отдельно
-          для каждой вкладки.
-
-        </div>
-
-
-        ${
-          profiles.length
-            ? `
-                <section class="liv-builder-section">
-
-                  <div class="liv-builder-section-head">
-
-                    <h3>
-                      Сохраненные представления
-                    </h3>
-
-                  </div>
-
-
-                  <div class="liv-profile-list">
-
-                    ${
-                      profiles
-                        .map(
-                          profile => `
-
-                            <div class="liv-profile-row">
-
-                              <span>
-                                ${esc(profile.name)}
-                              </span>
-
-                              <div>
-
-                                <button
-                                  class="btn"
-                                  type="button"
-                                  data-profile-load="${esc(profile.id)}">
-
-                                  Применить
-
-                                </button>
-
-                                <button
-                                  class="btn danger-lite"
-                                  type="button"
-                                  data-profile-delete="${esc(profile.id)}">
-
-                                  Удалить
-
-                                </button>
-
-                              </div>
-
-                            </div>
-                          `
-                        )
-                        .join('')
-                    }
-
-                  </div>
-
-                </section>
-              `
-            : ''
-        }
-
-
-        ${
-          livVBBuilderGroup(
-            'Режимы',
-            'modes',
-            schema.modes,
-            settings.hiddenModes,
-            settings.modeOrder
-          )
-        }
-
-
-        ${
-          livVBBuilderGroup(
-            'Фильтры и переключатели',
-            'filters',
-            schema.filters,
-            settings.hiddenFilters,
-            settings.filterOrder
-          )
-        }
-
-
-        ${
-          livVBBuilderGroup(
-            'Показатели',
-            'kpis',
-            schema.kpis,
-            settings.hiddenKpis,
-            settings.kpiOrder
-          )
-        }
-
-
-        ${
-          livVBBuilderGroup(
-            'Разделы и блоки',
-            'blocks',
-            schema.blocks,
-            settings.hiddenBlocks,
-            settings.blockOrder
-          )
-        }
-
-
-        ${
-          livVBBuilderGroup(
-            'Графики',
-            'charts',
-            schema.charts,
-            settings.hiddenCharts,
-            settings.chartOrder
-          )
-        }
-
-
-        ${
-          livVBArray(
-            schema.tables
-          )
-            .length
-            ? `
-                <section class="liv-builder-section">
-
-                  <div class="liv-builder-section-head">
-
-                    <h3>
-                      Таблицы
-                    </h3>
-
-                  </div>
-
-
-                  <div class="liv-builder-tables">
-
-                    ${
-                      livVBArray(
-                        schema.tables
-                      )
-                        .map(
-                          table =>
-                            livVBTableBuilderHtml(
-                              table
-                            )
-                        )
-                        .join('')
-                    }
-
-                  </div>
-
-                </section>
-              `
-            : ''
-        }
-
-
-        <section class="liv-builder-section">
-
-          <div class="liv-builder-section-head">
-
-            <h3>
-              Печать / PDF
-            </h3>
-
-          </div>
-
-
-          <div class="form-grid">
-
-            <div class="field">
-
-              <label>
-                Ориентация
-              </label>
-
-              <select id="livPrintOrientation">
-
-                <option
-                  value="landscape"
-                  ${
-                    settings.print
-                      .orientation ===
-                    'landscape'
-                      ? 'selected'
-                      : ''
-                  }>
-
-                  Альбомная
-
-                </option>
-
-                <option
-                  value="portrait"
-                  ${
-                    settings.print
-                      .orientation ===
-                    'portrait'
-                      ? 'selected'
-                      : ''
-                  }>
-
-                  Книжная
-
-                </option>
-
-              </select>
-
-            </div>
-
-
-            <label class="check-line">
-
-              <input
-                id="livPrintHeader"
-                type="checkbox"
-                ${
-                  settings.print
-                    .showHeader
-                    ? 'checked'
-                    : ''
-                }
-              >
-
-              Шапка отчета
-
-            </label>
-
-
-            <label class="check-line">
-
-              <input
-                id="livPrintFilters"
-                type="checkbox"
-                ${
-                  settings.print
-                    .showFilters
-                    ? 'checked'
-                    : ''
-                }
-              >
-
-              Выбранные фильтры
-
-            </label>
-
-
-            <label class="check-line">
-
-              <input
-                id="livPrintFooter"
-                type="checkbox"
-                ${
-                  settings.print
-                    .showFooter
-                    ? 'checked'
-                    : ''
-                }
-              >
-
-              Подвал отчета
-
-            </label>
-
-
-            <label class="check-line">
-
-              <input
-                id="livPrintCompact"
-                type="checkbox"
-                ${
-                  settings.print
-                    .compact
-                    ? 'checked'
-                    : ''
-                }
-              >
-
-              Компактный режим
-
-            </label>
-
-          </div>
-
-        </section>
-
-
-        <div class="editor-actions">
-
-          <button
-            id="livBuilderReset"
-            class="btn"
-            type="button">
-
-            Сбросить вид
-
-          </button>
-
-
-          <button
-            id="livBuilderSaveProfile"
-            class="btn"
-            type="button">
-
-            Сохранить как представление
-
-          </button>
-
-
-          <button
-            id="livBuilderApply"
-            class="btn primary"
-            type="button">
-
-            Применить
-
-          </button>
-
-        </div>
-
-      </div>
-    `
-  );
-
-
-  const root =
-    $('modalBody');
-
-
-  livVBBindMoveButtons(
-    root
-  );
-
-
-  root
-    .querySelectorAll(
-      '[data-profile-load]'
-    )
-    .forEach(
-      button => {
-
-        button.onclick =
-          () =>
-            livVBLoadProfile(
-              button.dataset
-                .profileLoad
-            );
-      }
+function livVBReadGroup(
+  root,
+  group,
+  hiddenKey,
+  orderKey,
+  settings
+) {
+  const list =
+    root.querySelector(
+      `[data-sort-group="${group}"]`
     );
 
+  if (
+    !list
+  ) {
+    return;
+  }
 
-  root
-    .querySelectorAll(
-      '[data-profile-delete]'
-    )
-    .forEach(
-      button => {
+  const rows =
+    [
+      ...list.querySelectorAll(
+        ':scope > .liv-builder-row'
+      )
+    ];
 
-        button.onclick =
-          () =>
-            livVBDeleteProfile(
-              button.dataset
-                .profileDelete
-            );
-      }
-    );
+  settings[
+    orderKey
+  ] =
+    rows
+      .map(
+        row =>
+          row.dataset
+            .itemId
+      )
+      .filter(
+        Boolean
+      );
 
-
-  $('livBuilderApply')
-    .onclick =
-      async () => {
-
-        await livVBSaveModalSettings();
-
-
-        closeModal();
-
-
-        if (
-          typeof renderResourceCurrentView ===
-            'function' &&
-          livActiveMainTab() ===
-            'resources'
-        ) {
-
-          renderResourceCurrentView();
-
-        } else {
-
-          livApplyViewConstructor();
-        }
-      };
-
-
-  $('livBuilderSaveProfile')
-    .onclick =
-      async () => {
-
-        await livVBSaveModalSettings();
-
-
-        const name =
-          prompt(
-            'Название представления:',
-            schema.title ||
-            livReportTitle()
-          );
-
-
-        if (
-          !name
-        ) {
-          return;
-        }
-
-
-        project.viewBuilder
-          .profiles
-          .push({
-
-            id:
-              uid(
-                'VIEW'
-              ),
-
-            viewKey:
-              livCurrentViewKey(),
-
-            name:
-              name.trim(),
-
-            settings:
-              livVBClone(
-                livViewSettings()
-              ),
-
-            createdAt:
-              nowIso(),
-
-            updatedAt:
-              nowIso()
-          });
-
-
-        await saveProject();
-
-
-        livOpenViewBuilder();
-      };
-
-
-  $('livBuilderReset')
-    .onclick =
-      async () => {
-
-        project.viewBuilder
-          .views[
-            livCurrentViewKey()
-          ] =
-            livVBDefaultViewConfig();
-
-
-        await saveProject();
-
-
-        closeModal();
-
-
-        if (
-          typeof renderResourceCurrentView ===
-            'function' &&
-          livActiveMainTab() ===
-            'resources'
-        ) {
-
-          renderResourceCurrentView();
-
-        } else {
-
-          livApplyViewConstructor();
-        }
-      };
+  settings[
+    hiddenKey
+  ] =
+    rows
+      .filter(
+        row =>
+          !row
+            .querySelector(
+              `[data-builder-group="${group}"]`
+            )
+            ?.checked
+      )
+      .map(
+        row =>
+          row.dataset
+            .itemId
+      )
+      .filter(
+        Boolean
+      );
 }
 
-
-/* =========================================================
-   СОХРАНЕНИЕ КОНСТРУКТОРА
-   ========================================================= */
-
 async function livVBSaveModalSettings() {
-
   const root =
-    $('modalBody');
-
+    document.getElementById(
+      'modalBody'
+    );
 
   if (
     !root
@@ -2714,116 +1694,60 @@ async function livVBSaveModalSettings() {
     return;
   }
 
-
   const settings =
     livViewSettings();
 
-
-  const saveGroup =
-    (
-      group,
-      hiddenKey,
-      orderKey
-    ) => {
-
-      const list =
-        root.querySelector(
-          `[data-sort-group="${group}"]`
-        );
-
-
-      if (
-        !list
-      ) {
-        return;
-      }
-
-
-      const rows =
-        [
-          ...list
-            .querySelectorAll(
-              ':scope > .liv-builder-row'
-            )
-        ];
-
-
-      settings[
-        orderKey
-      ] =
-        rows
-          .map(
-            row =>
-              row.dataset
-                .itemId
-          )
-          .filter(
-            Boolean
-          );
-
-
-      settings[
-        hiddenKey
-      ] =
-        rows
-          .filter(
-            row =>
-              !row
-                .querySelector(
-                  `[data-builder-group="${group}"]`
-                )
-                ?.checked
-          )
-          .map(
-            row =>
-              row.dataset
-                .itemId
-          )
-          .filter(
-            Boolean
-          );
-    };
-
-
-  saveGroup(
+  livVBReadGroup(
+    root,
     'modes',
     'hiddenModes',
-    'modeOrder'
+    'modeOrder',
+    settings
   );
 
-
-  saveGroup(
+  livVBReadGroup(
+    root,
     'filters',
     'hiddenFilters',
-    'filterOrder'
+    'filterOrder',
+    settings
   );
 
+  livVBReadGroup(
+    root,
+    'actions',
+    'hiddenActions',
+    'actionOrder',
+    settings
+  );
 
-  saveGroup(
+  livVBReadGroup(
+    root,
     'kpis',
     'hiddenKpis',
-    'kpiOrder'
+    'kpiOrder',
+    settings
   );
 
-
-  saveGroup(
+  livVBReadGroup(
+    root,
     'blocks',
     'hiddenBlocks',
-    'blockOrder'
+    'blockOrder',
+    settings
   );
 
-
-  saveGroup(
+  livVBReadGroup(
+    root,
     'charts',
     'hiddenCharts',
-    'chartOrder'
+    'chartOrder',
+    settings
   );
-
 
   settings.tables =
     settings.tables ||
     {};
-
 
   root
     .querySelectorAll(
@@ -2831,33 +1755,27 @@ async function livVBSaveModalSettings() {
     )
     .forEach(
       card => {
-
-        const id =
+        const tableId =
           card.dataset
             .tableBuilder;
 
-
         const rows =
           [
-            ...card
-              .querySelectorAll(
-                '[data-column-row]'
-              )
+            ...card.querySelectorAll(
+              '[data-column-row]'
+            )
           ];
 
-
-        const previous =
-          settings.tables[
-            id
-          ] ||
-          {};
-
-
         settings.tables[
-          id
+          tableId
         ] = {
-
-          ...previous,
+          ...(
+            settings
+              .tables[
+                tableId
+              ] ||
+            {}
+          ),
 
           title:
             card
@@ -2935,7 +1853,6 @@ async function livVBSaveModalSettings() {
               rows
                 .map(
                   row => [
-
                     row.dataset
                       .columnId,
 
@@ -2961,302 +1878,646 @@ async function livVBSaveModalSettings() {
       }
     );
 
-
   settings.print = {
-
     orientation:
-      $('livPrintOrientation')
+      document
+        .getElementById(
+          'livPrintOrientation'
+        )
         ?.value ||
       'landscape',
 
-    showHeader:
-      $('livPrintHeader')
+    showReportHeader:
+      document
+        .getElementById(
+          'livPrintHeader'
+        )
         ?.checked !==
       false,
 
     showFilters:
-      $('livPrintFilters')
+      document
+        .getElementById(
+          'livPrintFilters'
+        )
         ?.checked !==
       false,
 
     showFooter:
-      $('livPrintFooter')
+      document
+        .getElementById(
+          'livPrintFooter'
+        )
         ?.checked !==
       false,
 
     compact:
-      $('livPrintCompact')
+      document
+        .getElementById(
+          'livPrintCompact'
+        )
         ?.checked ===
       true
   };
 
-
   await saveProject();
 }
 
-
 /* =========================================================
-   ФИЛЬТРЫ ДЛЯ ПЕЧАТИ
+   ОКНО КОНСТРУКТОРА
    ========================================================= */
 
-function livCurrentReportFilters() {
+function livOpenViewBuilder() {
+  const schema =
+    livGetCurrentSchema();
 
-  const result =
-    [];
+  const settings =
+    livViewSettings();
 
+  const profiles =
+    livVBProfilesForCurrentView();
 
-  if (
-    livActiveMainTab() ===
-    'resources'
-  ) {
+  openModal(
+    `Конструктор · ${schema.title || livReportTitle()}`,
 
-    const from =
-      $('rFrom')
-        ?.value ||
-      '';
+    `
+      <div class="liv-builder-shell">
 
+        <div class="liv-builder-intro">
 
-    const to =
-      $('rTo')
-        ?.value ||
-      '';
+          <strong>
+            Как пользоваться:
+          </strong>
 
+          1) галочкой включай или выключай элемент;
+          2) стрелками меняй порядок;
+          3) в разделе «Таблицы» отдельно
+          настраиваются название, шапка, итог,
+          нумерация и колонки;
+          4) нажми «Применить».
 
-    if (
-      from ||
-      to
-    ) {
+          Настройка сохраняется и не должна
+          сбрасываться после обновления страницы.
 
-      result.push(
-        `Период: ${
-          from
-            ? ruDate(
-                from
-              )
-            : '—'
-        } — ${
-          to
-            ? ruDate(
-                to
-              )
-            : '—'
-        }`
-      );
-    }
+        </div>
 
+        ${
+          profiles.length
+            ? `
+                <section class="liv-builder-section">
 
-    [
-      [
-        'rOrgMulti',
-        'Организации'
-      ],
+                  <div class="liv-builder-section-head">
 
-      [
-        'rBuildingMulti',
-        'Здания'
-      ],
+                    <div>
 
-      [
-        'rWorkMulti',
-        'Работы'
-      ],
+                      <h3>
+                        Сохраненные представления
+                      </h3>
 
-      [
-        'rFrontMulti',
-        'Фронты'
-      ]
-    ]
-      .forEach(
-        (
-          [
-            id,
-            label
-          ]
-        ) => {
+                      <div class="liv-builder-help">
+                        Например: рабочий вид,
+                        директор, заказчик, печать.
+                      </div>
 
-          const text =
-            $(
-              id
-            )
-              ?.querySelector(
-                '.multi-filter-summary'
-              )
-              ?.textContent
-              ?.trim();
+                    </div>
 
+                  </div>
 
-          if (
-            text &&
-            !/^Все\b/i.test(
-              text
-            )
-          ) {
+                  <div class="liv-profile-list">
 
-            result.push(
-              `${label}: ${text}`
-            );
-          }
+                    ${
+                      profiles
+                        .map(
+                          profile => `
+                            <div class="liv-profile-row">
+
+                              <span>
+                                ${esc(profile.name)}
+                              </span>
+
+                              <div>
+
+                                <button
+                                  type="button"
+                                  class="btn"
+                                  data-profile-load="${esc(profile.id)}">
+                                  Применить
+                                </button>
+
+                                <button
+                                  type="button"
+                                  class="btn danger-lite"
+                                  data-profile-delete="${esc(profile.id)}">
+                                  Удалить
+                                </button>
+
+                              </div>
+
+                            </div>
+                          `
+                        )
+                        .join('')
+                    }
+
+                  </div>
+
+                </section>
+              `
+            : ''
         }
-      );
-  }
 
+        ${
+          livVBBuilderGroup(
+            'Режимы',
+            'Какие подвкладки доступны и в каком порядке.',
+            'modes',
+            schema.modes,
+            settings.hiddenModes,
+            settings.modeOrder
+          )
+        }
 
-  return result;
-}
+        ${
+          livVBBuilderGroup(
+            'Фильтры',
+            'Какие фильтры видит пользователь и в каком порядке.',
+            'filters',
+            schema.filters,
+            settings.hiddenFilters,
+            settings.filterOrder
+          )
+        }
 
+        ${
+          livVBBuilderGroup(
+            'Действия',
+            'Кнопки добавления, сброса, сохранения и другие команды.',
+            'actions',
+            schema.actions,
+            settings.hiddenActions,
+            settings.actionOrder
+          )
+        }
 
-/* =========================================================
-   ПОДГОТОВКА ПЕЧАТИ
-   ========================================================= */
+        ${
+          livVBBuilderGroup(
+            'Показатели',
+            'Карточки KPI над таблицами.',
+            'kpis',
+            schema.kpis,
+            settings.hiddenKpis,
+            settings.kpiOrder
+          )
+        }
 
-function livPreparePrintClone(
-  source
-) {
+        ${
+          livVBBuilderGroup(
+            'Разделы страницы',
+            'Целые таблицы, панели и смысловые блоки.',
+            'blocks',
+            schema.blocks,
+            settings.hiddenBlocks,
+            settings.blockOrder
+          )
+        }
 
-  const clone =
-    source.cloneNode(
-      true
+        ${
+          livVBBuilderGroup(
+            'Графики',
+            'Графики можно независимо включать, выключать и переставлять.',
+            'charts',
+            schema.charts,
+            settings.hiddenCharts,
+            settings.chartOrder
+          )
+        }
+
+        ${
+          livVBResolveItems(
+            schema.tables
+          )
+            .length
+            ? `
+                <section class="liv-builder-section">
+
+                  <div class="liv-builder-section-head">
+
+                    <div>
+
+                      <h3>
+                        Таблицы
+                      </h3>
+
+                      <div class="liv-builder-help">
+                        Здесь нет жесткой шапки:
+                        состав, порядок и названия
+                        колонок задаются тобой.
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                  <div class="liv-builder-tables">
+
+                    ${
+                      livVBResolveItems(
+                        schema.tables
+                      )
+                        .map(
+                          table =>
+                            livVBTableBuilderHtml(
+                              table
+                            )
+                        )
+                        .join('')
+                    }
+
+                  </div>
+
+                </section>
+              `
+            : ''
+        }
+
+        <section class="liv-builder-section">
+
+          <div class="liv-builder-section-head">
+
+            <div>
+
+              <h3>
+                Печать / PDF
+              </h3>
+
+              <div class="liv-builder-help">
+                PDF строится как отдельный отчет
+                из текущего представления,
+                а не как скрин страницы.
+              </div>
+
+            </div>
+
+          </div>
+
+          <div class="liv-builder-print-grid">
+
+            <div class="field">
+
+              <label>
+                Ориентация
+              </label>
+
+              <select id="livPrintOrientation">
+
+                <option
+                  value="landscape"
+                  ${
+                    settings
+                      .print
+                      .orientation ===
+                    'landscape'
+                      ? 'selected'
+                      : ''
+                  }>
+                  Альбомная
+                </option>
+
+                <option
+                  value="portrait"
+                  ${
+                    settings
+                      .print
+                      .orientation ===
+                    'portrait'
+                      ? 'selected'
+                      : ''
+                  }>
+                  Книжная
+                </option>
+
+              </select>
+
+            </div>
+
+            <label class="check-line">
+
+              <input
+                id="livPrintHeader"
+                type="checkbox"
+                ${
+                  settings
+                    .print
+                    .showReportHeader
+                    ? 'checked'
+                    : ''
+                }
+              >
+
+              Шапка отчета LIV Planning
+
+            </label>
+
+            <label class="check-line">
+
+              <input
+                id="livPrintFilters"
+                type="checkbox"
+                ${
+                  settings
+                    .print
+                    .showFilters
+                    ? 'checked'
+                    : ''
+                }
+              >
+
+              Показывать выбранные фильтры
+
+            </label>
+
+            <label class="check-line">
+
+              <input
+                id="livPrintFooter"
+                type="checkbox"
+                ${
+                  settings
+                    .print
+                    .showFooter
+                    ? 'checked'
+                    : ''
+                }
+              >
+
+              Подвал отчета
+
+            </label>
+
+            <label class="check-line">
+
+              <input
+                id="livPrintCompact"
+                type="checkbox"
+                ${
+                  settings
+                    .print
+                    .compact
+                    ? 'checked'
+                    : ''
+                }
+              >
+
+              Компактная печать
+
+            </label>
+
+          </div>
+
+        </section>
+
+        <div class="editor-actions liv-builder-footer-actions">
+
+          <button
+            id="livBuilderReset"
+            type="button"
+            class="btn">
+            Сбросить текущий вид
+          </button>
+
+          <button
+            id="livBuilderSaveProfile"
+            type="button"
+            class="btn">
+            Сохранить как представление
+          </button>
+
+          <button
+            id="livBuilderApply"
+            type="button"
+            class="btn primary">
+            Применить
+          </button>
+
+        </div>
+
+      </div>
+    `
+  );
+
+  const root =
+    document.getElementById(
+      'modalBody'
     );
 
+  livVBBindMoveButtons(
+    root
+  );
 
-  const originalCanvases =
-    [
-      ...source
-        .querySelectorAll(
-          'canvas'
-        )
-    ];
-
-
-  [
-    ...clone
-      .querySelectorAll(
-        'canvas'
-      )
-  ]
+  root
+    .querySelectorAll(
+      '[data-profile-load]'
+    )
     .forEach(
-      (
-        canvas,
-        index
-      ) => {
-
-        try {
-
-          const data =
-            originalCanvases[
-              index
-            ]
-              ?.toDataURL(
-                'image/png'
-              );
-
-
-          if (
-            !data
-          ) {
-
-            canvas.remove();
-
-            return;
-          }
-
-
-          const image =
-            document.createElement(
-              'img'
+      button => {
+        button.onclick =
+          () =>
+            livVBLoadProfile(
+              button.dataset
+                .profileLoad
             );
-
-
-          image.src =
-            data;
-
-
-          image.className =
-            'liv-print-chart';
-
-
-          canvas.replaceWith(
-            image
-          );
-
-        } catch (
-          error
-        ) {
-
-          canvas.remove();
-        }
       }
     );
 
-
-  clone
+  root
     .querySelectorAll(
-      [
-        '.no-print',
-        '.hidden',
-        '.liv-builder-hidden',
-        '.liv-mode-hidden',
-        'button',
-        'input',
-        'select',
-        'textarea',
-        '.resource-columns-panel',
-        '.selection-state',
-        '.row-actions',
-        '.select-col'
-      ]
-        .join(
-          ','
-        )
+      '[data-profile-delete]'
     )
     .forEach(
-      element =>
-        element.remove()
+      button => {
+        button.onclick =
+          () =>
+            livVBDeleteProfile(
+              button.dataset
+                .profileDelete
+            );
+      }
     );
 
-
-  clone
-    .querySelectorAll(
-      'table'
+  document
+    .getElementById(
+      'livBuilderApply'
     )
-    .forEach(
-      table =>
-        table.classList
-          .add(
-            'liv-print-table'
+    .onclick =
+      async () => {
+        await livVBSaveModalSettings();
+
+        closeModal();
+
+        const currentSchema =
+          livGetCurrentSchema();
+
+        if (
+          typeof currentSchema.rerender ===
+          'function'
+        ) {
+          currentSchema.rerender();
+        } else {
+          livApplyViewConstructor();
+        }
+      };
+
+  document
+    .getElementById(
+      'livBuilderSaveProfile'
+    )
+    .onclick =
+      async () => {
+        await livVBSaveModalSettings();
+        await livVBSaveProfile();
+      };
+
+  document
+    .getElementById(
+      'livBuilderReset'
+    )
+    .onclick =
+      async () => {
+        if (
+          !confirm(
+            'Сбросить настройки только текущего представления? Данные проекта не изменятся.'
           )
-    );
+        ) {
+          return;
+        }
 
+        project
+          .viewBuilder
+          .views[
+            livCurrentViewKey()
+          ] =
+            livVBDefaultViewSettings();
 
-  return clone;
+        await saveProject();
+
+        closeModal();
+
+        const currentSchema =
+          livGetCurrentSchema();
+
+        if (
+          typeof currentSchema.rerender ===
+          'function'
+        ) {
+          currentSchema.rerender();
+        } else {
+          livApplyViewConstructor();
+        }
+      };
 }
 
+/* =========================================================
+   КНОПКА
+   ========================================================= */
+
+function livEnsureViewBuilderButton() {
+  const actions =
+    document.querySelector(
+      '.top-actions'
+    );
+
+  if (
+    !actions
+  ) {
+    return;
+  }
+
+  let button =
+    document.getElementById(
+      'livViewBuilderBtn'
+    );
+
+  if (
+    !button
+  ) {
+    button =
+      document.createElement(
+        'button'
+      );
+
+    button.id =
+      'livViewBuilderBtn';
+
+    button.className =
+      'btn';
+
+    button.textContent =
+      'Конструктор';
+
+    const pdf =
+      document.getElementById(
+        'pdfBtn'
+      );
+
+    if (
+      pdf
+    ) {
+      actions.insertBefore(
+        button,
+        pdf
+      );
+    } else {
+      actions.appendChild(
+        button
+      );
+    }
+  }
+
+  button.onclick =
+    livOpenViewBuilder;
+}
 
 /* =========================================================
-   CSS ПЕЧАТИ
+   ПЕЧАТЬ
    ========================================================= */
+
+function livCurrentReportMeta(
+  schema
+) {
+  if (
+    typeof schema.getPrintMeta ===
+    'function'
+  ) {
+    return (
+      schema.getPrintMeta() ||
+      []
+    );
+  }
+
+  return [];
+}
 
 function livPrintCss(
   settings
 ) {
-
-  const portrait =
-    settings.print
-      ?.orientation ===
-    'portrait';
-
+  const orientation =
+    settings
+      .print
+      .orientation ===
+    'portrait'
+      ? 'portrait'
+      : 'landscape';
 
   const compact =
-    settings.print
-      ?.compact ===
+    settings
+      .print
+      .compact ===
     true;
 
-
   return `
-
     @page{
-      size:A4 ${portrait ? 'portrait' : 'landscape'};
-      margin:9mm;
+      size:A4 ${orientation};
+      margin:10mm 9mm 10mm 9mm;
     }
 
     *{
@@ -3278,26 +2539,26 @@ function livPrintCss(
       font-size:${compact ? '8px' : '9px'};
     }
 
-    .report{
+    .liv-report{
       width:100%;
     }
 
-    .report-header{
+    .liv-report-header{
       display:flex;
       justify-content:space-between;
-      gap:16px;
       align-items:flex-start;
+      gap:16px;
       padding-bottom:8px;
       border-bottom:2px solid #142033;
     }
 
-    .brand{
+    .liv-brand{
       display:flex;
-      align-items:center;
       gap:10px;
+      align-items:center;
     }
 
-    .brand-mark{
+    .liv-brand-mark{
       width:38px;
       height:38px;
       border-radius:7px;
@@ -3310,51 +2571,53 @@ function livPrintCss(
       font-weight:800;
     }
 
-    .brand-name{
+    .liv-brand-name{
       font-size:15px;
       font-weight:800;
     }
 
-    .brand-subtitle,
-    .generated-label{
+    .liv-brand-subtitle,
+    .liv-generated-label{
       font-size:8px;
       color:#667085;
     }
 
-    .generated{
+    .liv-generated{
       text-align:right;
     }
 
-    .generated-value{
+    .liv-generated-value{
       font-size:9px;
       font-weight:700;
       margin-top:3px;
     }
 
-    .title-block{
+    .liv-report-title{
       padding:12px 0 10px;
     }
 
-    .eyebrow{
+    .liv-report-title small{
+      display:block;
       font-size:7px;
       font-weight:800;
       letter-spacing:.14em;
       color:#667085;
     }
 
-    .title-block h1{
+    .liv-report-title h1{
       margin:3px 0 0;
       font-size:${compact ? '17px' : '20px'};
+      line-height:1.15;
     }
 
-    .filters{
+    .liv-report-meta{
       display:flex;
       flex-wrap:wrap;
       gap:4px;
       margin-top:7px;
     }
 
-    .filter-chip{
+    .liv-report-chip{
       border:1px solid #d9dee7;
       border-radius:999px;
       background:#f8fafc;
@@ -3363,66 +2626,47 @@ function livPrintCss(
       color:#475467;
     }
 
-    .card,
-    .stat{
-      box-shadow:none!important;
-      border:1px solid #d9dee7!important;
-      border-radius:7px!important;
-      background:#fff!important;
+    .liv-report-kpis{
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:6px;
+      margin:0 0 8px;
+    }
+
+    .liv-report-kpi{
+      border:1px solid #d9dee7;
+      border-radius:7px;
+      padding:7px 8px;
       break-inside:avoid;
     }
 
-    .card{
-      padding:${compact ? '6px' : '8px'}!important;
-      margin-bottom:7px!important;
-    }
-
-    .card h2,
-    .card h3{
-      margin:0 0 6px!important;
-      padding-bottom:4px;
-      border-bottom:1px solid #e8ebf0;
-      font-size:${compact ? '10px' : '11px'}!important;
-    }
-
-    .stats{
-      display:grid!important;
-      grid-template-columns:repeat(3,1fr)!important;
-      gap:6px!important;
-      margin-bottom:7px!important;
-    }
-
-    .stat{
-      padding:7px 8px!important;
-    }
-
-    .stat span{
+    .liv-report-kpi span{
       display:block;
       color:#667085;
-      font-size:7px!important;
-      margin-bottom:3px!important;
+      font-size:7px;
+      margin-bottom:3px;
     }
 
-    .stat strong{
-      font-size:15px!important;
+    .liv-report-kpi strong{
+      font-size:15px;
     }
 
-    .grid2,
-    .grid3,
-    .resource-chart-grid{
-      display:block!important;
+    .liv-report-section{
+      margin-bottom:8px;
+      break-inside:auto;
     }
 
-    .table-wrap{
-      overflow:visible!important;
+    .liv-report-section h2{
+      margin:0 0 5px;
+      font-size:11px;
+      padding-bottom:4px;
+      border-bottom:1px solid #e8ebf0;
     }
 
-    table,
-    .liv-print-table{
-      width:100%!important;
-      min-width:0!important;
-      border-collapse:collapse!important;
-      table-layout:auto!important;
+    table{
+      width:100%;
+      border-collapse:collapse;
+      table-layout:auto;
     }
 
     thead{
@@ -3439,44 +2683,51 @@ function livPrintCss(
 
     th,
     td{
-      padding:${compact ? '3px 4px' : '4px 5px'}!important;
-      border-bottom:1px solid #e4e7ec!important;
-      font-size:${compact ? '6.6px' : '7.4px'}!important;
-      line-height:1.2!important;
-      vertical-align:middle!important;
-      position:static!important;
-      white-space:normal;
+      padding:${compact ? '3px 4px' : '4px 5px'};
+      border-bottom:1px solid #e4e7ec;
+      font-size:${compact ? '6.6px' : '7.4px'};
+      line-height:1.2;
+      vertical-align:middle;
       background:#fff;
     }
 
     th{
-      background:#f2f4f7!important;
-      font-weight:700!important;
-      color:#344054!important;
+      background:#f2f4f7;
+      font-weight:700;
+      color:#344054;
+    }
+
+    .num{
+      text-align:center;
+      font-variant-numeric:tabular-nums;
     }
 
     .num-cell,
-    .num-head,
-    .total-cell{
-      text-align:center!important;
+    .num-head{
+      text-align:center;
       font-variant-numeric:tabular-nums;
+    }
+
+    .total,
+    .total-cell{
+      font-weight:700;
     }
 
     tfoot th,
     tfoot td{
-      background:#f6f8fb!important;
-      font-weight:700!important;
-      border-top:1.5px solid #cfd5df!important;
+      background:#f6f8fb;
+      font-weight:700;
+      border-top:1.5px solid #cfd5df;
     }
 
-    .liv-print-chart{
-      display:block;
+    .liv-report-chart{
       max-width:100%;
-      max-height:150mm;
-      margin:0 auto;
+      display:block;
+      margin:0 auto 8px;
+      break-inside:avoid;
     }
 
-    .report-footer{
+    .liv-report-footer{
       display:flex;
       justify-content:space-between;
       margin-top:8px;
@@ -3485,61 +2736,56 @@ function livPrintCss(
       color:#98a2b3;
       font-size:7px;
     }
+
+    .muted{
+      color:#667085;
+    }
   `;
 }
 
-
-/* =========================================================
-   ПЕЧАТНЫЙ ДОКУМЕНТ
-   ========================================================= */
-
-function livBuildPrintableDocument() {
-
-  const source =
-    livCurrentPanel();
-
-
-  if (
-    !source
-  ) {
-
-    throw new Error(
-      'Не найден текущий раздел для печати.'
-    );
-  }
-
+function livBuildPrintDocument() {
+  const schema =
+    livGetCurrentSchema();
 
   const settings =
     livViewSettings();
 
-
-  const clone =
-    livPreparePrintClone(
-      source
+  if (
+    typeof schema.getPrintHtml !==
+    'function'
+  ) {
+    throw new Error(
+      'Для этого представления еще не подключен печатный отчет.'
     );
+  }
 
+  const content =
+    schema.getPrintHtml();
 
-  const filters =
-    livCurrentReportFilters();
+  if (
+    !livVBText(
+      content
+    )
+  ) {
+    throw new Error(
+      'Печатный отчет не содержит данных.'
+    );
+  }
 
+  const meta =
+    settings
+      .print
+      .showFilters
+      ? livCurrentReportMeta(
+          schema
+        )
+      : [];
 
   const generated =
     new Date()
       .toLocaleString(
         'ru-RU'
       );
-
-
-  const wrapper =
-    document.createElement(
-      'div'
-    );
-
-
-  wrapper.appendChild(
-    clone
-  );
-
 
   return `
     <!doctype html>
@@ -3551,7 +2797,10 @@ function livBuildPrintableDocument() {
         <meta charset="UTF-8">
 
         <title>
-          ${esc(livReportTitle())}
+          ${esc(
+            schema.title ||
+            livReportTitle()
+          )}
         </title>
 
         <style>
@@ -3560,31 +2809,30 @@ function livBuildPrintableDocument() {
 
       </head>
 
-
       <body>
 
-        <div class="report">
+        <div class="liv-report">
 
           ${
-            settings.print
-              .showHeader !==
-            false
+            settings
+              .print
+              .showReportHeader
               ? `
-                  <header class="report-header">
+                  <header class="liv-report-header">
 
-                    <div class="brand">
+                    <div class="liv-brand">
 
-                      <div class="brand-mark">
+                      <div class="liv-brand-mark">
                         LIV
                       </div>
 
                       <div>
 
-                        <div class="brand-name">
+                        <div class="liv-brand-name">
                           LIV Planning
                         </div>
 
-                        <div class="brand-subtitle">
+                        <div class="liv-brand-subtitle">
                           Планирование и производственная аналитика
                         </div>
 
@@ -3592,14 +2840,13 @@ function livBuildPrintableDocument() {
 
                     </div>
 
+                    <div class="liv-generated">
 
-                    <div class="generated">
-
-                      <div class="generated-label">
+                      <div class="liv-generated-label">
                         Сформировано
                       </div>
 
-                      <div class="generated-value">
+                      <div class="liv-generated-value">
                         ${esc(generated)}
                       </div>
 
@@ -3607,33 +2854,31 @@ function livBuildPrintableDocument() {
 
                   </header>
 
+                  <section class="liv-report-title">
 
-                  <section class="title-block">
-
-                    <div class="eyebrow">
+                    <small>
                       ОТЧЕТ
-                    </div>
+                    </small>
 
                     <h1>
-                      ${esc(livReportTitle())}
+                      ${esc(
+                        schema.title ||
+                        livReportTitle()
+                      )}
                     </h1>
 
-
                     ${
-                      settings.print
-                        .showFilters !==
-                        false &&
-                      filters.length
+                      meta.length
                         ? `
-                            <div class="filters">
+                            <div class="liv-report-meta">
 
                               ${
-                                filters
+                                meta
                                   .map(
-                                    text =>
+                                    item =>
                                       `
-                                        <span class="filter-chip">
-                                          ${esc(text)}
+                                        <span class="liv-report-chip">
+                                          ${esc(item)}
                                         </span>
                                       `
                                   )
@@ -3650,25 +2895,26 @@ function livBuildPrintableDocument() {
               : ''
           }
 
-
           <main>
-            ${wrapper.innerHTML}
+            ${content}
           </main>
 
-
           ${
-            settings.print
-              .showFooter !==
-            false
+            settings
+              .print
+              .showFooter
               ? `
-                  <footer class="report-footer">
+                  <footer class="liv-report-footer">
 
                     <span>
                       LIV Planning
                     </span>
 
                     <span>
-                      ${esc(livReportTitle())}
+                      ${esc(
+                        schema.title ||
+                        livReportTitle()
+                      )}
                     </span>
 
                   </footer>
@@ -3684,48 +2930,78 @@ function livBuildPrintableDocument() {
   `;
 }
 
-
-/* =========================================================
-   ПЕЧАТЬ ЧЕРЕЗ IFRAME
-   ========================================================= */
-
-function livDestroyPrintFrame() {
-
-  if (
-    !livPrintFrame
-  ) {
-    return;
-  }
-
-
-  try {
-
-    livPrintFrame.remove();
-
-  } catch (
-    error
-  ) {
-  }
-
-
-  livPrintFrame =
-    null;
-}
-
-
 function livPrintCurrent() {
-
-  let html;
-
+  let printWindow =
+    null;
 
   try {
+    printWindow =
+      window.open(
+        '',
+        '_blank',
+        'width=1200,height=800'
+      );
 
-    html =
-      livBuildPrintableDocument();
+    if (
+      !printWindow
+    ) {
+      alert(
+        'Браузер заблокировал окно печати. Разреши всплывающие окна для LIV Planning и повтори.'
+      );
 
+      return;
+    }
+
+    const html =
+      livBuildPrintDocument();
+
+    printWindow
+      .document
+      .open();
+
+    printWindow
+      .document
+      .write(
+        html
+      );
+
+    printWindow
+      .document
+      .close();
+
+    const startPrint =
+      () => {
+        printWindow.focus();
+        printWindow.print();
+      };
+
+    if (
+      printWindow
+        .document
+        .readyState ===
+      'complete'
+    ) {
+      setTimeout(
+        startPrint,
+        250
+      );
+    } else {
+      printWindow.onload =
+        () =>
+          setTimeout(
+            startPrint,
+            250
+          );
+    }
   } catch (
     error
   ) {
+    if (
+      printWindow &&
+      !printWindow.closed
+    ) {
+      printWindow.close();
+    }
 
     alert(
       error?.message ||
@@ -3733,212 +3009,33 @@ function livPrintCurrent() {
         error
       )
     );
-
-    return;
-  }
-
-
-  livDestroyPrintFrame();
-
-
-  const iframe =
-    document.createElement(
-      'iframe'
-    );
-
-
-  Object.assign(
-    iframe.style,
-    {
-
-      position:
-        'fixed',
-
-      right:
-        '0',
-
-      bottom:
-        '0',
-
-      width:
-        '1px',
-
-      height:
-        '1px',
-
-      border:
-        '0',
-
-      opacity:
-        '0',
-
-      pointerEvents:
-        'none'
-    }
-  );
-
-
-  document.body.appendChild(
-    iframe
-  );
-
-
-  livPrintFrame =
-    iframe;
-
-
-  const doc =
-    iframe.contentDocument ||
-    iframe.contentWindow
-      .document;
-
-
-  doc.open();
-
-
-  doc.write(
-    html
-  );
-
-
-  doc.close();
-
-
-  const doPrint =
-    () => {
-
-      try {
-
-        iframe.contentWindow
-          .focus();
-
-
-        iframe.contentWindow
-          .print();
-
-      } finally {
-
-        setTimeout(
-          livDestroyPrintFrame,
-          1500
-        );
-      }
-    };
-
-
-  if (
-    doc.readyState ===
-    'complete'
-  ) {
-
-    setTimeout(
-      doPrint,
-      200
-    );
-
-  } else {
-
-    iframe.onload =
-      () =>
-        setTimeout(
-          doPrint,
-          200
-        );
   }
 }
 
-
 /* =========================================================
-   КНОПКА КОНСТРУКТОРА
-   ========================================================= */
-
-function livEnsureViewBuilderButton() {
-
-  const actions =
-    document.querySelector(
-      '.top-actions'
-    );
-
-
-  if (
-    !actions ||
-    $('livViewBuilderBtn')
-  ) {
-    return;
-  }
-
-
-  const button =
-    document.createElement(
-      'button'
-    );
-
-
-  button.id =
-    'livViewBuilderBtn';
-
-
-  button.className =
-    'btn';
-
-
-  button.textContent =
-    'Конструктор';
-
-
-  button.onclick =
-    livOpenViewBuilder;
-
-
-  const pdf =
-    $('pdfBtn');
-
-
-  if (
-    pdf
-  ) {
-
-    actions.insertBefore(
-      button,
-      pdf
-    );
-
-  } else {
-
-    actions.appendChild(
-      button
-    );
-  }
-}
-
-
-/* =========================================================
-   СТИЛИ КОНСТРУКТОРА
+   СТИЛИ
    ========================================================= */
 
 function livEnsureBuilderStyles() {
-
   if (
-    $('livViewBuilderStyles')
+    document.getElementById(
+      'livViewBuilderStyles'
+    )
   ) {
     return;
   }
-
 
   const style =
     document.createElement(
       'style'
     );
 
-
   style.id =
     'livViewBuilderStyles';
 
-
   style.textContent = `
 
-    .liv-builder-hidden,
-    .liv-mode-hidden{
+    .liv-builder-hidden{
       display:none!important;
     }
 
@@ -3953,8 +3050,8 @@ function livEnsureBuilderStyles() {
       border:1px solid var(--line);
       border-radius:10px;
       background:#f8fafc;
-      color:var(--muted);
-      line-height:1.45;
+      color:#475467;
+      line-height:1.55;
     }
 
     .liv-builder-section{
@@ -3964,7 +3061,7 @@ function livEnsureBuilderStyles() {
 
     .liv-builder-section-head{
       display:flex;
-      align-items:center;
+      align-items:flex-start;
       justify-content:space-between;
       margin-bottom:8px;
     }
@@ -3972,6 +3069,13 @@ function livEnsureBuilderStyles() {
     .liv-builder-section-head h3{
       margin:0;
       font-size:15px;
+    }
+
+    .liv-builder-help{
+      margin-top:3px;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.35;
     }
 
     .liv-builder-list{
@@ -4046,18 +3150,27 @@ function livEnsureBuilderStyles() {
       margin-bottom:10px;
     }
 
-    .liv-table-options{
-      margin-bottom:10px;
+    .liv-builder-table-options{
+      display:grid;
+      grid-template-columns:1fr;
+      gap:8px;
+      margin-bottom:12px;
+      padding-bottom:10px;
+      border-bottom:1px solid #e8ebf0;
     }
 
-    .liv-builder-column-head{
+    .liv-builder-subtitle{
       font-weight:700;
-      margin:8px 0;
+      margin-bottom:8px;
+    }
+
+    .liv-builder-column-row{
+      display:grid;
+      grid-template-columns:minmax(140px,1fr) minmax(140px,220px) auto;
     }
 
     .liv-builder-title-input{
-      width:min(220px,35%);
-      min-width:120px;
+      width:100%;
     }
 
     .liv-profile-list{
@@ -4077,72 +3190,113 @@ function livEnsureBuilderStyles() {
       background:#fff;
     }
 
-    .liv-profile-row > div{
+    .liv-profile-row>div{
       display:flex;
       gap:6px;
     }
 
+    .liv-builder-print-grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+      align-items:end;
+    }
+
+    .liv-builder-footer-actions{
+      position:sticky;
+      bottom:0;
+      padding:10px 0 2px;
+      background:linear-gradient(
+        to bottom,
+        rgba(255,255,255,.7),
+        #fff 30%
+      );
+    }
+
     @media(max-width:900px){
 
-      .liv-builder-tables{
+      .liv-builder-tables,
+      .liv-builder-print-grid{
         grid-template-columns:1fr;
       }
 
+      .liv-builder-column-row{
+        grid-template-columns:1fr auto;
+      }
+
       .liv-builder-title-input{
-        width:40%;
+        grid-column:1/-1;
       }
     }
+
   `;
 
-
-  document.head.appendChild(
-    style
-  );
+  document
+    .head
+    .appendChild(
+      style
+    );
 }
-
 
 /* =========================================================
    ИНИЦИАЛИЗАЦИЯ
    ========================================================= */
 
 function initLivViewBuilder() {
+  if (
+    !livVBEnsureState()
+  ) {
+    return false;
+  }
 
   livEnsureBuilderStyles();
 
-
   livEnsureViewBuilderButton();
 
+  const pdfButton =
+    document.getElementById(
+      'pdfBtn'
+    );
 
   if (
-    $('pdfBtn')
+    pdfButton
   ) {
-
-    $('pdfBtn').onclick =
+    pdfButton.onclick =
       livPrintCurrent;
   }
-
 
   if (
     !livViewBuilderInitialized
   ) {
-
     livViewBuilderInitialized =
       true;
 
-
     document.addEventListener(
       'click',
-
       event => {
-
         if (
           event.target.closest(
             '[data-tab],[data-rview]'
           )
         ) {
-
           setTimeout(
-            livApplyViewConstructor,
+            () => {
+              livEnsureViewBuilderButton();
+
+              const pdf =
+                document.getElementById(
+                  'pdfBtn'
+                );
+
+              if (
+                pdf
+              ) {
+                pdf.onclick =
+                  livPrintCurrent;
+              }
+
+              livApplyViewConstructor();
+            },
             0
           );
         }
@@ -4150,6 +3304,58 @@ function initLivViewBuilder() {
     );
   }
 
-
   livApplyViewConstructor();
+
+  return true;
+}
+
+function livViewBuilderBootstrap(
+  attempt =
+    0
+) {
+  if (
+    typeof project !==
+      'undefined' &&
+    project &&
+    typeof openModal ===
+      'function'
+  ) {
+    initLivViewBuilder();
+    return;
+  }
+
+  if (
+    attempt <
+    40
+  ) {
+    setTimeout(
+      () =>
+        livViewBuilderBootstrap(
+          attempt +
+          1
+        ),
+      250
+    );
+  }
+}
+
+if (
+  document.readyState ===
+  'loading'
+) {
+  document.addEventListener(
+    'DOMContentLoaded',
+    () =>
+      setTimeout(
+        () =>
+          livViewBuilderBootstrap(),
+        0
+      )
+  );
+} else {
+  setTimeout(
+    () =>
+      livViewBuilderBootstrap(),
+    0
+  );
 }
