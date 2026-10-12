@@ -14,6 +14,12 @@ window.ACONS_CONFIG = {
   API_URL:
     'https://script.google.com/macros/s/AKfycbwFRJAeILdVatxnFpgB3-xN6V3Ug1S-e7zlcvqaIL4jRHfW_fcgQ5NMKY2Vtvq551xASQ/exec',
 
+  SUPABASE_URL:
+    'https://sobipyyappqsrszwedqk.supabase.co',
+
+  SUPABASE_PUBLISHABLE_KEY:
+    'sb_publishable_GHckFgL30B9jtkKv7z0NwA_vUYZYvI3',
+
 
   /* =======================================================
      ОБЩИЕ НАСТРОЙКИ ПРОДУКТА
