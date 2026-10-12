@@ -118,7 +118,39 @@
     return message || 'Не удалось выполнить вход.';
   }
 
-  function ensureUserControls(user) {
+  async function loadProfile(user) {
+    try {
+      const result = await client
+        .from('app_users')
+        .select('full_name, role, email')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (result.error) {
+        console.warn('LIV Auth: profile load failed', result.error);
+        return null;
+      }
+
+      return result.data || null;
+    } catch (err) {
+      console.warn('LIV Auth: profile load failed', err);
+      return null;
+    }
+  }
+
+  function roleLabel(role) {
+    const map = {
+      admin: 'Администратор',
+      planner: 'Планер',
+      responsible: 'Ответственный',
+      contractor: 'Подрядчик',
+      customer: 'Заказчик'
+    };
+
+    return map[role] || role || '';
+  }
+
+  async function ensureUserControls(user) {
     let wrap = document.getElementById('livAuthUserControls');
 
     if (!wrap) {
@@ -131,12 +163,18 @@
       topActions.appendChild(wrap);
     }
 
+    const profile = await loadProfile(user);
+    const fullName = profile && profile.full_name ? profile.full_name.trim() : '';
+    const role = profile && profile.role ? roleLabel(profile.role) : '';
+    const displayName = fullName || user.email || '';
+    const details = role ? displayName + ' · ' + role : displayName;
+
     wrap.textContent = '';
 
     const email = document.createElement('span');
     email.className = 'liv-auth-email';
     email.title = user.email || '';
-    email.textContent = user.email || '';
+    email.textContent = details;
 
     const logout = document.createElement('button');
     logout.id = 'livAuthLogout';
