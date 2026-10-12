@@ -35,9 +35,14 @@
       '.liv-auth-btn{width:100%;min-height:44px;border:0;border-radius:10px;padding:10px 16px;font:inherit;font-weight:700;cursor:pointer;background:#111827;color:#fff;}' +
       '.liv-auth-btn:disabled{opacity:.6;cursor:wait;}' +
       '.liv-auth-error{min-height:20px;margin:14px 0 0;color:#b91c1c;font-size:13px;}' +
-      '.liv-auth-user{display:inline-flex;align-items:center;gap:8px;margin-left:8px;}' +
-      '.liv-auth-email{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:#6b7280;}' +
-      '.liv-auth-logout{min-height:34px;padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer;}';
+      '.liv-auth-user{display:inline-flex;align-items:center;gap:10px;margin-left:8px;min-width:0;}' +
+      '.liv-auth-identity{display:inline-flex;align-items:center;min-width:0;gap:6px;}' +
+      '.liv-auth-name{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:#cbd5e1;}' +
+      '.liv-auth-role{white-space:nowrap;font-size:12px;color:#94a3b8;}' +
+      '.liv-auth-role:before{content:"· ";}' +
+      '.liv-auth-logout{min-height:34px;padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer;flex:0 0 auto;}' +
+      '@media(max-width:1100px){.liv-auth-user{margin-left:0}.liv-auth-identity{flex-direction:column;align-items:flex-start;gap:2px}.liv-auth-role:before{content:""}.liv-auth-name{max-width:min(70vw,420px)}}' +
+      '@media(max-width:680px){.liv-auth-user{width:100%;justify-content:space-between}.liv-auth-identity{min-width:0;flex:1}.liv-auth-name{max-width:100%;font-size:14px}.liv-auth-role{font-size:12px}.liv-auth-logout{min-height:38px}}';
 
     document.head.appendChild(style);
   }
@@ -167,14 +172,25 @@
     const fullName = profile && profile.full_name ? profile.full_name.trim() : '';
     const role = profile && profile.role ? roleLabel(profile.role) : '';
     const displayName = fullName || user.email || '';
-    const details = role ? displayName + ' · ' + role : displayName;
 
     wrap.textContent = '';
 
-    const email = document.createElement('span');
-    email.className = 'liv-auth-email';
-    email.title = user.email || '';
-    email.textContent = details;
+    const identity = document.createElement('div');
+    identity.className = 'liv-auth-identity';
+    identity.title = user.email || '';
+
+    const name = document.createElement('span');
+    name.className = 'liv-auth-name';
+    name.textContent = displayName;
+
+    identity.appendChild(name);
+
+    if (role) {
+      const roleNode = document.createElement('span');
+      roleNode.className = 'liv-auth-role';
+      roleNode.textContent = role;
+      identity.appendChild(roleNode);
+    }
 
     const logout = document.createElement('button');
     logout.id = 'livAuthLogout';
@@ -186,7 +202,7 @@
       await client.auth.signOut();
     });
 
-    wrap.appendChild(email);
+    wrap.appendChild(identity);
     wrap.appendChild(logout);
   }
 
