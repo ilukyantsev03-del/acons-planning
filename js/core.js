@@ -4350,14 +4350,7 @@ async function saveLog(
       comment,
 
       createdAt:
-        nowIso(),
-
-      createdByRole:
-        window.LIV_ACCESS?.role ||
-        '',
-
-      backdated:
-        date < today()
+        nowIso()
     });
 
 
@@ -4449,7 +4442,14 @@ async function saveLog(
       comment,
 
       createdAt:
-        nowIso()
+        nowIso(),
+
+      createdByRole:
+        window.LIV_ACCESS?.role ||
+        '',
+
+      backdated:
+        date < today()
     });
 
 
