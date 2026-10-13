@@ -172,6 +172,11 @@ let importModeResolved =
 
 let importMappingMode = '';
 
+let importMatrixLayoutDetected =
+  false;
+
+let importMatrixLayoutInfo =
+  '';
 
 
 
