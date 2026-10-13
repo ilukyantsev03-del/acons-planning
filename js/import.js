@@ -3236,15 +3236,28 @@ function previewImportRow(
   }
 
 
+  const existingFront =
+    findMatchingFrontByMapped(
+      raw
+    );
+
+
   return {
     raw,
     rowNumber,
     status:
-      'Готово',
+      existingFront
+        ? 'Совпадение'
+        : 'Готово',
     message:
-      'Фронт работ',
+      existingFront
+        ? 'Обновится существующая ячейка шахматки'
+        : 'Новый фронт работ',
     selected:
-      true
+      true,
+    existingId:
+      existingFront?.id ||
+      ''
   };
 }
 
@@ -4089,9 +4102,33 @@ async function commitImport(){
   }
 
 
+  const targetMatrixId =
+    selectedImportMatrixTarget();
+
+
+  const targetMatrix =
+    targetMatrixId ===
+      'new'
+      ? null
+      : matrixById(
+          targetMatrixId
+        );
+
+
   if (
     !confirm(
-      `Импортировать выбранные строки: ${selected.length}?`
+      `Импортировать выбранные строки: ${selected.length}?\n` +
+      (
+        importModeResolved ===
+          'fronts'
+          ? (
+              targetMatrix
+                ? 'Обновится шахматка: ' +
+                  targetMatrix.name
+                : 'Будет создана новая шахматка'
+            )
+          : ''
+      )
     )
   ) {
     return;
@@ -5186,9 +5223,43 @@ async function commitImport(){
             item
           )
         }
-      });
+      };
 
-      appended++;
+
+      if (
+        existingMilestone
+      ) {
+
+        const correspondence =
+          existingMilestone.correspondence ||
+          [];
+
+
+        Object.assign(
+          existingMilestone,
+          importedMilestone,
+          {
+            correspondence,
+            createdAt:
+              existingMilestone.createdAt ||
+              importedMilestone.createdAt,
+            updatedAt:
+              nowIso()
+          }
+        );
+
+
+        updated++;
+
+      } else {
+
+        project.milestones.push(
+          importedMilestone
+        );
+
+
+        appended++;
+      }
     }
   }
 
