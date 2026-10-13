@@ -653,7 +653,6 @@
               entity_type: entityType,
               entity_id: entityId,
               alias,
-              normalized_alias: normalized(alias),
               source_name: 'LIV',
               active: true
             });
@@ -696,7 +695,6 @@
           source_name: text(item.sourceName) || 'LIV',
           source_entity_type: text(item.sourceEntityType) || item.targetEntityType,
           source_value: text(item.sourceValue),
-          normalized_source_value: normalized(item.sourceValue),
           target_entity_type: item.targetEntityType,
           target_entity_id: targetEntityId,
           confidence: Number(item.confidence ?? 1),
