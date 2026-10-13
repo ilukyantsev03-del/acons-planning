@@ -6862,6 +6862,10 @@ function exportCurrentViewExcel() {
               ) ||
               '',
 
+            'Группа':
+              item.groupCode ||
+              '',
+
             'Захватка':
               item.capture ||
               '',
