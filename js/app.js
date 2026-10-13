@@ -6974,6 +6974,231 @@ function printCurrent() {
    ========================================================= */
 
 
+function openCreateMatrixEditor() {
+
+  openModal(
+    'Новая шахматка',
+
+    `
+      <div class="liv-editor-content">
+
+        <div class="field">
+          <label>
+            Название шахматки
+          </label>
+
+          <input
+            id="newMatrixName"
+            placeholder="Например: Фасады Главного корпуса"
+            autocomplete="off"
+          >
+        </div>
+
+        <div class="liv-editor-hint">
+          Шахматка создаётся как отдельное представление.
+          Фронты можно добавить вручную или загрузить через импорт.
+        </div>
+
+      </div>
+
+      <div class="liv-editor-footer">
+
+        <button
+          id="newMatrixCancel"
+          class="btn">
+          Отмена
+        </button>
+
+        <button
+          id="newMatrixSave"
+          class="btn primary">
+          Создать
+        </button>
+
+      </div>
+    `
+  );
+
+
+  bindClick(
+    'newMatrixCancel',
+    closeModal
+  );
+
+
+  bindClick(
+    'newMatrixSave',
+    createMatrixFromEditor
+  );
+
+
+  setTimeout(
+    () =>
+      $('newMatrixName')
+        ?.focus(),
+    0
+  );
+}
+
+
+async function createMatrixFromEditor() {
+
+  const name =
+    $('newMatrixName')
+      ?.value
+      .trim() ||
+    '';
+
+
+  if (!name) {
+
+    alert(
+      'Укажи название шахматки.'
+    );
+
+    return;
+  }
+
+
+  const matrix = {
+    id:
+      uid(
+        'MX'
+      ),
+    name,
+    sourceType:
+      'manual',
+    sourceFile:
+      '',
+    sourceSheet:
+      '',
+    active:
+      true,
+    createdAt:
+      nowIso(),
+    updatedAt:
+      nowIso(),
+    lastImportId:
+      '',
+    viewConfig:
+      {}
+  };
+
+
+  project.matrices =
+    project.matrices ||
+    [];
+
+
+  project.matrices.push(
+    matrix
+  );
+
+
+  log(
+    'Создано',
+    'Шахматка',
+    name,
+    {
+      matrixId:
+        matrix.id
+    }
+  );
+
+
+  await saveProject();
+
+
+  closeModal();
+
+
+  fillMatrixSelects();
+
+
+  if (
+    $('mfMatrix')
+  ) {
+
+    $('mfMatrix').value =
+      matrix.id;
+  }
+
+
+  renderMatrix();
+}
+
+
+function updateCurrentMatrixFromFile() {
+
+  const id =
+    currentMatrixId();
+
+
+  const matrix =
+    matrixById(
+      id
+    );
+
+
+  if (!matrix) {
+
+    alert(
+      'Сначала выбери конкретную шахматку.'
+    );
+
+    return;
+  }
+
+
+  importMatrixTargetId =
+    matrix.id;
+
+
+  switchTab(
+    'import'
+  );
+
+
+  fillMatrixSelects();
+
+
+  if (
+    $('importMatrixTarget')
+  ) {
+
+    $('importMatrixTarget').value =
+      matrix.id;
+  }
+
+
+  if (
+    $('importMatrixName')
+  ) {
+
+    $('importMatrixName').disabled =
+      true;
+  }
+
+
+  if (
+    $('importInfo')
+  ) {
+
+    $('importInfo')
+      .classList
+      .remove(
+        'hidden'
+      );
+
+
+    $('importInfo').textContent =
+      'Обновление шахматки «' +
+      matrix.name +
+      '». Загрузи новый Excel-файл и выполни анализ.';
+  }
+}
+
+
 async function renameCurrentMatrix() {
 
   const id =
@@ -7279,6 +7504,33 @@ async function deleteMatrix(
 
   matrix.deletedAt =
     nowIso();
+
+
+  (
+    project.importHistory ||
+    []
+  )
+    .forEach(
+      item => {
+
+        if (
+          String(
+            item.matrixId ||
+            ''
+          ) ===
+          String(
+            matrixId
+          )
+        ) {
+
+          item.status =
+            'matrix_deleted';
+
+          item.matrixDeletedAt =
+            nowIso();
+        }
+      }
+    );
 
 
   log(
@@ -8100,6 +8352,18 @@ function bindUi() {
           renderMatrix
         )
     );
+
+
+  bindClick(
+    'matrixCreateBtn',
+    openCreateMatrixEditor
+  );
+
+
+  bindClick(
+    'matrixUpdateBtn',
+    updateCurrentMatrixFromFile
+  );
 
 
   bindClick(
