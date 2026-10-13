@@ -373,6 +373,135 @@
     }
   }
 
+  async function syncAliasesAndMappings(current) {
+
+    const aliases = [];
+
+    const pushAliases = (
+      entityType,
+      items,
+      mapName
+    ) => {
+      (items || []).forEach(item => {
+        const entityId = mapValue(mapName, item.id);
+        if (!entityId || !Array.isArray(item.aliases)) return;
+
+        item.aliases
+          .map(text)
+          .filter(Boolean)
+          .forEach(alias => {
+            aliases.push({
+              project_id: state.projectId,
+              entity_type: entityType,
+              entity_id: entityId,
+              alias,
+              normalized_alias: normalized(alias),
+              source_name: 'LIV',
+              active: true
+            });
+          });
+      });
+    };
+
+    pushAliases('building', current.buildings, 'building');
+    pushAliases('work', current.works, 'work');
+    pushAliases('organization', current.organizations, 'organization');
+
+    if (aliases.length) {
+      const result = await client()
+        .from('entity_aliases')
+        .upsert(aliases, {
+          onConflict: 'project_id,entity_type,normalized_alias',
+          ignoreDuplicates: false
+        });
+
+      if (result.error) throw result.error;
+    }
+
+    const mappings = (current.sourceMappings || [])
+      .filter(item => item?.sourceValue && item?.targetEntityId)
+      .map(item => {
+        let targetEntityId = null;
+
+        if (item.targetEntityType === 'building') {
+          targetEntityId = mapValue('building', item.targetEntityId);
+        } else if (item.targetEntityType === 'work') {
+          targetEntityId = mapValue('work', item.targetEntityId);
+        } else if (item.targetEntityType === 'organization') {
+          targetEntityId = mapValue('organization', item.targetEntityId);
+        }
+
+        if (!targetEntityId) return null;
+
+        return {
+          project_id: state.projectId,
+          source_name: text(item.sourceName) || 'LIV',
+          source_entity_type: text(item.sourceEntityType) || item.targetEntityType,
+          source_value: text(item.sourceValue),
+          normalized_source_value: normalized(item.sourceValue),
+          target_entity_type: item.targetEntityType,
+          target_entity_id: targetEntityId,
+          confidence: Number(item.confidence ?? 1),
+          decision: text(item.decision) || 'confirmed'
+        };
+      })
+      .filter(Boolean);
+
+    if (mappings.length) {
+      const result = await client()
+        .from('source_mappings')
+        .upsert(mappings, {
+          onConflict: 'project_id,source_name,source_entity_type,normalized_source_value',
+          ignoreDuplicates: false
+        });
+
+      if (result.error) throw result.error;
+    }
+  }
+
+
+  async function verifyMigration(current) {
+
+    const checks = [
+      ['buildings', current.buildings.filter(item => item.active !== false).length],
+      ['organizations', current.organizations.filter(item => item.active !== false).length],
+      ['works', current.works.filter(item => item.active !== false).length],
+      ['fronts', current.fronts.filter(item => item.active !== false).length],
+      ['milestones', current.milestones.filter(item => item.active !== false).length],
+      ['numbered_elements', current.numberedElements.filter(item => item.active !== false).length]
+    ];
+
+    const report = {};
+
+    for (const [table, localCount] of checks) {
+      let query = client()
+        .from(table)
+        .select('id', {
+          count: 'exact',
+          head: true
+        });
+
+      if (!['organizations', 'works'].includes(table)) {
+        query = query.eq('project_id', state.projectId);
+      }
+
+      const result = await query;
+      if (result.error) throw result.error;
+
+      const serverCount = Number(result.count || 0);
+
+      report[table] = {
+        local: localCount,
+        server: serverCount,
+        ok: serverCount >= localCount
+      };
+    }
+
+    window.LIV_MIGRATION_CHECK = report;
+    return report;
+  }
+
+
   async function syncContracts(current) {
     const rows = current.contracts
       .filter(item => item?.id)
@@ -1031,6 +1160,7 @@
       ensureCollections(current);
       await resolveProjectId();
       await syncDictionaries(current);
+      await syncAliasesAndMappings(current);
       await syncContracts(current);
       await syncStructures(current);
       await syncFronts(current);
@@ -1040,8 +1170,34 @@
       await syncMetricsAndFacts(current);
       await syncSchedule(current);
       await syncImportHistory(current);
+
+      const migrationCheck =
+        await verifyMigration(
+          current
+        );
+
       saveHashes();
-      setStatus('ready', 'Серверная база синхронизирована');
+
+      const failed =
+        Object.values(
+          migrationCheck
+        )
+          .filter(
+            value =>
+              !value.ok
+          );
+
+      if (failed.length) {
+        setStatus(
+          'error',
+          'Сверка миграции: есть расхождения'
+        );
+      } else {
+        setStatus(
+          'ready',
+          'Серверная база синхронизирована'
+        );
+      }
       setTimeout(() => syncResourcesBackground(current), 50);
       return true;
     } catch (error) {
@@ -1140,7 +1296,12 @@
     state: () => ({ ...state, maps: undefined, hashes: undefined }),
     projectId: () => state.projectId,
     serverId: mapValue,
-    inferMilestoneTarget: targetFromTitle
+    inferMilestoneTarget: targetFromTitle,
+    verifyMigration:
+      () =>
+        verifyMigration(
+          localProject()
+        )
   };
 
   if (document.readyState === 'loading') {
