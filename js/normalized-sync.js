@@ -1,7 +1,7 @@
 'use strict';
 
 (function () {
-  const MODULE_VERSION = '2026.10.13.6';
+  const MODULE_VERSION = '2026.10.13.7';
   const PROJECT_EXTERNAL_ID = 'LIV-MAIN';
   const SAVE_DELAY = 1200;
   const PAGE_SIZE = 1000;
@@ -45,6 +45,20 @@
 
   function client() {
     return window.LIV_SUPABASE || null;
+  }
+
+  function dbError(context, error) {
+    const message = error?.message || String(error || 'Неизвестная ошибка');
+    const code = error?.code ? ' [' + error.code + ']' : '';
+    return new Error(context + ': ' + message + code);
+  }
+
+  async function syncStep(label, action) {
+    try {
+      return await action();
+    } catch (error) {
+      throw dbError(label, error);
+    }
   }
 
   function remoteSync() {
@@ -430,7 +444,7 @@
       .select('external_id,row_version')
       .in('external_id', ids);
 
-    if (lookup.error) throw lookup.error;
+    if (lookup.error) throw dbError('Таблица ' + table + ' · чтение версии', lookup.error);
 
     const serverById = new Map(
       (lookup.data || []).map(row => [String(row.external_id), row])
@@ -460,7 +474,7 @@
               '» была создана другим пользователем. Обнови данные перед сохранением.'
             );
           }
-          throw inserted.error;
+          throw dbError('Таблица ' + table + ' · вставка', inserted.error);
         }
 
         state.serverVersions[versionKey] = Number(inserted.data?.row_version || 1);
@@ -486,7 +500,7 @@
         .eq('row_version', serverVersion)
         .select('external_id,row_version');
 
-      if (updated.error) throw updated.error;
+      if (updated.error) throw dbError('Таблица ' + table + ' · обновление', updated.error);
 
       if (!updated.data || updated.data.length !== 1) {
         throw new Error(
@@ -529,7 +543,7 @@
           onConflict,
           ignoreDuplicates: false
         });
-        if (result.error) throw result.error;
+        if (result.error) throw dbError('Таблица ' + table, result.error);
 
         await refreshWrittenVersions(
           table,
@@ -1421,21 +1435,22 @@
     try {
       ensureCollections(current);
       await resolveProjectId();
-      await syncDictionaries(current);
-      await syncAliasesAndMappings(current);
-      await syncContracts(current);
-      await syncStructures(current);
-      await syncFronts(current);
-      await syncMatrices(current);
-      await syncMilestones(current);
-      await syncNumberedElements(current);
-      await syncMetricsAndFacts(current);
-      await syncSchedule(current);
-      await syncImportHistory(current);
+      await syncStep('Справочники', () => syncDictionaries(current));
+      await syncStep('Алиасы и сопоставления', () => syncAliasesAndMappings(current));
+      await syncStep('Договоры', () => syncContracts(current));
+      await syncStep('Структура зданий', () => syncStructures(current));
+      await syncStep('Фронты', () => syncFronts(current));
+      await syncStep('Шахматки', () => syncMatrices(current));
+      await syncStep('Ключевые даты', () => syncMilestones(current));
+      await syncStep('Номерные элементы', () => syncNumberedElements(current));
+      await syncStep('Объёмы и факты', () => syncMetricsAndFacts(current));
+      await syncStep('Рабочий график', () => syncSchedule(current));
+      await syncStep('Журнал импорта', () => syncImportHistory(current));
 
       const migrationCheck =
-        await verifyMigration(
-          current
+        await syncStep(
+          'Сверка миграции',
+          () => verifyMigration(current)
         );
 
       saveHashes();
