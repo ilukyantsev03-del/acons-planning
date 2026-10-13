@@ -202,8 +202,63 @@
       .subscribe();
   }
 
+  async function reconnect(localProject) {
+    const client = sb();
+
+    if (
+      channel &&
+      client
+    ) {
+      try {
+        await client.removeChannel(
+          channel
+        );
+      } catch (error) {
+        console.warn(
+          'LIV Supabase: channel reset failed',
+          error
+        );
+      }
+    }
+
+    channel = null;
+    role = '';
+    userId = '';
+
+    const state =
+      await bootstrap(
+        localProject
+      );
+
+    subscribe();
+
+    return state;
+  }
+
+  function disconnect() {
+    role = '';
+    userId = '';
+
+    if (
+      channel &&
+      sb()
+    ) {
+      sb()
+        .removeChannel(
+          channel
+        )
+        .catch(
+          () => {}
+        );
+    }
+
+    channel = null;
+  }
+
   window.LIV_REMOTE_SYNC = {
     bootstrap,
+    reconnect,
+    disconnect,
     queueSave,
     flush,
     subscribe,
