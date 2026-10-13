@@ -198,6 +198,60 @@
   }
 
   const userId=()=>window.LIV_REMOTE_SYNC?.userId?.()||null;
+  async function writeVersioned(table,x,data){
+    const client=window.LIV_SUPABASE;
+    if(!client)return;
+
+    if(!x.serverId){
+      const existing=await client
+        .from(table)
+        .select('id,row_version')
+        .eq('external_id',x.id)
+        .maybeSingle();
+      if(existing.error)throw existing.error;
+
+      if(existing.data?.id){
+        x.serverId=existing.data.id;
+        x.serverVersion=Number(existing.data.row_version||1);
+      }else{
+        const inserted=await client
+          .from(table)
+          .insert({...data,created_by:userId()})
+          .select('id,row_version')
+          .single();
+        if(inserted.error)throw inserted.error;
+        x.serverId=inserted.data.id;
+        x.serverVersion=Number(inserted.data.row_version||1);
+        return;
+      }
+    }
+
+    if(!x.serverVersion){
+      const version=await client
+        .from(table)
+        .select('row_version')
+        .eq('id',x.serverId)
+        .single();
+      if(version.error)throw version.error;
+      x.serverVersion=Number(version.data?.row_version||1);
+    }
+
+    const expected=Number(x.serverVersion||1);
+    const updated=await client
+      .from(table)
+      .update(data)
+      .eq('id',x.serverId)
+      .eq('row_version',expected)
+      .select('row_version');
+
+    if(updated.error)throw updated.error;
+    if(!updated.data||updated.data.length!==1){
+      throw new Error('Конфликт редактирования: объект уже изменён другим пользователем. Обнови страницу и повтори.');
+    }
+
+    x.serverVersion=Number(updated.data[0].row_version||expected+1);
+  }
+
   async function syncScheme(x){
     const client=window.LIV_SUPABASE;
     if(!client)return;
@@ -221,23 +275,9 @@
         fileSize:Number(x.fileSize||0)
       }
     };
-    if(x.serverId){
-      const r=await client.from('schemes').update(data).eq('id',x.serverId);
-      if(r.error)throw r.error;
-      return;
-    }
-    const e=await client.from('schemes').select('id').eq('external_id',x.id).maybeSingle();
-    if(e.error)throw e.error;
-    if(e.data?.id){
-      x.serverId=e.data.id;
-      const r=await client.from('schemes').update(data).eq('id',x.serverId);
-      if(r.error)throw r.error;
-      return;
-    }
-    const r=await client.from('schemes').insert({...data,created_by:userId()}).select('id').single();
-    if(r.error)throw r.error;
-    x.serverId=r.data.id;
+    await writeVersioned('schemes',x,data);
   }
+
   async function syncMark(x){
     const client=window.LIV_SUPABASE,item=scheme(x.schemeId);
     if(!client||!item)return;
@@ -269,23 +309,9 @@
         frontExternalId:x.frontId||''
       }
     };
+
     try{
-      if(x.serverId){
-        const r=await client.from('scheme_marks').update(data).eq('id',x.serverId);
-        if(r.error)throw r.error;
-        return;
-      }
-      const e=await client.from('scheme_marks').select('id').eq('external_id',x.id).maybeSingle();
-      if(e.error)throw e.error;
-      if(e.data?.id){
-        x.serverId=e.data.id;
-        const r=await client.from('scheme_marks').update(data).eq('id',x.serverId);
-        if(r.error)throw r.error;
-        return;
-      }
-      const r=await client.from('scheme_marks').insert({...data,created_by:userId()}).select('id').single();
-      if(r.error)throw r.error;
-      x.serverId=r.data.id;
+      await writeVersioned('scheme_marks',x,data);
     }catch(error){
       console.warn('LIV Schemes: sync mark failed',error);
       throw error;
