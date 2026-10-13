@@ -358,7 +358,16 @@
       if (rawBuilding) inheritedBuilding = rawBuilding;
       if (!title && !targetDate) return;
 
-      const organizationMatch = findOrganization(rawOrganization || inheritedOrganization, defaultOrganizationId);
+      const organizationSource =
+        rawOrganization ||
+        inheritedOrganization ||
+        (
+          defaultOrganizationId
+            ? ''
+            : state.sheetName
+        );
+
+      const organizationMatch = findOrganization(organizationSource, defaultOrganizationId);
       const milestoneNo = parseMilestoneNo(title, value(sourceRow, 'number'));
       const target = inferTarget(title);
       const parsed = {
