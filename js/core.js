@@ -1412,6 +1412,59 @@ function normalizeProject(
     );
 
 
+  if (
+    !result.progressFacts.length &&
+    result.factLog.length
+  ) {
+
+    result.progressFacts =
+      result.factLog
+        .map(
+          row => ({
+            id:
+              row.id ||
+              uid(
+                'FCT'
+              ),
+            frontId:
+              row.frontId,
+            factDate:
+              row.date,
+            factType:
+              'quantity',
+            quantity:
+              num(
+                row.qty
+              ),
+            cumulativeQty:
+              row.cumulative,
+            people:
+              row.people,
+            comment:
+              row.comment ||
+              '',
+            sourceFingerprint:
+              row.importFingerprint ||
+              (
+                'legacy:' +
+                (
+                  row.id ||
+                  uid(
+                    'FCT'
+                  )
+                )
+              ),
+            createdAt:
+              row.createdAt ||
+              nowIso(),
+            source:
+              row.source ||
+              null
+          })
+        );
+  }
+
+
   result.numberedElements =
     (
       result.numberedElements ||
@@ -4320,6 +4373,55 @@ function pfFrontIds() {
 }
 
 
+function canonicalFactRows() {
+
+  if (
+    Array.isArray(
+      project.progressFacts
+    ) &&
+    project.progressFacts.length
+  ) {
+
+    return project.progressFacts
+      .filter(
+        row =>
+          row.factType !==
+          'cumulative_snapshot'
+      )
+      .map(
+        row => ({
+          id:
+            row.id,
+          frontId:
+            row.frontId,
+          date:
+            row.factDate ||
+            row.date,
+          qty:
+            num(
+              row.quantity ??
+              row.qty
+            ),
+          cumulative:
+            row.cumulativeQty ??
+            row.cumulative,
+          people:
+            row.people,
+          comment:
+            row.comment ||
+            ''
+        })
+      );
+  }
+
+
+  return (
+    project.factLog ||
+    []
+  );
+}
+
+
 function renderPlanFact() {
 
   const ids =
@@ -4358,10 +4460,7 @@ function renderPlanFact() {
 
 
   const fact =
-    (
-      project.factLog ||
-      []
-    )
+    canonicalFactRows()
       .filter(
         row =>
           ids.has(
@@ -4438,10 +4537,7 @@ function renderPlanFact() {
 
 
   const factCumulative =
-    (
-      project.factLog ||
-      []
-    )
+    canonicalFactRows()
       .filter(
         row =>
           ids.has(
@@ -4881,10 +4977,7 @@ async function saveLog(
   } else {
 
     const previous =
-      (
-        project.factLog ||
-        []
-      )
+      canonicalFactRows()
         .filter(
           row =>
             row.frontId ===
