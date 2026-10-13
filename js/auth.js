@@ -274,6 +274,8 @@
 
     wrap.appendChild(identity);
     wrap.appendChild(logout);
+
+    return profile;
   }
 
   function removeUserControls() {
@@ -281,13 +283,30 @@
     if (wrap) wrap.remove();
   }
 
-  function applySession(session) {
+  async function applySession(session) {
     const overlay = ensureOverlay();
 
     if (session && session.user) {
       overlay.classList.add('hidden');
       document.body.classList.remove('liv-auth-locked');
-      ensureUserControls(session.user);
+
+      const profile =
+        await ensureUserControls(
+          session.user
+        );
+
+      window.dispatchEvent(
+        new CustomEvent(
+          'liv-auth-session',
+          {
+            detail: {
+              signedIn: true,
+              userId: session.user.id,
+              role: profile?.role || ''
+            }
+          }
+        )
+      );
     } else {
       overlay.classList.remove('hidden');
       document.body.classList.add('liv-auth-locked');
@@ -306,6 +325,19 @@
 
       const password = document.getElementById('livAuthPassword');
       if (password) password.value = '';
+
+      window.dispatchEvent(
+        new CustomEvent(
+          'liv-auth-session',
+          {
+            detail: {
+              signedIn: false,
+              userId: '',
+              role: ''
+            }
+          }
+        )
+      );
     }
   }
 
@@ -318,13 +350,19 @@
 
     if (result.error) {
       console.error('LIV Auth: session check failed', result.error);
-      applySession(null);
+      await applySession(null);
     } else {
-      applySession(result.data.session);
+      await applySession(result.data.session);
     }
 
     client.auth.onAuthStateChange(function (_event, session) {
-      applySession(session);
+      applySession(session).catch(
+        error =>
+          console.error(
+            'LIV Auth: session apply failed',
+            error
+          )
+      );
     });
   }
 
