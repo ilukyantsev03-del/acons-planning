@@ -222,7 +222,9 @@
     const status=$s('smStatus').value;
     const frontId=$s('smFront').value;
     const progressPercent=derivedProgress(status,frontId);
-    Object.assign(x,{title:$s('smTitle').value.trim(),status,progressPercent,workId:$s('smWork').value,organizationId:$s('smOrg').value,frontId,comment:$s('smComment').value.trim(),active:true,updatedAt:t});
+    const completedAt=DONE.has(status)?(x.completedAt||t):null;
+    const completedBy=DONE.has(status)?(x.completedBy||userId()||null):null;
+    Object.assign(x,{title:$s('smTitle').value.trim(),status,progressPercent,workId:$s('smWork').value,organizationId:$s('smOrg').value,frontId,comment:$s('smComment').value.trim(),completedAt,completedBy,active:true,updatedAt:t});
     if(typeof log==='function')log(existing?'Изменено':'Создано','Отметка на схеме',x.title||'Участок',{schemeId:x.schemeId,markId:x.id,status:x.status,progress:x.progressPercent});
     await syncMark(x);await saveProject();closeModal();renderMarks();stats();renderList();
   }
@@ -381,6 +383,8 @@
       front_id:normalizer?.serverId?.('front',x.frontId)||null,
       element_group_id:normalizer?.serverId?.('elementGroup',x.elementGroupId)||null,
       numbered_element_id:normalizer?.serverId?.('numberedElement',x.numberedElementId)||null,
+      completed_at:x.completedAt||null,
+      completed_by:x.completedBy||null,
       comment:x.comment||null,
       active:x.active!==false,
       updated_at:x.updatedAt||now(),
