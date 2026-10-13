@@ -729,15 +729,22 @@ function milestoneDeviation(
     );
   }
 
-  return dateDeviationDays(
-    milestoneTargetDate(
-      item
-    ),
+  const calculated =
+    dateDeviationDays(
+      milestoneTargetDate(
+        item
+      ),
 
-    milestoneCurrentDate(
-      item
-    )
-  );
+      milestoneCurrentDate(
+        item
+      )
+    );
+
+
+  return calculated ===
+    null
+    ? null
+    : -calculated;
 }
 
 
@@ -838,6 +845,15 @@ function renderMilestones() {
             milestoneDeviation(
               item
             );
+
+
+          const risk =
+            typeof milestoneRiskForecast ===
+              'function'
+              ? milestoneRiskForecast(
+                  item
+                )
+              : null;
 
 
           const org =
@@ -1670,6 +1686,42 @@ function openMilestoneEditor(
         <div class="field">
 
           <label>
+            Целевой объём КД
+          </label>
+
+          <input
+            id="mTargetQty"
+            type="number"
+            min="0"
+            step="any"
+            value="${milestone.targetQty ?? ''}"
+            placeholder="Например: 190"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Ед. изм. цели
+          </label>
+
+          <input
+            id="mTargetUnit"
+            value="${esc(
+              milestone.targetUnit ||
+              ''
+            )}"
+            placeholder="шт. / м³ / м² / м.п."
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
             Отклонение, дн.
           </label>
 
@@ -2155,6 +2207,26 @@ async function saveMilestone(
           : num(
               $('mDeviation').value
             ),
+
+      targetQty:
+        $('mTargetQty').value ===
+          ''
+          ? null
+          : Math.max(
+              0,
+              num(
+                $('mTargetQty').value
+              )
+            ),
+
+      targetUnit:
+        $('mTargetUnit')
+          .value
+          .trim(),
+
+      riskWindowDays:
+        milestone.riskWindowDays ||
+        7,
 
       title,
 
