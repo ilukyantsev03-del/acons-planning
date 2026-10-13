@@ -322,8 +322,25 @@
   function openDelete(){const x=scheme(state.schemeId);if(!x||!canWrite())return;openModal('Удаление PDF-схемы',`<div class="notice bad">Будет удалена схема <b>${html(x.name)}</b>, исходный PDF и ${marks(x.id).length} отметок. Фронты и шахматки не удаляются.</div><div class="liv-editor-footer"><button id="sdCancel" class="btn">Отмена</button><button id="sdConfirm" class="btn danger">Удалить</button></div>`);$s('sdCancel').onclick=closeModal;$s('sdConfirm').onclick=removeScheme;}
   async function removeScheme(){const x=scheme(state.schemeId),client=window.LIV_SUPABASE;if(!x)return;try{if(client){if(x.storagePath)await client.storage.from(BUCKET).remove([x.storagePath]);const r=x.serverId?await client.from('schemes').delete().eq('id',x.serverId):await client.from('schemes').delete().eq('external_id',x.id);if(r.error)throw r.error;}x.active=false;x.deletedAt=x.updatedAt=now();marks(x.id).forEach(m=>{m.active=false;m.deletedAt=m.updatedAt=x.deletedAt;});await saveProject();const cached=state.cache.get(x.id);state.cache.delete(x.id);try{await cached?.destroy?.();}catch(_){}closeModal();clear();}catch(error){alert('Не удалось удалить схему: '+(error.message||error));}}
 
+  async function resyncServerLinks(){
+    if(!canWrite()||!window.LIV_NORMALIZED_SYNC?.projectId?.())return;
+    const current=p();
+    if(!current)return;
+
+    for(const item of (current.schemes||[]).filter(x=>x.active!==false)){
+      try{await syncScheme(item);}catch(error){console.warn('LIV Schemes: relation sync failed',error);}
+    }
+
+    for(const item of (current.schemeMarks||[]).filter(x=>x.active!==false)){
+      try{await syncMark(item);}catch(error){console.warn('LIV Schemes: mark relation sync failed',error);}
+    }
+  }
+
   function boot(){addStyles();addUi();bind();const timer=setInterval(()=>{if(ensure()){clearInterval(timer);render();}},150);setTimeout(()=>clearInterval(timer),15000);}
-  window.addEventListener('liv-remote-project',()=>setTimeout(render,0));window.addEventListener('liv-auth-session',()=>setTimeout(render,0));let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(state.pdf&&!$s('tab-schemes')?.classList.contains('hidden'))renderPage();},250);});
+  window.addEventListener('liv-remote-project',()=>setTimeout(render,0));
+  window.addEventListener('liv-normalized-sync-status',event=>{
+    if(event.detail?.status==='ready')setTimeout(resyncServerLinks,50);
+  });window.addEventListener('liv-auth-session',()=>setTimeout(render,0));let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(state.pdf&&!$s('tab-schemes')?.classList.contains('hidden'))renderPage();},250);});
   window.LIV_SCHEMES={render,select,upload:openUpload,openMark};
   document.readyState==='loading'?document.addEventListener('DOMContentLoaded',boot,{once:true}):boot();
 })();
