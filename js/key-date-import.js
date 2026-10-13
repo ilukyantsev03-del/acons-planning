@@ -1,7 +1,7 @@
 'use strict';
 
 (function () {
-  const MODULE_VERSION = '2026.10.13.1';
+  const MODULE_VERSION = '2026.10.13.3';
   const state = {
     workbook: null,
     fileName: '',
@@ -252,13 +252,38 @@
 
     const sourceName = text(name);
     if (!sourceName) return { item: null, sourceName: '', status: 'Требует проверки' };
-    const exact = current.organizations.find(item => same(item.name, sourceName));
+
+    const remembered = window.LIV_SOURCE_MAPPINGS?.resolve?.(
+      state.fileName || 'key-date-import',
+      'organization',
+      sourceName,
+      'organization'
+    );
+
+    if (remembered?.targetLocalId) {
+      const item = current.organizations.find(
+        organization => String(organization.id) === String(remembered.targetLocalId)
+      ) || null;
+
+      if (item) return { item, sourceName, status: 'Совпадение' };
+    }
+
+    const exact = current.organizations.find(item =>
+      same(item.name, sourceName) ||
+      (Array.isArray(item.aliases) && item.aliases.some(alias => same(alias, sourceName)))
+    );
     if (exact) return { item: exact, sourceName, status: 'Совпадение' };
 
     const sourceKey = normalized(sourceName);
     const similar = current.organizations.filter(item => {
-      const itemKey = normalized(item.name);
-      return itemKey.includes(sourceKey) || sourceKey.includes(itemKey);
+      const keys = [
+        normalized(item.name),
+        ...(Array.isArray(item.aliases) ? item.aliases.map(normalized) : [])
+      ].filter(Boolean);
+
+      return keys.some(itemKey =>
+        itemKey.includes(sourceKey) || sourceKey.includes(itemKey)
+      );
     });
     if (similar.length === 1) return { item: similar[0], sourceName, status: 'Похоже' };
     return { item: null, sourceName, status: 'Новая организация' };
