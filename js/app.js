@@ -4285,74 +4285,97 @@ function renderHistory() {
    ========================================================= */
 
 
-async function addSimple(
-  type
-) {
+function simpleSettingsConfig(type) {
 
-  const config = {
+  return {
+    building: {
+      list:
+        project.buildings,
+      prefix:
+        'BLD',
+      singular:
+        'здания',
+      title:
+        'Здание',
+      placeholder:
+        'Например: Главный корпус'
+    },
 
-    building: [
-      'newBuilding',
-      project.buildings,
-      'BLD'
-    ],
+    work: {
+      list:
+        project.works,
+      prefix:
+        'WRK',
+      singular:
+        'вида работ',
+      title:
+        'Вид работ',
+      placeholder:
+        'Например: Монолитные работы'
+    },
 
-    work: [
-      'newWork',
-      project.works,
-      'WRK'
-    ],
-
-    org: [
-      'newOrg',
-      project.organizations,
-      'ORG'
-    ]
-
+    org: {
+      list:
+        project.organizations,
+      prefix:
+        'ORG',
+      singular:
+        'организации',
+      title:
+        'Организация',
+      placeholder:
+        'Например: ООО «Подрядчик»'
+    }
   }[
     type
-  ];
+  ] || null;
+}
 
 
-  if (
-    !config
-  ) {
-    return;
-  }
+async function saveSimpleSettingsItem(
+  type,
+  id,
+  values
+) {
 
-
-  const [
-    inputId,
-    list,
-    prefix
-  ] =
-    config;
-
-
-  const input =
-    $(
-      inputId
+  const config =
+    simpleSettingsConfig(
+      type
     );
+
+  if (!config) return;
 
 
   const name =
-    input?.value
-      .trim() ||
-    '';
+    String(
+      values?.name ||
+      ''
+    )
+      .trim();
 
 
-  if (
-    !name
-  ) {
+  if (!name) {
+
+    alert(
+      'Название не может быть пустым.'
+    );
+
     return;
   }
 
 
   if (
-    list.some(
-      item =>
+    config.list.some(
+      row =>
+        String(
+          row.id
+        ) !==
+          String(
+            id ||
+            ''
+          ) &&
         sameText(
-          item.name,
+          row.name,
           name
         )
     )
@@ -4366,35 +4389,77 @@ async function addSimple(
   }
 
 
-  list.push({
-
-    id:
-      uid(
-        prefix
-      ),
-
-    name,
-
-    active:
-      true,
-
-    createdAt:
-      nowIso()
-  });
+  let item =
+    id
+      ? byId(
+          config.list,
+          id
+        )
+      : null;
 
 
-  input.value =
-    '';
+  if (
+    item
+  ) {
+
+    const oldName =
+      item.name ||
+      '';
+
+    item.name =
+      name;
+
+    item.active =
+      values.active !==
+        false;
+
+    item.updatedAt =
+      nowIso();
 
 
-  log(
-    'Создано',
-    'Справочник',
-    name
-  );
+    log(
+      'Изменено',
+      'Справочник',
+      oldName +
+        ' → ' +
+        name
+    );
+
+  } else {
+
+    item = {
+      id:
+        uid(
+          config.prefix
+        ),
+      name,
+      active:
+        values.active !==
+          false,
+      createdAt:
+        nowIso(),
+      updatedAt:
+        nowIso()
+    };
+
+
+    config.list.push(
+      item
+    );
+
+
+    log(
+      'Создано',
+      'Справочник',
+      name
+    );
+  }
 
 
   await saveProject();
+
+
+  closeModal();
 
 
   initSelects();
@@ -4402,7 +4467,7 @@ async function addSimple(
 
   if (
     typeof refreshAllMultiFilters ===
-    'function'
+      'function'
   ) {
 
     refreshAllMultiFilters();
@@ -4413,13 +4478,196 @@ async function addSimple(
 }
 
 
+function openSimpleSettingsEditor(
+  type,
+  id =
+    null
+) {
+
+  const config =
+    simpleSettingsConfig(
+      type
+    );
+
+  if (!config) return;
+
+
+  const item =
+    id
+      ? (
+          byId(
+            config.list,
+            id
+          ) ||
+          {}
+        )
+      : {};
+
+
+  openModal(
+    id
+      ? 'Редактирование: ' +
+        config.title
+      : 'Новый элемент: ' +
+        config.title,
+
+    `
+      <div class="liv-editor-layout">
+
+        <aside class="liv-editor-nav">
+          <button
+            type="button"
+            class="liv-editor-nav-item active">
+            Основное
+          </button>
+
+          <button
+            type="button"
+            class="liv-editor-nav-item"
+            disabled>
+            Дополнительные поля
+          </button>
+
+          <button
+            type="button"
+            class="liv-editor-nav-item"
+            disabled>
+            История изменений
+          </button>
+        </aside>
+
+
+        <div class="liv-editor-content">
+
+          <div class="field">
+
+            <label>
+              Название
+              <span class="required-mark">*</span>
+            </label>
+
+            <input
+              id="simpleEditorName"
+              value="${esc(
+                item.name ||
+                ''
+              )}"
+              placeholder="${esc(
+                config.placeholder
+              )}"
+              autocomplete="off"
+            >
+
+          </div>
+
+
+          <div class="field">
+
+            <label>
+              Статус
+            </label>
+
+            <select id="simpleEditorActive">
+              <option
+                value="1"
+                ${
+                  item.active ===
+                    false
+                    ? ''
+                    : 'selected'
+                }>
+                Активно
+              </option>
+
+              <option
+                value="0"
+                ${
+                  item.active ===
+                    false
+                    ? 'selected'
+                    : ''
+                }>
+                Архив
+              </option>
+            </select>
+
+          </div>
+
+
+          <div class="liv-editor-hint">
+            Изменение названия не разрывает существующие связи:
+            LIV хранит связанные данные по внутреннему идентификатору.
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <div class="liv-editor-footer">
+
+        <button
+          id="simpleEditorCancel"
+          type="button"
+          class="btn">
+          Отмена
+        </button>
+
+        <button
+          id="simpleEditorSave"
+          type="button"
+          class="btn primary">
+          Сохранить
+        </button>
+
+      </div>
+    `
+  );
+
+
+  bindClick(
+    'simpleEditorCancel',
+    closeModal
+  );
+
+
+  bindClick(
+    'simpleEditorSave',
+    () =>
+      saveSimpleSettingsItem(
+        type,
+        id,
+        {
+          name:
+            $('simpleEditorName')
+              ?.value ||
+            '',
+          active:
+            $('simpleEditorActive')
+              ?.value !==
+            '0'
+        }
+      )
+  );
+
+
+  setTimeout(
+    () =>
+      $('simpleEditorName')
+        ?.focus(),
+    0
+  );
+}
+
+
 /* =========================================================
    НАСТРОЙКИ
    ========================================================= */
 
 
 function settingsListHtml(
-  list
+  list,
+  type
 ) {
 
   return (
@@ -4430,6 +4678,12 @@ function settingsListHtml(
       item => `
         <div
           class="settings-row"
+          data-settings-id="${esc(
+            item.id
+          )}"
+          data-settings-type="${esc(
+            type
+          )}"
           data-settings-name="${esc(
             item.name ||
             ''
@@ -4438,20 +4692,10 @@ function settingsListHtml(
           <div class="settings-row-main">
 
             <strong class="settings-row-title">
-
               ${esc(
                 item.name ||
                 ''
               )}
-
-              ${
-                item.unit
-                  ? ` · ${esc(
-                      item.unit
-                    )}`
-                  : ''
-              }
-
             </strong>
 
 
@@ -4462,6 +4706,8 @@ function settingsListHtml(
                   ? 'is-archive'
                   : 'is-active'
               }">
+
+              <span class="settings-status-dot"></span>
 
               ${
                 item.active ===
@@ -4474,6 +4720,43 @@ function settingsListHtml(
 
           </div>
 
+
+          <div class="settings-row-menu-wrap">
+
+            <button
+              type="button"
+              class="settings-kebab"
+              data-settings-menu-button
+              aria-label="Действия">
+              ⋮
+            </button>
+
+
+            <div
+              class="settings-row-menu hidden"
+              data-settings-menu>
+
+              <button
+                type="button"
+                data-settings-edit>
+                Редактировать
+              </button>
+
+              <button
+                type="button"
+                data-settings-toggle>
+                ${
+                  item.active ===
+                    false
+                    ? 'Вернуть из архива'
+                    : 'Сделать архивным'
+                }
+              </button>
+
+            </div>
+
+          </div>
+
         </div>
       `
     )
@@ -4481,11 +4764,10 @@ function settingsListHtml(
 
   `
     <div class="settings-empty">
-      Список пуст.
+      Список пока пуст.
     </div>
   `;
 }
-
 
 function ensureBuilderSettingsCard() {
 
@@ -4530,80 +4812,15 @@ function simpleSettingsList(type) {
 }
 
 
-async function editSettingsItem(type, id) {
-  const list =
-    simpleSettingsList(
-      type
-    );
+function editSettingsItem(
+  type,
+  id
+) {
 
-  const item =
-    byId(
-      list,
-      id
-    );
-
-  if (!item) return;
-
-  const next =
-    prompt(
-      'Новое название:',
-      item.name ||
-      ''
-    );
-
-  if (next === null) return;
-
-  const name =
-    next.trim();
-
-  if (!name) {
-    alert('Название не может быть пустым.');
-    return;
-  }
-
-  if (
-    list.some(
-      row =>
-        String(row.id) !==
-          String(item.id) &&
-        sameText(
-          row.name,
-          name
-        )
-    )
-  ) {
-    alert('Такая запись уже есть.');
-    return;
-  }
-
-  const oldName =
-    item.name ||
-    '';
-
-  item.name =
-    name;
-
-  item.updatedAt =
-    nowIso();
-
-  log(
-    'Изменено',
-    'Справочник',
-    oldName + ' → ' + name
+  openSimpleSettingsEditor(
+    type,
+    id
   );
-
-  await saveProject();
-
-  initSelects();
-
-  if (
-    typeof refreshAllMultiFilters ===
-      'function'
-  ) {
-    refreshAllMultiFilters();
-  }
-
-  renderAll();
 }
 
 
@@ -4651,108 +4868,191 @@ async function toggleSettingsItem(type, id) {
 }
 
 
+function closeSettingsMenus() {
+
+  document
+    .querySelectorAll(
+      '[data-settings-menu]'
+    )
+    .forEach(
+      menu =>
+        menu.classList
+          .add(
+            'hidden'
+          )
+    );
+}
+
+
 function makeSettingsListEditable(
   containerId,
   type
 ) {
+
   const container =
     $(
       containerId
     );
 
+
   if (!container) return;
 
-  const list =
-    simpleSettingsList(
-      type
-    );
 
-  const rows =
-    container.querySelectorAll(
+  container
+    .querySelectorAll(
       '.settings-row'
+    )
+    .forEach(
+      row => {
+
+        const id =
+          row.dataset
+            .settingsId;
+
+
+        const menu =
+          row.querySelector(
+            '[data-settings-menu]'
+          );
+
+
+        row
+          .querySelector(
+            '[data-settings-menu-button]'
+          )
+          ?.addEventListener(
+            'click',
+            event => {
+
+              event.stopPropagation();
+
+
+              const hidden =
+                menu
+                  ?.classList
+                  .contains(
+                    'hidden'
+                  );
+
+
+              closeSettingsMenus();
+
+
+              if (
+                hidden
+              ) {
+
+                menu
+                  ?.classList
+                  .remove(
+                    'hidden'
+                  );
+              }
+            }
+          );
+
+
+        row
+          .querySelector(
+            '[data-settings-edit]'
+          )
+          ?.addEventListener(
+            'click',
+            event => {
+
+              event.stopPropagation();
+
+              closeSettingsMenus();
+
+              editSettingsItem(
+                type,
+                id
+              );
+            }
+          );
+
+
+        row
+          .querySelector(
+            '[data-settings-toggle]'
+          )
+          ?.addEventListener(
+            'click',
+            event => {
+
+              event.stopPropagation();
+
+              closeSettingsMenus();
+
+              toggleSettingsItem(
+                type,
+                id
+              );
+            }
+          );
+
+
+        row.onclick =
+          event => {
+
+            if (
+              event.target.closest(
+                '.settings-row-menu-wrap'
+              )
+            ) {
+              return;
+            }
+
+
+            editSettingsItem(
+              type,
+              id
+            );
+          };
+      }
     );
-
-  rows.forEach(
-    (
-      row,
-      index
-    ) => {
-      const item =
-        list[
-          index
-        ];
-
-      if (!item) return;
-
-      const actions =
-        document.createElement(
-          'span'
-        );
-
-      actions.className =
-        'editor-actions';
-
-      const edit =
-        document.createElement(
-          'button'
-        );
-
-      edit.type =
-        'button';
-
-      edit.className =
-        'btn settings-action';
-
-      edit.textContent =
-        'Изменить';
-
-      edit.onclick =
-        () =>
-          editSettingsItem(
-            type,
-            item.id
-          );
-
-      const toggle =
-        document.createElement(
-          'button'
-        );
-
-      toggle.type =
-        'button';
-
-      toggle.className =
-        'btn settings-action settings-action-secondary';
-
-      toggle.textContent =
-        item.active === false
-          ? 'Вернуть'
-          : 'Архив';
-
-      toggle.onclick =
-        () =>
-          toggleSettingsItem(
-            type,
-            item.id
-          );
-
-      actions.appendChild(
-        edit
-      );
-
-      actions.appendChild(
-        toggle
-      );
-
-      row.appendChild(
-        actions
-      );
-    }
-  );
 }
 
 
+
+
 function renderSettings() {
+
+  if (
+    $('settingsBuildingCount')
+  ) {
+    $('settingsBuildingCount').textContent =
+      (
+        project.buildings ||
+        []
+      ).length +
+      ' записей';
+  }
+
+
+  if (
+    $('settingsWorkCount')
+  ) {
+    $('settingsWorkCount').textContent =
+      (
+        project.works ||
+        []
+      ).length +
+      ' записей';
+  }
+
+
+  if (
+    $('settingsOrgCount')
+  ) {
+    $('settingsOrgCount').textContent =
+      (
+        project.organizations ||
+        []
+      ).length +
+      ' записей';
+  }
+
 
   if (
     $('buildingList')
@@ -4760,7 +5060,8 @@ function renderSettings() {
 
     $('buildingList').innerHTML =
       settingsListHtml(
-        project.buildings
+        project.buildings,
+        'building'
       );
 
     makeSettingsListEditable(
@@ -4776,7 +5077,8 @@ function renderSettings() {
 
     $('workList').innerHTML =
       settingsListHtml(
-        project.works
+        project.works,
+        'work'
       );
 
     makeSettingsListEditable(
@@ -4792,7 +5094,8 @@ function renderSettings() {
 
     $('orgList').innerHTML =
       settingsListHtml(
-        project.organizations
+        project.organizations,
+        'org'
       );
 
     makeSettingsListEditable(
@@ -7160,6 +7463,21 @@ async function init() {
 
 function bindUi() {
 
+  document.addEventListener(
+    'click',
+    event => {
+
+      if (
+        !event.target.closest(
+          '.settings-row-menu-wrap'
+        )
+      ) {
+        closeSettingsMenus();
+      }
+    }
+  );
+
+
   document
     .querySelectorAll(
       '.tab[data-tab]'
@@ -7345,7 +7663,7 @@ function bindUi() {
   bindClick(
     'addBuildingBtn',
     () =>
-      addSimple(
+      openSimpleSettingsEditor(
         'building'
       )
   );
@@ -7354,7 +7672,7 @@ function bindUi() {
   bindClick(
     'addWorkBtn',
     () =>
-      addSimple(
+      openSimpleSettingsEditor(
         'work'
       )
   );
@@ -7363,7 +7681,7 @@ function bindUi() {
   bindClick(
     'addOrgBtn',
     () =>
-      addSimple(
+      openSimpleSettingsEditor(
         'org'
       )
   );
