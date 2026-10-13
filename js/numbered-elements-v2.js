@@ -60,7 +60,7 @@
   }
 
   function groupCodeFor(element) {
-    const modalValue = el('neGroupCode')?.value;
+    const modalValue = el('neGroup')?.value || el('neGroupCode')?.value;
     return text(element?.groupCode || element?.mark || modalValue || element?.capture || element?.zone || 'Основная группа');
   }
 
@@ -128,7 +128,7 @@
 
   function injectEditorFields() {
     const typeInput = el('neType');
-    if (!typeInput || el('neGroupCode')) return;
+    if (!typeInput || el('neLayerName')) return;
     const grid = el('modalBody')?.querySelector('.form-grid');
     if (!grid) return;
 
@@ -143,11 +143,14 @@
 
     const fields = document.createElement('div');
     fields.style.display = 'contents';
+    const hasGroupField = Boolean(el('neGroup') || el('neGroupCode'));
     fields.innerHTML = `
-      <div class="field">
-        <label>Группа / марка</label>
-        <input id="neGroupCode" value="${text(item.groupCode || item.mark || '')}" placeholder="Например: БНС-2, БСС-1, Г1, Г2">
-      </div>
+      ${hasGroupField ? '' : `
+        <div class="field">
+          <label>Группа / марка</label>
+          <input id="neGroupCode" value="${text(item.groupCode || item.mark || '')}" placeholder="Например: БНС-2, БСС-1, Г1, Г2">
+        </div>
+      `}
       <div class="field">
         <label>Слой / ярус</label>
         <input id="neLayerName" value="${text(item.layerName || '')}" placeholder="Например: Ярус 1">
@@ -197,8 +200,8 @@
     window.saveElement = async function (id) {
       const beforeIds = new Set((currentProject()?.numberedElements || []).map(item => String(item.id)));
       const extras = {
-        groupCode: text(el('neGroupCode')?.value),
-        mark: text(el('neGroupCode')?.value),
+        groupCode: text(el('neGroup')?.value || el('neGroupCode')?.value),
+        mark: text(el('neGroup')?.value || el('neGroupCode')?.value),
         layerName: text(el('neLayerName')?.value),
         groupTotal: Number(el('neGroupTotal')?.value || 0)
       };
@@ -248,7 +251,7 @@
   }
 
   window.LIV_NUMBERED_ELEMENTS_V2 = {
-    version: '2026.10.13.2',
+    version: '2026.10.13.3',
     contextKey: contextualElementKey,
     ensureGroup
   };
