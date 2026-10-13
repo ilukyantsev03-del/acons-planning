@@ -961,3 +961,286 @@ do nothing;
 -- update public.app_users
 -- set role='admin'
 -- where email='ТВОЙ_EMAIL';
+
+-- =========================================================
+-- LIV CORE V2 — УНИВЕРСАЛЬНЫЙ ГРАФИК И ПРЕДСТАВЛЕНИЯ
+-- Добавляется поверх существующей схемы без удаления старых таблиц.
+-- =========================================================
+
+alter table public.app_users
+  drop constraint if exists app_users_role_check;
+
+alter table public.app_users
+  add constraint app_users_role_check
+  check (
+    role in (
+      'admin',
+      'planner',
+      'director',
+      'project_manager',
+      'responsible',
+      'contractor',
+      'customer'
+    )
+  );
+
+create table if not exists public.projects (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  code text,
+  status text not null default 'active',
+  timezone text not null default 'Europe/Moscow',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.tasks (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid references public.projects(id) on delete cascade,
+  parent_task_id uuid references public.tasks(id) on delete set null,
+  name text not null,
+  task_type text not null default 'task',
+  building_id uuid references public.buildings(id) on delete set null,
+  block text,
+  floor text,
+  axis text,
+  capture text,
+  zone text,
+  network text,
+  segment text,
+  work_id uuid references public.works(id) on delete set null,
+  organization_id uuid references public.organizations(id) on delete set null,
+  status text not null default 'Не начато',
+  progress_percent numeric not null default 0,
+  duration_method text not null default 'manual',
+  duration_manual numeric,
+  duration_calculated numeric,
+  duration_accepted numeric,
+  calendar_code text,
+  comment text,
+  source_type text,
+  source_file text,
+  source_sheet text,
+  source_row integer,
+  active boolean not null default true,
+  created_by uuid references public.app_users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.task_dates (
+  id uuid primary key default gen_random_uuid(),
+  task_id uuid not null references public.tasks(id) on delete cascade,
+  date_type text not null
+    check (date_type in (
+      'customer_contract',
+      'subcontract',
+      'baseline',
+      'working',
+      'forecast',
+      'actual'
+    )),
+  start_date date,
+  finish_date date,
+  source text,
+  comment text,
+  created_by uuid references public.app_users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(task_id, date_type)
+);
+
+create table if not exists public.task_quantities (
+  id uuid primary key default gen_random_uuid(),
+  task_id uuid not null references public.tasks(id) on delete cascade,
+  quantity_type text not null default 'primary',
+  name text not null,
+  unit text,
+  planned_qty numeric,
+  is_primary boolean not null default false,
+  calculation_role text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.task_dependencies (
+  id uuid primary key default gen_random_uuid(),
+  task_id uuid not null references public.tasks(id) on delete cascade,
+  predecessor_task_id uuid not null references public.tasks(id) on delete cascade,
+  relation_type text not null default 'FS'
+    check (relation_type in ('FS','SS','FF','SF')),
+  lag_value numeric not null default 0,
+  lag_unit text not null default 'day',
+  created_at timestamptz not null default now(),
+  unique(task_id, predecessor_task_id, relation_type, lag_value, lag_unit)
+);
+
+create table if not exists public.saved_views (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid references public.projects(id) on delete cascade,
+  owner_user_id uuid references public.app_users(id) on delete set null,
+  name text not null,
+  view_type text not null default 'table'
+    check (view_type in (
+      'table',
+      'schedule',
+      'matrix',
+      'gantt',
+      'linear',
+      'planfact',
+      'dashboard',
+      'network'
+    )),
+  config jsonb not null default '{}'::jsonb,
+  is_shared boolean not null default false,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.view_access (
+  id uuid primary key default gen_random_uuid(),
+  view_id uuid not null references public.saved_views(id) on delete cascade,
+  user_id uuid references public.app_users(id) on delete cascade,
+  role text,
+  can_view boolean not null default true,
+  can_export boolean not null default true,
+  unique(view_id, user_id, role),
+  check (user_id is not null or role is not null)
+);
+
+alter table public.projects enable row level security;
+alter table public.tasks enable row level security;
+alter table public.task_dates enable row level security;
+alter table public.task_quantities enable row level security;
+alter table public.task_dependencies enable row level security;
+alter table public.saved_views enable row level security;
+alter table public.view_access enable row level security;
+
+drop policy if exists "authenticated read projects" on public.projects;
+create policy "authenticated read projects"
+on public.projects for select
+to authenticated
+using (true);
+
+drop policy if exists "authenticated read tasks" on public.tasks;
+create policy "authenticated read tasks"
+on public.tasks for select
+to authenticated
+using (true);
+
+drop policy if exists "authenticated read task_dates" on public.task_dates;
+create policy "authenticated read task_dates"
+on public.task_dates for select
+to authenticated
+using (true);
+
+drop policy if exists "authenticated read task_quantities" on public.task_quantities;
+create policy "authenticated read task_quantities"
+on public.task_quantities for select
+to authenticated
+using (true);
+
+drop policy if exists "authenticated read task_dependencies" on public.task_dependencies;
+create policy "authenticated read task_dependencies"
+on public.task_dependencies for select
+to authenticated
+using (true);
+
+drop policy if exists "planner manage projects" on public.projects;
+create policy "planner manage projects"
+on public.projects for all
+to authenticated
+using (public.is_admin_or_planner())
+with check (public.is_admin_or_planner());
+
+drop policy if exists "planner manage tasks" on public.tasks;
+create policy "planner manage tasks"
+on public.tasks for all
+to authenticated
+using (public.is_admin_or_planner())
+with check (public.is_admin_or_planner());
+
+drop policy if exists "planner manage task_dates" on public.task_dates;
+create policy "planner manage task_dates"
+on public.task_dates for all
+to authenticated
+using (public.is_admin_or_planner())
+with check (public.is_admin_or_planner());
+
+drop policy if exists "planner manage task_quantities" on public.task_quantities;
+create policy "planner manage task_quantities"
+on public.task_quantities for all
+to authenticated
+using (public.is_admin_or_planner())
+with check (public.is_admin_or_planner());
+
+drop policy if exists "planner manage task_dependencies" on public.task_dependencies;
+create policy "planner manage task_dependencies"
+on public.task_dependencies for all
+to authenticated
+using (public.is_admin_or_planner())
+with check (public.is_admin_or_planner());
+
+drop policy if exists "views readable by owner shared or granted" on public.saved_views;
+create policy "views readable by owner shared or granted"
+on public.saved_views for select
+to authenticated
+using (
+  owner_user_id = auth.uid()
+  or is_shared = true
+  or exists (
+    select 1
+    from public.view_access va
+    where va.view_id = saved_views.id
+      and va.can_view = true
+      and (
+        va.user_id = auth.uid()
+        or va.role = public.my_role()
+      )
+  )
+);
+
+drop policy if exists "planner manage saved_views" on public.saved_views;
+create policy "planner manage saved_views"
+on public.saved_views for all
+to authenticated
+using (public.is_admin_or_planner())
+with check (public.is_admin_or_planner());
+
+drop policy if exists "view access readable" on public.view_access;
+create policy "view access readable"
+on public.view_access for select
+to authenticated
+using (
+  user_id = auth.uid()
+  or role = public.my_role()
+  or public.is_admin_or_planner()
+);
+
+drop policy if exists "planner manage view_access" on public.view_access;
+create policy "planner manage view_access"
+on public.view_access for all
+to authenticated
+using (public.is_admin_or_planner())
+with check (public.is_admin_or_planner());
+
+grant select on
+  public.projects,
+  public.tasks,
+  public.task_dates,
+  public.task_quantities,
+  public.task_dependencies,
+  public.saved_views,
+  public.view_access
+to authenticated;
+
+grant insert, update, delete on
+  public.projects,
+  public.tasks,
+  public.task_dates,
+  public.task_quantities,
+  public.task_dependencies,
+  public.saved_views,
+  public.view_access
+to authenticated;
