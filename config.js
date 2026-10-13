@@ -216,6 +216,14 @@ window.ACONS_CONFIG = {
 
     {
       id:
+        'schedule',
+
+      name:
+        'Классический график'
+    },
+
+    {
+      id:
         'matrix',
 
       name:
@@ -232,10 +240,26 @@ window.ACONS_CONFIG = {
 
     {
       id:
+        'linear',
+
+      name:
+        'Линейный график'
+    },
+
+    {
+      id:
         'planfact',
 
       name:
         'План / факт'
+    },
+
+    {
+      id:
+        'dashboard',
+
+      name:
+        'Дашборд'
     },
 
     {
