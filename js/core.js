@@ -24,7 +24,7 @@ const PROJECT_KEY =
   'main';
 
 const SCHEMA_VERSION =
-  '2.2.0';
+  '2.3.0';
 
 
 /* =========================================================
@@ -863,6 +863,31 @@ function emptyProject() {
     fronts:
       [],
 
+    /* Новое ядро графика. Старые fronts сохраняются для совместимости. */
+    tasks:
+      [],
+
+    taskDates:
+      [],
+
+    taskQuantities:
+      [],
+
+    dependencies:
+      [],
+
+    dailyReports:
+      [],
+
+    factHistory:
+      [],
+
+    quantityHistory:
+      [],
+
+    forecastSnapshots:
+      [],
+
     planLog:
       [],
 
@@ -1151,6 +1176,14 @@ function normalizeProject(
     'works',
     'structures',
     'fronts',
+    'tasks',
+    'taskDates',
+    'taskQuantities',
+    'dependencies',
+    'dailyReports',
+    'factHistory',
+    'quantityHistory',
+    'forecastSnapshots',
     'planLog',
     'factLog',
     'resources',
@@ -2102,12 +2135,77 @@ function renderDashboard() {
     `;
 
 
+  /*
+    0 и "нет данных" — разные состояния.
+    Пустые предзаполненные строки не сдвигают дату текущих ресурсов.
+  */
+  const resourceRowHasData =
+    row => {
+
+      if (!row || !row.date) {
+        return false;
+      }
+
+      const numericKeys = [
+        'peopleQty',
+        'itr',
+        'workers',
+        'mechanizers',
+        'equipmentQty'
+      ];
+
+      const hasPositiveOrNegativeValue =
+        numericKeys.some(
+          key => {
+
+            const raw =
+              row[key];
+
+            if (
+              raw === '' ||
+              raw === null ||
+              raw === undefined
+            ) {
+              return false;
+            }
+
+            const value =
+              Number(raw);
+
+            return (
+              Number.isFinite(value) &&
+              value !== 0
+            );
+          }
+        );
+
+      if (hasPositiveOrNegativeValue) {
+        return true;
+      }
+
+      return Boolean(
+        String(row.equipmentType || '').trim() ||
+        String(row.specialization || '').trim() ||
+        String(row.comment || '').trim() ||
+        row.reportConfirmed === true ||
+        row.hasData === true
+      );
+    };
+
+
+  const meaningfulResourceRows =
+    (
+      project.resources ||
+      []
+    )
+      .filter(
+        resourceRowHasData
+      );
+
+
   const resourceDates =
     uniq(
-      (
-        project.resources ||
-        []
-      )
+      meaningfulResourceRows
         .map(
           row =>
             row.date
@@ -2127,10 +2225,7 @@ function renderDashboard() {
 
 
   const rows =
-    (
-      project.resources ||
-      []
-    )
+    meaningfulResourceRows
       .filter(
         row =>
           row.date ===
