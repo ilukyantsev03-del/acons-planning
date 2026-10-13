@@ -717,15 +717,173 @@
   }
 
 
+  function escapeHtml(value) {
+
+    if (
+      typeof window.esc ===
+      'function'
+    ) {
+      return window.esc(
+        value
+      );
+    }
+
+
+    return String(
+      value == null
+        ? ''
+        : value
+    )
+      .replace(
+        /&/g,
+        '&amp;'
+      )
+      .replace(
+        /</g,
+        '&lt;'
+      )
+      .replace(
+        />/g,
+        '&gt;'
+      )
+      .replace(
+        /"/g,
+        '&quot;'
+      );
+  }
+
+
+  function formatNumber(value) {
+
+    return (
+      Math.round(
+        Number(
+          value ||
+          0
+        ) *
+        100
+      ) /
+      100
+    );
+  }
+
+
+  function riskHtml(risk) {
+
+    if (!risk) {
+      return '';
+    }
+
+
+    const forecastDate =
+      risk.forecastFinish &&
+      typeof window.ruDate ===
+        'function'
+        ? window.ruDate(
+            risk.forecastFinish
+          )
+        : (
+            risk.forecastFinish ||
+            ''
+          );
+
+
+    const parts = [
+      '<div class="milestone-risk milestone-risk-' +
+        escapeHtml(
+          risk.level
+        ) +
+        '">',
+      '<b>' +
+        escapeHtml(
+          label(
+            risk
+          )
+        ) +
+        '</b>',
+      '<span>Цель: ' +
+        formatNumber(
+          risk.targetQty
+        ) +
+        (
+          risk.unit
+            ? ' ' +
+              escapeHtml(
+                risk.unit
+              )
+            : ''
+        ) +
+        '</span>',
+      '<span>Факт: ' +
+        formatNumber(
+          risk.doneQty
+        ) +
+        '</span>',
+      '<span>Нужно: ' +
+        formatNumber(
+          risk.requiredPace
+        ) +
+        '/дн.</span>',
+      '<span>Темп: ' +
+        formatNumber(
+          risk.pace7
+        ) +
+        '/дн.</span>'
+    ];
+
+
+    if (
+      risk.shortage >
+      0
+    ) {
+      parts.push(
+        '<span>Недобор: ≈ ' +
+        formatNumber(
+          risk.shortage
+        ) +
+        '</span>'
+      );
+    }
+
+
+    if (
+      forecastDate
+    ) {
+      parts.push(
+        '<span>Прогноз: ' +
+        escapeHtml(
+          forecastDate
+        ) +
+        '</span>'
+      );
+    }
+
+
+    parts.push(
+      '</div>'
+    );
+
+
+    return parts.join(
+      ''
+    );
+  }
+
+
   window.milestoneRiskForecast =
     forecast;
 
   window.milestoneRiskLabel =
     label;
 
+  window.milestoneRiskHtml =
+    riskHtml;
+
   window.LIV_RISK = {
     forecast,
     label,
+    html:
+      riskHtml,
     pace,
     daysBetween,
     addDays
