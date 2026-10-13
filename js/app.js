@@ -7025,7 +7025,7 @@ async function init() {
     Начальные даты.
   */
 
-  initDefaultDates();
+  await initDefaultDates();
 
 
   /*
@@ -7658,7 +7658,15 @@ function bindUi() {
    ========================================================= */
 
 
-function initDefaultDates() {
+async function initDefaultDates() {
+
+  if (
+    typeof syncTrustedToday ===
+      'function'
+  ) {
+    await syncTrustedToday();
+  }
+
 
   const currentDate =
     today();
