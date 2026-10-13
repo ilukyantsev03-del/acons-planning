@@ -268,9 +268,9 @@
 (function loadLivDataModules() {
   const modules = [
     ['liv-normalized-sync', 'js/normalized-sync.js?v=20261013-1'],
-    ['liv-milestone-risk', 'js/milestone-risk.js?v=20261013-1'],
+    ['liv-milestone-risk', 'js/milestone-risk.js?v=20261013-2'],
     ['liv-key-date-import', 'js/key-date-import.js?v=20261013-1'],
-    ['liv-numbered-elements-v2', 'js/numbered-elements-v2.js?v=20261013-1']
+    ['liv-numbered-elements-v2', 'js/numbered-elements-v2.js?v=20261013-2']
   ];
 
   function loadModule(index) {
