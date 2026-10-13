@@ -6184,6 +6184,18 @@ async function rollbackLastImport(){
       );
 
 
+  project.progressFacts =
+    (
+      project.progressFacts ||
+      []
+    )
+      .filter(
+        item =>
+          item.source?.batchId !==
+          batchId
+      );
+
+
   project.numberedElements =
     (
       project.numberedElements ||
