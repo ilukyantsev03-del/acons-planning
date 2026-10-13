@@ -6,7 +6,7 @@
 
   <title>LIV Planning</title>
 
-  <link rel="stylesheet" href="style.css?v=20261013-2">
+  <link rel="stylesheet" href="style.css?v=20261013-3">
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
@@ -2186,13 +2186,17 @@
     id="tab-settings"
     class="panel hidden">
 
-    <section class="grid3">
+    <section class="grid3 settings-directory-grid">
 
-      <div class="card">
+      <div class="card settings-directory-card">
 
-        <h2>
-          Здания
-        </h2>
+        <div class="settings-card-head">
+          <div>
+            <h2>Здания</h2>
+            <p>Объекты и сооружения проекта</p>
+          </div>
+          <span class="settings-card-icon">З</span>
+        </div>
 
 
         <div class="inline-add">
@@ -2212,19 +2216,30 @@
         </div>
 
 
+        <input
+          class="settings-search"
+          type="search"
+          placeholder="Поиск по зданиям"
+          data-settings-search="buildingList"
+        >
+
         <div
           id="buildingList"
-          class="list">
+          class="list settings-list">
         </div>
 
       </div>
 
 
-      <div class="card">
+      <div class="card settings-directory-card">
 
-        <h2>
-          Виды работ
-        </h2>
+        <div class="settings-card-head">
+          <div>
+            <h2>Виды работ</h2>
+            <p>Единый справочник работ</p>
+          </div>
+          <span class="settings-card-icon">Р</span>
+        </div>
 
 
         <div class="inline-add">
@@ -2244,19 +2259,30 @@
         </div>
 
 
+        <input
+          class="settings-search"
+          type="search"
+          placeholder="Поиск по видам работ"
+          data-settings-search="workList"
+        >
+
         <div
           id="workList"
-          class="list">
+          class="list settings-list">
         </div>
 
       </div>
 
 
-      <div class="card">
+      <div class="card settings-directory-card">
 
-        <h2>
-          Организации
-        </h2>
+        <div class="settings-card-head">
+          <div>
+            <h2>Организации</h2>
+            <p>Подрядчики и участники проекта</p>
+          </div>
+          <span class="settings-card-icon">О</span>
+        </div>
 
 
         <div class="inline-add">
@@ -2276,9 +2302,16 @@
         </div>
 
 
+        <input
+          class="settings-search"
+          type="search"
+          placeholder="Поиск по организациям"
+          data-settings-search="orgList"
+        >
+
         <div
           id="orgList"
-          class="list">
+          class="list settings-list">
         </div>
 
       </div>
@@ -2286,11 +2319,14 @@
     </section>
 
 
-    <section class="card">
+    <section class="card settings-project-card">
 
-      <h2>
-        Состояние проекта
-      </h2>
+      <div class="settings-card-head settings-card-head-wide">
+        <div>
+          <h2>Состояние проекта</h2>
+          <p>Сводная информация о текущей базе LIV</p>
+        </div>
+      </div>
 
 
       <div id="projectMeta"></div>
@@ -2359,7 +2395,7 @@
 
 <script src="js/view-builder.js?v=20261008-8"></script>
 <script src="js/schedule.js?v=20261013-2"></script>
-<script src="js/app.js?v=20261013-6"></script>
+<script src="js/app.js?v=20261013-7"></script>
 
 </body>
 </html>
