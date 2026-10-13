@@ -64,6 +64,14 @@
       label: 'Статус',
       aliases: ['статус','состояние']
     },
+    sourceTaskId: {
+      label: 'ID задачи',
+      aliases: ['id','id задачи','номер задачи','№ задачи','task id']
+    },
+    outlineNumber: {
+      label: 'Код структуры',
+      aliases: ['код структуры','номер структуры','структурный номер','outline number','wbs','сдп']
+    },
     progress: {
       label: '% выполнения',
       aliases: ['% завершен','% завершено','% выполнения','процент выполнения','готовность']
@@ -608,6 +616,311 @@
     };
   }
 
+  function parseDependencyToken(raw) {
+
+    const value =
+      text(
+        raw
+      )
+        .replace(
+          /\s+/g,
+          ''
+        );
+
+
+    if (!value) {
+      return null;
+    }
+
+
+    const match =
+      value.match(
+        /^(\d+(?:\.\d+)*)(FS|SS|FF|SF)?(?:([+-])(\d+(?:[.,]\d+)?)(?:d|д|дн|days?)?)?$/i
+      );
+
+
+    if (!match) {
+      return null;
+    }
+
+
+    const lag =
+      match[4]
+        ? Number(
+            String(
+              match[4]
+            )
+              .replace(
+                ',',
+                '.'
+              )
+          ) *
+          (
+            match[3] ===
+              '-'
+              ? -1
+              : 1
+          )
+        : 0;
+
+
+    return {
+      sourceTaskId:
+        match[1],
+      linkType:
+        (
+          match[2] ||
+          'FS'
+        )
+          .toUpperCase(),
+      lagDays:
+        Number.isFinite(
+          lag
+        )
+          ? lag
+          : 0,
+      sourceExpression:
+        text(
+          raw
+        )
+    };
+  }
+
+
+  function parseDependencyList(raw) {
+
+    return text(
+      raw
+    )
+      .split(
+        /[;,]+/
+      )
+      .map(
+        parseDependencyToken
+      )
+      .filter(Boolean);
+  }
+
+
+  function buildStagedDependencies(
+    staged,
+    versionId
+  ) {
+
+    const bySourceId =
+      new Map();
+
+
+    const byOutline =
+      new Map();
+
+
+    staged.forEach(
+      (
+        item,
+        index
+      ) => {
+
+        const sourceTaskId =
+          text(
+            item.task
+              .sourceTaskId
+          ) ||
+          String(
+            index +
+            1
+          );
+
+
+        bySourceId.set(
+          sourceTaskId,
+          item.task.id
+        );
+
+
+        if (
+          item.task
+            .outlineNumber
+        ) {
+
+          byOutline.set(
+            text(
+              item.task
+                .outlineNumber
+            ),
+            item.task.id
+          );
+        }
+      }
+    );
+
+
+    staged.forEach(
+      item => {
+
+        const outline =
+          text(
+            item.task
+              .outlineNumber
+          );
+
+
+        if (
+          outline &&
+          outline.includes(
+            '.'
+          )
+        ) {
+
+          const parentOutline =
+            outline
+              .split(
+                '.'
+              )
+              .slice(
+                0,
+                -1
+              )
+              .join(
+                '.'
+              );
+
+
+          item.task.parentTaskId =
+            byOutline.get(
+              parentOutline
+            ) ||
+            '';
+
+
+          item.task.outlineLevel =
+            Math.max(
+              0,
+              outline
+                .split(
+                  '.'
+                )
+                .length -
+              1
+            );
+        }
+      }
+    );
+
+
+    const dependencies = [];
+    const seen = new Set();
+
+
+    const pushDependency =
+      (
+        predecessorTaskId,
+        successorTaskId,
+        parsed
+      ) => {
+
+        if (
+          !predecessorTaskId ||
+          !successorTaskId ||
+          predecessorTaskId ===
+            successorTaskId
+        ) {
+          return;
+        }
+
+
+        const key =
+          [
+            predecessorTaskId,
+            successorTaskId,
+            parsed.linkType,
+            parsed.lagDays
+          ]
+            .join(
+              '|'
+            );
+
+
+        if (
+          seen.has(
+            key
+          )
+        ) {
+          return;
+        }
+
+
+        seen.add(
+          key
+        );
+
+
+        dependencies.push({
+          id:
+            uid(
+              'DEP'
+            ),
+          versionId,
+          predecessorTaskId,
+          successorTaskId,
+          linkType:
+            parsed.linkType,
+          lagDays:
+            parsed.lagDays,
+          sourceExpression:
+            parsed.sourceExpression,
+          createdAt:
+            new Date()
+              .toISOString()
+        });
+      };
+
+
+    staged.forEach(
+      item => {
+
+        parseDependencyList(
+          item.task
+            .predecessorsRaw
+        )
+          .forEach(
+            parsed => {
+
+              pushDependency(
+                bySourceId.get(
+                  parsed.sourceTaskId
+                ),
+                item.task.id,
+                parsed
+              );
+            }
+          );
+
+
+        parseDependencyList(
+          item.task
+            .successorsRaw
+        )
+          .forEach(
+            parsed => {
+
+              pushDependency(
+                item.task.id,
+                bySourceId.get(
+                  parsed.sourceTaskId
+                ),
+                parsed
+              );
+            }
+          );
+      }
+    );
+
+
+    return dependencies;
+  }
+
+
   function makeDate(taskId, type, start, finish, source) {
     const s = isoDate(start);
     const f = isoDate(finish);
@@ -652,6 +965,24 @@
         sourceFile: state.fileName,
         sourceSheet: state.sheetName,
         sourceType: state.sourceType,
+        sourceTaskId:
+          text(
+            value(
+              row,
+              'sourceTaskId'
+            )
+          ) ||
+          String(
+            index +
+            1
+          ),
+        outlineNumber:
+          text(
+            value(
+              row,
+              'outlineNumber'
+            )
+          ),
         name,
         ...ctx,
         organizationName: text(value(row,'organization')),
@@ -690,6 +1021,28 @@
       staged.push({ task, dates, quantities });
     });
 
+    const stagedDependencies =
+      buildStagedDependencies(
+        staged,
+        importId
+      );
+
+
+    staged.forEach(
+      item => {
+        item.dependencies =
+          stagedDependencies
+            .filter(
+              dependency =>
+                dependency.predecessorTaskId ===
+                  item.task.id ||
+                dependency.successorTaskId ===
+                  item.task.id
+            );
+      }
+    );
+
+
     project.scheduleStaging = staged;
     project.scheduleVersions.unshift({
       id: importId,
@@ -699,6 +1052,8 @@
       sourceType: state.sourceType,
       rowsTotal: state.dataRows.length,
       rowsCreated: staged.length,
+      dependencyCount:
+        stagedDependencies.length,
       createdAt,
       status: 'Тест'
     });
@@ -726,11 +1081,54 @@
       'Текущий рабочий график не удаляется автоматически.'
     )) return;
 
+    const acceptedDependencyKeys =
+      new Set(
+        (
+          project.dependencies ||
+          []
+        )
+          .map(
+            dependency =>
+              [
+                dependency.predecessorTaskId,
+                dependency.successorTaskId,
+                dependency.linkType ||
+                  'FS',
+                Number(
+                  dependency.lagDays ||
+                  0
+                )
+              ]
+                .join(
+                  '|'
+                )
+          )
+      );
+
+
     staged.forEach(item => {
       const task = { ...item.task, testOnly: false, acceptedAt: new Date().toISOString() };
       project.tasks.push(task);
       (item.dates || []).forEach(d => project.taskDates.push({ ...d, source: 'accepted-import' }));
       (item.quantities || []).forEach(q => project.taskQuantities.push({ ...q }));
+
+      (item.dependencies || []).forEach(dependency => {
+        const key = [
+          dependency.predecessorTaskId,
+          dependency.successorTaskId,
+          dependency.linkType || 'FS',
+          Number(dependency.lagDays || 0)
+        ].join('|');
+
+        if (acceptedDependencyKeys.has(key)) return;
+
+        acceptedDependencyKeys.add(key);
+        project.dependencies.push({
+          ...dependency,
+          source:
+            'accepted-import'
+        });
+      });
     });
 
     const lastVersion = (project.scheduleVersions || []).find(v => v.status === 'Тест');
