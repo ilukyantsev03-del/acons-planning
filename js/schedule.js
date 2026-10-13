@@ -936,6 +936,224 @@
     };
   }
 
+  function scheduleTaskIdentity(task) {
+
+    return (
+      text(
+        task.sourceTaskId
+      ) ||
+      [
+        key(
+          task.name
+        ),
+        key(
+          task.building
+        ),
+        key(
+          task.block
+        ),
+        key(
+          task.floor
+        ),
+        key(
+          task.axis
+        )
+      ]
+        .join(
+          '|'
+        )
+    );
+  }
+
+
+  function stagedWorkingDate(item) {
+
+    return (
+      item.dates ||
+      []
+    )
+      .find(
+        date =>
+          date.type ===
+          'working'
+      ) ||
+      {};
+  }
+
+
+  function acceptedWorkingDate(taskId) {
+
+    const rows =
+      (
+        project.taskDates ||
+        []
+      )
+        .filter(
+          date =>
+            String(
+              date.taskId
+            ) ===
+              String(
+                taskId
+              ) &&
+            date.type ===
+              'working'
+        );
+
+
+    return rows.length
+      ? rows[
+          rows.length -
+          1
+        ]
+      : {};
+  }
+
+
+  function buildScheduleComparison(staged) {
+
+    const current =
+      (
+        project.tasks ||
+        []
+      )
+        .filter(
+          task =>
+            task.active !==
+              false &&
+            task.testOnly !==
+              true
+        );
+
+
+    const currentMap =
+      new Map(
+        current.map(
+          task => [
+            scheduleTaskIdentity(
+              task
+            ),
+            task
+          ]
+        )
+      );
+
+
+    const stagedKeys =
+      new Set();
+
+
+    let added = 0;
+    let changed = 0;
+    let unchanged = 0;
+
+
+    staged.forEach(
+      item => {
+
+        const identity =
+          scheduleTaskIdentity(
+            item.task
+          );
+
+
+        stagedKeys.add(
+          identity
+        );
+
+
+        const existing =
+          currentMap.get(
+            identity
+          );
+
+
+        if (!existing) {
+          added++;
+          return;
+        }
+
+
+        const stagedDate =
+          stagedWorkingDate(
+            item
+          );
+
+
+        const currentDate =
+          acceptedWorkingDate(
+            existing.id
+          );
+
+
+        const isChanged =
+          text(
+            existing.name
+          ) !==
+            text(
+              item.task.name
+            ) ||
+          Number(
+            existing.progressPercent ||
+            0
+          ) !==
+            Number(
+              item.task.progressPercent ||
+              0
+            ) ||
+          text(
+            existing.status
+          ) !==
+            text(
+              item.task.status
+            ) ||
+          text(
+            currentDate.start
+          ) !==
+            text(
+              stagedDate.start
+            ) ||
+          text(
+            currentDate.finish
+          ) !==
+            text(
+              stagedDate.finish
+            );
+
+
+        if (
+          isChanged
+        ) {
+          changed++;
+        } else {
+          unchanged++;
+        }
+      }
+    );
+
+
+    const removed =
+      current
+        .filter(
+          task =>
+            !stagedKeys.has(
+              scheduleTaskIdentity(
+                task
+              )
+            )
+        )
+        .length;
+
+
+    return {
+      added,
+      changed,
+      unchanged,
+      removed
+    };
+  }
+
+
   async function importSchedule() {
     if (!ensureCollections()) return;
     if (state.mapping.name == null) {
@@ -1028,6 +1246,12 @@
       );
 
 
+    const comparison =
+      buildScheduleComparison(
+        staged
+      );
+
+
     staged.forEach(
       item => {
         item.dependencies =
@@ -1054,6 +1278,7 @@
       rowsCreated: staged.length,
       dependencyCount:
         stagedDependencies.length,
+      comparison,
       createdAt,
       status: 'Тест'
     });
@@ -1064,7 +1289,15 @@
     if (typeof window.saveProject === 'function') await saveProject();
 
     renderSchedule();
-    alert('Тестовая загрузка завершена. В рабочий график ничего не записано. Загружено задач: '+staged.length);
+    alert(
+      'Тестовая загрузка завершена. В рабочий график ничего не записано.\n\n' +
+      'Задач в файле: ' + staged.length + '\n' +
+      'Новых: ' + comparison.added + '\n' +
+      'Изменено: ' + comparison.changed + '\n' +
+      'Без изменений: ' + comparison.unchanged + '\n' +
+      'Нет в новой версии: ' + comparison.removed + '\n' +
+      'Зависимостей: ' + stagedDependencies.length
+    );
   }
 
   async function promoteTestImport() {
