@@ -5203,6 +5203,12 @@ async function commitImport(){
           normText(
             mappedValue(
               row,
+              'cumulative'
+            )
+          ),
+          normText(
+            mappedValue(
+              row,
               'comment'
             )
           )
@@ -5358,6 +5364,78 @@ async function commitImport(){
           )
         }
       });
+
+
+      front.doneQty =
+        Math.max(
+          num(
+            front.doneQty
+          ),
+          cumulative
+        );
+
+
+      if (
+        !front.factStart ||
+        date <
+          front.factStart
+      ) {
+        front.factStart =
+          date;
+      }
+
+
+      const totalQty =
+        num(
+          front.totalQty
+        );
+
+
+      if (
+        totalQty >
+          0 &&
+        cumulative >=
+          totalQty
+      ) {
+
+        front.status =
+          'Завершено';
+
+        front.completed =
+          true;
+
+        if (
+          !front.factEnd ||
+          date >
+            front.factEnd
+        ) {
+          front.factEnd =
+            date;
+        }
+
+      } else if (
+        cumulative >
+          0 &&
+        ![
+          'Ограничение',
+          'Приостановлено'
+        ]
+          .includes(
+            front.status
+          )
+      ) {
+
+        front.status =
+          'В работе';
+
+        front.completed =
+          false;
+      }
+
+
+      front.updatedAt =
+        nowIso();
+
 
       appended++;
 
