@@ -201,10 +201,10 @@ const uid = prefix => {
 };
 
 
-const today = () => {
+let livTrustedToday = '';
 
-  const date =
-    new Date();
+
+function localIsoDate(date) {
 
   const year =
     date.getFullYear();
@@ -230,7 +230,98 @@ const today = () => {
   return (
     `${year}-${month}-${day}`
   );
+}
+
+
+const today = () => {
+
+  if (
+    /^\d{4}-\d{2}-\d{2}$/.test(
+      livTrustedToday
+    )
+  ) {
+    return livTrustedToday;
+  }
+
+  return localIsoDate(
+    new Date()
+  );
 };
+
+
+async function syncTrustedToday() {
+
+  try {
+
+    const response =
+      await fetch(
+        'https://worldtimeapi.org/api/timezone/Etc/UTC',
+        {
+          cache:
+            'no-store'
+        }
+      );
+
+    if (!response.ok) {
+      throw new Error(
+        'time service unavailable'
+      );
+    }
+
+    const data =
+      await response.json();
+
+    const datetime =
+      String(
+        data.datetime ||
+        ''
+      );
+
+    if (!datetime) {
+      throw new Error(
+        'empty server date'
+      );
+    }
+
+    const instant =
+      new Date(
+        datetime
+      );
+
+    if (
+      Number.isNaN(
+        instant.getTime()
+      )
+    ) {
+      throw new Error(
+        'invalid server date'
+      );
+    }
+
+    livTrustedToday =
+      localIsoDate(
+        instant
+      );
+
+    return livTrustedToday;
+
+  } catch (
+    error
+  ) {
+
+    console.warn(
+      'LIV: не удалось получить серверную дату, используется локальная дата.',
+      error
+    );
+
+    livTrustedToday =
+      localIsoDate(
+        new Date()
+      );
+
+    return livTrustedToday;
+  }
+}
 
 
 const nowIso = () =>
