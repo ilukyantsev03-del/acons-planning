@@ -68,6 +68,23 @@ function resourceHasOwn(object, key) {
   );
 }
 
+function resourceValidIsoDate(value) {
+  const text = String(value || '').trim();
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return false;
+  }
+
+  const parts = text.split('-').map(Number);
+  const date = new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0, 0);
+
+  return (
+    date.getFullYear() === parts[0] &&
+    date.getMonth() === parts[1] - 1 &&
+    date.getDate() === parts[2]
+  );
+}
+
 function resourceShowZero() {
   return (
     document.getElementById(
@@ -208,6 +225,10 @@ function resourceFiltered(
   return (
     project.resources || []
   ).filter(row => {
+    if (!resourceValidIsoDate(row.date)) {
+      return false;
+    }
+
     if (
       from &&
       row.date < from
@@ -1768,9 +1789,9 @@ async function saveResource(id) {
       ''
   };
 
-  if (!row.date) {
+  if (!resourceValidIsoDate(row.date)) {
     alert(
-      'Укажи дату.'
+      'Укажи корректную дату.'
     );
 
     return;
@@ -3135,20 +3156,39 @@ function averageByDate(
             value !== 0
         );
 
+    const calcMethod =
+      $('rCalcMethod')?.value ||
+      'average';
+
+    const rollingDays =
+      Math.max(
+        1,
+        Math.round(
+          num(
+            $('rRollingDays')?.value ||
+            7
+          )
+        )
+      );
+
+    let calculated = 0;
+
+    if (values.length) {
+      if (calcMethod === 'maximum') {
+        calculated = Math.max(...values);
+      } else if (calcMethod === 'last') {
+        calculated = values[values.length - 1];
+      } else if (calcMethod === 'rolling') {
+        const windowValues = values.slice(-rollingDays);
+        calculated = windowValues.reduce((sum, value) => sum + value, 0) / windowValues.length;
+      } else {
+        calculated = values.reduce((sum, value) => sum + value, 0) / values.length;
+      }
+    }
+
     return {
       average:
-        values.length
-          ? values.reduce(
-              (
-                sum,
-                value
-              ) =>
-                sum +
-                value,
-              0
-            ) /
-            values.length
-          : 0,
+        calculated,
 
       days:
         values.length
@@ -3176,20 +3216,39 @@ function averageByDate(
       }
     });
 
+  const calcMethod =
+    $('rCalcMethod')?.value ||
+    'average';
+
+  const rollingDays =
+    Math.max(
+      1,
+      Math.round(
+        num(
+          $('rRollingDays')?.value ||
+          7
+        )
+      )
+    );
+
+  let calculated = 0;
+
+  if (values.length) {
+    if (calcMethod === 'maximum') {
+      calculated = Math.max(...values);
+    } else if (calcMethod === 'last') {
+      calculated = values[values.length - 1];
+    } else if (calcMethod === 'rolling') {
+      const windowValues = values.slice(-rollingDays);
+      calculated = windowValues.reduce((sum, value) => sum + value, 0) / windowValues.length;
+    } else {
+      calculated = values.reduce((sum, value) => sum + value, 0) / values.length;
+    }
+  }
+
   return {
     average:
-      values.length
-        ? values.reduce(
-            (
-              sum,
-              value
-            ) =>
-              sum +
-              value,
-            0
-          ) /
-          values.length
-        : 0,
+      calculated,
 
     days:
       values.length
@@ -4800,6 +4859,21 @@ function resourceCaptureViewState(
       $('rAvgMethod')?.value ||
       'reported',
 
+    calcMethod:
+      $('rCalcMethod')?.value ||
+      'average',
+
+    rollingDays:
+      Math.max(
+        1,
+        Math.round(
+          num(
+            $('rRollingDays')?.value ||
+            7
+          )
+        )
+      ),
+
     missingRule:
       $('rMissingRule')?.value ||
       'skip',
@@ -4901,6 +4975,22 @@ function resourceApplyViewState(state) {
   ) {
     $('rAvgMethod').value =
       state.avgMethod;
+  }
+
+  if (
+    $('rCalcMethod') &&
+    state.calcMethod
+  ) {
+    $('rCalcMethod').value =
+      state.calcMethod;
+  }
+
+  if (
+    $('rRollingDays') &&
+    state.rollingDays
+  ) {
+    $('rRollingDays').value =
+      state.rollingDays;
   }
 
   if (
@@ -6572,6 +6662,16 @@ function bindResourceUi() {
 
   bindChange(
     'rAvgMethod',
+    renderResourceAnalytics
+  );
+
+  bindChange(
+    'rCalcMethod',
+    renderResourceAnalytics
+  );
+
+  bindChange(
+    'rRollingDays',
     renderResourceAnalytics
   );
 
