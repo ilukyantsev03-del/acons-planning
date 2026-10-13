@@ -6,7 +6,7 @@
 
   <title>LIV Planning</title>
 
-  <link rel="stylesheet" href="style.css?v=20261013-3">
+  <link rel="stylesheet" href="style.css?v=20261013-4">
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
@@ -2186,6 +2186,43 @@
     id="tab-settings"
     class="panel hidden">
 
+    <section class="settings-page-head">
+
+      <div>
+        <h1>Настройки</h1>
+        <p>
+          Управление справочниками и параметрами проекта
+        </p>
+      </div>
+
+    </section>
+
+
+    <section class="settings-summary">
+
+      <div class="settings-summary-card">
+        <span>Здания</span>
+        <strong id="settingsBuildingCount">0 записей</strong>
+      </div>
+
+      <div class="settings-summary-card">
+        <span>Виды работ</span>
+        <strong id="settingsWorkCount">0 записей</strong>
+      </div>
+
+      <div class="settings-summary-card">
+        <span>Организации</span>
+        <strong id="settingsOrgCount">0 записей</strong>
+      </div>
+
+      <div class="settings-summary-card settings-summary-card-accent">
+        <span>Последнее изменение</span>
+        <strong id="settingsLastUpdate">см. ниже</strong>
+      </div>
+
+    </section>
+
+
     <section class="grid3 settings-directory-grid">
 
       <div class="card settings-directory-card">
@@ -2195,37 +2232,42 @@
             <h2>Здания</h2>
             <p>Объекты и сооружения проекта</p>
           </div>
-          <span class="settings-card-icon">З</span>
+          <span
+            id="settingsBuildingBadge"
+            class="settings-count-badge">
+            Справочник
+          </span>
         </div>
 
 
-        <div class="inline-add">
+        <div class="settings-toolbar">
 
           <input
-            id="newBuilding"
-            placeholder="Новое здание"
+            class="settings-search"
+            type="search"
+            placeholder="Поиск по зданиям..."
+            data-settings-search="buildingList"
           >
-
 
           <button
             id="addBuildingBtn"
-            class="btn">
-            Добавить
+            class="btn primary settings-add-btn">
+            + Добавить
           </button>
 
         </div>
 
 
-        <input
-          class="settings-search"
-          type="search"
-          placeholder="Поиск по зданиям"
-          data-settings-search="buildingList"
-        >
+        <div class="settings-table-head">
+          <span>Название</span>
+          <span>Статус</span>
+          <span></span>
+        </div>
+
 
         <div
           id="buildingList"
-          class="list settings-list">
+          class="settings-list">
         </div>
 
       </div>
@@ -2238,37 +2280,40 @@
             <h2>Виды работ</h2>
             <p>Единый справочник работ</p>
           </div>
-          <span class="settings-card-icon">Р</span>
+          <span class="settings-count-badge">
+            Справочник
+          </span>
         </div>
 
 
-        <div class="inline-add">
+        <div class="settings-toolbar">
 
           <input
-            id="newWork"
-            placeholder="Новый вид работ"
+            class="settings-search"
+            type="search"
+            placeholder="Поиск по видам работ..."
+            data-settings-search="workList"
           >
-
 
           <button
             id="addWorkBtn"
-            class="btn">
-            Добавить
+            class="btn primary settings-add-btn">
+            + Добавить
           </button>
 
         </div>
 
 
-        <input
-          class="settings-search"
-          type="search"
-          placeholder="Поиск по видам работ"
-          data-settings-search="workList"
-        >
+        <div class="settings-table-head">
+          <span>Название</span>
+          <span>Статус</span>
+          <span></span>
+        </div>
+
 
         <div
           id="workList"
-          class="list settings-list">
+          class="settings-list">
         </div>
 
       </div>
@@ -2281,37 +2326,40 @@
             <h2>Организации</h2>
             <p>Подрядчики и участники проекта</p>
           </div>
-          <span class="settings-card-icon">О</span>
+          <span class="settings-count-badge">
+            Справочник
+          </span>
         </div>
 
 
-        <div class="inline-add">
+        <div class="settings-toolbar">
 
           <input
-            id="newOrg"
-            placeholder="Организация"
+            class="settings-search"
+            type="search"
+            placeholder="Поиск по организациям..."
+            data-settings-search="orgList"
           >
-
 
           <button
             id="addOrgBtn"
-            class="btn">
-            Добавить
+            class="btn primary settings-add-btn">
+            + Добавить
           </button>
 
         </div>
 
 
-        <input
-          class="settings-search"
-          type="search"
-          placeholder="Поиск по организациям"
-          data-settings-search="orgList"
-        >
+        <div class="settings-table-head">
+          <span>Название</span>
+          <span>Статус</span>
+          <span></span>
+        </div>
+
 
         <div
           id="orgList"
-          class="list settings-list">
+          class="settings-list">
         </div>
 
       </div>
@@ -2332,11 +2380,11 @@
       <div id="projectMeta"></div>
 
 
-      <div class="editor-actions no-print">
+      <div class="settings-project-actions no-print">
 
         <button
           id="clearProjectBtn"
-          class="btn danger">
+          class="btn danger-lite">
           Очистить рабочие данные
         </button>
 
@@ -2395,7 +2443,7 @@
 
 <script src="js/view-builder.js?v=20261008-8"></script>
 <script src="js/schedule.js?v=20261013-2"></script>
-<script src="js/app.js?v=20261013-7"></script>
+<script src="js/app.js?v=20261013-8"></script>
 
 </body>
 </html>
