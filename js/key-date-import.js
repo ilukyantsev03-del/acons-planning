@@ -1,7 +1,7 @@
 'use strict';
 
 (function () {
-  const MODULE_VERSION = '2026.10.13.4';
+  const MODULE_VERSION = '2026.10.13.5';
   const state = {
     workbook: null,
     fileName: '',
