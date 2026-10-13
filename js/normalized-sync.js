@@ -1400,11 +1400,128 @@
     };
   }
 
+  async function primeResourceHashes() {
+    const hasResourceHashes =
+      Object.keys(
+        state.hashes
+      )
+        .some(
+          key =>
+            key.startsWith(
+              'resource_log:'
+            )
+        );
+
+    if (
+      hasResourceHashes ||
+      !state.projectId
+    ) {
+      return;
+    }
+
+    const rows =
+      await fetchAll(
+        'resource_log',
+        [
+          'external_id',
+          'project_id',
+          'resource_date',
+          'organization_id',
+          'building_id',
+          'front_id',
+          'work_id',
+          'itr',
+          'workers',
+          'mechanizers',
+          'specialization',
+          'people_qty',
+          'equipment_name',
+          'equipment_qty',
+          'comment'
+        ]
+          .join(
+            ','
+          ),
+        query =>
+          query.eq(
+            'project_id',
+            state.projectId
+          )
+      );
+
+    rows.forEach(
+      row => {
+        if (!row.external_id) return;
+
+        state.hashes[
+          'resource_log:' +
+          row.external_id
+        ] =
+          hash({
+            external_id:
+              row.external_id,
+            project_id:
+              row.project_id,
+            resource_date:
+              row.resource_date,
+            organization_id:
+              row.organization_id,
+            building_id:
+              row.building_id,
+            front_id:
+              row.front_id,
+            work_id:
+              row.work_id,
+            itr:
+              Number(
+                row.itr ||
+                0
+              ),
+            workers:
+              Number(
+                row.workers ||
+                0
+              ),
+            mechanizers:
+              Number(
+                row.mechanizers ||
+                0
+              ),
+            specialization:
+              row.specialization ||
+              null,
+            people_qty:
+              Number(
+                row.people_qty ||
+                0
+              ),
+            equipment_name:
+              row.equipment_name ||
+              null,
+            equipment_qty:
+              Number(
+                row.equipment_qty ||
+                0
+              ),
+            comment:
+              row.comment ||
+              null
+          });
+      }
+    );
+
+    saveHashes();
+  }
+
+
   async function syncResourcesBackground(current) {
     if (state.resourceRunning || !canWrite() || !current.resources.length) return;
     state.resourceRunning = true;
     try {
       const rows = current.resources.map(resourcePayload).filter(Boolean);
+
+      await primeResourceHashes();
+
       const pending = changedRows('resource_log', rows);
       if (!pending.length) return;
 
@@ -1426,11 +1543,21 @@
         saveHashes();
         await new Promise(resolve => setTimeout(resolve, 20));
       }
-      if (
-        written &&
-        state.status !==
-          'error'
-      ) {
+      const migrationCheck =
+        await verifyMigration(
+          current
+        );
+
+      const failed =
+        Object.values(
+          migrationCheck
+        )
+          .filter(
+            value =>
+              !value.ok
+          );
+
+      if (!failed.length) {
         setStatus(
           'ready',
           'Серверная база синхронизирована'
