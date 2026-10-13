@@ -1969,3 +1969,251 @@ tbody tr:hover {
   letter-spacing:.04em;
   vertical-align:middle;
 }
+
+
+/* =========================================================
+   НАСТРОЙКИ — ПАНЕЛЬ УПРАВЛЕНИЯ
+   ========================================================= */
+
+.settings-directory-grid {
+  align-items: stretch;
+}
+
+.settings-directory-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 430px;
+  padding: 18px;
+}
+
+.settings-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.settings-card-head h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.settings-card-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.settings-card-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  background: #eef2f6;
+  color: var(--dark);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.settings-directory-card .inline-add {
+  margin-bottom: 9px;
+}
+
+.settings-directory-card .inline-add input {
+  min-width: 0;
+}
+
+.settings-search {
+  width: 100%;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  color: var(--text);
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+
+.settings-search:focus {
+  outline: none;
+  border-color: #98a2b3;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.06);
+}
+
+.settings-list {
+  flex: 1;
+  min-height: 0;
+  max-height: 255px;
+  overflow-y: auto;
+  padding-right: 3px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 50px;
+  padding: 9px 2px;
+  border-bottom: 1px solid #edf0f4;
+}
+
+.settings-row:last-child {
+  border-bottom: 0;
+}
+
+.settings-row-main {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.settings-row-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-status {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 3px 7px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.settings-status.is-active {
+  background: #eaf7ef;
+  color: #146b4a;
+}
+
+.settings-status.is-archive {
+  background: #f2f4f7;
+  color: #667085;
+}
+
+.settings-row .editor-actions {
+  margin: 0;
+  flex: 0 0 auto;
+  gap: 5px;
+  flex-wrap: nowrap;
+}
+
+.settings-action {
+  min-height: 30px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  font-size: 11px;
+}
+
+.settings-action-secondary {
+  color: #667085;
+}
+
+.settings-empty {
+  padding: 24px 8px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.settings-project-card {
+  padding: 18px;
+}
+
+.settings-card-head-wide {
+  margin-bottom: 16px;
+}
+
+.settings-metrics {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(110px, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.settings-metric {
+  padding: 12px;
+  border: 1px solid #e5e9ef;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.settings-metric span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.settings-metric strong {
+  font-size: 18px;
+}
+
+.settings-meta-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 9px 0;
+  border-top: 1px solid #edf0f4;
+  font-size: 13px;
+}
+
+.settings-danger-zone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 14px;
+  padding: 13px 14px;
+  border: 1px solid #f1c4c4;
+  border-radius: 10px;
+  background: #fff8f8;
+}
+
+.settings-danger-zone strong {
+  color: #9b1c1c;
+}
+
+.settings-danger-zone p {
+  margin: 3px 0 0;
+  color: #8b5b5b;
+  font-size: 12px;
+}
+
+@media (max-width: 1200px) {
+  .settings-metrics {
+    grid-template-columns: repeat(3, minmax(120px, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .settings-directory-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-directory-card {
+    min-height: auto;
+  }
+
+  .settings-metrics {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
+
+  .settings-danger-zone {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
