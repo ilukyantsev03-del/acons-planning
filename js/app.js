@@ -1598,6 +1598,98 @@ function openMilestoneEditor(
         <div class="field">
 
           <label>
+            Блок / захватка
+          </label>
+
+          <input
+            id="mBlockCapture"
+            value="${esc(
+              milestone.blockCapture ||
+              ''
+            )}"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Этаж / номер захватки
+          </label>
+
+          <input
+            id="mFloorCapture"
+            value="${esc(
+              milestone.floorCapture ||
+              ''
+            )}"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Дата начала
+          </label>
+
+          <input
+            id="mStart"
+            type="date"
+            value="${esc(
+              milestone.startDate ||
+              ''
+            )}"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Длительность, дн.
+          </label>
+
+          <input
+            id="mDuration"
+            type="number"
+            min="0"
+            step="1"
+            value="${
+              milestone.durationDays ??
+              ''
+            }"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Отклонение, дн.
+          </label>
+
+          <input
+            id="mDeviation"
+            type="number"
+            step="1"
+            value="${
+              milestone.importedDeviation ??
+              ''
+            }"
+            placeholder="Пусто — рассчитать автоматически"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
             Договорная дата
           </label>
 
@@ -2034,6 +2126,35 @@ async function saveMilestone(
         $('mResponsible')
           .value
           .trim(),
+
+      blockCapture:
+        $('mBlockCapture')
+          .value
+          .trim(),
+
+      floorCapture:
+        $('mFloorCapture')
+          .value
+          .trim(),
+
+      startDate:
+        $('mStart').value,
+
+      durationDays:
+        Math.max(
+          0,
+          roundInt(
+            $('mDuration').value
+          )
+        ),
+
+      importedDeviation:
+        $('mDeviation').value ===
+          ''
+          ? null
+          : num(
+              $('mDeviation').value
+            ),
 
       title,
 
@@ -4386,6 +4507,236 @@ function ensureBuilderSettingsCard() {
 }
 
 
+function simpleSettingsList(type) {
+  if (type === 'building') return project.buildings;
+  if (type === 'work') return project.works;
+  if (type === 'org') return project.organizations;
+  return [];
+}
+
+
+async function editSettingsItem(type, id) {
+  const list =
+    simpleSettingsList(
+      type
+    );
+
+  const item =
+    byId(
+      list,
+      id
+    );
+
+  if (!item) return;
+
+  const next =
+    prompt(
+      'Новое название:',
+      item.name ||
+      ''
+    );
+
+  if (next === null) return;
+
+  const name =
+    next.trim();
+
+  if (!name) {
+    alert('Название не может быть пустым.');
+    return;
+  }
+
+  if (
+    list.some(
+      row =>
+        String(row.id) !==
+          String(item.id) &&
+        sameText(
+          row.name,
+          name
+        )
+    )
+  ) {
+    alert('Такая запись уже есть.');
+    return;
+  }
+
+  const oldName =
+    item.name ||
+    '';
+
+  item.name =
+    name;
+
+  item.updatedAt =
+    nowIso();
+
+  log(
+    'Изменено',
+    'Справочник',
+    oldName + ' → ' + name
+  );
+
+  await saveProject();
+
+  initSelects();
+
+  if (
+    typeof refreshAllMultiFilters ===
+      'function'
+  ) {
+    refreshAllMultiFilters();
+  }
+
+  renderAll();
+}
+
+
+async function toggleSettingsItem(type, id) {
+  const list =
+    simpleSettingsList(
+      type
+    );
+
+  const item =
+    byId(
+      list,
+      id
+    );
+
+  if (!item) return;
+
+  item.active =
+    item.active === false;
+
+  item.updatedAt =
+    nowIso();
+
+  log(
+    item.active
+      ? 'Восстановлено'
+      : 'Архивировано',
+    'Справочник',
+    item.name ||
+    item.id
+  );
+
+  await saveProject();
+
+  initSelects();
+
+  if (
+    typeof refreshAllMultiFilters ===
+      'function'
+  ) {
+    refreshAllMultiFilters();
+  }
+
+  renderAll();
+}
+
+
+function makeSettingsListEditable(
+  containerId,
+  type
+) {
+  const container =
+    $(
+      containerId
+    );
+
+  if (!container) return;
+
+  const list =
+    simpleSettingsList(
+      type
+    );
+
+  const rows =
+    container.querySelectorAll(
+      '.item'
+    );
+
+  rows.forEach(
+    (
+      row,
+      index
+    ) => {
+      const item =
+        list[
+          index
+        ];
+
+      if (!item) return;
+
+      const actions =
+        document.createElement(
+          'span'
+        );
+
+      actions.className =
+        'editor-actions';
+
+      const edit =
+        document.createElement(
+          'button'
+        );
+
+      edit.type =
+        'button';
+
+      edit.className =
+        'btn';
+
+      edit.textContent =
+        'Изменить';
+
+      edit.onclick =
+        () =>
+          editSettingsItem(
+            type,
+            item.id
+          );
+
+      const toggle =
+        document.createElement(
+          'button'
+        );
+
+      toggle.type =
+        'button';
+
+      toggle.className =
+        'btn';
+
+      toggle.textContent =
+        item.active === false
+          ? 'Вернуть'
+          : 'Архив';
+
+      toggle.onclick =
+        () =>
+          toggleSettingsItem(
+            type,
+            item.id
+          );
+
+      actions.appendChild(
+        edit
+      );
+
+      actions.appendChild(
+        toggle
+      );
+
+      row.appendChild(
+        actions
+      );
+    }
+  );
+}
+
+
 function renderSettings() {
 
   if (
@@ -4396,6 +4747,11 @@ function renderSettings() {
       settingsListHtml(
         project.buildings
       );
+
+    makeSettingsListEditable(
+      'buildingList',
+      'building'
+    );
   }
 
 
@@ -4407,6 +4763,11 @@ function renderSettings() {
       settingsListHtml(
         project.works
       );
+
+    makeSettingsListEditable(
+      'workList',
+      'work'
+    );
   }
 
 
@@ -4418,6 +4779,11 @@ function renderSettings() {
       settingsListHtml(
         project.organizations
       );
+
+    makeSettingsListEditable(
+      'orgList',
+      'org'
+    );
   }
 
 
