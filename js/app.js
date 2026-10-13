@@ -7774,13 +7774,58 @@ async function init() {
     await dbGetKey();
 
 
-  project =
+  const localProject =
     await migrateIfNeeded(
       raw
     );
 
 
+  project =
+    localProject;
+
+
   validateLoadedProject();
+
+
+  if (
+    window.LIV_REMOTE_SYNC &&
+    typeof window.LIV_REMOTE_SYNC.bootstrap ===
+      'function'
+  ) {
+
+    const remoteState =
+      await window.LIV_REMOTE_SYNC.bootstrap(
+        localProject
+      );
+
+
+    if (
+      remoteState?.project
+    ) {
+
+      project =
+        await migrateIfNeeded(
+          remoteState.project
+        );
+
+
+      validateLoadedProject();
+
+
+      await dbPutKey(
+        project
+      );
+    }
+
+
+    if (
+      typeof window.LIV_REMOTE_SYNC.subscribe ===
+        'function'
+    ) {
+
+      window.LIV_REMOTE_SYNC.subscribe();
+    }
+  }
 
 
   if (
@@ -7808,7 +7853,7 @@ async function init() {
   bindUi();
 
 
-  initDefaultDates();
+  await initDefaultDates();
 
 
   ensureExcelButton();
@@ -7819,7 +7864,7 @@ async function init() {
 
   if (
     typeof renderBackupNotice ===
-    'function'
+      'function'
   ) {
 
     renderBackupNotice();
@@ -7840,9 +7885,66 @@ async function init() {
   }
 
 
+  window.addEventListener(
+    'liv-remote-project',
+    async event => {
+
+      const incoming =
+        event?.detail?.project;
+
+
+      if (
+        !incoming
+      ) {
+        return;
+      }
+
+
+      try {
+
+        window.LIV_REMOTE_SYNC
+          ?.beginRemoteApply?.();
+
+
+        project =
+          await migrateIfNeeded(
+            incoming
+          );
+
+
+        validateLoadedProject();
+
+
+        await dbPutKey(
+          project
+        );
+
+
+        initSelects();
+
+
+        if (
+          typeof refreshAllMultiFilters ===
+            'function'
+        ) {
+
+          refreshAllMultiFilters();
+        }
+
+
+        renderAll();
+
+      } finally {
+
+        window.LIV_REMOTE_SYNC
+          ?.endRemoteApply?.();
+      }
+    }
+  );
+
+
   renderAll();
 }
-
 
 /* =========================================================
    DOM READY
