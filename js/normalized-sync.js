@@ -1,7 +1,7 @@
 'use strict';
 
 (function () {
-  const MODULE_VERSION = '2026.10.13.1';
+  const MODULE_VERSION = '2026.10.13.6';
   const PROJECT_EXTERNAL_ID = 'LIV-MAIN';
   const SAVE_DELAY = 1200;
   const PAGE_SIZE = 1000;
@@ -421,35 +421,128 @@
     });
   }
 
+  async function writeVersionedRows(table, rows) {
+    const ids = rows.map(row => row.external_id).filter(Boolean);
+    if (!ids.length) return 0;
+
+    const lookup = await client()
+      .from(table)
+      .select('external_id,row_version')
+      .in('external_id', ids);
+
+    if (lookup.error) throw lookup.error;
+
+    const serverById = new Map(
+      (lookup.data || []).map(row => [String(row.external_id), row])
+    );
+
+    let written = 0;
+
+    for (const row of rows) {
+      const id = String(row.external_id || '');
+      if (!id) continue;
+
+      const versionKey = table + ':' + id;
+      const serverRow = serverById.get(id);
+
+      if (!serverRow) {
+        const inserted = await client()
+          .from(table)
+          .insert(row)
+          .select('external_id,row_version')
+          .single();
+
+        if (inserted.error) {
+          if (inserted.error.code === '23505') {
+            throw new Error(
+              'Конфликт редактирования: запись «' + id +
+              '» в «' + table +
+              '» была создана другим пользователем. Обнови данные перед сохранением.'
+            );
+          }
+          throw inserted.error;
+        }
+
+        state.serverVersions[versionKey] = Number(inserted.data?.row_version || 1);
+        written += 1;
+        continue;
+      }
+
+      const serverVersion = Number(serverRow.row_version || 1);
+      const knownVersion = Number(state.serverVersions[versionKey] || 0);
+
+      if (knownVersion > 0 && serverVersion !== knownVersion) {
+        throw new Error(
+          'Конфликт редактирования: запись «' + id +
+          '» в «' + table +
+          '» уже изменена другим пользователем. Обнови данные перед сохранением.'
+        );
+      }
+
+      const updated = await client()
+        .from(table)
+        .update(row)
+        .eq('external_id', id)
+        .eq('row_version', serverVersion)
+        .select('external_id,row_version');
+
+      if (updated.error) throw updated.error;
+
+      if (!updated.data || updated.data.length !== 1) {
+        throw new Error(
+          'Конфликт редактирования: запись «' + id +
+          '» в «' + table +
+          '» изменилась во время сохранения. Обнови данные и повтори.'
+        );
+      }
+
+      state.serverVersions[versionKey] = Number(updated.data[0].row_version || serverVersion + 1);
+      written += 1;
+    }
+
+    saveServerVersions();
+    return written;
+  }
+
   async function upsertRows(table, rows, onConflict, tableKey = table, identity = 'external_id', chunkSize = WRITE_CHUNK) {
     const pending = changedRows(tableKey, rows, identity);
     if (!pending.length) return { written: 0, total: rows.length };
 
     let written = 0;
+
     for (let index = 0; index < pending.length; index += chunkSize) {
       const chunk = pending.slice(index, index + chunkSize);
 
-      await checkWriteConflicts(
-        table,
-        chunk,
-        identity
-      );
+      if (
+        identity === 'external_id' &&
+        VERSIONED_TABLES.has(table)
+      ) {
+        written += await writeVersionedRows(table, chunk);
+      } else {
+        await checkWriteConflicts(
+          table,
+          chunk,
+          identity
+        );
 
-      const result = await client().from(table).upsert(chunk, {
-        onConflict,
-        ignoreDuplicates: false
-      });
-      if (result.error) throw result.error;
+        const result = await client().from(table).upsert(chunk, {
+          onConflict,
+          ignoreDuplicates: false
+        });
+        if (result.error) throw result.error;
 
-      await refreshWrittenVersions(
-        table,
-        chunk,
-        identity
-      );
+        await refreshWrittenVersions(
+          table,
+          chunk,
+          identity
+        );
+
+        written += chunk.length;
+      }
 
       markRows(tableKey, chunk, identity);
-      written += chunk.length;
     }
+
     saveHashes();
     return { written, total: rows.length };
   }
