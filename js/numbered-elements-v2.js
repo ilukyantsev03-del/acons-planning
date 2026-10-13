@@ -183,7 +183,8 @@
         note.style.marginTop = '3px';
         cell.appendChild(note);
       }
-      note.textContent = value ? 'Группа: ' + value : '';
+      const nextText = value ? 'Группа: ' + value : '';
+      if (note.textContent !== nextText) note.textContent = nextText;
     });
   }
 
@@ -205,7 +206,7 @@
       await originalSave(id);
 
       const current = currentProject();
-      let element = id
+      const element = id
         ? current?.numberedElements.find(item => String(item.id) === String(id))
         : current?.numberedElements.find(item => !beforeIds.has(String(item.id)));
       if (!element) return;
@@ -247,7 +248,7 @@
   }
 
   window.LIV_NUMBERED_ELEMENTS_V2 = {
-    version: '2026.10.13.1',
+    version: '2026.10.13.2',
     contextKey: contextualElementKey,
     ensureGroup
   };
