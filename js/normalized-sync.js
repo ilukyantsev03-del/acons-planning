@@ -1132,6 +1132,13 @@
     await refreshMap('work_metrics', 'metric', true);
 
     const facts = [];
+    const canonicalFactIds =
+      new Set(
+        current.progressFacts
+          .map(item => item?.id ? String(item.id) : '')
+          .filter(Boolean)
+      );
+
     current.progressFacts.forEach(item => {
       if (!item?.id && !item?.sourceFingerprint) return;
       const sourceFingerprint = text(item.sourceFingerprint) || 'progress:' + item.id;
@@ -1156,6 +1163,7 @@
     });
 
     current.factLog.forEach(item => {
+      if (item?.id && canonicalFactIds.has(String(item.id))) return;
       if (!item?.frontId || !dateValue(item.date ?? item.factDate)) return;
       const metricExternal = item.metricId || 'METRIC-' + item.frontId + '-PRIMARY';
       const sourceFingerprint = text(item.importFingerprint) || 'legacy-fact:' + (item.id || hash(item));
