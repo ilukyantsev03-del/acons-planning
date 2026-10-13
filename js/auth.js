@@ -41,6 +41,8 @@
       '.liv-auth-role{white-space:nowrap;font-size:12px;color:#94a3b8;}' +
       '.liv-auth-role:before{content:"· ";}' +
       '.liv-auth-logout{min-height:34px;padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer;flex:0 0 auto;}' +
+      '.liv-role-hidden{display:none!important;}' +
+      'body.liv-readonly .editor-actions button:not(.liv-auth-logout),body.liv-readonly .row-btn,body.liv-readonly button[data-delete],body.liv-readonly button[data-edit]{display:none!important;}' +
       '@media(max-width:1100px){.liv-auth-user{margin-left:0}.liv-auth-identity{flex-direction:column;align-items:flex-start;gap:2px}.liv-auth-role:before{content:""}.liv-auth-name{max-width:min(70vw,420px)}}' +
       '@media(max-width:680px){.liv-auth-user{width:100%;justify-content:space-between}.liv-auth-identity{min-width:0;flex:1}.liv-auth-name{max-width:100%;font-size:14px}.liv-auth-role{font-size:12px}.liv-auth-logout{min-height:38px}}';
 
@@ -157,6 +159,67 @@
     return map[role] || role || '';
   }
 
+  function applyRoleAccess(profile) {
+    const role = profile?.role || '';
+    const readOnlyRoles = new Set([
+      'customer',
+      'director',
+      'project_manager'
+    ]);
+
+    const readOnly =
+      readOnlyRoles.has(role);
+
+    window.LIV_ACCESS = {
+      role,
+      readOnly,
+      canEdit:
+        !readOnly,
+      canBackdateFact:
+        role === 'admin' ||
+        role === 'planner' ||
+        !role
+    };
+
+    document.body.classList.toggle(
+      'liv-readonly',
+      readOnly
+    );
+
+    document
+      .querySelectorAll(
+        [
+          '#newFrontBtn',
+          '#newPlanRow',
+          '#newFactRow',
+          '#newResourceBtn',
+          '#resourceDeleteSelectedBtn',
+          '#resourceDeleteFilteredBtn',
+          '#newMilestoneBtn',
+          '#newElementBtn',
+          '#analyzeImportBtn',
+          '#commitImportBtn',
+          '#rollbackImportBtn',
+          '#scheduleFileInput',
+          '#scheduleImportBtn',
+          '#schedulePromoteBtn',
+          '#scheduleClearTestBtn',
+          '#backupBtn',
+          '#restoreInput'
+        ].join(',')
+      )
+      .forEach(node => {
+        const target =
+          node.closest('label') ||
+          node;
+
+        target.classList.toggle(
+          'liv-role-hidden',
+          readOnly
+        );
+      });
+  }
+
   async function ensureUserControls(user) {
     let wrap = document.getElementById('livAuthUserControls');
 
@@ -171,6 +234,11 @@
     }
 
     const profile = await loadProfile(user);
+
+    applyRoleAccess(
+      profile
+    );
+
     const fullName = profile && profile.full_name ? profile.full_name.trim() : '';
     const role = profile && profile.role ? roleLabel(profile.role) : '';
     const displayName = fullName || user.email || '';
@@ -224,6 +292,17 @@
       overlay.classList.remove('hidden');
       document.body.classList.add('liv-auth-locked');
       removeUserControls();
+
+      window.LIV_ACCESS = {
+        role: '',
+        readOnly: false,
+        canEdit: true,
+        canBackdateFact: true
+      };
+
+      document.body.classList.remove(
+        'liv-readonly'
+      );
 
       const password = document.getElementById('livAuthPassword');
       if (password) password.value = '';
