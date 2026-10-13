@@ -861,8 +861,10 @@
         custom_data: {
           ...(item.customData || {}),
           constraint: text(item.constraint) || undefined,
-          originMatrixId: item.originMatrixId || undefined
+          originMatrixId: item.originMatrixId || undefined,
+          sourceFingerprint: item.importFingerprint || item.sourceFingerprint || undefined
         },
+        source_batch_id: mapValue('importBatch', item.source?.batchId ?? item.lastImport?.batchId),
         source_file: text(item.source?.file ?? item.lastImport?.file) || null,
         source_sheet: text(item.source?.sheet ?? item.lastImport?.sheet) || null,
         source_row: integer(item.source?.row ?? item.lastImport?.row, 0) || null,
@@ -967,7 +969,14 @@
           risk_level: ({green:'normal',yellow:'attention',orange:'risk',red:'failure',gray:'unknown',normal:'normal',attention:'attention',risk:'risk',failure:'failure',unknown:'unknown'}[text(item.riskLevel)] || null),
           risk_updated_at: item.riskUpdatedAt || null,
           risk_details: item.riskDetails || {},
-          custom_data: item.customData || {},
+          custom_data: {
+            ...(item.customData || {}),
+            sourceFingerprint: item.sourceFingerprint || undefined,
+            responsibility: item.responsibility || undefined,
+            riskCalendarId: item.riskCalendarId || undefined,
+            elementGroupId: item.elementGroupId || undefined
+          },
+          source_batch_id: mapValue('importBatch', item.source?.batchId),
           source_file: text(item.source?.file) || null,
           source_sheet: text(item.source?.sheet) || null,
           source_row: integer(item.source?.row, 0) || null,
@@ -1063,8 +1072,10 @@
         active: item.active !== false,
         custom_data: {
           ...(item.customData || {}),
-          uniqueScope: item.uniqueScope || 'context'
+          uniqueScope: item.uniqueScope || 'context',
+          sourceFingerprint: item.sourceFingerprint || undefined
         },
+        source_batch_id: mapValue('importBatch', item.source?.batchId),
         source_file: text(item.source?.file) || null,
         source_sheet: text(item.source?.sheet) || null,
         source_row: integer(item.source?.row, 0) || null
@@ -1091,6 +1102,7 @@
         targetQty: front.totalQty,
         weight: 1,
         calculationMethod: /шт/i.test(front.unit || work?.unit || '') ? 'elements' : 'quantity',
+        sourceBatchId: front.source?.batchId || front.lastImport?.batchId || '',
         isPrimary: true,
         active: front.active !== false
       });
@@ -1112,6 +1124,7 @@
         target_qty: numberOrNull(item.targetQty),
         weight: numberOrNull(item.weight) ?? 1,
         calculation_method: new Set(['quantity','elements','status','length','area','manual']).has(text(item.calculationMethod)) ? text(item.calculationMethod) : 'quantity',
+        source_batch_id: mapValue('importBatch', item.sourceBatchId || item.source?.batchId),
         is_primary: item.isPrimary === true,
         active: item.active !== false
       }));
@@ -1134,6 +1147,7 @@
         status: text(item.status) || null,
         people: numberOrNull(item.people),
         comment: text(item.comment) || null,
+        source_batch_id: mapValue('importBatch', item.source?.batchId),
         source_file: text(item.source?.file) || null,
         source_sheet: text(item.source?.sheet) || null,
         source_row: integer(item.source?.row, 0) || null,
@@ -1157,6 +1171,7 @@
         status: text(item.status) || null,
         people: numberOrNull(item.people),
         comment: text(item.comment) || null,
+        source_batch_id: mapValue('importBatch', item.source?.batchId),
         source_file: text(item.source?.file) || null,
         source_sheet: text(item.source?.sheet) || null,
         source_row: integer(item.source?.row, 0) || null,
@@ -1216,6 +1231,7 @@
         source_file: text(item.fileName ?? item.sourceFile) || null,
         source_sheet: text(item.sheetName ?? item.sourceSheet) || null,
         source_format: text(item.sourceType ?? item.sourceFormat) || null,
+        import_batch_id: mapValue('importBatch', item.id),
         status,
         effective_date: dateValue(item.effectiveDate),
         accepted_at: item.acceptedAt || null
@@ -1349,6 +1365,7 @@
         details: item.details || item
       }));
     await upsertRows('import_log', rows, 'external_id');
+    await refreshMap('import_log', 'importBatch', true);
   }
 
   function resourcePayload(item) {
@@ -1437,13 +1454,14 @@
       await syncStep('Алиасы и сопоставления', () => syncAliasesAndMappings(current));
       await syncStep('Договоры', () => syncContracts(current));
       await syncStep('Структура зданий', () => syncStructures(current));
+      await syncStep('Журнал импорта · база', () => syncImportHistory(current));
       await syncStep('Фронты', () => syncFronts(current));
       await syncStep('Шахматки', () => syncMatrices(current));
+      await syncStep('Журнал импорта · связи', () => syncImportHistory(current));
       await syncStep('Ключевые даты', () => syncMilestones(current));
       await syncStep('Номерные элементы', () => syncNumberedElements(current));
       await syncStep('Объёмы и факты', () => syncMetricsAndFacts(current));
       await syncStep('Рабочий график', () => syncSchedule(current));
-      await syncStep('Журнал импорта', () => syncImportHistory(current));
 
       const migrationCheck =
         await syncStep(
