@@ -232,6 +232,19 @@
       <div class="field">
 
         <label>
+          Шахматка
+        </label>
+
+        <select id="mfMatrix">
+          <option value="all">Все шахматки</option>
+        </select>
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
           Здание
         </label>
 
@@ -326,11 +339,28 @@
 
 
       <button
+        id="matrixRenameBtn"
+        class="btn align-end">
+        Переименовать
+      </button>
+
+      <button
+        id="matrixDeleteBtn"
+        class="btn danger-lite align-end">
+        Удалить
+      </button>
+
+      <button
         id="newFrontBtn"
         class="btn primary align-end">
         Добавить фронт
       </button>
 
+    </section>
+
+    <section
+      id="matrixContextInfo"
+      class="card matrix-context-info">
     </section>
 
 
@@ -2042,6 +2072,35 @@
         </div>
 
 
+        <div class="field">
+
+          <label>
+            Шахматка
+          </label>
+
+          <select id="importMatrixTarget">
+            <option value="new">
+              Создать новую шахматку
+            </option>
+          </select>
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Название новой шахматки
+          </label>
+
+          <input
+            id="importMatrixName"
+            placeholder="Например: Фасады Главного корпуса"
+          >
+
+        </div>
+
+
         <label class="check-line">
 
           <input
@@ -2439,11 +2498,11 @@
 <script src="js/filters.js?v=20261008-8"></script>
 <script src="js/resources.js?v=20261013-1"></script>
 <script src="js/organizations.js?v=20261013-1"></script>
-<script src="js/import.js?v=20261013-3"></script>
+<script src="js/import.js?v=20261013-4"></script>
 
 <script src="js/view-builder.js?v=20261008-8"></script>
 <script src="js/schedule.js?v=20261013-2"></script>
-<script src="js/app.js?v=20261013-9"></script>
+<script src="js/app.js?v=20261013-10"></script>
 
 </body>
 </html>
