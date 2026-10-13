@@ -677,16 +677,16 @@
     }
 
     const mappings = (current.sourceMappings || [])
-      .filter(item => item?.sourceValue && item?.targetEntityId)
+      .filter(item => item?.sourceValue && (item?.targetLocalId || item?.targetEntityId))
       .map(item => {
         let targetEntityId = null;
 
         if (item.targetEntityType === 'building') {
-          targetEntityId = mapValue('building', item.targetEntityId);
+          targetEntityId = mapValue('building', item.targetLocalId || item.targetEntityId);
         } else if (item.targetEntityType === 'work') {
-          targetEntityId = mapValue('work', item.targetEntityId);
+          targetEntityId = mapValue('work', item.targetLocalId || item.targetEntityId);
         } else if (item.targetEntityType === 'organization') {
-          targetEntityId = mapValue('organization', item.targetEntityId);
+          targetEntityId = mapValue('organization', item.targetLocalId || item.targetEntityId);
         }
 
         if (!targetEntityId) return null;
