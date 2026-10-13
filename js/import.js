@@ -4778,34 +4778,9 @@ async function commitImport(){
             item
           )
         }
-      };
+      });
 
-      if (existingMilestone) {
-        const correspondence =
-          existingMilestone.correspondence ||
-          [];
-
-        Object.assign(
-          existingMilestone,
-          importedMilestone,
-          {
-            correspondence,
-            createdAt:
-              existingMilestone.createdAt ||
-              importedMilestone.createdAt,
-            updatedAt:
-              nowIso()
-          }
-        );
-
-        updated++;
-      } else {
-        project.milestones.push(
-          importedMilestone
-        );
-
-        appended++;
-      }
+      appended++;
 
       continue;
     }
