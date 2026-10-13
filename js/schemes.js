@@ -17,7 +17,7 @@
   const clamp = (v,min=0,max=1) => Math.max(min,Math.min(max,Number.isFinite(Number(v))?Number(v):min));
   const makeId = prefix => typeof uid === 'function' ? uid(prefix) : `${prefix}-${crypto.randomUUID()}`;
   const html = value => typeof esc === 'function' ? esc(value) : String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
-  const safeName = value => String(value||'scheme.pdf').replace(/[^a-zA-Z0-9а-яА-ЯёЁ._-]+/g,'_').slice(-140);
+  const safeName = value => String(value||'scheme.pdf').replace(/[^a-zA-Z0-9._-]+/g,'_').replace(/^\.+/,'').slice(-120) || 'scheme.pdf';
 
   function ensure() {
     const current = p();
@@ -25,6 +25,30 @@
     if (!Array.isArray(current.schemes)) current.schemes=[];
     if (!Array.isArray(current.schemeMarks)) current.schemeMarks=[];
     return true;
+  }
+
+  async function rememberPdf(id, doc) {
+    if (state.cache.has(id)) state.cache.delete(id);
+    state.cache.set(id, doc);
+
+    while (state.cache.size > 3) {
+      const oldestId = state.cache.keys().next().value;
+      if (!oldestId || String(oldestId) === String(id)) break;
+      const old = state.cache.get(oldestId);
+      state.cache.delete(oldestId);
+      try { await old?.destroy?.(); } catch (_) {}
+    }
+  }
+
+  function derivedProgress(status, frontId) {
+    const current = p();
+    const front = (current?.fronts || []).find(x => String(x.id) === String(frontId || ''));
+    const total = Number(front?.totalQty || 0);
+    const done = Number(front?.doneQty || 0);
+    if (front && total > 0 && Number.isFinite(done)) {
+      return Math.max(0, Math.min(100, Math.round(done / total * 100)));
+    }
+    return null;
   }
 
   const schemes = () => (p()?.schemes||[]).filter(x=>x.active!==false).sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
@@ -93,8 +117,13 @@
   }
 
   function stats() {
-    const rows=state.schemeId?marks(state.schemeId):[], avg=rows.length?Math.round(rows.reduce((sum,x)=>sum+clamp(x.progressPercent,0,100),0)/rows.length):0;
-    $s('schTotal').textContent=rows.length; $s('schWork').textContent=rows.filter(x=>x.status==='В работе').length; $s('schDone').textContent=rows.filter(x=>DONE.has(x.status)).length; $s('schProgress').textContent=`${avg}%`;
+    const rows=state.schemeId?marks(state.schemeId):[];
+    const measurable=rows.filter(x=>x.progressPercent!==null&&x.progressPercent!==undefined&&x.progressPercent!=='');
+    const avg=measurable.length?Math.round(measurable.reduce((sum,x)=>sum+Number(x.progressPercent||0),0)/measurable.length):null;
+    $s('schTotal').textContent=rows.length;
+    $s('schWork').textContent=rows.filter(x=>x.status==='В работе').length;
+    $s('schDone').textContent=rows.filter(x=>DONE.has(x.status)).length;
+    $s('schProgress').textContent=avg===null?'—':`${avg}%`;
   }
 
   function render() {
@@ -117,7 +146,7 @@
 
   async function loadPdf() {
     const item=scheme(state.schemeId); if(!item)return clear(); loading(true);
-    try { let doc=state.cache.get(item.id); if(!doc){const client=window.LIV_SUPABASE;if(!client)throw new Error('Нет подключения к Supabase');const d=await client.storage.from(BUCKET).download(item.storagePath);if(d.error)throw d.error;const lib=await pdfjs();doc=await lib.getDocument({data:new Uint8Array(await d.data.arrayBuffer())}).promise;state.cache.set(item.id,doc);} state.pdf=doc;if(item.pageCount!==doc.numPages){item.pageCount=doc.numPages;item.updatedAt=now();await syncScheme(item);await saveProject();}await renderPage(); }
+    try { let doc=state.cache.get(item.id); if(!doc){const client=window.LIV_SUPABASE;if(!client)throw new Error('Нет подключения к Supabase');const d=await client.storage.from(BUCKET).download(item.storagePath);if(d.error)throw d.error;const lib=await pdfjs();doc=await lib.getDocument({data:new Uint8Array(await d.data.arrayBuffer())}).promise;await rememberPdf(item.id,doc);} state.pdf=doc;if(item.pageCount!==doc.numPages){item.pageCount=doc.numPages;item.updatedAt=now();await syncScheme(item);await saveProject();}await renderPage(); }
     catch(error){console.error(error);state.pdf=null;$s('schStage').classList.add('hidden');$s('schEmpty').classList.remove('hidden');$s('schEmpty').innerHTML=`<strong>Не удалось открыть PDF</strong><span>${html(error.message||error)}</span>`;} finally{loading(false);toolbar();renderList();}
   }
 
@@ -126,7 +155,7 @@
   }
 
   function renderMarks() {
-    const over=$s('schOverlay');if(!over)return;over.querySelectorAll('.sch-mark').forEach(x=>x.remove());marks(state.schemeId,state.page).filter(x=>state.filter==='all'||x.status===state.filter).forEach(x=>{const b=document.createElement('button');b.className=`sch-mark ${markClass(x.status)}`;b.style.left=`${clamp(x.x)*100}%`;b.style.top=`${clamp(x.y)*100}%`;b.style.width=`${clamp(x.width,.008,1)*100}%`;b.style.height=`${clamp(x.height,.008,1)*100}%`;b.innerHTML=`<span>${html(x.title||x.status||'Участок')} · ${Math.round(clamp(x.progressPercent,0,100))}%</span>`;b.onpointerdown=e=>e.stopPropagation();b.onclick=e=>{e.stopPropagation();openMark(x.id);};over.appendChild(b);});
+    const over=$s('schOverlay');if(!over)return;over.querySelectorAll('.sch-mark').forEach(x=>x.remove());marks(state.schemeId,state.page).filter(x=>state.filter==='all'||x.status===state.filter).forEach(x=>{const b=document.createElement('button');b.className=`sch-mark ${markClass(x.status)}`;b.style.left=`${clamp(x.x)*100}%`;b.style.top=`${clamp(x.y)*100}%`;b.style.width=`${clamp(x.width,.008,1)*100}%`;b.style.height=`${clamp(x.height,.008,1)*100}%`;b.innerHTML=`<span>${html(x.title||x.status||'Участок')}${x.progressPercent!==null&&x.progressPercent!==undefined&&x.progressPercent!==''?' · '+Math.round(Number(x.progressPercent||0))+'%':''}</span>`;b.onpointerdown=e=>e.stopPropagation();b.onclick=e=>{e.stopPropagation();openMark(x.id);};over.appendChild(b);});
   }
 
   function point(e){const r=$s('schOverlay').getBoundingClientRect();return{x:clamp((e.clientX-r.left)/r.width),y:clamp((e.clientY-r.top)/r.height)};}
@@ -136,12 +165,24 @@
   function cancelDraw(){state.start=null;state.draft?.remove();state.draft=null;}
 
   function openMark(id=null,geometry=null) {
-    if(!canWrite())return;const current=p(),existing=id?mark(id):null,x=existing||geometry||{};openModal(existing?'Отметка выполнения':'Новая отметка на схеме',`<div class="form-grid"><div class="field"><label>Участок</label><input id="smTitle" value="${html(x.title||'')}"></div><div class="field"><label>Статус</label><select id="smStatus">${STATUSES.map(s=>`<option ${s===(x.status||'Не начато')?'selected':''}>${s}</option>`).join('')}</select></div><div class="field"><label>Готовность, %</label><input id="smProgress" type="number" min="0" max="100" value="${Math.round(clamp(x.progressPercent,0,100))}"></div><div class="field"><label>Вид работ</label><select id="smWork">${options(current.works,x.workId)}</select></div><div class="field"><label>Организация</label><select id="smOrg">${options(current.organizations,x.organizationId)}</select></div><div class="field"><label>Связанный фронт</label><select id="smFront">${frontOptions(x.frontId)}</select></div></div><div class="field"><label>Комментарий</label><textarea id="smComment">${html(x.comment||'')}</textarea></div><div class="liv-editor-footer">${existing?'<button id="smDelete" class="btn danger-lite">Удалить отметку</button>':''}<button id="smCancel" class="btn">Отмена</button><button id="smSave" class="btn primary">Сохранить</button></div>`);
-    $s('smStatus').onchange=e=>$s('smProgress').value=DONE.has(e.target.value)?100:e.target.value==='В работе'?50:0;$s('smCancel').onclick=closeModal;$s('smSave').onclick=()=>saveMark(existing,x);if($s('smDelete'))$s('smDelete').onclick=()=>deleteMark(existing);
+    if(!canWrite())return;
+    const current=p(),existing=id?mark(id):null,x=existing||geometry||{};
+    openModal(existing?'Отметка выполнения':'Новая отметка на схеме',`<div class="form-grid"><div class="field"><label>Участок</label><input id="smTitle" value="${html(x.title||'')}"></div><div class="field"><label>Статус</label><select id="smStatus">${STATUSES.map(s=>`<option ${s===(x.status||'Не начато')?'selected':''}>${s}</option>`).join('')}</select></div><div class="field"><label>Вид работ</label><select id="smWork">${options(current.works,x.workId)}</select></div><div class="field"><label>Организация</label><select id="smOrg">${options(current.organizations,x.organizationId)}</select></div><div class="field"><label>Связанный фронт</label><select id="smFront">${frontOptions(x.frontId)}</select></div></div><div class="sch-note">Процент вручную не вводится. Если отметка связана с измеряемым фронтом, LIV рассчитает готовность из фактического и общего объёма.</div><div class="field"><label>Комментарий</label><textarea id="smComment">${html(x.comment||'')}</textarea></div><div class="liv-editor-footer">${existing?'<button id="smDelete" class="btn danger-lite">Удалить отметку</button>':''}<button id="smCancel" class="btn">Отмена</button><button id="smSave" class="btn primary">Сохранить</button></div>`);
+    $s('smCancel').onclick=closeModal;
+    $s('smSave').onclick=()=>saveMark(existing,x);
+    if($s('smDelete'))$s('smDelete').onclick=()=>deleteMark(existing);
   }
 
   async function saveMark(existing,g) {
-    const current=p(),t=now();if(!current)return;let x=existing;if(!x){x={id:makeId('SMK'),schemeId:g.schemeId,pageNo:g.pageNo,x:g.x,y:g.y,width:g.width,height:g.height,active:true,createdAt:t};current.schemeMarks.push(x);}Object.assign(x,{title:$s('smTitle').value.trim(),status:$s('smStatus').value,progressPercent:Math.round(clamp($s('smProgress').value,0,100)),workId:$s('smWork').value,organizationId:$s('smOrg').value,frontId:$s('smFront').value,comment:$s('smComment').value.trim(),active:true,updatedAt:t});if(typeof log==='function')log(existing?'Изменено':'Создано','Отметка на схеме',x.title||'Участок',{schemeId:x.schemeId,markId:x.id,status:x.status,progress:x.progressPercent});await syncMark(x);await saveProject();closeModal();renderMarks();stats();renderList();
+    const current=p(),t=now();if(!current)return;
+    let x=existing;
+    if(!x){x={id:makeId('SMK'),schemeId:g.schemeId,pageNo:g.pageNo,x:g.x,y:g.y,width:g.width,height:g.height,active:true,createdAt:t};current.schemeMarks.push(x);}
+    const status=$s('smStatus').value;
+    const frontId=$s('smFront').value;
+    const progressPercent=derivedProgress(status,frontId);
+    Object.assign(x,{title:$s('smTitle').value.trim(),status,progressPercent,workId:$s('smWork').value,organizationId:$s('smOrg').value,frontId,comment:$s('smComment').value.trim(),active:true,updatedAt:t});
+    if(typeof log==='function')log(existing?'Изменено':'Создано','Отметка на схеме',x.title||'Участок',{schemeId:x.schemeId,markId:x.id,status:x.status,progress:x.progressPercent});
+    await syncMark(x);await saveProject();closeModal();renderMarks();stats();renderList();
   }
 
   async function deleteMark(x){if(!x||!confirm('Удалить отметку со схемы?'))return;x.active=false;x.updatedAt=x.deletedAt=now();await syncMark(x);await saveProject();closeModal();renderMarks();stats();renderList();}
@@ -153,12 +194,12 @@
   }
 
   async function upload() {
-    const file=state.pending,current=p(),client=window.LIV_SUPABASE;if(!file||!current||!client)return alert('Нет подключения к серверу.');const b=$s('suSave');b.disabled=true;b.textContent='Загрузка...';const id=makeId('SCH'),path=`schemes/${id}/${safeName(file.name)}`,t=now();try{const u=await client.storage.from(BUCKET).upload(path,file,{contentType:'application/pdf',upsert:false});if(u.error)throw u.error;const x={id,name:$s('suName').value.trim()||file.name,fileName:file.name,storagePath:path,mimeType:'application/pdf',fileSize:file.size,pageCount:0,buildingId:$s('suBuilding').value,matrixId:$s('suMatrix').value,revision:$s('suRevision').value.trim(),status:'Загружена',active:true,createdAt:t,updatedAt:t};current.schemes.push(x);try{await syncScheme(x);}catch(error){current.schemes=current.schemes.filter(y=>y.id!==x.id);await client.storage.from(BUCKET).remove([path]);throw error;}await saveProject();state.pending=null;closeModal();render();await select(x.id);}catch(error){alert('Не удалось загрузить PDF: '+(error.message||error));b.disabled=false;b.textContent='Загрузить';}
+    const file=state.pending,current=p(),client=window.LIV_SUPABASE;if(!file||!current||!client)return alert('Нет подключения к серверу.');const b=$s('suSave');b.disabled=true;b.textContent='Загрузка...';const id=makeId('SCH'),path=`schemes/${safeName(id)}/source.pdf`,t=now();try{const u=await client.storage.from(BUCKET).upload(path,file,{contentType:'application/pdf',upsert:false});if(u.error)throw u.error;const x={id,name:$s('suName').value.trim()||file.name,fileName:file.name,storagePath:path,mimeType:'application/pdf',fileSize:file.size,pageCount:0,buildingId:$s('suBuilding').value,matrixId:$s('suMatrix').value,revision:$s('suRevision').value.trim(),status:'Загружена',active:true,createdAt:t,updatedAt:t};current.schemes.push(x);try{await syncScheme(x);}catch(error){current.schemes=current.schemes.filter(y=>y.id!==x.id);await client.storage.from(BUCKET).remove([path]);throw error;}await saveProject();state.pending=null;closeModal();render();await select(x.id);}catch(error){alert('Не удалось загрузить PDF: '+(error.message||error));b.disabled=false;b.textContent='Загрузить';}
   }
 
   const userId=()=>window.LIV_REMOTE_SYNC?.userId?.()||null;
   async function syncScheme(x){const client=window.LIV_SUPABASE;if(!client)return;const data={external_id:x.id,name:x.name,file_name:x.fileName,storage_path:x.storagePath,mime_type:'application/pdf',page_count:Number(x.pageCount||0),revision:x.revision||null,status:x.status||'Загружена',active:x.active!==false,updated_at:x.updatedAt||now(),custom_data:{buildingExternalId:x.buildingId||'',matrixExternalId:x.matrixId||'',fileSize:Number(x.fileSize||0)}};if(x.serverId){const r=await client.from('schemes').update(data).eq('id',x.serverId);if(r.error)throw r.error;return;}const e=await client.from('schemes').select('id').eq('external_id',x.id).maybeSingle();if(e.error)throw e.error;if(e.data?.id){x.serverId=e.data.id;const r=await client.from('schemes').update(data).eq('id',x.serverId);if(r.error)throw r.error;return;}const r=await client.from('schemes').insert({...data,created_by:userId()}).select('id').single();if(r.error)throw r.error;x.serverId=r.data.id;}
-  async function syncMark(x){const client=window.LIV_SUPABASE,item=scheme(x.schemeId);if(!client||!item)return;if(!item.serverId)await syncScheme(item);const data={external_id:x.id,scheme_id:item.serverId,page_no:Number(x.pageNo||1),x:clamp(x.x),y:clamp(x.y),width:clamp(x.width),height:clamp(x.height),mark_type:'area',title:x.title||null,status:x.status||'Не начато',progress_percent:Math.round(clamp(x.progressPercent,0,100)),comment:x.comment||null,active:x.active!==false,updated_at:x.updatedAt||now(),custom_data:{workExternalId:x.workId||'',organizationExternalId:x.organizationId||'',frontExternalId:x.frontId||''}};try{if(x.serverId){const r=await client.from('scheme_marks').update(data).eq('id',x.serverId);if(r.error)throw r.error;return;}const e=await client.from('scheme_marks').select('id').eq('external_id',x.id).maybeSingle();if(e.error)throw e.error;if(e.data?.id){x.serverId=e.data.id;const r=await client.from('scheme_marks').update(data).eq('id',x.serverId);if(r.error)throw r.error;return;}const r=await client.from('scheme_marks').insert({...data,created_by:userId()}).select('id').single();if(r.error)throw r.error;x.serverId=r.data.id;}catch(error){console.warn('LIV Schemes: sync mark failed',error);}}
+  async function syncMark(x){const client=window.LIV_SUPABASE,item=scheme(x.schemeId);if(!client||!item)return;if(!item.serverId)await syncScheme(item);const data={external_id:x.id,scheme_id:item.serverId,page_no:Number(x.pageNo||1),x:clamp(x.x),y:clamp(x.y),width:clamp(x.width),height:clamp(x.height),mark_type:'area',title:x.title||null,status:x.status||'Не начато',progress_percent:x.progressPercent===null||x.progressPercent===undefined||x.progressPercent===''?null:Math.round(clamp(x.progressPercent,0,100)),comment:x.comment||null,active:x.active!==false,updated_at:x.updatedAt||now(),custom_data:{workExternalId:x.workId||'',organizationExternalId:x.organizationId||'',frontExternalId:x.frontId||''}};try{if(x.serverId){const r=await client.from('scheme_marks').update(data).eq('id',x.serverId);if(r.error)throw r.error;return;}const e=await client.from('scheme_marks').select('id').eq('external_id',x.id).maybeSingle();if(e.error)throw e.error;if(e.data?.id){x.serverId=e.data.id;const r=await client.from('scheme_marks').update(data).eq('id',x.serverId);if(r.error)throw r.error;return;}const r=await client.from('scheme_marks').insert({...data,created_by:userId()}).select('id').single();if(r.error)throw r.error;x.serverId=r.data.id;}catch(error){console.warn('LIV Schemes: sync mark failed',error);}}
 
   async function download(){const x=scheme(state.schemeId),client=window.LIV_SUPABASE;if(!x||!client)return;loading(true,'Подготовка файла...');try{const r=await client.storage.from(BUCKET).download(x.storagePath);if(r.error)throw r.error;const url=URL.createObjectURL(r.data),a=document.createElement('a');a.href=url;a.download=x.fileName||`${x.name}.pdf`;a.click();URL.revokeObjectURL(url);}catch(error){alert('Не удалось скачать PDF: '+(error.message||error));}finally{loading(false);}}
   function openDelete(){const x=scheme(state.schemeId);if(!x||!canWrite())return;openModal('Удаление PDF-схемы',`<div class="notice bad">Будет удалена схема <b>${html(x.name)}</b>, исходный PDF и ${marks(x.id).length} отметок. Фронты и шахматки не удаляются.</div><div class="liv-editor-footer"><button id="sdCancel" class="btn">Отмена</button><button id="sdConfirm" class="btn danger">Удалить</button></div>`);$s('sdCancel').onclick=closeModal;$s('sdConfirm').onclick=removeScheme;}
