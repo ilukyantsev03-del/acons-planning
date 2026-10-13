@@ -4428,36 +4428,51 @@ function settingsListHtml(
   )
     .map(
       item => `
-        <div class="item">
+        <div
+          class="settings-row"
+          data-settings-name="${esc(
+            item.name ||
+            ''
+          )}">
 
-          <span>
+          <div class="settings-row-main">
 
-            ${esc(
-              item.name ||
-              ''
-            )}
+            <strong class="settings-row-title">
 
-            ${
-              item.unit
-                ? ` · ${esc(
-                    item.unit
-                  )}`
-                : ''
-            }
+              ${esc(
+                item.name ||
+                ''
+              )}
 
-          </span>
+              ${
+                item.unit
+                  ? ` · ${esc(
+                      item.unit
+                    )}`
+                  : ''
+              }
+
+            </strong>
 
 
-          <small>
+            <span
+              class="settings-status ${
+                item.active ===
+                  false
+                  ? 'is-archive'
+                  : 'is-active'
+              }">
 
-            ${
-              item.active ===
-                false
-                ? 'архив'
-                : 'активно'
-            }
+              ${
+                item.active ===
+                  false
+                  ? 'Архив'
+                  : 'Активно'
+              }
 
-          </small>
+            </span>
+
+          </div>
 
         </div>
       `
@@ -4465,7 +4480,7 @@ function settingsListHtml(
     .join('') ||
 
   `
-    <div class="muted">
+    <div class="settings-empty">
       Список пуст.
     </div>
   `;
@@ -4654,7 +4669,7 @@ function makeSettingsListEditable(
 
   const rows =
     container.querySelectorAll(
-      '.item'
+      '.settings-row'
     );
 
   rows.forEach(
@@ -4686,7 +4701,7 @@ function makeSettingsListEditable(
         'button';
 
       edit.className =
-        'btn';
+        'btn settings-action';
 
       edit.textContent =
         'Изменить';
@@ -4707,7 +4722,7 @@ function makeSettingsListEditable(
         'button';
 
       toggle.className =
-        'btn';
+        'btn settings-action settings-action-secondary';
 
       toggle.textContent =
         item.active === false
@@ -4793,30 +4808,71 @@ function renderSettings() {
 
     $('projectMeta').innerHTML = `
 
-      <div class="item">
+      <div class="settings-metrics">
 
-        <span>
-          Версия структуры
-        </span>
-
-        <strong>
-          ${esc(
+        <div class="settings-metric">
+          <span>Версия</span>
+          <strong>${esc(
             project.schemaVersion ||
-            ''
-          )}
-        </strong>
+            '—'
+          )}</strong>
+        </div>
+
+        <div class="settings-metric">
+          <span>Фронты</span>
+          <strong>${activeFronts().length}</strong>
+        </div>
+
+        <div class="settings-metric">
+          <span>Ресурсы</span>
+          <strong>${
+            (
+              project.resources ||
+              []
+            ).length
+          }</strong>
+        </div>
+
+        <div class="settings-metric">
+          <span>Планы ресурсов</span>
+          <strong>${
+            (
+              project.resourcePlans ||
+              []
+            ).length
+          }</strong>
+        </div>
+
+        <div class="settings-metric">
+          <span>Ключевые даты</span>
+          <strong>${
+            (
+              project.milestones ||
+              []
+            ).length
+          }</strong>
+        </div>
+
+        <div class="settings-metric">
+          <span>Импорты</span>
+          <strong>${
+            (
+              project.importHistory ||
+              []
+            ).length
+          }</strong>
+        </div>
 
       </div>
 
 
-      <div class="item">
+      <div class="settings-meta-line">
 
         <span>
           Последнее изменение
         </span>
 
         <strong>
-
           ${
             project.meta
               ?.updatedAt
@@ -4828,20 +4884,18 @@ function renderSettings() {
                   )
               : '—'
           }
-
         </strong>
 
       </div>
 
 
-      <div class="item">
+      <div class="settings-meta-line">
 
         <span>
           Последняя резервная копия
         </span>
 
         <strong>
-
           ${
             project.meta
               ?.lastBackupAt
@@ -4853,102 +4907,22 @@ function renderSettings() {
                   )
               : 'не создавалась'
           }
-
         </strong>
 
       </div>
 
 
-      <div class="item">
+      <div class="settings-danger-zone no-print">
 
-        <span>
-          Фронтов
-        </span>
+        <div>
+          <strong>
+            Опасная зона
+          </strong>
 
-        <strong>
-          ${activeFronts().length}
-        </strong>
-
-      </div>
-
-
-      <div class="item">
-
-        <span>
-          Записей ресурсов
-        </span>
-
-        <strong>
-          ${
-            (
-              project.resources ||
-              []
-            )
-              .length
-          }
-        </strong>
-
-      </div>
-
-
-      <div class="item">
-
-        <span>
-          Планов ресурсов
-        </span>
-
-        <strong>
-          ${
-            (
-              project.resourcePlans ||
-              []
-            )
-              .length
-          }
-        </strong>
-
-      </div>
-
-
-      <div class="item">
-
-        <span>
-          Ключевых дат
-        </span>
-
-        <strong>
-          ${
-            (
-              project.milestones ||
-              []
-            )
-              .length
-          }
-        </strong>
-
-      </div>
-
-
-      <div class="item">
-
-        <span>
-          Импортов
-        </span>
-
-        <strong>
-          ${
-            (
-              project.importHistory ||
-              []
-            )
-              .length
-          }
-        </strong>
-
-      </div>
-
-
-      <div class="editor-actions left-actions no-print">
+          <p>
+            Эти действия затрагивают рабочие данные проекта.
+          </p>
+        </div>
 
         <button
           id="fullResetProjectBtn"
@@ -4967,6 +4941,62 @@ function renderSettings() {
       fullResetProject
     );
   }
+
+  document
+    .querySelectorAll(
+      '[data-settings-search]'
+    )
+    .forEach(input => {
+
+      input.oninput =
+        () => {
+
+          const list =
+            $(
+              input.dataset
+                .settingsSearch
+            );
+
+          if (!list) return;
+
+          const query =
+            String(
+              input.value ||
+              ''
+            )
+              .trim()
+              .toLocaleLowerCase(
+                'ru-RU'
+              );
+
+          list
+            .querySelectorAll(
+              '.settings-row'
+            )
+            .forEach(row => {
+
+              const name =
+                String(
+                  row.dataset
+                    .settingsName ||
+                  ''
+                )
+                  .toLocaleLowerCase(
+                    'ru-RU'
+                  );
+
+              row.classList.toggle(
+                'hidden',
+                Boolean(
+                  query &&
+                  !name.includes(
+                    query
+                  )
+                )
+              );
+            });
+        };
+    });
 
 
   ensureBuilderSettingsCard();
