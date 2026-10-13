@@ -707,17 +707,26 @@
   async function verifyMigration(current) {
 
     const checks = [
-      ['buildings', current.buildings.filter(item => item.active !== false).length],
-      ['organizations', current.organizations.filter(item => item.active !== false).length],
-      ['works', current.works.filter(item => item.active !== false).length],
-      ['fronts', current.fronts.filter(item => item.active !== false).length],
-      ['milestones', current.milestones.filter(item => item.active !== false).length],
-      ['numbered_elements', current.numberedElements.filter(item => item.active !== false).length]
+      ['buildings', current.buildings.filter(item => item.active !== false).length, true],
+      ['organizations', current.organizations.filter(item => item.active !== false).length, false],
+      ['works', current.works.filter(item => item.active !== false).length, false],
+      ['contracts', current.contracts.filter(item => item.active !== false).length, true],
+      ['structures', current.structures.filter(item => item.active !== false).length, true],
+      ['fronts', current.fronts.filter(item => item.active !== false).length, true],
+      ['matrices', current.matrices.filter(item => item.active !== false).length, true],
+      ['milestones', current.milestones.filter(item => item.active !== false).length, true],
+      ['numbered_element_groups', current.numberedElementGroups.filter(item => item.active !== false).length, true],
+      ['numbered_elements', current.numberedElements.filter(item => item.active !== false).length, true],
+      ['work_metrics', derivedMetrics(current).filter(item => item.active !== false).length, true],
+      ['progress_facts', current.progressFacts.length, true],
+      ['schedule_versions', current.scheduleVersions.length, true],
+      ['schedule_tasks', current.tasks.filter(item => item.active !== false && item.testOnly !== true).length, true],
+      ['resource_log', current.resources.length, true]
     ];
 
     const report = {};
 
-    for (const [table, localCount] of checks) {
+    for (const [table, localCount, projectScoped] of checks) {
       let query = client()
         .from(table)
         .select('id', {
@@ -725,7 +734,7 @@
           head: true
         });
 
-      if (!['organizations', 'works'].includes(table)) {
+      if (projectScoped) {
         query = query.eq('project_id', state.projectId);
       }
 
@@ -737,14 +746,14 @@
       report[table] = {
         local: localCount,
         server: serverCount,
-        ok: serverCount >= localCount
+        ok: serverCount >= localCount,
+        exact: serverCount === localCount
       };
     }
 
     window.LIV_MIGRATION_CHECK = report;
     return report;
   }
-
 
   async function syncContracts(current) {
     const rows = current.contracts
