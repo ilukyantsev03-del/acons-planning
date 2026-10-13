@@ -220,7 +220,6 @@
           source_name: text(item.sourceName) || 'manual',
           source_entity_type: text(item.sourceEntityType),
           source_value: text(item.sourceValue),
-          normalized_source_value: normalized(item.sourceValue),
           target_entity_type: text(item.targetEntityType),
           target_entity_id: targetEntityId,
           confidence: Number(item.confidence || 1),
