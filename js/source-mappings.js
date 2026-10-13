@@ -1,7 +1,7 @@
 'use strict';
 
 (function () {
-  const VERSION = '2026.10.13.4';
+  const VERSION = '2026.10.13.5';
   const state = {
     loaded: false,
     loading: false,
