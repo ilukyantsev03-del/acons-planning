@@ -1,0 +1,44 @@
+name: Validate LIV
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in config.js js/*.js; do
+            echo "Checking $file"
+            node --check "$file"
+          done
+
+      - name: Check HTML script references
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          html = Path('index.html').read_text(encoding='utf-8')
+          missing = []
+          for source in re.findall(r'<script[^>]+src="([^"]+)"', html):
+              if source.startswith(('http://', 'https://')):
+                  continue
+              path = source.split('?', 1)[0]
+              if not Path(path).exists():
+                  missing.append(path)
+          if missing:
+              raise SystemExit('Missing scripts: ' + ', '.join(sorted(set(missing))))
+          print('All local script references exist.')
