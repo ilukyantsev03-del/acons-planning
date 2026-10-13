@@ -2838,3 +2838,28 @@ tbody tr:hover {
     width: 100%;
   }
 }
+
+
+.matrix-context-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 48px;
+  padding: 10px 14px;
+  box-shadow: none;
+}
+
+.matrix-context-info strong {
+  color: #172033;
+  font-size: 13px;
+}
+
+.matrix-context-info span {
+  color: #667085;
+  font-size: 11px;
+}
+
+.matrix-context-info span + span {
+  padding-left: 14px;
+  border-left: 1px solid #e5e9ef;
+}
