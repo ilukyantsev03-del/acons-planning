@@ -147,6 +147,8 @@
     const map = {
       admin: 'Администратор',
       planner: 'Планер',
+      director: 'Директор',
+      project_manager: 'Руководитель проекта',
       responsible: 'Ответственный',
       contractor: 'Подрядчик',
       customer: 'Заказчик'
