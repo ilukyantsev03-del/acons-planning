@@ -1501,6 +1501,18 @@ async function saveProject() {
 
 
   if (
+    window.LIV_REMOTE_SYNC &&
+    typeof window.LIV_REMOTE_SYNC.queueSave ===
+      'function'
+  ) {
+
+    window.LIV_REMOTE_SYNC.queueSave(
+      project
+    );
+  }
+
+
+  if (
     typeof renderBackupNotice ===
     'function'
   ) {
