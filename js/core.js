@@ -24,7 +24,7 @@ const PROJECT_KEY =
   'main';
 
 const SCHEMA_VERSION =
-  '2.3.0';
+  '2.4.0';
 
 
 /* =========================================================
@@ -177,6 +177,12 @@ let importMatrixLayoutDetected =
 
 let importMatrixLayoutInfo =
   '';
+
+let importMatrixTargetId =
+  '';
+
+let importMatrixTargetMode =
+  'new';
 
 
 
@@ -959,6 +965,12 @@ function emptyProject() {
     fronts:
       [],
 
+    matrices:
+      [],
+
+    matrixFronts:
+      [],
+
     /* Новое ядро графика. Старые fronts сохраняются для совместимости. */
     tasks:
       [],
@@ -1272,6 +1284,8 @@ function normalizeProject(
     'works',
     'structures',
     'fronts',
+    'matrices',
+    'matrixFronts',
     'tasks',
     'taskDates',
     'taskQuantities',
@@ -2405,7 +2419,316 @@ function renderDashboard() {
    ========================================================= */
 
 
+function activeMatrices() {
+
+  return (
+    project.matrices ||
+    []
+  )
+    .filter(
+      matrix =>
+        matrix.active !==
+        false
+    );
+}
+
+
+function matrixById(
+  id
+) {
+
+  return byId(
+    project.matrices,
+    id
+  );
+}
+
+
+function activeMatrixLinks(
+  matrixId
+) {
+
+  return (
+    project.matrixFronts ||
+    []
+  )
+    .filter(
+      link =>
+        link.active !==
+          false &&
+        (
+          !matrixId ||
+          String(
+            link.matrixId
+          ) ===
+          String(
+            matrixId
+          )
+        )
+    );
+}
+
+
+function matrixFrontIds(
+  matrixId
+) {
+
+  return new Set(
+    activeMatrixLinks(
+      matrixId
+    )
+      .map(
+        link =>
+          String(
+            link.frontId
+          )
+      )
+  );
+}
+
+
+function ensureMatrixFrontLink(
+  matrixId,
+  frontId,
+  batchId =
+    ''
+) {
+
+  if (
+    !matrixId ||
+    !frontId
+  ) {
+    return null;
+  }
+
+
+  project.matrixFronts =
+    project.matrixFronts ||
+    [];
+
+
+  let link =
+    project.matrixFronts
+      .find(
+        item =>
+          String(
+            item.matrixId
+          ) ===
+            String(
+              matrixId
+            ) &&
+          String(
+            item.frontId
+          ) ===
+            String(
+              frontId
+            )
+      );
+
+
+  if (!link) {
+
+    link = {
+      id:
+        uid(
+          'MXL'
+        ),
+      matrixId,
+      frontId,
+      active:
+        true,
+      createdAt:
+        nowIso(),
+      updatedAt:
+        nowIso(),
+      sourceBatchId:
+        batchId ||
+        ''
+    };
+
+
+    project.matrixFronts.push(
+      link
+    );
+
+  } else {
+
+    link.active =
+      true;
+
+    link.updatedAt =
+      nowIso();
+
+    if (
+      batchId
+    ) {
+      link.sourceBatchId =
+        batchId;
+    }
+  }
+
+
+  return link;
+}
+
+
+function matrixFrontUsageCount(
+  frontId,
+  excludeMatrixId =
+    ''
+) {
+
+  return (
+    project.matrixFronts ||
+    []
+  )
+    .filter(
+      link =>
+        link.active !==
+          false &&
+        String(
+          link.frontId
+        ) ===
+          String(
+            frontId
+          ) &&
+        (
+          !excludeMatrixId ||
+          String(
+            link.matrixId
+          ) !==
+            String(
+              excludeMatrixId
+            )
+        )
+    )
+    .length;
+}
+
+
+function fillMatrixSelects() {
+
+  const list =
+    activeMatrices();
+
+
+  if (
+    $('mfMatrix')
+  ) {
+
+    const current =
+      $('mfMatrix').value;
+
+
+    $('mfMatrix').innerHTML =
+      `
+        <option value="all">
+          Все шахматки
+        </option>
+      ` +
+      list
+        .map(
+          item => `
+            <option value="${esc(item.id)}">
+              ${esc(item.name)}
+            </option>
+          `
+        )
+        .join('');
+
+
+    if (
+      current &&
+      [
+        'all',
+        ...list.map(
+          item =>
+            String(
+              item.id
+            )
+        )
+      ]
+        .includes(
+          String(
+            current
+          )
+        )
+    ) {
+      $('mfMatrix').value =
+        current;
+    }
+  }
+
+
+  if (
+    $('importMatrixTarget')
+  ) {
+
+    const current =
+      importMatrixTargetId ||
+      $('importMatrixTarget').value;
+
+
+    $('importMatrixTarget').innerHTML =
+      `
+        <option value="new">
+          Создать новую шахматку
+        </option>
+      ` +
+      list
+        .map(
+          item => `
+            <option value="${esc(item.id)}">
+              Обновить: ${esc(item.name)}
+            </option>
+          `
+        )
+        .join('');
+
+
+    if (
+      current &&
+      (
+        current ===
+          'new' ||
+        list.some(
+          item =>
+            String(
+              item.id
+            ) ===
+            String(
+              current
+            )
+        )
+      )
+    ) {
+      $('importMatrixTarget').value =
+        current;
+    }
+  }
+}
+
+
+function currentMatrixId() {
+
+  const value =
+    $('mfMatrix')?.value ||
+    'all';
+
+
+  return (
+    value ===
+      'all'
+      ? ''
+      : value
+  );
+}
+
+
 function updateMatrixDependent() {
+
+  fillMatrixSelects();
+
 
   const buildingId =
     $('mfBuilding')?.value ||
@@ -2483,12 +2806,33 @@ function updateMatrixDependent() {
 
 function matrixFiltered() {
 
+  const matrixId =
+    currentMatrixId();
+
+
+  const linked =
+    matrixId
+      ? matrixFrontIds(
+          matrixId
+        )
+      : null;
+
+
   return activeFronts()
     .map(
       hydrateFront
     )
     .filter(
       front =>
+
+        (
+          !linked ||
+          linked.has(
+            String(
+              front.id
+            )
+          )
+        ) &&
 
         (
           $('mfBuilding').value ===
@@ -2537,7 +2881,6 @@ function matrixFiltered() {
     );
 }
 
-
 function statusRowClass(
   status
 ) {
@@ -2584,6 +2927,39 @@ function statusRowClass(
 function renderMatrix() {
 
   updateMatrixDependent();
+
+
+  const selectedMatrix =
+    matrixById(
+      currentMatrixId()
+    );
+
+
+  if (
+    $('matrixContextInfo')
+  ) {
+
+    const count =
+      matrixFiltered()
+        .length;
+
+
+    $('matrixContextInfo').innerHTML =
+      selectedMatrix
+        ? `
+            <strong>${esc(selectedMatrix.name)}</strong>
+            <span>${count} фронтов</span>
+            <span>
+              ${selectedMatrix.sourceFile
+                ? 'Источник: ' + esc(selectedMatrix.sourceFile)
+                : 'Локальная шахматка'}
+            </span>
+          `
+        : `
+            <strong>Все шахматки</strong>
+            <span>${count} фронтов</span>
+          `;
+  }
 
 
   $('matrixHead').innerHTML = `
