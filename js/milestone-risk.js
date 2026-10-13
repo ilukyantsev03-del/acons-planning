@@ -1,7 +1,7 @@
 'use strict';
 
 (function () {
-  const VERSION = '2026.10.13.2';
+  const VERSION = '2026.10.13.4';
   const COMPLETE = new Set(['выполнено','выполнен','сделано','завершено','освидетельствовано','принято','выполнена','выполнена с просрочкой']);
   const LABELS = {
     green: 'Норма',
@@ -589,7 +589,7 @@
         projected_qty:risk.projectedQty,
         projected_finish_date:risk.projectedFinishDate || null,
         gap_qty:risk.gapQty,
-        risk_level:risk.riskLevel,
+        risk_level:({green:'normal',yellow:'attention',orange:'risk',red:'failure',gray:'unknown'}[risk.riskLevel]||'unknown'),
         reason:risk.reason,
         details:risk
       };
