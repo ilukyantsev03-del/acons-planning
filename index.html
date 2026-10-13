@@ -6,7 +6,7 @@
 
   <title>LIV Planning</title>
 
-  <link rel="stylesheet" href="style.css?v=20261013-1">
+  <link rel="stylesheet" href="style.css?v=20261013-2">
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
@@ -1234,6 +1234,52 @@
         <div class="field">
 
           <label>
+            Расчет показателя
+          </label>
+
+          <select id="rCalcMethod">
+
+            <option value="average">
+              Среднее
+            </option>
+
+            <option value="maximum">
+              Максимум
+            </option>
+
+            <option value="last">
+              Последнее значение
+            </option>
+
+            <option value="rolling">
+              Скользящее среднее
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Окно скользящего, дней
+          </label>
+
+          <input
+            id="rRollingDays"
+            type="number"
+            min="1"
+            step="1"
+            value="7"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
             Если записи нет
           </label>
 
@@ -2303,10 +2349,10 @@
 <script src="config.js?v=20261013-1"></script>
 <script src="js/auth.js?v=20261013-1"></script>
 
-<script src="js/core.js?v=20261013-1"></script>
+<script src="js/core.js?v=20261013-2"></script>
 <script src="js/storage.js?v=20261008-8"></script>
 <script src="js/filters.js?v=20261008-8"></script>
-<script src="js/resources.js?v=20261008-8"></script>
+<script src="js/resources.js?v=20261013-1"></script>
 <script src="js/organizations.js?v=20261013-1"></script>
 <script src="js/import.js?v=20261008-8"></script>
 
