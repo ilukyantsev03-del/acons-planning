@@ -260,6 +260,13 @@
       else nav.appendChild(tab);
     }
 
+    if (!tab.dataset.scheduleBound) {
+      tab.dataset.scheduleBound = '1';
+      tab.addEventListener('click', () => {
+        setTimeout(renderSchedule, 0);
+      });
+    }
+
     if (!document.getElementById('tab-schedule')) {
       const panel = document.createElement('section');
       panel.id = 'tab-schedule';
