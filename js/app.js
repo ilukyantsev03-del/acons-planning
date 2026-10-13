@@ -716,6 +716,19 @@ function milestoneDeviation(
   item
 ) {
 
+  if (
+    item.importedDeviation !==
+      null &&
+    item.importedDeviation !==
+      undefined &&
+    item.importedDeviation !==
+      ''
+  ) {
+    return num(
+      item.importedDeviation
+    );
+  }
+
   return dateDeviationDays(
     milestoneTargetDate(
       item
@@ -907,6 +920,37 @@ function renderMilestones() {
 
 
                 ${
+                  item.blockCapture ||
+                  item.floorCapture ||
+                  item.startDate ||
+                  item.durationDays
+                    ? `
+                        <div class="tiny">
+                          ${esc(
+                            [
+                              item.blockCapture
+                                ? `Блок/захватка: ${item.blockCapture}`
+                                : '',
+                              item.floorCapture
+                                ? `Этаж/№: ${item.floorCapture}`
+                                : '',
+                              item.startDate
+                                ? `Начало: ${ruDate(item.startDate)}`
+                                : '',
+                              item.durationDays
+                                ? `Длит.: ${item.durationDays} дн.`
+                                : ''
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')
+                          )}
+                        </div>
+                      `
+                    : ''
+                }
+
+
+                ${
                   org
                     ? `
                         <div class="tiny">
@@ -1008,7 +1052,7 @@ function renderMilestones() {
                   class="badge ${
                     deviation !==
                       null &&
-                    deviation >
+                    deviation <
                       0
                       ? 's-risk'
                       : ''
