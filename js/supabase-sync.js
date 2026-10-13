@@ -264,3 +264,34 @@
   };
   document.head.appendChild(script);
 })();
+
+(function loadLivDataModules() {
+  const modules = [
+    ['liv-normalized-sync', 'js/normalized-sync.js?v=20261013-1'],
+    ['liv-milestone-risk', 'js/milestone-risk.js?v=20261013-1'],
+    ['liv-key-date-import', 'js/key-date-import.js?v=20261013-1'],
+    ['liv-numbered-elements-v2', 'js/numbered-elements-v2.js?v=20261013-1']
+  ];
+
+  function loadModule(index) {
+    if (index >= modules.length) return;
+    const [marker, source] = modules[index];
+    if (document.querySelector('script[data-' + marker + ']')) {
+      loadModule(index + 1);
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = source;
+    script.async = false;
+    script.setAttribute('data-' + marker, '1');
+    script.onload = () => loadModule(index + 1);
+    script.onerror = () => {
+      console.error('LIV: не удалось загрузить модуль ' + source);
+      loadModule(index + 1);
+    };
+    document.head.appendChild(script);
+  }
+
+  loadModule(0);
+})();
