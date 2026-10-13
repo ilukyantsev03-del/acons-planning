@@ -2863,3 +2863,12 @@ tbody tr:hover {
   padding-left: 14px;
   border-left: 1px solid #e5e9ef;
 }
+
+
+/* Итоговые строки во всех таблицах */
+table tr.liv-total-row > th,
+table tr.liv-total-row > td,
+table tfoot > tr > th,
+table tfoot > tr > td {
+  font-weight: 700 !important;
+}
