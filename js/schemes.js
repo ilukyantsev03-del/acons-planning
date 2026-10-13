@@ -140,8 +140,50 @@
   function loading(on,text='Загрузка схемы...'){const x=$s('schLoading');x.textContent=text;x.classList.toggle('hidden',!on);}
 
   async function pdfjs() {
-    if(window.pdfjsLib){window.pdfjsLib.GlobalWorkerOptions.workerSrc=WORKER;return window.pdfjsLib;} if(window.LIV_PDFJS_PROMISE)return window.LIV_PDFJS_PROMISE;
-    window.LIV_PDFJS_PROMISE=new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=PDFJS;s.onload=()=>{if(!window.pdfjsLib)return reject(new Error('PDF.js не инициализирован'));window.pdfjsLib.GlobalWorkerOptions.workerSrc=WORKER;resolve(window.pdfjsLib);};s.onerror=()=>reject(new Error('Не удалось загрузить PDF.js'));document.head.appendChild(s);});return window.LIV_PDFJS_PROMISE;
+    if(window.pdfjsLib){window.pdfjsLib.GlobalWorkerOptions.workerSrc=WORKER;return window.pdfjsLib;}
+    if(window.LIV_PDFJS_PROMISE)return window.LIV_PDFJS_PROMISE;
+
+    const sources=[
+      {script:PDFJS,worker:WORKER},
+      {
+        script:'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js',
+        worker:'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js'
+      }
+    ];
+
+    window.LIV_PDFJS_PROMISE=new Promise((resolve,reject)=>{
+      let index=0;
+      const attempt=()=>{
+        if(index>=sources.length){
+          reject(new Error('Не удалось загрузить PDF.js. Проверь доступ браузера к cdnjs/jsDelivr.'));
+          return;
+        }
+
+        const source=sources[index++];
+        const script=document.createElement('script');
+        script.src=source.script;
+        script.onload=()=>{
+          if(!window.pdfjsLib){
+            script.remove();
+            attempt();
+            return;
+          }
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc=source.worker;
+          resolve(window.pdfjsLib);
+        };
+        script.onerror=()=>{
+          script.remove();
+          attempt();
+        };
+        document.head.appendChild(script);
+      };
+      attempt();
+    }).catch(error=>{
+      window.LIV_PDFJS_PROMISE=null;
+      throw error;
+    });
+
+    return window.LIV_PDFJS_PROMISE;
   }
 
   async function loadPdf() {
