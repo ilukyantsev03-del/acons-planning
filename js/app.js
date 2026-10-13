@@ -6970,6 +6970,352 @@ function printCurrent() {
 
 
 /* =========================================================
+   УПРАВЛЕНИЕ ШАХМАТКАМИ
+   ========================================================= */
+
+
+async function renameCurrentMatrix() {
+
+  const id =
+    currentMatrixId();
+
+
+  const matrix =
+    matrixById(
+      id
+    );
+
+
+  if (!matrix) {
+
+    alert(
+      'Сначала выбери конкретную шахматку.'
+    );
+
+    return;
+  }
+
+
+  const value =
+    prompt(
+      'Новое название шахматки:',
+      matrix.name ||
+      ''
+    );
+
+
+  if (
+    value ===
+    null
+  ) {
+    return;
+  }
+
+
+  const name =
+    value.trim();
+
+
+  if (!name) {
+
+    alert(
+      'Название не может быть пустым.'
+    );
+
+    return;
+  }
+
+
+  matrix.name =
+    name;
+
+  matrix.updatedAt =
+    nowIso();
+
+
+  log(
+    'Переименовано',
+    'Шахматка',
+    name,
+    {
+      matrixId:
+        matrix.id
+    }
+  );
+
+
+  await saveProject();
+
+
+  fillMatrixSelects();
+
+
+  $('mfMatrix').value =
+    matrix.id;
+
+
+  renderMatrix();
+}
+
+
+function openDeleteMatrixDialog() {
+
+  const id =
+    currentMatrixId();
+
+
+  const matrix =
+    matrixById(
+      id
+    );
+
+
+  if (!matrix) {
+
+    alert(
+      'Сначала выбери конкретную шахматку.'
+    );
+
+    return;
+  }
+
+
+  const links =
+    activeMatrixLinks(
+      id
+    );
+
+
+  const exclusive =
+    links.filter(
+      link =>
+        matrixFrontUsageCount(
+          link.frontId,
+          id
+        ) ===
+          0
+    );
+
+
+  const shared =
+    links.length -
+    exclusive.length;
+
+
+  openModal(
+    'Удаление шахматки',
+
+    `
+      <div class="notice warn">
+        <b>${esc(matrix.name)}</b><br>
+        Связано фронтов: ${links.length}.<br>
+        Только в этой шахматке: ${exclusive.length}.<br>
+        Используются также в других шахматках: ${shared}.
+      </div>
+
+      <p>
+        Что удалить?
+      </p>
+
+      <div class="editor-actions">
+
+        <button
+          id="matrixDeleteCancel"
+          class="btn">
+          Отмена
+        </button>
+
+        <button
+          id="matrixDeleteViewOnly"
+          class="btn">
+          Только шахматку
+        </button>
+
+        <button
+          id="matrixDeleteWithData"
+          class="btn danger">
+          Шахматку и её данные
+        </button>
+
+      </div>
+    `
+  );
+
+
+  bindClick(
+    'matrixDeleteCancel',
+    closeModal
+  );
+
+
+  bindClick(
+    'matrixDeleteViewOnly',
+    () =>
+      deleteMatrix(
+        id,
+        false
+      )
+  );
+
+
+  bindClick(
+    'matrixDeleteWithData',
+    () =>
+      deleteMatrix(
+        id,
+        true
+      )
+  );
+}
+
+
+async function deleteMatrix(
+  matrixId,
+  withData
+) {
+
+  const matrix =
+    matrixById(
+      matrixId
+    );
+
+
+  if (!matrix) {
+    return;
+  }
+
+
+  const links =
+    activeMatrixLinks(
+      matrixId
+    );
+
+
+  const linkedFrontIds =
+    links.map(
+      link =>
+        link.frontId
+    );
+
+
+  project.matrixFronts =
+    (
+      project.matrixFronts ||
+      []
+    )
+      .filter(
+        link =>
+          String(
+            link.matrixId
+          ) !==
+          String(
+            matrixId
+          )
+      );
+
+
+  if (
+    withData
+  ) {
+
+    linkedFrontIds
+      .forEach(
+        frontId => {
+
+          if (
+            matrixFrontUsageCount(
+              frontId
+            ) >
+              0
+          ) {
+            return;
+          }
+
+
+          const front =
+            byId(
+              project.fronts,
+              frontId
+            );
+
+
+          if (
+            front &&
+            (
+              String(
+                front.originMatrixId ||
+                ''
+              ) ===
+                String(
+                  matrixId
+                ) ||
+              String(
+                front.source
+                  ?.matrixId ||
+                ''
+              ) ===
+                String(
+                  matrixId
+                )
+            )
+          ) {
+
+            front.active =
+              false;
+
+            front.deletedAt =
+              nowIso();
+
+            front.deletedReason =
+              'Удалена шахматка';
+          }
+        }
+      );
+  }
+
+
+  matrix.active =
+    false;
+
+  matrix.deletedAt =
+    nowIso();
+
+
+  log(
+    'Удалено',
+    'Шахматка',
+    matrix.name,
+    {
+      matrixId,
+      withData,
+      linkedFronts:
+        linkedFrontIds.length
+    }
+  );
+
+
+  await saveProject();
+
+
+  closeModal();
+
+
+  fillMatrixSelects();
+
+
+  if (
+    $('mfMatrix')
+  ) {
+    $('mfMatrix').value =
+      'all';
+  }
+
+
+  renderAll();
+}
+
+
+/* =========================================================
    ЕДИНЫЙ ИНТЕРФЕЙС РАЗДЕЛОВ
    ========================================================= */
 
@@ -7739,6 +8085,7 @@ function bindUi() {
 
 
   [
+    'mfMatrix',
     'mfBuilding',
     'mfBlock',
     'mfFloor',
@@ -7753,6 +8100,18 @@ function bindUi() {
           renderMatrix
         )
     );
+
+
+  bindClick(
+    'matrixRenameBtn',
+    renameCurrentMatrix
+  );
+
+
+  bindClick(
+    'matrixDeleteBtn',
+    openDeleteMatrixDialog
+  );
 
 
   bindClick(
@@ -8032,6 +8391,29 @@ function bindUi() {
         .add(
           'hidden'
         );
+    }
+  );
+
+
+  bindChange(
+    'importMatrixTarget',
+    () => {
+
+      importMatrixTargetId =
+        $('importMatrixTarget')
+          ?.value ||
+        'new';
+
+
+      if (
+        $('importMatrixName')
+      ) {
+
+        $('importMatrixName')
+          .disabled =
+            importMatrixTargetId !==
+            'new';
+      }
     }
   );
 
