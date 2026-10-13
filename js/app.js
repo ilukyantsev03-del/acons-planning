@@ -6970,6 +6970,194 @@ function printCurrent() {
 
 
 /* =========================================================
+   ЕДИНЫЙ ИНТЕРФЕЙС РАЗДЕЛОВ
+   ========================================================= */
+
+
+function livPanelMeta(
+  name
+) {
+
+  return {
+    dashboard: [
+      'Сводка',
+      'Ключевые показатели проекта и текущее состояние'
+    ],
+    matrix: [
+      'Шахматка',
+      'Рабочее представление по объектам, этажам и видам работ'
+    ],
+    gantt: [
+      'Гант',
+      'Сроки, последовательность и текущее состояние работ'
+    ],
+    planfact: [
+      'План / факт',
+      'Сравнение плановых и фактических объёмов'
+    ],
+    resources: [
+      'Ресурсы',
+      'Люди, техника, динамика и план / факт ресурсов'
+    ],
+    organizations: [
+      'Организации',
+      'Карточки подрядчиков и участников проекта'
+    ],
+    milestones: [
+      'Ключевые даты',
+      'Договорные и контрольные сроки по подрядчикам'
+    ],
+    elements: [
+      'Номерные элементы',
+      'Сваи, анкеры и другие элементы с уникальными номерами'
+    ],
+    demolition: [
+      'Демонтаж',
+      'Статус, сроки и зависимости демонтажных работ'
+    ],
+    import: [
+      'Импорт',
+      'Загрузка, сопоставление и проверка внешних данных'
+    ],
+    history: [
+      'История',
+      'Журнал изменений и действий пользователей'
+    ]
+  }[
+    name
+  ] || null;
+}
+
+
+function ensureUnifiedPanelPresentation() {
+
+  document
+    .querySelectorAll(
+      'main > .panel[id^="tab-"]'
+    )
+    .forEach(
+      panel => {
+
+        const name =
+          String(
+            panel.id ||
+            ''
+          )
+            .replace(
+              'tab-',
+              ''
+            );
+
+
+        if (
+          name ===
+          'settings'
+        ) {
+          return;
+        }
+
+
+        const meta =
+          livPanelMeta(
+            name
+          );
+
+
+        if (
+          meta &&
+          !panel.querySelector(
+            ':scope > .liv-page-head'
+          )
+        ) {
+
+          const head =
+            document.createElement(
+              'section'
+            );
+
+
+          head.className =
+            'liv-page-head';
+
+
+          head.innerHTML = `
+            <div>
+              <h1>${esc(meta[0])}</h1>
+              <p>${esc(meta[1])}</p>
+            </div>
+          `;
+
+
+          panel.prepend(
+            head
+          );
+        }
+
+
+        panel
+          .querySelectorAll(
+            ':scope > .toolbar, :scope > .resource-toolbar'
+          )
+          .forEach(
+            node =>
+              node.classList.add(
+                'liv-filter-bar'
+              )
+          );
+
+
+        panel
+          .querySelectorAll(
+            '.section-toolbar'
+          )
+          .forEach(
+            node =>
+              node.classList.add(
+                'liv-section-toolbar'
+              )
+          );
+
+
+        panel
+          .querySelectorAll(
+            '.table-wrap'
+          )
+          .forEach(
+            node =>
+              node.classList.add(
+                'liv-table-surface'
+              )
+          );
+
+
+        panel
+          .querySelectorAll(
+            '.stats'
+          )
+          .forEach(
+            node =>
+              node.classList.add(
+                'liv-metrics'
+              )
+          );
+      }
+    );
+
+
+  document
+    .querySelectorAll(
+      '.resource-nav'
+    )
+    .forEach(
+      node =>
+        node.classList.add(
+          'liv-subnav'
+        )
+    );
+}
+
+
+/* =========================================================
    ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК
    ========================================================= */
 
@@ -6977,6 +7165,9 @@ function printCurrent() {
 function switchTab(
   name
 ) {
+
+  ensureUnifiedPanelPresentation();
+
 
   document
     .querySelectorAll(
@@ -7149,6 +7340,9 @@ function switchTab(
 
 
 function renderAll() {
+
+  ensureUnifiedPanelPresentation();
+
 
   initSelects();
 
@@ -8162,6 +8356,9 @@ async function init() {
 
 
   rebuildCustomSections();
+
+
+  ensureUnifiedPanelPresentation();
 
 
   if (
