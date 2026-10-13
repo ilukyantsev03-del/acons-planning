@@ -697,7 +697,7 @@
           source_value: text(item.sourceValue),
           target_entity_type: item.targetEntityType,
           target_entity_id: targetEntityId,
-          confidence: Number(item.confidence ?? 1),
+          confidence: Math.max(0, Math.min(1, Number(item.confidence ?? 1))),
           decision: text(item.decision) || 'confirmed'
         };
       })
@@ -1111,7 +1111,7 @@
         unit: text(item.unit) || 'ед.',
         target_qty: numberOrNull(item.targetQty),
         weight: numberOrNull(item.weight) ?? 1,
-        calculation_method: text(item.calculationMethod) || 'quantity',
+        calculation_method: new Set(['quantity','elements','status','length','area','manual']).has(text(item.calculationMethod)) ? text(item.calculationMethod) : 'quantity',
         is_primary: item.isPrimary === true,
         active: item.active !== false
       }));
@@ -1128,7 +1128,7 @@
         front_id: mapValue('front', item.frontId),
         numbered_element_id: mapValue('numberedElement', item.numberedElementId),
         fact_date: dateValue(item.factDate ?? item.date),
-        fact_type: text(item.factType) || 'quantity',
+        fact_type: new Set(['quantity','cumulative_snapshot','status','event']).has(text(item.factType)) ? text(item.factType) : 'quantity',
         quantity: numberOrNull(item.quantity ?? item.qty),
         cumulative_qty: numberOrNull(item.cumulativeQty ?? item.cumulative),
         status: text(item.status) || null,
@@ -1309,7 +1309,7 @@
         version_id: mapValue('scheduleVersion', item.versionId || fallbackVersion?.id),
         predecessor_task_id: mapValue('scheduleTask', item.predecessorTaskId ?? item.predecessorId),
         successor_task_id: mapValue('scheduleTask', item.successorTaskId ?? item.successorId),
-        link_type: text(item.linkType) || 'FS',
+        link_type: new Set(['FS','SS','FF','SF']).has(text(item.linkType).toUpperCase()) ? text(item.linkType).toUpperCase() : 'FS',
         lag_days: numberOrNull(item.lagDays) || 0,
         source_expression: text(item.sourceExpression) || null
       }))
