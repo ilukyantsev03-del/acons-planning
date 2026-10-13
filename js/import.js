@@ -215,7 +215,15 @@ function findNamedMatch(list, name) {
   const exact = (list || []).find(
     row =>
       strictNameKey(row.name) ===
-      strictNameKey(clean)
+        strictNameKey(clean) ||
+      (
+        Array.isArray(row.aliases) &&
+        row.aliases.some(
+          alias =>
+            strictNameKey(alias) ===
+            strictNameKey(clean)
+        )
+      )
   );
 
   if (exact) {
@@ -229,7 +237,15 @@ function findNamedMatch(list, name) {
   const canonical = (list || []).find(
     row =>
       smartNameKey(row.name) ===
-      smartNameKey(clean)
+        smartNameKey(clean) ||
+      (
+        Array.isArray(row.aliases) &&
+        row.aliases.some(
+          alias =>
+            smartNameKey(alias) ===
+            smartNameKey(clean)
+        )
+      )
   );
 
   if (canonical) {
@@ -887,6 +903,20 @@ const FIELD_DEFS = {
     ]
   },
 
+  groupCode: {
+    label:
+      'Группа / ярус / марка',
+    aliases: [
+      'группа',
+      'группа элементов',
+      'ярус',
+      'марка',
+      'типоразмер',
+      'серия',
+      'контур'
+    ]
+  },
+
   title: {
     label:
       'Наименование КД',
@@ -1009,6 +1039,7 @@ const MODE_FIELDS = {
   elements: [
     'elementType',
     'elementNo',
+    'groupCode',
     'building',
     'capture',
     'zone',
@@ -4693,14 +4724,27 @@ async function commitImport(){
 
       if (
         (
-          project.factLog ||
-          []
-        )
-          .some(
-            existing =>
-              existing.importFingerprint ===
-              fingerprint
+          (
+            project.progressFacts ||
+            []
           )
+            .some(
+              existing =>
+                existing.sourceFingerprint ===
+                fingerprint
+            )
+        ) ||
+        (
+          (
+            project.factLog ||
+            []
+          )
+            .some(
+              existing =>
+                existing.importFingerprint ===
+                fingerprint
+            )
+        )
       ) {
 
         skipped++;
@@ -4749,11 +4793,61 @@ async function commitImport(){
             quantity;
 
 
+      const factId =
+        uid(
+          'FCT'
+        );
+
+
+      const factComment =
+        normText(
+          mappedValue(
+            row,
+            'comment'
+          )
+        );
+
+
+      project.progressFacts =
+        project.progressFacts ||
+        [];
+
+
+      project.progressFacts.push({
+        id:
+          factId,
+        frontId:
+          front.id,
+        factDate:
+          date,
+        factType:
+          normText(
+            cumulativeRaw
+          ) !== ''
+            ? 'cumulative_snapshot'
+            : 'quantity',
+        quantity,
+        cumulativeQty:
+          cumulative,
+        people,
+        comment:
+          factComment,
+        sourceFingerprint:
+          fingerprint,
+        createdAt:
+          nowIso(),
+        source: {
+          batchId,
+          ...importSource(
+            item
+          )
+        }
+      });
+
+
       project.factLog.push({
         id:
-          uid(
-            'FCT'
-          ),
+          factId,
         frontId:
           front.id,
         date,
@@ -4762,12 +4856,7 @@ async function commitImport(){
         cumulative,
         people,
         comment:
-          normText(
-            mappedValue(
-              row,
-              'comment'
-            )
-          ),
+          factComment,
         createdAt:
           nowIso(),
         importFingerprint:
@@ -4881,6 +4970,14 @@ async function commitImport(){
           building?.id ||
           '',
 
+        groupCode:
+          normText(
+            mappedValue(
+              row,
+              'groupCode'
+            )
+          ),
+
         capture:
           normText(
             mappedValue(
@@ -4943,6 +5040,9 @@ async function commitImport(){
           ),
           candidate.buildingId,
           normKey(
+            candidate.groupCode
+          ),
+          normKey(
             candidate.capture
           ),
           normKey(
@@ -4972,6 +5072,9 @@ async function commitImport(){
                 ),
                 existing.buildingId ||
                   '',
+                normKey(
+                  existing.groupCode
+                ),
                 normKey(
                   existing.capture
                 ),
