@@ -4312,6 +4312,19 @@ async function saveLog(
     return;
   }
 
+  if (
+    mode === 'fact' &&
+    date < today() &&
+    window.LIV_ACCESS &&
+    window.LIV_ACCESS.canBackdateFact === false
+  ) {
+    alert(
+      'Корректировка факта задним числом доступна только планеру или администратору.'
+    );
+
+    return;
+  }
+
 
   if (
     mode ===
@@ -4337,7 +4350,14 @@ async function saveLog(
       comment,
 
       createdAt:
-        nowIso()
+        nowIso(),
+
+      createdByRole:
+        window.LIV_ACCESS?.role ||
+        '',
+
+      backdated:
+        date < today()
     });
 
 
