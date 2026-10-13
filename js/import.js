@@ -201,6 +201,243 @@ function nameSimilarity(a, b) {
 }
 
 
+function namedEntityType(list) {
+
+  if (
+    typeof project ===
+      'undefined' ||
+    !project
+  ) {
+    return '';
+  }
+
+
+  if (
+    list ===
+    project.buildings
+  ) {
+    return 'building';
+  }
+
+
+  if (
+    list ===
+    project.works
+  ) {
+    return 'work';
+  }
+
+
+  if (
+    list ===
+    project.organizations
+  ) {
+    return 'organization';
+  }
+
+
+  return '';
+}
+
+
+function mappedNamedItem(
+  list,
+  sourceValue
+) {
+
+  const entityType =
+    namedEntityType(
+      list
+    );
+
+
+  if (
+    !entityType ||
+    !Array.isArray(
+      project.sourceMappings
+    )
+  ) {
+    return null;
+  }
+
+
+  const key =
+    smartNameKey(
+      sourceValue
+    );
+
+
+  const mapping =
+    project.sourceMappings
+      .find(
+        item =>
+          item &&
+          item.targetEntityType ===
+            entityType &&
+          smartNameKey(
+            item.sourceValue
+          ) ===
+            key &&
+          item.decision !==
+            'rejected'
+      );
+
+
+  if (!mapping) {
+    return null;
+  }
+
+
+  return (
+    list ||
+    []
+  )
+    .find(
+      item =>
+        String(
+          item.id
+        ) ===
+        String(
+          mapping.targetEntityId
+        )
+    ) ||
+    null;
+}
+
+
+function rememberNamedMapping(
+  list,
+  sourceValue,
+  targetItem,
+  confidence =
+    1
+) {
+
+  const entityType =
+    namedEntityType(
+      list
+    );
+
+
+  const clean =
+    normText(
+      sourceValue
+    );
+
+
+  if (
+    !entityType ||
+    !clean ||
+    !targetItem?.id
+  ) {
+    return;
+  }
+
+
+  targetItem.aliases =
+    Array.isArray(
+      targetItem.aliases
+    )
+      ? targetItem.aliases
+      : [];
+
+
+  if (
+    !sameText(
+      clean,
+      targetItem.name
+    ) &&
+    !targetItem.aliases.some(
+      alias =>
+        sameText(
+          alias,
+          clean
+        )
+    )
+  ) {
+
+    targetItem.aliases.push(
+      clean
+    );
+  }
+
+
+  project.sourceMappings =
+    Array.isArray(
+      project.sourceMappings
+    )
+      ? project.sourceMappings
+      : [];
+
+
+  const existing =
+    project.sourceMappings
+      .find(
+        item =>
+          item.targetEntityType ===
+            entityType &&
+          smartNameKey(
+            item.sourceValue
+          ) ===
+            smartNameKey(
+              clean
+            )
+      );
+
+
+  const data = {
+    sourceName:
+      normText(
+        importSheetName
+      ) ||
+      normText(
+        importFileName
+      ) ||
+      'Импорт',
+    sourceEntityType:
+      entityType,
+    sourceValue:
+      clean,
+    targetEntityType:
+      entityType,
+    targetEntityId:
+      targetItem.id,
+    confidence:
+      Number(
+        confidence ||
+        1
+      ),
+    decision:
+      'confirmed',
+    updatedAt:
+      nowIso()
+  };
+
+
+  if (
+    existing
+  ) {
+
+    Object.assign(
+      existing,
+      data
+    );
+
+  } else {
+
+    project.sourceMappings.push({
+      id:
+        uid(
+          'MAP'
+        ),
+      ...data,
+      createdAt:
+        nowIso()
+    });
+  }
+}
+
+
 function findNamedMatch(list, name) {
   const clean = normText(name);
 
@@ -211,6 +448,28 @@ function findNamedMatch(list, name) {
       score: 0
     };
   }
+
+  const mapped =
+    mappedNamedItem(
+      list,
+      clean
+    );
+
+
+  if (
+    mapped
+  ) {
+
+    return {
+      kind:
+        'mapped',
+      item:
+        mapped,
+      score:
+        1
+    };
+  }
+
 
   const exact = (list || []).find(
     row =>
@@ -307,6 +566,10 @@ function namedMatchText(label, list, sourceName) {
       sourceName
     );
 
+  if (match.kind === 'mapped') {
+    return label + ': сохранённое соответствие → «' + match.item.name + '»';
+  }
+
   if (match.kind === 'exact') {
     return label + ': совпало с «' + match.item.name + '»';
   }
@@ -367,11 +630,25 @@ function ensureNamed(
 
   let item =
     (
+      match.kind === 'mapped' ||
       match.kind === 'exact' ||
       match.kind === 'smart'
     )
       ? match.item
       : null;
+
+
+  if (
+    item
+  ) {
+
+    rememberNamedMapping(
+      list,
+      clean,
+      item,
+      match.score
+    );
+  }
 
 
   if (
