@@ -964,7 +964,7 @@
           target_unit: text(item.targetUnit) || inferred.unit || null,
           risk_method: text(item.riskMethod) || 'auto',
           risk_window_days: Math.max(1, Math.min(90, integer(item.riskWindowDays, 7))),
-          risk_level: text(item.riskLevel) || null,
+          risk_level: ({green:'normal',yellow:'attention',orange:'risk',red:'failure',gray:'unknown',normal:'normal',attention:'attention',risk:'risk',failure:'failure',unknown:'unknown'}[text(item.riskLevel)] || null),
           risk_updated_at: item.riskUpdatedAt || null,
           risk_details: item.riskDetails || {},
           custom_data: item.customData || {},
