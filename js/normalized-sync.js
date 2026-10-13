@@ -8,6 +8,25 @@
   const WRITE_CHUNK = 150;
   const RESOURCE_CHUNK = 250;
 
+  const VERSIONED_TABLES = new Set([
+    'buildings',
+    'organizations',
+    'works',
+    'contracts',
+    'structures',
+    'fronts',
+    'matrices',
+    'milestones',
+    'numbered_element_groups',
+    'numbered_elements',
+    'work_metrics',
+    'progress_facts',
+    'schedule_versions',
+    'schedule_tasks',
+    'source_mappings',
+    'entity_aliases'
+  ]);
+
   const state = {
     projectId: '',
     running: false,
@@ -16,6 +35,7 @@
     timer: null,
     maps: {},
     hashes: {},
+    serverVersions: {},
     lastError: '',
     lastSuccessAt: '',
     status: 'idle'
@@ -114,6 +134,120 @@
     } catch (error) {
       console.warn('LIV normalized sync: не удалось сохранить локальный индекс.', error);
     }
+  }
+
+  function versionsStorageKey() {
+    return 'liv-normalized-versions:' + MODULE_VERSION + ':' + (state.projectId || 'pending');
+  }
+
+  function loadServerVersions() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(versionsStorageKey()) || '{}');
+      state.serverVersions = parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (error) {
+      state.serverVersions = {};
+    }
+  }
+
+  function saveServerVersions() {
+    try {
+      localStorage.setItem(versionsStorageKey(), JSON.stringify(state.serverVersions));
+    } catch (error) {
+      console.warn('LIV normalized sync: не удалось сохранить версии строк.', error);
+    }
+  }
+
+  function samePayload(localRow, serverRow) {
+    return Object.keys(localRow)
+      .every(key => {
+        if (key === 'row_version' || key === 'updated_at') return true;
+
+        const left = localRow[key] == null ? null : localRow[key];
+        const right = serverRow[key] == null ? null : serverRow[key];
+
+        return JSON.stringify(stable(left)) === JSON.stringify(stable(right));
+      });
+  }
+
+  async function checkWriteConflicts(table, rows, identity) {
+    if (
+      identity !== 'external_id' ||
+      !VERSIONED_TABLES.has(table) ||
+      !rows.length
+    ) {
+      return;
+    }
+
+    const ids = rows
+      .map(row => row.external_id)
+      .filter(Boolean);
+
+    if (!ids.length) return;
+
+    const result = await client()
+      .from(table)
+      .select('*')
+      .in('external_id', ids);
+
+    if (result.error) throw result.error;
+
+    const serverById = new Map(
+      (result.data || [])
+        .map(row => [String(row.external_id), row])
+    );
+
+    for (const row of rows) {
+      const id = String(row.external_id || '');
+      const serverRow = serverById.get(id);
+      if (!serverRow) continue;
+
+      const versionKey = table + ':' + id;
+      const serverVersion = Number(serverRow.row_version || 1);
+      const knownVersion = Number(state.serverVersions[versionKey] || 0);
+
+      if (
+        knownVersion > 0 &&
+        serverVersion > knownVersion &&
+        !samePayload(row, serverRow)
+      ) {
+        throw new Error(
+          'Конфликт редактирования: запись в «' +
+          table +
+          '» уже изменена другим пользователем. Обнови данные перед сохранением.'
+        );
+      }
+
+      state.serverVersions[versionKey] = serverVersion;
+    }
+
+    saveServerVersions();
+  }
+
+  async function refreshWrittenVersions(table, rows, identity) {
+    if (
+      identity !== 'external_id' ||
+      !VERSIONED_TABLES.has(table) ||
+      !rows.length
+    ) {
+      return;
+    }
+
+    const ids = rows.map(row => row.external_id).filter(Boolean);
+    if (!ids.length) return;
+
+    const result = await client()
+      .from(table)
+      .select('external_id,row_version')
+      .in('external_id', ids);
+
+    if (result.error) throw result.error;
+
+    (result.data || []).forEach(row => {
+      state.serverVersions[table + ':' + row.external_id] =
+        Number(row.row_version || 1);
+    });
+
+    saveServerVersions();
   }
 
   function ensureStatusBadge() {
@@ -227,6 +361,7 @@
     if (!result.data?.id) throw new Error('Не найден серверный проект LIV-MAIN.');
     state.projectId = result.data.id;
     loadHashes();
+    loadServerVersions();
     return state.projectId;
   }
 
@@ -291,11 +426,25 @@
     let written = 0;
     for (let index = 0; index < pending.length; index += chunkSize) {
       const chunk = pending.slice(index, index + chunkSize);
+
+      await checkWriteConflicts(
+        table,
+        chunk,
+        identity
+      );
+
       const result = await client().from(table).upsert(chunk, {
         onConflict,
         ignoreDuplicates: false
       });
       if (result.error) throw result.error;
+
+      await refreshWrittenVersions(
+        table,
+        chunk,
+        identity
+      );
+
       markRows(tableKey, chunk, identity);
       written += chunk.length;
     }
