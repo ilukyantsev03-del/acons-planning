@@ -198,8 +198,99 @@
   }
 
   const userId=()=>window.LIV_REMOTE_SYNC?.userId?.()||null;
-  async function syncScheme(x){const client=window.LIV_SUPABASE;if(!client)return;const data={external_id:x.id,name:x.name,file_name:x.fileName,storage_path:x.storagePath,mime_type:'application/pdf',page_count:Number(x.pageCount||0),revision:x.revision||null,status:x.status||'Загружена',active:x.active!==false,updated_at:x.updatedAt||now(),custom_data:{buildingExternalId:x.buildingId||'',matrixExternalId:x.matrixId||'',fileSize:Number(x.fileSize||0)}};if(x.serverId){const r=await client.from('schemes').update(data).eq('id',x.serverId);if(r.error)throw r.error;return;}const e=await client.from('schemes').select('id').eq('external_id',x.id).maybeSingle();if(e.error)throw e.error;if(e.data?.id){x.serverId=e.data.id;const r=await client.from('schemes').update(data).eq('id',x.serverId);if(r.error)throw r.error;return;}const r=await client.from('schemes').insert({...data,created_by:userId()}).select('id').single();if(r.error)throw r.error;x.serverId=r.data.id;}
-  async function syncMark(x){const client=window.LIV_SUPABASE,item=scheme(x.schemeId);if(!client||!item)return;if(!item.serverId)await syncScheme(item);const data={external_id:x.id,scheme_id:item.serverId,page_no:Number(x.pageNo||1),x:clamp(x.x),y:clamp(x.y),width:clamp(x.width),height:clamp(x.height),mark_type:'area',title:x.title||null,status:x.status||'Не начато',progress_percent:x.progressPercent===null||x.progressPercent===undefined||x.progressPercent===''?null:Math.round(clamp(x.progressPercent,0,100)),comment:x.comment||null,active:x.active!==false,updated_at:x.updatedAt||now(),custom_data:{workExternalId:x.workId||'',organizationExternalId:x.organizationId||'',frontExternalId:x.frontId||''}};try{if(x.serverId){const r=await client.from('scheme_marks').update(data).eq('id',x.serverId);if(r.error)throw r.error;return;}const e=await client.from('scheme_marks').select('id').eq('external_id',x.id).maybeSingle();if(e.error)throw e.error;if(e.data?.id){x.serverId=e.data.id;const r=await client.from('scheme_marks').update(data).eq('id',x.serverId);if(r.error)throw r.error;return;}const r=await client.from('scheme_marks').insert({...data,created_by:userId()}).select('id').single();if(r.error)throw r.error;x.serverId=r.data.id;}catch(error){console.warn('LIV Schemes: sync mark failed',error);}}
+  async function syncScheme(x){
+    const client=window.LIV_SUPABASE;
+    if(!client)return;
+    const normalizer=window.LIV_NORMALIZED_SYNC;
+    const data={
+      external_id:x.id,
+      name:x.name,
+      file_name:x.fileName,
+      storage_path:x.storagePath,
+      mime_type:'application/pdf',
+      page_count:Number(x.pageCount||0),
+      building_id:normalizer?.serverId?.('building',x.buildingId)||null,
+      matrix_id:normalizer?.serverId?.('matrix',x.matrixId)||null,
+      revision:x.revision||null,
+      status:x.status||'Загружена',
+      active:x.active!==false,
+      updated_at:x.updatedAt||now(),
+      custom_data:{
+        buildingExternalId:x.buildingId||'',
+        matrixExternalId:x.matrixId||'',
+        fileSize:Number(x.fileSize||0)
+      }
+    };
+    if(x.serverId){
+      const r=await client.from('schemes').update(data).eq('id',x.serverId);
+      if(r.error)throw r.error;
+      return;
+    }
+    const e=await client.from('schemes').select('id').eq('external_id',x.id).maybeSingle();
+    if(e.error)throw e.error;
+    if(e.data?.id){
+      x.serverId=e.data.id;
+      const r=await client.from('schemes').update(data).eq('id',x.serverId);
+      if(r.error)throw r.error;
+      return;
+    }
+    const r=await client.from('schemes').insert({...data,created_by:userId()}).select('id').single();
+    if(r.error)throw r.error;
+    x.serverId=r.data.id;
+  }
+  async function syncMark(x){
+    const client=window.LIV_SUPABASE,item=scheme(x.schemeId);
+    if(!client||!item)return;
+    if(!item.serverId)await syncScheme(item);
+    const normalizer=window.LIV_NORMALIZED_SYNC;
+    const data={
+      external_id:x.id,
+      scheme_id:item.serverId,
+      page_no:Number(x.pageNo||1),
+      x:clamp(x.x),
+      y:clamp(x.y),
+      width:clamp(x.width),
+      height:clamp(x.height),
+      mark_type:x.markType||'area',
+      title:x.title||null,
+      status:x.status||'Не начато',
+      progress_percent:x.progressPercent===null||x.progressPercent===undefined||x.progressPercent===''?null:Math.round(clamp(x.progressPercent,0,100)),
+      work_id:normalizer?.serverId?.('work',x.workId)||null,
+      organization_id:normalizer?.serverId?.('organization',x.organizationId)||null,
+      front_id:normalizer?.serverId?.('front',x.frontId)||null,
+      element_group_id:normalizer?.serverId?.('elementGroup',x.elementGroupId)||null,
+      numbered_element_id:normalizer?.serverId?.('numberedElement',x.numberedElementId)||null,
+      comment:x.comment||null,
+      active:x.active!==false,
+      updated_at:x.updatedAt||now(),
+      custom_data:{
+        workExternalId:x.workId||'',
+        organizationExternalId:x.organizationId||'',
+        frontExternalId:x.frontId||''
+      }
+    };
+    try{
+      if(x.serverId){
+        const r=await client.from('scheme_marks').update(data).eq('id',x.serverId);
+        if(r.error)throw r.error;
+        return;
+      }
+      const e=await client.from('scheme_marks').select('id').eq('external_id',x.id).maybeSingle();
+      if(e.error)throw e.error;
+      if(e.data?.id){
+        x.serverId=e.data.id;
+        const r=await client.from('scheme_marks').update(data).eq('id',x.serverId);
+        if(r.error)throw r.error;
+        return;
+      }
+      const r=await client.from('scheme_marks').insert({...data,created_by:userId()}).select('id').single();
+      if(r.error)throw r.error;
+      x.serverId=r.data.id;
+    }catch(error){
+      console.warn('LIV Schemes: sync mark failed',error);
+      throw error;
+    }
+  }
 
   async function download(){const x=scheme(state.schemeId),client=window.LIV_SUPABASE;if(!x||!client)return;loading(true,'Подготовка файла...');try{const r=await client.storage.from(BUCKET).download(x.storagePath);if(r.error)throw r.error;const url=URL.createObjectURL(r.data),a=document.createElement('a');a.href=url;a.download=x.fileName||`${x.name}.pdf`;a.click();URL.revokeObjectURL(url);}catch(error){alert('Не удалось скачать PDF: '+(error.message||error));}finally{loading(false);}}
   function openDelete(){const x=scheme(state.schemeId);if(!x||!canWrite())return;openModal('Удаление PDF-схемы',`<div class="notice bad">Будет удалена схема <b>${html(x.name)}</b>, исходный PDF и ${marks(x.id).length} отметок. Фронты и шахматки не удаляются.</div><div class="liv-editor-footer"><button id="sdCancel" class="btn">Отмена</button><button id="sdConfirm" class="btn danger">Удалить</button></div>`);$s('sdCancel').onclick=closeModal;$s('sdConfirm').onclick=removeScheme;}
