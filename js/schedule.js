@@ -182,7 +182,7 @@
   }
 
   function ensureCollections() {
-    if (!window.project) return false;
+    if (typeof project === 'undefined' || !project) return false;
     const names = [
       'tasks','taskDates','taskQuantities','dependencies',
       'dailyReports','factHistory','quantityHistory','forecastSnapshots'
@@ -737,7 +737,7 @@
   }
 
   function renderSchedule() {
-    if (!window.project) return;
+    if (typeof project === 'undefined' || !project) return;
     ensureCollections();
 
     const search = key(document.getElementById('scheduleSearch')?.value || '');
