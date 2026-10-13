@@ -184,7 +184,7 @@
     function add(row, legacy) {
       const linked = row.frontId && frontIds.has(String(row.frontId)) || row.metricId && metricIds.has(String(row.metricId));
       if (!linked) return;
-      const identity = (legacy ? 'l:' : 'p:') + (row.id || row.sourceFingerprint || row.importFingerprint || JSON.stringify(row));
+      const identity = row.id || row.sourceFingerprint || row.importFingerprint || JSON.stringify(row);
       if (seen.has(identity)) return;
       seen.add(identity);
       const date = row.factDate || row.date || '';
