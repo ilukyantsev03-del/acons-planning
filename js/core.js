@@ -2203,6 +2203,9 @@ function renderDashboard() {
       );
 
 
+  const currentDate =
+    today();
+
   const resourceDates =
     uniq(
       meaningfulResourceRows
@@ -2211,7 +2214,13 @@ function renderDashboard() {
             row.date
         )
         .filter(
-          Boolean
+          date =>
+            Boolean(date) &&
+            /^\d{4}-\d{2}-\d{2}$/.test(
+              String(date)
+            ) &&
+            date <=
+              currentDate
         )
     )
       .sort();
