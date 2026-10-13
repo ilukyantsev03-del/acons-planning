@@ -1,12 +1,13 @@
 'use strict';
 
 (function () {
-  const VERSION = '2026.10.13.1';
+  const VERSION = '2026.10.13.2';
   const state = {
     loaded: false,
     loading: false,
     flushing: false,
-    timer: null
+    timer: null,
+    localSaveTimer: null
   };
 
   function currentProject() {
@@ -50,7 +51,17 @@
     ].join('|');
   }
 
-  function remember(input) {
+  function queueLocalSave() {
+    if (state.loading || typeof saveProject !== 'function') return;
+    clearTimeout(state.localSaveTimer);
+    state.localSaveTimer = setTimeout(() => {
+      saveProject().catch(error =>
+        console.warn('LIV source mappings: не удалось сохранить локальную память.', error)
+      );
+    }, 350);
+  }
+
+  function remember(input, options = {}) {
     const collection = ensureCollection();
     if (!collection || !input?.sourceValue || !input?.targetLocalId) return null;
 
@@ -65,7 +76,7 @@
       confidence: Number.isFinite(Number(input.confidence)) ? Number(input.confidence) : 1,
       decision: text(input.decision) || 'confirmed',
       createdAt: input.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: input.updatedAt || new Date().toISOString()
     };
 
     let existing = collection.find(item => identity(item) === identity(candidate));
@@ -79,7 +90,10 @@
       collection.push(existing);
     }
 
-    queueFlush();
+    if (!options.fromServer) {
+      queueLocalSave();
+      queueFlush();
+    }
     return existing;
   }
 
@@ -96,20 +110,35 @@
     ) || null;
   }
 
-  function localEntityId(entityType, serverId) {
+  function entityConfig(entityType) {
+    return {
+      organization: { table: 'organizations', collection: 'organizations', map: 'organization' },
+      building: { table: 'buildings', collection: 'buildings', map: 'building' },
+      work: { table: 'works', collection: 'works', map: 'work' },
+      contract: { table: 'contracts', collection: 'contracts', map: 'contract' },
+      front: { table: 'fronts', collection: 'fronts', map: 'front' },
+      milestone: { table: 'milestones', collection: 'milestones', map: 'milestone' },
+      numbered_element: { table: 'numbered_elements', collection: 'numberedElements', map: 'numberedElement' }
+    }[entityType] || null;
+  }
+
+  async function serverToLocalMap(entityType, serverIds) {
+    const config = entityConfig(entityType);
     const current = currentProject();
-    if (!current || !serverId) return '';
-    const collectionName = {
-      organization: 'organizations',
-      building: 'buildings',
-      work: 'works',
-      contract: 'contracts',
-      front: 'fronts',
-      milestone: 'milestones',
-      numbered_element: 'numberedElements'
-    }[entityType];
-    if (!collectionName) return '';
-    return (current[collectionName] || []).find(item => String(item.serverId || '') === String(serverId))?.id || '';
+    if (!config || !current || !serverIds.length) return new Map();
+
+    const result = await window.LIV_SUPABASE
+      .from(config.table)
+      .select('id,external_id')
+      .in('id', serverIds);
+    if (result.error) throw result.error;
+
+    const localIds = new Set((current[config.collection] || []).map(item => String(item.id)));
+    return new Map(
+      (result.data || [])
+        .filter(row => row.external_id && localIds.has(String(row.external_id)))
+        .map(row => [String(row.id), String(row.external_id)])
+    );
   }
 
   async function loadServerMappings() {
@@ -128,8 +157,21 @@
         .range(0, 4999);
       if (result.error) throw result.error;
 
-      (result.data || []).forEach(row => {
-        const targetLocalId = localEntityId(row.target_entity_type, row.target_entity_id);
+      const rows = result.data || [];
+      const types = [...new Set(rows.map(row => row.target_entity_type).filter(Boolean))];
+      const maps = {};
+
+      for (const type of types) {
+        const ids = [...new Set(
+          rows
+            .filter(row => row.target_entity_type === type)
+            .map(row => String(row.target_entity_id))
+        )];
+        maps[type] = await serverToLocalMap(type, ids);
+      }
+
+      rows.forEach(row => {
+        const targetLocalId = maps[row.target_entity_type]?.get(String(row.target_entity_id)) || '';
         if (!targetLocalId) return;
         remember({
           id: row.id,
@@ -142,9 +184,10 @@
           decision: row.decision,
           createdAt: row.created_at,
           updatedAt: row.updated_at
-        });
+        }, { fromServer: true });
       });
       state.loaded = true;
+      queueLocalSave();
     } catch (error) {
       console.warn('LIV source mappings: не удалось загрузить сопоставления.', error);
     } finally {
@@ -153,17 +196,9 @@
   }
 
   function serverId(entityType, localId) {
-    const mapName = {
-      organization: 'organization',
-      building: 'building',
-      work: 'work',
-      contract: 'contract',
-      front: 'front',
-      milestone: 'milestone',
-      numbered_element: 'numberedElement'
-    }[entityType];
-    return mapName
-      ? window.LIV_NORMALIZED_SYNC?.serverId?.(mapName, localId) || ''
+    const config = entityConfig(entityType);
+    return config
+      ? window.LIV_NORMALIZED_SYNC?.serverId?.(config.map, localId) || ''
       : '';
   }
 
