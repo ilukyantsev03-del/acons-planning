@@ -24,7 +24,9 @@
     'schedule_versions',
     'schedule_tasks',
     'source_mappings',
-    'entity_aliases'
+    'entity_aliases',
+    'resource_log',
+    'import_log'
   ]);
 
   const state = {
@@ -1285,7 +1287,16 @@
         saveHashes();
         await new Promise(resolve => setTimeout(resolve, 20));
       }
-      if (written) setStatus('ready', 'Серверная база синхронизирована');
+      if (
+        written &&
+        state.status !==
+          'error'
+      ) {
+        setStatus(
+          'ready',
+          'Серверная база синхронизирована'
+        );
+      }
     } catch (error) {
       console.error('LIV normalized sync: resource migration failed', error);
       setStatus('error', 'Ошибка переноса ресурсов');
