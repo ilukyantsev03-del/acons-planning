@@ -2353,6 +2353,9 @@ function elementContextKey(
     element.buildingId ||
       '',
     normKey(
+      element.groupCode
+    ),
+    normKey(
       element.capture
     ),
     normKey(
@@ -2504,6 +2507,13 @@ function renderElements() {
 
             <td>
               ${esc(
+                element.groupCode ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              ${esc(
                 element.capture ||
                 '—'
               )}
@@ -2560,7 +2570,7 @@ function renderElements() {
     `
       <tr>
 
-        <td colspan="9">
+        <td colspan="10">
 
           <div class="empty-state">
             Номерные элементы не найдены.
@@ -2758,6 +2768,24 @@ function openElementEditor(
             }
 
           </select>
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Группа / ярус / марка
+          </label>
+
+          <input
+            id="neGroup"
+            value="${esc(
+              element.groupCode ||
+              ''
+            )}"
+            placeholder="Например: Г1 / БНС-2 / Ярус 1"
+          >
 
         </div>
 
@@ -2966,6 +2994,11 @@ async function saveElement(
 
     buildingId:
       $('neBuilding').value,
+
+    groupCode:
+      $('neGroup')
+        .value
+        .trim(),
 
     capture:
       $('neCapture')
@@ -4405,6 +4438,39 @@ async function saveSimpleSettingsItem(
     const oldName =
       item.name ||
       '';
+
+    if (
+      oldName &&
+      !sameText(
+        oldName,
+        name
+      )
+    ) {
+
+      item.aliases =
+        Array.isArray(
+          item.aliases
+        )
+          ? item.aliases
+          : [];
+
+
+      if (
+        !item.aliases.some(
+          alias =>
+            sameText(
+              alias,
+              oldName
+            )
+        )
+      ) {
+
+        item.aliases.push(
+          oldName
+        );
+      }
+    }
+
 
     item.name =
       name;
@@ -7937,6 +8003,41 @@ function switchTab(
    ========================================================= */
 
 
+function markTotalRows() {
+
+  document
+    .querySelectorAll(
+      'table tr'
+    )
+    .forEach(
+      row => {
+
+        const hasTotal =
+          Array.from(
+            row.cells ||
+            []
+          )
+            .some(
+              cell =>
+                /^\s*итого(?:\s|$)/i
+                  .test(
+                    String(
+                      cell.textContent ||
+                      ''
+                    )
+                  )
+            );
+
+
+        row.classList.toggle(
+          'liv-total-row',
+          hasTotal
+        );
+      }
+    );
+}
+
+
 function renderAll() {
 
   ensureUnifiedPanelPresentation();
@@ -8064,6 +8165,9 @@ function renderAll() {
 
     livApplyViewConstructor();
   }
+
+
+  markTotalRows();
 }
 
 
