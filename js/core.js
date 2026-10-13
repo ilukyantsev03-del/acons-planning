@@ -1011,7 +1011,28 @@ function emptyProject() {
     milestones:
       [],
 
+    numberedElementGroups:
+      [],
+
     numberedElements:
+      [],
+
+    workMetrics:
+      [],
+
+    progressFacts:
+      [],
+
+    sourceMappings:
+      [],
+
+    entityAliases:
+      [],
+
+    networkSegments:
+      [],
+
+    reportSnapshots:
       [],
 
     contracts:
@@ -1299,7 +1320,14 @@ function normalizeProject(
     'resources',
     'resourcePlans',
     'milestones',
+    'numberedElementGroups',
     'numberedElements',
+    'workMetrics',
+    'progressFacts',
+    'sourceMappings',
+    'entityAliases',
+    'networkSegments',
+    'reportSnapshots',
     'contracts',
     'constraints',
     'diagrams',
@@ -4905,12 +4933,59 @@ async function saveLog(
       );
     }
 
+    const factId =
+      uid(
+        'FCT'
+      );
+
+
+    project.progressFacts =
+      project.progressFacts ||
+      [];
+
+
+    project.progressFacts.push({
+
+      id:
+        factId,
+
+      frontId,
+
+      factDate:
+        date,
+
+      factType:
+        'quantity',
+
+      quantity,
+
+      cumulativeQty:
+        cumulative,
+
+      people,
+
+      comment,
+
+      sourceFingerprint:
+        'manual:' +
+        factId,
+
+      createdAt:
+        nowIso(),
+
+      createdByRole:
+        window.LIV_ACCESS?.role ||
+        '',
+
+      backdated:
+        date < today()
+    });
+
+
     project.factLog.push({
 
       id:
-        uid(
-          'FCT'
-        ),
+        factId,
 
       frontId,
 
