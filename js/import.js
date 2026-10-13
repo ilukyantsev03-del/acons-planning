@@ -298,6 +298,7 @@ function mappedNamedItem(
           item.id
         ) ===
         String(
+          mapping.targetLocalId ||
           mapping.targetEntityId
         )
     ) ||
@@ -400,7 +401,7 @@ function rememberNamedMapping(
       clean,
     targetEntityType:
       entityType,
-    targetEntityId:
+    targetLocalId:
       targetItem.id,
     confidence:
       Number(
