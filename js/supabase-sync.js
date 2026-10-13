@@ -205,19 +205,11 @@
   async function reconnect(localProject) {
     const client = sb();
 
-    if (
-      channel &&
-      client
-    ) {
+    if (channel && client) {
       try {
-        await client.removeChannel(
-          channel
-        );
+        await client.removeChannel(channel);
       } catch (error) {
-        console.warn(
-          'LIV Supabase: channel reset failed',
-          error
-        );
+        console.warn('LIV Supabase: channel reset failed', error);
       }
     }
 
@@ -225,13 +217,8 @@
     role = '';
     userId = '';
 
-    const state =
-      await bootstrap(
-        localProject
-      );
-
+    const state = await bootstrap(localProject);
     subscribe();
-
     return state;
   }
 
@@ -239,17 +226,8 @@
     role = '';
     userId = '';
 
-    if (
-      channel &&
-      sb()
-    ) {
-      sb()
-        .removeChannel(
-          channel
-        )
-        .catch(
-          () => {}
-        );
+    if (channel && sb()) {
+      sb().removeChannel(channel).catch(() => {});
     }
 
     channel = null;
@@ -272,4 +250,17 @@
     role: () => role,
     userId: () => userId
   };
+})();
+
+(function loadLivSchemesModule() {
+  if (document.querySelector('script[data-liv-schemes]')) return;
+
+  const script = document.createElement('script');
+  script.src = 'js/schemes.js?v=20261013-1';
+  script.async = true;
+  script.dataset.livSchemes = '1';
+  script.onerror = () => {
+    console.error('LIV Schemes: не удалось загрузить модуль схем.');
+  };
+  document.head.appendChild(script);
 })();
