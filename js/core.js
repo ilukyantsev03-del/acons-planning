@@ -2206,39 +2206,13 @@ function renderDashboard() {
   const currentDate =
     today();
 
-  const resourceDates =
-    uniq(
-      meaningfulResourceRows
-        .map(
-          row =>
-            row.date
-        )
-        .filter(
-          date =>
-            Boolean(date) &&
-            /^\d{4}-\d{2}-\d{2}$/.test(
-              String(date)
-            ) &&
-            date <=
-              currentDate
-        )
-    )
-      .sort();
-
-
-  const lastDate =
-    resourceDates[
-      resourceDates.length -
-      1
-    ];
-
 
   const rows =
     meaningfulResourceRows
       .filter(
         row =>
           row.date ===
-          lastDate
+          currentDate
       );
 
 
@@ -2278,50 +2252,43 @@ function renderDashboard() {
       );
 
 
-  $('dResources').innerHTML =
-    lastDate
-      ? `
-          <div class="item">
+  $('dResources').innerHTML = `
+    <div class="item">
 
-            <span>
-              Дата
-            </span>
+      <span>
+        Дата
+      </span>
 
-            <strong>
-              ${ruDate(lastDate)}
-            </strong>
+      <strong>
+        ${ruDate(currentDate)}
+      </strong>
 
-          </div>
+    </div>
 
-          <div class="item">
+    <div class="item">
 
-            <span>
-              Людей
-            </span>
+      <span>
+        Людей
+      </span>
 
-            <strong>
-              ${roundInt(people)}
-            </strong>
+      <strong>
+        ${roundInt(people)}
+      </strong>
 
-          </div>
+    </div>
 
-          <div class="item">
+    <div class="item">
 
-            <span>
-              Техники
-            </span>
+      <span>
+        Техники
+      </span>
 
-            <strong>
-              ${roundInt(equipment)}
-            </strong>
+      <strong>
+        ${roundInt(equipment)}
+      </strong>
 
-          </div>
-        `
-      : `
-          <div class="muted">
-            Нет данных
-          </div>
-        `;
+    </div>
+  `;
 }
 
 
