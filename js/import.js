@@ -2576,6 +2576,15 @@ async function readImportFile(
 
     readSelectedSheet();
 
+
+    if (
+      typeof fillMatrixSelects ===
+        'function'
+    ) {
+      fillMatrixSelects();
+    }
+
+
     if (
       $('analyzeImportBtn')
     ) {
@@ -3667,10 +3676,17 @@ function findMatchingFrontByMapped(
               workMatch.item.id
           ) &&
           (
-            !organizationName ||
-            !organizationMatch.item ||
-            front.organizationId ===
-              organizationMatch.item.id
+            !importMatrixTargetId ||
+            importMatrixTargetId ===
+              'new' ||
+            matrixFrontIds(
+              importMatrixTargetId
+            )
+              .has(
+                String(
+                  front.id
+                )
+              )
           )
         );
       }
@@ -3840,6 +3856,29 @@ function ensureFrontFromImport(
   }
 
 
+  if (
+    front
+  ) {
+
+    front.buildingId =
+      building?.id ||
+      front.buildingId ||
+      '';
+
+    front.workId =
+      work?.id ||
+      front.workId ||
+      '';
+
+    front.organizationId =
+      organization?.id ||
+      '';
+
+    front.structureId =
+      structure.id;
+  }
+
+
   return front;
 }
 
@@ -3878,6 +3917,157 @@ function importSource(
     importedAt:
       nowIso()
   };
+}
+
+
+function selectedImportMatrixTarget() {
+
+  const value =
+    $('importMatrixTarget')
+      ?.value ||
+    importMatrixTargetId ||
+    'new';
+
+
+  importMatrixTargetId =
+    value;
+
+
+  return value;
+}
+
+
+function createImportMatrix() {
+
+  const name =
+    normText(
+      $('importMatrixName')
+        ?.value
+    ) ||
+    normText(
+      importFileName
+        .replace(
+          /\.[^.]+$/,
+          ''
+        )
+    ) ||
+    'Новая шахматка';
+
+
+  const matrix = {
+    id:
+      uid(
+        'MX'
+      ),
+    name,
+    sourceType:
+      'excel',
+    sourceFile:
+      importFileName,
+    sourceSheet:
+      importSheetName,
+    active:
+      true,
+    createdAt:
+      nowIso(),
+    updatedAt:
+      nowIso(),
+    lastImportId:
+      '',
+    viewConfig:
+      {}
+  };
+
+
+  project.matrices =
+    project.matrices ||
+    [];
+
+
+  project.matrices.push(
+    matrix
+  );
+
+
+  return matrix;
+}
+
+
+function resolveImportMatrix() {
+
+  if (
+    importModeResolved !==
+      'fronts'
+  ) {
+    return null;
+  }
+
+
+  const target =
+    selectedImportMatrixTarget();
+
+
+  if (
+    target ===
+      'new'
+  ) {
+    return createImportMatrix();
+  }
+
+
+  return matrixById(
+    target
+  );
+}
+
+
+function detachStaleMatrixLinks(
+  matrixId,
+  touchedFrontIds
+) {
+
+  const touched =
+    new Set(
+      [
+        ...touchedFrontIds
+      ]
+        .map(
+          String
+        )
+    );
+
+
+  (
+    project.matrixFronts ||
+    []
+  )
+    .forEach(
+      link => {
+
+        if (
+          String(
+            link.matrixId
+          ) ===
+            String(
+              matrixId
+            ) &&
+          link.active !==
+            false &&
+          !touched.has(
+            String(
+              link.frontId
+            )
+          )
+        ) {
+
+          link.active =
+            false;
+
+          link.updatedAt =
+            nowIso();
+        }
+      }
+    );
 }
 
 
@@ -3924,6 +4114,28 @@ async function commitImport(){
     uid(
       'IMP'
     );
+
+
+  const importMatrix =
+    resolveImportMatrix();
+
+
+  if (
+    importModeResolved ===
+      'fronts' &&
+    !importMatrix
+  ) {
+
+    alert(
+      'Не удалось определить шахматку для импорта.'
+    );
+
+    return;
+  }
+
+
+  const touchedMatrixFrontIds =
+    new Set();
 
 
   let created =
@@ -4326,10 +4538,38 @@ async function commitImport(){
 
       front.lastImport = {
         batchId,
+        matrixId:
+          importMatrix?.id ||
+          '',
         ...importSource(
           item
         )
       };
+
+
+      if (
+        importMatrix
+      ) {
+
+        if (
+          !front.originMatrixId
+        ) {
+          front.originMatrixId =
+            importMatrix.id;
+        }
+
+
+        ensureMatrixFrontLink(
+          importMatrix.id,
+          front.id,
+          batchId
+        );
+
+
+        touchedMatrixFrontIds.add(
+          front.id
+        );
+      }
 
 
       if (
@@ -4953,6 +5193,30 @@ async function commitImport(){
   }
 
 
+  if (
+    importMatrix
+  ) {
+
+    detachStaleMatrixLinks(
+      importMatrix.id,
+      touchedMatrixFrontIds
+    );
+
+
+    importMatrix.sourceFile =
+      importFileName;
+
+    importMatrix.sourceSheet =
+      importSheetName;
+
+    importMatrix.updatedAt =
+      nowIso();
+
+    importMatrix.lastImportId =
+      batchId;
+  }
+
+
   project.importHistory =
     project.importHistory ||
     [];
@@ -4971,6 +5235,13 @@ async function commitImport(){
 
     mode:
       importModeResolved,
+
+    matrixId:
+      importMatrix?.id ||
+      '',
+
+    status:
+      'accepted',
 
     at:
       nowIso(),
@@ -5014,6 +5285,11 @@ async function commitImport(){
 
   alert(
     `Импорт завершен.\n` +
+    (
+      importMatrix
+        ? `Шахматка: ${importMatrix.name}\n`
+        : ''
+    ) +
     `Добавлено: ${created + appended}\n` +
     `Обновлено: ${updated}\n` +
     `Пропущено: ${skipped}`
