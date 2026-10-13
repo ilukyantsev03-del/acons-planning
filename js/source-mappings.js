@@ -222,7 +222,7 @@
           source_value: text(item.sourceValue),
           target_entity_type: text(item.targetEntityType),
           target_entity_id: targetEntityId,
-          confidence: Number(item.confidence || 1),
+          confidence: Math.max(0, Math.min(1, Number(item.confidence || 1))),
           decision: text(item.decision) || 'confirmed',
           updated_at: item.updatedAt || new Date().toISOString()
         };
