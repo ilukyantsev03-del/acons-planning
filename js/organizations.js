@@ -97,8 +97,67 @@ function organizationLatestResourceRows(
       );
 
 
-  const lastDate =
+  const meaningfulRows =
     rows
+      .filter(
+        row => {
+
+          if (
+            !row ||
+            !row.date
+          ) {
+            return false;
+          }
+
+          const numericKeys = [
+            'peopleQty',
+            'itr',
+            'workers',
+            'mechanizers',
+            'equipmentQty'
+          ];
+
+          if (
+            numericKeys.some(
+              key => {
+
+                const raw =
+                  row[key];
+
+                if (
+                  raw === '' ||
+                  raw === null ||
+                  raw === undefined
+                ) {
+                  return false;
+                }
+
+                const value =
+                  Number(raw);
+
+                return (
+                  Number.isFinite(value) &&
+                  value !== 0
+                );
+              }
+            )
+          ) {
+            return true;
+          }
+
+          return Boolean(
+            String(row.equipmentType || '').trim() ||
+            String(row.specialization || '').trim() ||
+            String(row.comment || '').trim() ||
+            row.reportConfirmed === true ||
+            row.hasData === true
+          );
+        }
+      );
+
+
+  const lastDate =
+    meaningfulRows
       .map(
         row =>
           row.date
@@ -119,7 +178,7 @@ function organizationLatestResourceRows(
 
     rows:
       lastDate
-        ? rows.filter(
+        ? meaningfulRows.filter(
             row =>
               row.date ===
               lastDate
