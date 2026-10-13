@@ -7787,63 +7787,17 @@ async function init() {
   validateLoadedProject();
 
 
-  if (
-    window.LIV_REMOTE_SYNC &&
-    typeof window.LIV_REMOTE_SYNC.bootstrap ===
-      'function'
-  ) {
-
-    const remoteState =
-      await window.LIV_REMOTE_SYNC.bootstrap(
-        localProject
-      );
-
-
-    if (
-      remoteState?.project
-    ) {
-
-      project =
-        await migrateIfNeeded(
-          remoteState.project
-        );
-
-
-      validateLoadedProject();
-
-
-      await dbPutKey(
-        project
-      );
-    }
-
-
-    if (
-      typeof window.LIV_REMOTE_SYNC.subscribe ===
-        'function'
-    ) {
-
-      window.LIV_REMOTE_SYNC.subscribe();
-    }
-  }
-
-
-  if (
-    !raw ||
-    raw.schemaVersion !==
-      SCHEMA_VERSION
-  ) {
-
-    await saveProject();
-  }
-
+  /*
+    Интерфейс должен быть рабочим сразу.
+    Supabase не блокирует переключение вкладок.
+  */
 
   initSelects();
 
 
   if (
     typeof initResourceMultiFilters ===
-    'function'
+      'function'
   ) {
 
     initResourceMultiFilters();
@@ -7885,6 +7839,94 @@ async function init() {
   }
 
 
+  renderAll();
+
+
+  async function applyRemoteState(
+    remoteState
+  ) {
+
+    if (
+      !remoteState?.project
+    ) {
+      return;
+    }
+
+
+    project =
+      await migrateIfNeeded(
+        remoteState.project
+      );
+
+
+    validateLoadedProject();
+
+
+    await dbPutKey(
+      project
+    );
+
+
+    initSelects();
+
+
+    if (
+      typeof refreshAllMultiFilters ===
+        'function'
+    ) {
+
+      refreshAllMultiFilters();
+    }
+
+
+    renderAll();
+  }
+
+
+  if (
+    window.LIV_REMOTE_SYNC &&
+    typeof window.LIV_REMOTE_SYNC.bootstrap ===
+      'function'
+  ) {
+
+    try {
+
+      const remoteState =
+        await window.LIV_REMOTE_SYNC.bootstrap(
+          localProject
+        );
+
+
+      await applyRemoteState(
+        remoteState
+      );
+
+
+      window.LIV_REMOTE_SYNC
+        .subscribe?.();
+
+    } catch (
+      error
+    ) {
+
+      console.error(
+        'LIV Supabase: startup sync failed',
+        error
+      );
+    }
+  }
+
+
+  if (
+    !raw ||
+    raw.schemaVersion !==
+      SCHEMA_VERSION
+  ) {
+
+    await saveProject();
+  }
+
+
   window.addEventListener(
     'liv-remote-project',
     async event => {
@@ -7906,33 +7948,10 @@ async function init() {
           ?.beginRemoteApply?.();
 
 
-        project =
-          await migrateIfNeeded(
+        await applyRemoteState({
+          project:
             incoming
-          );
-
-
-        validateLoadedProject();
-
-
-        await dbPutKey(
-          project
-        );
-
-
-        initSelects();
-
-
-        if (
-          typeof refreshAllMultiFilters ===
-            'function'
-        ) {
-
-          refreshAllMultiFilters();
-        }
-
-
-        renderAll();
+        });
 
       } finally {
 
@@ -7943,7 +7962,58 @@ async function init() {
   );
 
 
-  renderAll();
+  window.addEventListener(
+    'liv-auth-session',
+    async event => {
+
+      const signedIn =
+        Boolean(
+          event?.detail?.signedIn
+        );
+
+
+      if (
+        !window.LIV_REMOTE_SYNC
+      ) {
+        return;
+      }
+
+
+      if (
+        !signedIn
+      ) {
+
+        window.LIV_REMOTE_SYNC
+          .disconnect?.();
+
+        return;
+      }
+
+
+      try {
+
+        const state =
+          await window.LIV_REMOTE_SYNC
+            .reconnect?.(
+              project
+            );
+
+
+        await applyRemoteState(
+          state
+        );
+
+      } catch (
+        error
+      ) {
+
+        console.error(
+          'LIV Supabase: relogin sync failed',
+          error
+        );
+      }
+    }
+  );
 }
 
 /* =========================================================
