@@ -4390,6 +4390,24 @@ async function saveLog(
           );
 
 
+    const frontBeforeFact =
+      byId(
+        project.fronts,
+        frontId
+      );
+
+    if (
+      frontBeforeFact &&
+      num(frontBeforeFact.totalQty) > 0 &&
+      cumulative >
+        num(frontBeforeFact.totalQty)
+    ) {
+      alert(
+        'Внимание: накопительный факт превышает исходный объем фронта. ' +
+        'Факт будет сохранен. Проверь и при необходимости скорректируй исходный объем.'
+      );
+    }
+
     project.factLog.push({
 
       id:
@@ -4443,6 +4461,44 @@ async function saveLog(
           date;
       }
 
+      const totalQty =
+        num(
+          front.totalQty
+        );
+
+      if (
+        totalQty > 0 &&
+        cumulative >= totalQty
+      ) {
+        front.status =
+          'Завершено';
+
+        front.completed =
+          true;
+
+        if (
+          !front.factEnd ||
+          date >
+          front.factEnd
+        ) {
+          front.factEnd =
+            date;
+        }
+      } else if (
+        cumulative > 0 &&
+        ![
+          'Ограничение',
+          'Приостановлено'
+        ].includes(
+          front.status
+        )
+      ) {
+        front.status =
+          'В работе';
+
+        front.completed =
+          false;
+      }
 
       front.updatedAt =
         nowIso();
