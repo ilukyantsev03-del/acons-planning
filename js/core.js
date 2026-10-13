@@ -3887,6 +3887,30 @@ async function saveFrontFromModal(
     project.fronts.push(
       front
     );
+
+
+    const matrixId =
+      typeof currentMatrixId ===
+        'function'
+        ? currentMatrixId()
+        : '';
+
+
+    if (
+      matrixId &&
+      typeof ensureMatrixFrontLink ===
+        'function'
+    ) {
+
+      ensureMatrixFrontLink(
+        matrixId,
+        front.id
+      );
+
+
+      front.originMatrixId =
+        matrixId;
+    }
   }
 
 
