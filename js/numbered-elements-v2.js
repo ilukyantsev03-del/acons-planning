@@ -251,7 +251,7 @@
   }
 
   window.LIV_NUMBERED_ELEMENTS_V2 = {
-    version: '2026.10.13.3',
+    version: '2026.10.13.4',
     contextKey: contextualElementKey,
     ensureGroup
   };
