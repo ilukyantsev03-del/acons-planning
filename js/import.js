@@ -351,7 +351,9 @@ const FIELD_DEFS = {
       'Блок',
     aliases: [
       'блок',
-      'секция'
+      'секция',
+      'блок/захватка',
+      'блок захватка'
     ]
   },
 
@@ -360,7 +362,9 @@ const FIELD_DEFS = {
       'Этаж',
     aliases: [
       'этаж',
-      'уровень'
+      'уровень',
+      'этаж/номер захватки',
+      'этаж номер захватки'
     ]
   },
 
@@ -731,7 +735,38 @@ const FIELD_DEFS = {
       'контрольная дата',
       'наименование кд',
       'формулировка',
-      'наименование'
+      'наименование',
+      'наименование работы'
+    ]
+  },
+
+  contractNo: {
+    label:
+      '№ договора',
+    aliases: [
+      '№ договора',
+      'номер договора',
+      'договор',
+      'договор №'
+    ]
+  },
+
+  durationDays: {
+    label:
+      'Длительность',
+    aliases: [
+      'длит',
+      'длит.',
+      'длительность',
+      'продолжительность'
+    ]
+  },
+
+  deviationSource: {
+    label:
+      'Отклонение',
+    aliases: [
+      'отклонение'
     ]
   },
 
@@ -825,11 +860,15 @@ const MODE_FIELDS = {
   milestones: [
     'title',
     'building',
-    'contractEnd',
+    'block',
+    'floor',
+    'planStart',
     'planEnd',
-    'forecastEnd',
     'factEnd',
+    'durationDays',
+    'deviationSource',
     'status',
+    'contractNo',
     'comment'
   ]
 };
@@ -910,6 +949,13 @@ function matchField(
   header,
   mode
 ){
+
+  if (
+    mode === 'milestones' &&
+    normKey(header) === 'комментарий'
+  ) {
+    return 'contractNo';
+  }
 
   let best =
     '';
@@ -1148,6 +1194,12 @@ function detectImportMode(
   if (
     /ключевая дата|контрольная дата|формулировка/.test(
       text
+    ) ||
+    (
+      /блок захватка/.test(text) &&
+      /этаж номер захватки/.test(text) &&
+      /окончание факт/.test(text) &&
+      /отклонение/.test(text)
     )
   ) {
     return 'milestones';
@@ -1455,7 +1507,8 @@ function applyFillDown(
             ]
           : [
               'building',
-              'title'
+              'block',
+              'floor'
             ];
 
 
@@ -2754,6 +2807,22 @@ function ensureFrontFromImport(
 }
 
 
+function normalizeMilestoneStatus(value) {
+  const text = normKey(value);
+
+  if (!text) return 'Не наступила';
+  if (/заверш|выполн/.test(text)) return 'Выполнена';
+  if (/просроч/.test(text)) return 'Просрочена';
+  if (/риск/.test(text)) return 'Под риском';
+  if (/работ/.test(text)) return 'В работе';
+  if (/перенес/.test(text)) return 'Перенесена';
+  if (/отмен/.test(text)) return 'Отменена';
+  if (/не наступ/.test(text)) return 'Не наступила';
+
+  return normText(value);
+}
+
+
 /* =========================================================
    ИМПОРТ
    ========================================================= */
@@ -3669,6 +3738,16 @@ async function commitImport(){
           : null;
 
 
+      const organization =
+        importSheetName
+          ? ensureNamed(
+              project.organizations,
+              'ORG',
+              importSheetName
+            )
+          : null;
+
+
       project.milestones.push({
 
         id:
@@ -3680,24 +3759,82 @@ async function commitImport(){
           building?.id ||
           '',
 
+        organizationId:
+          organization?.id ||
+          '',
+
+        contractNo:
+          normText(
+            mappedValue(
+              row,
+              'contractNo'
+            )
+          ),
+
+        blockCapture:
+          normText(
+            mappedValue(
+              row,
+              'block'
+            )
+          ),
+
+        floorCapture:
+          normText(
+            mappedValue(
+              row,
+              'floor'
+            )
+          ),
+
+        startDate:
+          normDate(
+            mappedValue(
+              row,
+              'planStart'
+            )
+          ),
+
+        durationDays:
+          Math.max(
+            0,
+            Math.round(
+              num(
+                mappedValue(
+                  row,
+                  'durationDays'
+                )
+              )
+            )
+          ),
+
+        importedDeviation:
+          normText(
+            mappedValue(
+              row,
+              'deviationSource'
+            )
+          ) === ''
+            ? null
+            : num(
+                mappedValue(
+                  row,
+                  'deviationSource'
+                )
+              ),
+
         title,
 
         status:
-          normText(
+          normalizeMilestoneStatus(
             mappedValue(
               row,
               'status'
             )
-          ) ||
-          'Не наступила',
+          ),
 
         contractDate:
-          normDate(
-            mappedValue(
-              row,
-              'contractEnd'
-            )
-          ),
+          '',
 
         workDate:
           normDate(
@@ -3708,12 +3845,7 @@ async function commitImport(){
           ),
 
         forecastDate:
-          normDate(
-            mappedValue(
-              row,
-              'forecastEnd'
-            )
-          ),
+          '',
 
         factDate:
           normDate(
