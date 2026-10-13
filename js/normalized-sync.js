@@ -1,7 +1,7 @@
 'use strict';
 
 (function () {
-  const MODULE_VERSION = '2026.10.13.8';
+  const MODULE_VERSION = '2026.10.13.10';
   const PROJECT_EXTERNAL_ID = 'LIV-MAIN';
   const SAVE_DELAY = 1200;
   const PAGE_SIZE = 1000;
