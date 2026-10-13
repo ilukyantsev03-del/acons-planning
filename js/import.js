@@ -1326,6 +1326,7 @@ const MODE_FIELDS = {
   ],
 
   milestones: [
+    'organization',
     'title',
     'building',
     'block',
@@ -4204,6 +4205,217 @@ function ensureFrontFromImport(
 }
 
 
+function ensureImportedContract(
+  organizationId,
+  contractNo
+) {
+
+  const number =
+    normText(
+      contractNo
+    );
+
+
+  if (
+    !number
+  ) {
+    return null;
+  }
+
+
+  project.contracts =
+    project.contracts ||
+    [];
+
+
+  let contract =
+    project.contracts
+      .find(
+        item =>
+          item.active !==
+            false &&
+          sameText(
+            item.number ||
+            item.contractNo,
+            number
+          ) &&
+          (
+            !organizationId ||
+            !item.organizationId ||
+            String(
+              item.organizationId
+            ) ===
+              String(
+                organizationId
+              )
+          )
+      );
+
+
+  if (
+    !contract
+  ) {
+
+    contract = {
+      id:
+        uid(
+          'CTR'
+        ),
+      organizationId:
+        organizationId ||
+        '',
+      number,
+      name:
+        number,
+      active:
+        true,
+      createdAt:
+        nowIso(),
+      updatedAt:
+        nowIso()
+    };
+
+
+    project.contracts.push(
+      contract
+    );
+  }
+
+
+  return contract;
+}
+
+
+function inferMilestoneImportTarget(
+  title
+) {
+
+  const raw =
+    normText(
+      title
+    );
+
+
+  if (!raw) {
+    return {
+      qty:
+        null,
+      unit:
+        ''
+    };
+  }
+
+
+  const patterns = [
+    {
+      regex:
+        /(\d[\d\s]*)\s*(?:\([^)]*\)\s*)?(?:буронабивн\w*|буросекущ\w*|грунтов\w*)\s+(?:сва\w*|анкер\w*)/i,
+      unit:
+        'шт.'
+    },
+    {
+      regex:
+        /(\d[\d\s]*)\s*(?:\([^)]*\)\s*)?(?:сва\w*|анкер\w*)/i,
+      unit:
+        'шт.'
+    },
+    {
+      regex:
+        /(\d+(?:[.,]\d+)?)\s*(м3|м³|м2|м²|м\.?\s*п\.?|шт\.?)/i,
+      unit:
+        ''
+    }
+  ];
+
+
+  for (
+    const item of patterns
+  ) {
+
+    const match =
+      raw.match(
+        item.regex
+      );
+
+
+    if (!match) {
+      continue;
+    }
+
+
+    const qty =
+      num(
+        String(
+          match[1]
+        )
+          .replace(
+            /\s/g,
+            ''
+          )
+      );
+
+
+    let unit =
+      item.unit ||
+      normText(
+        match[2]
+      );
+
+
+    if (/м3|м³/i.test(unit)) {
+      unit =
+        'м³';
+    } else if (/м2|м²/i.test(unit)) {
+      unit =
+        'м²';
+    } else if (/м.*п/i.test(unit)) {
+      unit =
+        'м.п.';
+    } else if (/шт/i.test(unit)) {
+      unit =
+        'шт.';
+    }
+
+
+    return {
+      qty:
+        qty >
+          0
+          ? qty
+          : null,
+      unit
+    };
+  }
+
+
+  return {
+    qty:
+      null,
+    unit:
+      ''
+  };
+}
+
+
+function inferMilestoneNumber(
+  title
+) {
+
+  const match =
+    normText(
+      title
+    )
+      .match(
+        /(?:ключевая|контрольная)\s+(?:дата|срок)\s*№?\s*([\d.]+)/i
+      );
+
+
+  return match
+    ? match[1]
+    : '';
+}
+
+
 function normalizeMilestoneStatus(value) {
   const text = normKey(value);
 
@@ -5432,14 +5644,49 @@ async function commitImport(){
           : null;
 
 
+      const organizationName =
+        normText(
+          mappedValue(
+            row,
+            'organization'
+          )
+        ) ||
+        normText(
+          importSheetName
+        );
+
+
       const organization =
-        importSheetName
+        organizationName
           ? ensureNamed(
               project.organizations,
               'ORG',
-              importSheetName
+              organizationName
             )
           : null;
+
+
+      const contractNo =
+        normText(
+          mappedValue(
+            row,
+            'contractNo'
+          )
+        );
+
+
+      const contract =
+        ensureImportedContract(
+          organization?.id ||
+          '',
+          contractNo
+        );
+
+
+      const target =
+        inferMilestoneImportTarget(
+          title
+        );
 
 
       const existingMilestone =
@@ -5463,13 +5710,25 @@ async function commitImport(){
           organization?.id ||
           '',
 
-        contractNo:
-          normText(
-            mappedValue(
-              row,
-              'contractNo'
-            )
+        contractId:
+          contract?.id ||
+          '',
+
+        contractNo,
+
+        milestoneNo:
+          inferMilestoneNumber(
+            title
           ),
+
+        targetQty:
+          target.qty,
+
+        targetUnit:
+          target.unit,
+
+        riskWindowDays:
+          7,
 
         blockCapture:
           normText(
