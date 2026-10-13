@@ -635,7 +635,7 @@
 
     const match =
       value.match(
-        /^(\d+(?:\.\d+)*)(FS|SS|FF|SF)?(?:([+-])(\d+(?:[.,]\d+)?)(?:d|д|дн|days?)?)?$/i
+        /^(\d+(?:\.\d+)*)(FS|SS|FF|SF|ОН|НН|ОО|НО)?(?:([+-])(\d+(?:[.,]\d+)?)(?:d|д|дн|days?)?)?$/i
       );
 
 
@@ -669,10 +669,28 @@
         match[1],
       linkType:
         (
-          match[2] ||
-          'FS'
-        )
-          .toUpperCase(),
+          {
+            'ОН':
+              'FS',
+            'НН':
+              'SS',
+            'ОО':
+              'FF',
+            'НО':
+              'SF'
+          }[
+            (
+              match[2] ||
+              ''
+            )
+              .toUpperCase()
+          ] ||
+          (
+            match[2] ||
+            'FS'
+          )
+            .toUpperCase()
+        ),
       lagDays:
         Number.isFinite(
           lag
