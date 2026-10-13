@@ -294,6 +294,45 @@
     x.serverVersion=Number(updated.data[0].row_version||expected+1);
   }
 
+  async function deleteVersioned(table,x){
+    const client=window.LIV_SUPABASE;
+    if(!client||!x)return;
+
+    if(!x.serverId){
+      const existing=await client
+        .from(table)
+        .select('id,row_version')
+        .eq('external_id',x.id)
+        .maybeSingle();
+      if(existing.error)throw existing.error;
+      if(!existing.data?.id)return;
+      x.serverId=existing.data.id;
+      x.serverVersion=Number(existing.data.row_version||1);
+    }
+
+    if(!x.serverVersion){
+      const version=await client
+        .from(table)
+        .select('row_version')
+        .eq('id',x.serverId)
+        .single();
+      if(version.error)throw version.error;
+      x.serverVersion=Number(version.data?.row_version||1);
+    }
+
+    const removed=await client
+      .from(table)
+      .delete()
+      .eq('id',x.serverId)
+      .eq('row_version',Number(x.serverVersion||1))
+      .select('id');
+
+    if(removed.error)throw removed.error;
+    if(!removed.data||removed.data.length!==1){
+      throw new Error('Конфликт удаления: объект уже изменён другим пользователем. Обнови страницу и повтори.');
+    }
+  }
+
   async function syncScheme(x){
     const client=window.LIV_SUPABASE;
     if(!client)return;
@@ -362,7 +401,36 @@
 
   async function download(){const x=scheme(state.schemeId),client=window.LIV_SUPABASE;if(!x||!client)return;loading(true,'Подготовка файла...');try{const r=await client.storage.from(BUCKET).download(x.storagePath);if(r.error)throw r.error;const url=URL.createObjectURL(r.data),a=document.createElement('a');a.href=url;a.download=x.fileName||`${x.name}.pdf`;a.click();URL.revokeObjectURL(url);}catch(error){alert('Не удалось скачать PDF: '+(error.message||error));}finally{loading(false);}}
   function openDelete(){const x=scheme(state.schemeId);if(!x||!canWrite())return;openModal('Удаление PDF-схемы',`<div class="notice bad">Будет удалена схема <b>${html(x.name)}</b>, исходный PDF и ${marks(x.id).length} отметок. Фронты и шахматки не удаляются.</div><div class="liv-editor-footer"><button id="sdCancel" class="btn">Отмена</button><button id="sdConfirm" class="btn danger">Удалить</button></div>`);$s('sdCancel').onclick=closeModal;$s('sdConfirm').onclick=removeScheme;}
-  async function removeScheme(){const x=scheme(state.schemeId),client=window.LIV_SUPABASE;if(!x)return;try{if(client){if(x.storagePath)await client.storage.from(BUCKET).remove([x.storagePath]);const r=x.serverId?await client.from('schemes').delete().eq('id',x.serverId):await client.from('schemes').delete().eq('external_id',x.id);if(r.error)throw r.error;}x.active=false;x.deletedAt=x.updatedAt=now();marks(x.id).forEach(m=>{m.active=false;m.deletedAt=m.updatedAt=x.deletedAt;});await saveProject();const cached=state.cache.get(x.id);state.cache.delete(x.id);try{await cached?.destroy?.();}catch(_){}closeModal();clear();}catch(error){alert('Не удалось удалить схему: '+(error.message||error));}}
+  async function removeScheme(){
+    const x=scheme(state.schemeId),client=window.LIV_SUPABASE;
+    if(!x)return;
+    try{
+      if(client){
+        await deleteVersioned('schemes',x);
+
+        if(x.storagePath){
+          const removed=await client.storage.from(BUCKET).remove([x.storagePath]);
+          if(removed.error){
+            console.warn('LIV Schemes: PDF storage cleanup failed',removed.error);
+          }
+        }
+      }
+
+      x.active=false;
+      x.deletedAt=x.updatedAt=now();
+      marks(x.id).forEach(m=>{m.active=false;m.deletedAt=m.updatedAt=x.deletedAt;});
+      await saveProject();
+
+      const cached=state.cache.get(x.id);
+      state.cache.delete(x.id);
+      try{await cached?.destroy?.();}catch(_){}
+
+      closeModal();
+      clear();
+    }catch(error){
+      alert('Не удалось удалить схему: '+(error.message||error));
+    }
+  }
 
   async function resyncServerLinks(){
     if(!canWrite()||!window.LIV_NORMALIZED_SYNC?.projectId?.())return;
