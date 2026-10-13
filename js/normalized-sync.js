@@ -285,9 +285,37 @@
       'background:#fff',
       'font-size:11px',
       'color:#667085',
-      'white-space:nowrap'
+      'white-space:nowrap',
+      'cursor:pointer'
     ].join(';');
     badge.textContent = 'Серверная база: ожидание';
+    badge.title = 'Нажми, чтобы увидеть сверку локальных и серверных данных.';
+    badge.onclick = () => {
+      const report = window.LIV_MIGRATION_CHECK || {};
+      const entries = Object.entries(report);
+
+      if (!entries.length) {
+        alert(
+          state.lastError
+            ? 'Последняя ошибка:\n' + state.lastError
+            : 'Сверка ещё не выполнялась.'
+        );
+        return;
+      }
+
+      const lines = entries.map(([table,value]) =>
+        table + ': ' +
+        value.local + ' локально / ' +
+        value.server + ' на сервере' +
+        (value.ok ? ' ✓' : ' ✕')
+      );
+
+      if (state.lastError) {
+        lines.push('', 'Последняя ошибка:', state.lastError);
+      }
+
+      alert('Сверка LIV\n\n' + lines.join('\n'));
+    };
     host.appendChild(badge);
     return badge;
   }
