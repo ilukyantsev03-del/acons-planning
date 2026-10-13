@@ -1,1460 +1,171 @@
 'use strict';
 
 (function () {
-  const STORAGE_BUCKET = 'liv-schemes';
-  const PDFJS_URL =
-    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-  const PDFJS_WORKER_URL =
-    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  const MAX_FILE_SIZE = 100 * 1024 * 1024;
+  const BUCKET = 'liv-schemes';
+  const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+  const WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const WRITERS = new Set(['admin', 'planner']);
+  const STATUSES = ['Не начато','В работе','Выполнено','Освидетельствовано','Принято','Ограничение'];
+  const DONE = new Set(['Выполнено','Освидетельствовано','Принято']);
+  const state = { schemeId:'', pdf:null, page:1, zoom:1, draw:false, start:null, draft:null, filter:'all', cache:new Map(), pending:null };
 
-  const MARK_STATUSES = [
-    'Не начато',
-    'В работе',
-    'Выполнено',
-    'Освидетельствовано',
-    'Принято',
-    'Ограничение'
-  ];
+  const $s = id => document.getElementById(id);
+  const p = () => { try { return project || null; } catch (_) { return null; } };
+  const role = () => window.LIV_ACCESS?.role || window.LIV_REMOTE_SYNC?.role?.() || '';
+  const canWrite = () => WRITERS.has(role());
+  const now = () => new Date().toISOString();
+  const clamp = (v,min=0,max=1) => Math.max(min,Math.min(max,Number.isFinite(Number(v))?Number(v):min));
+  const makeId = prefix => typeof uid === 'function' ? uid(prefix) : `${prefix}-${crypto.randomUUID()}`;
+  const html = value => typeof esc === 'function' ? esc(value) : String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+  const safeName = value => String(value||'scheme.pdf').replace(/[^a-zA-Z0-9а-яА-ЯёЁ._-]+/g,'_').slice(-140);
 
-  const COMPLETED_STATUSES = new Set([
-    'Выполнено',
-    'Освидетельствовано',
-    'Принято'
-  ]);
-
-  const state = {
-    currentSchemeId: '',
-    currentPdf: null,
-    currentPdfSchemeId: '',
-    page: 1,
-    zoom: 1,
-    drawMode: false,
-    drawStart: null,
-    draftElement: null,
-    pendingFile: null,
-    loading: false,
-    statusFilter: 'all',
-    pdfCache: new Map()
-  };
-
-  function el(id) {
-    return document.getElementById(id);
-  }
-
-  function getProject() {
-    try {
-      return project || null;
-    } catch (error) {
-      return null;
-    }
-  }
-
-  function canWrite() {
-    if (window.LIV_ACCESS) {
-      return window.LIV_ACCESS.readOnly !== true;
-    }
-
-    return Boolean(
-      window.LIV_REMOTE_SYNC?.canWrite?.()
-    );
-  }
-
-  function ensureState() {
-    const current = getProject();
-
-    if (!current) {
-      return false;
-    }
-
-    if (!Array.isArray(current.schemes)) {
-      current.schemes = [];
-    }
-
-    if (!Array.isArray(current.schemeMarks)) {
-      current.schemeMarks = [];
-    }
-
+  function ensure() {
+    const current = p();
+    if (!current) return false;
+    if (!Array.isArray(current.schemes)) current.schemes=[];
+    if (!Array.isArray(current.schemeMarks)) current.schemeMarks=[];
     return true;
   }
 
-  function activeSchemes() {
-    const current = getProject();
+  const schemes = () => (p()?.schemes||[]).filter(x=>x.active!==false).sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
+  const scheme = id => (p()?.schemes||[]).find(x=>String(x.id)===String(id))||null;
+  const mark = id => (p()?.schemeMarks||[]).find(x=>String(x.id)===String(id))||null;
+  const marks = (schemeId,page=null) => (p()?.schemeMarks||[]).filter(x=>x.active!==false&&String(x.schemeId)===String(schemeId)&&(page===null||Number(x.pageNo||1)===Number(page)));
+  const markClass = status => DONE.has(status)?'sch-done':status==='В работе'?'sch-work':status==='Ограничение'?'sch-risk':'sch-idle';
 
-    return (
-      current?.schemes || []
-    )
-      .filter(item => item.active !== false)
-      .sort((a, b) =>
-        String(b.updatedAt || b.createdAt || '')
-          .localeCompare(String(a.updatedAt || a.createdAt || ''))
-      );
+  function options(list,selected,empty='—') {
+    return `<option value="">${html(empty)}</option>`+(list||[]).filter(x=>x.active!==false).map(x=>`<option value="${html(x.id)}" ${String(x.id)===String(selected||'')?'selected':''}>${html(x.name||x.id)}</option>`).join('');
   }
 
-  function schemeById(id) {
-    return (
-      getProject()?.schemes || []
-    ).find(item => String(item.id) === String(id)) || null;
+  function frontOptions(selected) {
+    let rows=[];
+    try { rows=typeof activeFronts==='function'?activeFronts():(p()?.fronts||[]).filter(x=>x.active!==false); } catch(_) {}
+    return '<option value="">—</option>'+rows.map(x=>{
+      let label=x.id; try { if(typeof frontLabel==='function') label=frontLabel(x); } catch(_) {}
+      return `<option value="${html(x.id)}" ${String(x.id)===String(selected||'')?'selected':''}>${html(label)}</option>`;
+    }).join('');
   }
 
-  function marksForScheme(schemeId, pageNo = null) {
-    return (
-      getProject()?.schemeMarks || []
-    ).filter(mark =>
-      mark.active !== false &&
-      String(mark.schemeId) === String(schemeId) &&
-      (
-        pageNo === null ||
-        Number(mark.pageNo || 1) === Number(pageNo)
-      )
-    );
-  }
-
-  function markById(id) {
-    return (
-      getProject()?.schemeMarks || []
-    ).find(item => String(item.id) === String(id)) || null;
-  }
-
-  function escapeHtml(value) {
-    if (typeof esc === 'function') {
-      return esc(value);
-    }
-
-    return String(value ?? '')
-      .replace(/[&<>"']/g, char => ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
-      })[char]);
-  }
-
-  function safeFileName(value) {
-    return String(value || 'scheme.pdf')
-      .replace(/[^a-zA-Z0-9а-яА-ЯёЁ._-]+/g, '_')
-      .slice(-140);
-  }
-
-  function clamp(value, min = 0, max = 1) {
-    return Math.max(min, Math.min(max, Number(value) || 0));
-  }
-
-  function statusClass(status) {
-    const key = String(status || '');
-
-    if (COMPLETED_STATUSES.has(key)) return 'scheme-mark-complete';
-    if (key === 'В работе') return 'scheme-mark-work';
-    if (key === 'Ограничение') return 'scheme-mark-risk';
-    return 'scheme-mark-idle';
-  }
-
-  function statusSuggestedProgress(status) {
-    if (COMPLETED_STATUSES.has(status)) return 100;
-    if (status === 'В работе') return 50;
-    return 0;
-  }
-
-  function listOptions(list, selectedId, emptyLabel = '—') {
-    return `
-      <option value="">${escapeHtml(emptyLabel)}</option>
-      ${(
-        list || []
-      )
-        .filter(item => item.active !== false)
-        .map(item => `
-          <option
-            value="${escapeHtml(item.id)}"
-            ${String(item.id) === String(selectedId || '') ? 'selected' : ''}>
-            ${escapeHtml(item.name || item.id)}
-          </option>
-        `)
-        .join('')}
-    `;
-  }
-
-  function frontOptions(selectedId) {
-    let fronts = [];
-
-    try {
-      fronts = typeof activeFronts === 'function'
-        ? activeFronts()
-        : (getProject()?.fronts || []).filter(item => item.active !== false);
-    } catch (error) {
-      fronts = [];
-    }
-
-    return `
-      <option value="">—</option>
-      ${fronts
-        .map(front => {
-          let label = front.id;
-
-          try {
-            label = typeof frontLabel === 'function'
-              ? frontLabel(front)
-              : front.id;
-          } catch (error) {
-            label = front.id;
-          }
-
-          return `
-            <option
-              value="${escapeHtml(front.id)}"
-              ${String(front.id) === String(selectedId || '') ? 'selected' : ''}>
-              ${escapeHtml(label)}
-            </option>
-          `;
-        })
-        .join('')}
-    `;
-  }
-
-  function injectStyles() {
-    if (document.getElementById('liv-schemes-style')) return;
-
-    const style = document.createElement('style');
-    style.id = 'liv-schemes-style';
-    style.textContent = `
-      .scheme-page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin:4px 0 14px}
-      .scheme-page-head h1{margin:0;font-size:26px;line-height:1.1}
-      .scheme-page-head p{margin:6px 0 0;color:var(--muted);font-size:13px}
-      .scheme-stats{display:grid;grid-template-columns:repeat(4,minmax(130px,1fr));gap:9px;margin-bottom:14px}
-      .scheme-stat{min-height:74px;padding:13px 14px;border:1px solid #dfe4eb;border-radius:10px;background:#fff}
-      .scheme-stat span{display:block;margin-bottom:7px;color:#667085;font-size:11px}
-      .scheme-stat strong{font-size:20px;color:#172033}
-      .scheme-layout{display:grid;grid-template-columns:280px minmax(0,1fr);gap:14px;align-items:start}
-      .scheme-sidebar{padding:14px;position:sticky;top:78px}
-      .scheme-sidebar-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
-      .scheme-sidebar-head h2{margin:0;font-size:16px}
-      .scheme-search{width:100%;height:38px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:9px;background:#fff}
-      .scheme-list{display:grid;gap:6px;max-height:650px;overflow:auto}
-      .scheme-list-item{width:100%;padding:10px;border:1px solid #e3e7ed;border-radius:9px;background:#fff;text-align:left;cursor:pointer}
-      .scheme-list-item:hover{background:#f8fafc}
-      .scheme-list-item.active{border-color:#829ac0;background:#eef4ff}
-      .scheme-list-item strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
-      .scheme-list-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:5px;color:#667085;font-size:10px}
-      .scheme-view-card{padding:0;overflow:hidden}
-      .scheme-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 13px;border-bottom:1px solid #e6eaf0;background:#fff;flex-wrap:wrap}
-      .scheme-toolbar-group{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-      .scheme-toolbar .btn{min-height:34px;padding:6px 9px;font-size:12px}
-      .scheme-page-label{min-width:84px;text-align:center;color:#475467;font-size:12px}
-      .scheme-filter-select{height:34px;border:1px solid var(--line);border-radius:7px;padding:5px 8px;background:#fff;font-size:12px}
-      .scheme-canvas-scroll{position:relative;min-height:620px;max-height:calc(100vh - 235px);overflow:auto;background:#e8edf3;padding:20px}
-      .scheme-empty{min-height:570px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:#667085;text-align:center}
-      .scheme-empty strong{font-size:17px;color:#344054}
-      .scheme-stage{position:relative;width:max-content;margin:0 auto;background:#fff;box-shadow:0 8px 28px rgba(15,23,42,.15);user-select:none}
-      .scheme-stage canvas{display:block}
-      .scheme-overlay{position:absolute;inset:0;cursor:default;touch-action:none}
-      .scheme-overlay.draw-mode{cursor:crosshair}
-      .scheme-mark{position:absolute;display:flex;align-items:center;justify-content:center;min-width:12px;min-height:12px;border:2px solid currentColor;border-radius:4px;background:color-mix(in srgb,currentColor 19%,transparent);cursor:pointer;overflow:hidden}
-      .scheme-mark span{max-width:100%;padding:2px 4px;border-radius:4px;background:rgba(255,255,255,.84);color:#182230;font-size:9px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
-      .scheme-mark-complete{color:#16825d}
-      .scheme-mark-work{color:#d2860b}
-      .scheme-mark-risk{color:#c23a3a}
-      .scheme-mark-idle{color:#667085}
-      .scheme-mark-draft{position:absolute;border:2px dashed #2563eb;background:rgba(37,99,235,.12);pointer-events:none}
-      .scheme-legend{display:flex;gap:12px;flex-wrap:wrap;padding:9px 13px;border-top:1px solid #e6eaf0;background:#fff;color:#667085;font-size:10px}
-      .scheme-legend-item{display:inline-flex;align-items:center;gap:5px}
-      .scheme-legend-dot{width:8px;height:8px;border-radius:50%;background:currentColor}
-      .scheme-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(232,237,243,.78);z-index:8;color:#344054;font-weight:700}
-      .scheme-upload-note{padding:10px 12px;border:1px solid #dbe7ff;border-radius:8px;background:#f4f8ff;color:#475467;font-size:12px;line-height:1.45}
-      .scheme-editor-progress{display:grid;grid-template-columns:minmax(0,1fr) 90px;gap:8px;align-items:end}
-      .scheme-delete-note{padding:11px 12px;border:1px solid #efc1c1;border-radius:9px;background:#fff6f6;color:#8f2424;line-height:1.45}
-      body.liv-readonly .scheme-write-action{display:none!important}
-      @media(max-width:980px){.scheme-layout{grid-template-columns:1fr}.scheme-sidebar{position:static}.scheme-list{max-height:220px}.scheme-canvas-scroll{min-height:500px}.scheme-stats{grid-template-columns:repeat(2,minmax(120px,1fr))}}
-      @media(max-width:640px){.scheme-stats{grid-template-columns:1fr 1fr}.scheme-canvas-scroll{padding:8px}.scheme-page-head h1{font-size:22px}}
-    `;
-
+  function addStyles() {
+    if ($s('liv-schemes-style')) return;
+    const style=document.createElement('style'); style.id='liv-schemes-style';
+    style.textContent=`
+      .sch-head{display:flex;align-items:end;justify-content:space-between;gap:16px;margin:4px 0 14px}.sch-head h1{margin:0;font-size:26px}.sch-head p{margin:6px 0 0;color:var(--muted);font-size:13px}
+      .sch-stats{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:9px;margin-bottom:14px}.sch-stat{padding:13px;border:1px solid #dfe4eb;border-radius:10px;background:#fff}.sch-stat span{display:block;color:#667085;font-size:11px;margin-bottom:6px}.sch-stat strong{font-size:20px}
+      .sch-layout{display:grid;grid-template-columns:280px minmax(0,1fr);gap:14px;align-items:start}.sch-side{padding:14px;position:sticky;top:78px}.sch-side h2{margin:0 0 10px;font-size:16px}.sch-search{width:100%;height:38px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:9px}.sch-list{display:grid;gap:6px;max-height:650px;overflow:auto}.sch-item{padding:10px;border:1px solid #e3e7ed;border-radius:9px;background:#fff;text-align:left;cursor:pointer}.sch-item.active{background:#eef4ff;border-color:#829ac0}.sch-item strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px}.sch-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:5px;color:#667085;font-size:10px}
+      .sch-view{padding:0;overflow:hidden}.sch-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid #e6eaf0;flex-wrap:wrap}.sch-group{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.sch-toolbar .btn{min-height:34px;padding:6px 9px;font-size:12px}.sch-page{min-width:90px;text-align:center;font-size:12px;color:#475467}.sch-filter{height:34px;border:1px solid var(--line);border-radius:7px;padding:5px 8px;background:#fff}
+      .sch-scroll{position:relative;min-height:620px;max-height:calc(100vh - 235px);overflow:auto;background:#e8edf3;padding:20px}.sch-empty{min-height:570px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:#667085;text-align:center}.sch-empty strong{font-size:17px;color:#344054}.sch-stage{position:relative;width:max-content;margin:0 auto;background:#fff;box-shadow:0 8px 28px rgba(15,23,42,.15)}.sch-stage canvas{display:block}.sch-overlay{position:absolute;inset:0;touch-action:none}.sch-overlay.draw{cursor:crosshair}
+      .sch-mark{position:absolute;display:flex;align-items:center;justify-content:center;min-width:12px;min-height:12px;border:2px solid currentColor;border-radius:4px;cursor:pointer;overflow:hidden}.sch-mark span{max-width:100%;padding:2px 4px;background:rgba(255,255,255,.86);color:#182230;font-size:9px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}.sch-done{color:#16825d;background:rgba(22,130,93,.18)}.sch-work{color:#d2860b;background:rgba(210,134,11,.18)}.sch-risk{color:#c23a3a;background:rgba(194,58,58,.18)}.sch-idle{color:#667085;background:rgba(102,112,133,.16)}.sch-draft{position:absolute;border:2px dashed #2563eb;background:rgba(37,99,235,.12);pointer-events:none}
+      .sch-load{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(232,237,243,.82);z-index:8;font-weight:700}.sch-legend{display:flex;gap:12px;flex-wrap:wrap;padding:9px 13px;border-top:1px solid #e6eaf0;background:#fff;color:#667085;font-size:10px}.sch-dot{width:8px;height:8px;border-radius:50%;display:inline-block;background:currentColor;margin-right:4px}.sch-note{padding:10px 12px;border:1px solid #dbe7ff;border-radius:8px;background:#f4f8ff;color:#475467;font-size:12px;line-height:1.45}
+      @media(max-width:980px){.sch-layout{grid-template-columns:1fr}.sch-side{position:static}.sch-list{max-height:220px}.sch-stats{grid-template-columns:repeat(2,1fr)}}`;
     document.head.appendChild(style);
   }
 
-  function injectUi() {
-    if (document.getElementById('tab-schemes')) return;
-
-    const nav = document.querySelector('.tabs');
-    const main = document.querySelector('main.container');
-
-    if (!nav || !main) return;
-
-    const tab = document.createElement('button');
-    tab.className = 'tab';
-    tab.dataset.tab = 'schemes';
-    tab.textContent = 'Схемы';
-
-    const importTab = nav.querySelector('[data-tab="import"]');
-    nav.insertBefore(tab, importTab || null);
-
-    const panel = document.createElement('section');
-    panel.id = 'tab-schemes';
-    panel.className = 'panel hidden';
-    panel.innerHTML = `
-      <section class="scheme-page-head">
-        <div>
-          <h1>Схемы</h1>
-          <p>PDF-схемы, участки работ и визуальная фиксация выполнения</p>
-        </div>
-
-        <div class="scheme-toolbar-group no-print">
-          <button id="schemeUploadBtn" class="btn primary scheme-write-action">+ Загрузить PDF</button>
-          <input id="schemeFileInput" type="file" accept="application/pdf,.pdf" hidden>
-          <button id="schemeDownloadBtn" class="btn" disabled>Скачать PDF</button>
-          <button id="schemeDeleteBtn" class="btn danger-lite scheme-write-action" disabled>Удалить схему</button>
-        </div>
-      </section>
-
-      <section class="scheme-stats">
-        <div class="scheme-stat"><span>Отметок</span><strong id="schemeStatTotal">0</strong></div>
-        <div class="scheme-stat"><span>В работе</span><strong id="schemeStatWork">0</strong></div>
-        <div class="scheme-stat"><span>Выполнено</span><strong id="schemeStatDone">0</strong></div>
-        <div class="scheme-stat"><span>Средняя готовность</span><strong id="schemeStatProgress">0%</strong></div>
-      </section>
-
-      <section class="scheme-layout">
-        <aside class="card scheme-sidebar no-print">
-          <div class="scheme-sidebar-head">
-            <h2>Загруженные схемы</h2>
-            <span id="schemeListCount" class="badge">0</span>
-          </div>
-
-          <input id="schemeSearch" class="scheme-search" type="search" placeholder="Поиск по схемам...">
-          <div id="schemeList" class="scheme-list"></div>
-        </aside>
-
-        <section class="card scheme-view-card">
-          <div class="scheme-toolbar no-print">
-            <div class="scheme-toolbar-group">
-              <button id="schemePrevPage" class="btn" disabled>‹</button>
-              <span id="schemePageLabel" class="scheme-page-label">Страница —</span>
-              <button id="schemeNextPage" class="btn" disabled>›</button>
-              <button id="schemeZoomOut" class="btn" disabled>−</button>
-              <button id="schemeZoomFit" class="btn" disabled>По ширине</button>
-              <button id="schemeZoomIn" class="btn" disabled>+</button>
-            </div>
-
-            <div class="scheme-toolbar-group">
-              <select id="schemeStatusFilter" class="scheme-filter-select">
-                <option value="all">Все статусы</option>
-                ${MARK_STATUSES.map(status => `<option>${status}</option>`).join('')}
-              </select>
-              <button id="schemeMarkMode" class="btn primary scheme-write-action" disabled>Отметить участок</button>
-            </div>
-          </div>
-
-          <div id="schemeCanvasScroll" class="scheme-canvas-scroll">
-            <div id="schemeEmpty" class="scheme-empty">
-              <strong>Выбери или загрузи PDF-схему</strong>
-              <span>После загрузки можно выделять участки и отмечать выполнение.</span>
-            </div>
-
-            <div id="schemeStage" class="scheme-stage hidden">
-              <canvas id="schemeCanvas"></canvas>
-              <div id="schemeOverlay" class="scheme-overlay"></div>
-            </div>
-
-            <div id="schemeLoading" class="scheme-loading hidden">Загрузка схемы...</div>
-          </div>
-
-          <div class="scheme-legend">
-            <span class="scheme-legend-item scheme-mark-idle"><i class="scheme-legend-dot"></i>Не начато</span>
-            <span class="scheme-legend-item scheme-mark-work"><i class="scheme-legend-dot"></i>В работе</span>
-            <span class="scheme-legend-item scheme-mark-complete"><i class="scheme-legend-dot"></i>Выполнено / принято</span>
-            <span class="scheme-legend-item scheme-mark-risk"><i class="scheme-legend-dot"></i>Ограничение</span>
-          </div>
-        </section>
-      </section>
-    `;
-
-    const importPanel = document.getElementById('tab-import');
-    main.insertBefore(panel, importPanel || null);
-
-    tab.addEventListener('click', () => {
-      if (typeof switchTab === 'function') {
-        switchTab('schemes');
-      } else {
-        document.querySelectorAll('main > .panel').forEach(item => item.classList.add('hidden'));
-        panel.classList.remove('hidden');
-      }
-
-      renderSchemes();
-    });
+  function addUi() {
+    if ($s('tab-schemes')) return;
+    const nav=document.querySelector('.tabs'), main=document.querySelector('main.container'); if(!nav||!main)return;
+    const tab=document.createElement('button'); tab.className='tab'; tab.dataset.tab='schemes'; tab.textContent='Схемы'; nav.insertBefore(tab,nav.querySelector('[data-tab="import"]'));
+    const panel=document.createElement('section'); panel.id='tab-schemes'; panel.className='panel hidden'; panel.innerHTML=`
+      <section class="sch-head"><div><h1>Схемы</h1><p>PDF-схемы и визуальная фиксация выполнения</p></div><div class="sch-group no-print"><button id="schUpload" class="btn primary sch-write">+ Загрузить PDF</button><input id="schFile" type="file" accept="application/pdf,.pdf" hidden><button id="schDownload" class="btn" disabled>Скачать PDF</button><button id="schDelete" class="btn danger-lite sch-write" disabled>Удалить схему</button></div></section>
+      <section class="sch-stats"><div class="sch-stat"><span>Отметок</span><strong id="schTotal">0</strong></div><div class="sch-stat"><span>В работе</span><strong id="schWork">0</strong></div><div class="sch-stat"><span>Выполнено</span><strong id="schDone">0</strong></div><div class="sch-stat"><span>Средняя готовность</span><strong id="schProgress">0%</strong></div></section>
+      <section class="sch-layout"><aside class="card sch-side no-print"><h2>Загруженные схемы <span id="schCount" class="badge">0</span></h2><input id="schSearch" class="sch-search" type="search" placeholder="Поиск по схемам..."><div id="schList" class="sch-list"></div></aside>
+      <section class="card sch-view"><div class="sch-toolbar no-print"><div class="sch-group"><button id="schPrev" class="btn" disabled>‹</button><span id="schPage" class="sch-page">Страница —</span><button id="schNext" class="btn" disabled>›</button><button id="schMinus" class="btn" disabled>−</button><button id="schFit" class="btn" disabled>По ширине</button><button id="schPlus" class="btn" disabled>+</button></div><div class="sch-group"><select id="schFilter" class="sch-filter"><option value="all">Все статусы</option>${STATUSES.map(x=>`<option>${x}</option>`).join('')}</select><button id="schDraw" class="btn primary sch-write" disabled>Отметить участок</button></div></div>
+      <div id="schScroll" class="sch-scroll"><div id="schEmpty" class="sch-empty"><strong>Выбери или загрузи PDF-схему</strong><span>После загрузки можно выделять участки и отмечать выполнение.</span></div><div id="schStage" class="sch-stage hidden"><canvas id="schCanvas"></canvas><div id="schOverlay" class="sch-overlay"></div></div><div id="schLoading" class="sch-load hidden">Загрузка схемы...</div></div>
+      <div class="sch-legend"><span class="sch-idle"><i class="sch-dot"></i>Не начато</span><span class="sch-work"><i class="sch-dot"></i>В работе</span><span class="sch-done"><i class="sch-dot"></i>Выполнено</span><span class="sch-risk"><i class="sch-dot"></i>Ограничение</span></div></section></section>`;
+    main.insertBefore(panel,$s('tab-import'));
+    tab.onclick=()=>{ typeof switchTab==='function'?switchTab('schemes'):(document.querySelectorAll('main>.panel').forEach(x=>x.classList.add('hidden')),panel.classList.remove('hidden')); render(); };
   }
 
-  function bindUi() {
-    el('schemeUploadBtn')?.addEventListener('click', () => {
-      if (!canWrite()) return;
-      el('schemeFileInput')?.click();
-    });
-
-    el('schemeFileInput')?.addEventListener('change', event => {
-      const file = event.target.files?.[0] || null;
-      event.target.value = '';
-
-      if (file) {
-        beginSchemeUpload(file);
-      }
-    });
-
-    el('schemeSearch')?.addEventListener('input', renderSchemeList);
-    el('schemePrevPage')?.addEventListener('click', () => changePage(-1));
-    el('schemeNextPage')?.addEventListener('click', () => changePage(1));
-    el('schemeZoomOut')?.addEventListener('click', () => changeZoom(-0.15));
-    el('schemeZoomIn')?.addEventListener('click', () => changeZoom(0.15));
-    el('schemeZoomFit')?.addEventListener('click', () => {
-      state.zoom = 1;
-      renderCurrentPage();
-    });
-
-    el('schemeMarkMode')?.addEventListener('click', () => {
-      if (!canWrite() || !state.currentPdf) return;
-      state.drawMode = !state.drawMode;
-      updateToolbarState();
-    });
-
-    el('schemeStatusFilter')?.addEventListener('change', event => {
-      state.statusFilter = event.target.value || 'all';
-      renderMarks();
-    });
-
-    el('schemeDownloadBtn')?.addEventListener('click', downloadCurrentScheme);
-    el('schemeDeleteBtn')?.addEventListener('click', openDeleteSchemeDialog);
-
-    const overlay = el('schemeOverlay');
-    overlay?.addEventListener('pointerdown', beginMarkDraw);
-    overlay?.addEventListener('pointermove', moveMarkDraw);
-    overlay?.addEventListener('pointerup', finishMarkDraw);
-    overlay?.addEventListener('pointercancel', cancelMarkDraw);
+  function bind() {
+    $s('schUpload').onclick=()=>canWrite()&&$s('schFile').click();
+    $s('schFile').onchange=e=>{ const file=e.target.files?.[0]; e.target.value=''; if(file) openUpload(file); };
+    $s('schSearch').oninput=renderList; $s('schPrev').onclick=()=>page(-1); $s('schNext').onclick=()=>page(1);
+    $s('schMinus').onclick=()=>zoom(-.15); $s('schPlus').onclick=()=>zoom(.15); $s('schFit').onclick=()=>{state.zoom=1;renderPage();};
+    $s('schFilter').onchange=e=>{state.filter=e.target.value;renderMarks();}; $s('schDownload').onclick=download; $s('schDelete').onclick=openDelete;
+    $s('schDraw').onclick=()=>{if(!canWrite()||!state.pdf)return;state.draw=!state.draw;cancelDraw();toolbar();};
+    const over=$s('schOverlay'); over.onpointerdown=startDraw; over.onpointermove=moveDraw; over.onpointerup=endDraw; over.onpointercancel=cancelDraw;
   }
 
-  function renderSchemeList() {
-    const container = el('schemeList');
-    if (!container || !ensureState()) return;
-
-    const query = String(el('schemeSearch')?.value || '')
-      .trim()
-      .toLocaleLowerCase('ru-RU');
-
-    const schemes = activeSchemes()
-      .filter(item =>
-        !query ||
-        String(item.name || '').toLocaleLowerCase('ru-RU').includes(query) ||
-        String(item.fileName || '').toLocaleLowerCase('ru-RU').includes(query)
-      );
-
-    el('schemeListCount').textContent = String(activeSchemes().length);
-
-    container.innerHTML = schemes.length
-      ? schemes.map(item => {
-          const marks = marksForScheme(item.id);
-          const done = marks.filter(mark => COMPLETED_STATUSES.has(mark.status)).length;
-
-          return `
-            <button
-              type="button"
-              class="scheme-list-item ${String(item.id) === String(state.currentSchemeId) ? 'active' : ''}"
-              data-scheme-id="${escapeHtml(item.id)}">
-              <strong>${escapeHtml(item.name || item.fileName || 'Схема')}</strong>
-              <span class="scheme-list-meta">
-                <span>${Number(item.pageCount || 0) || '—'} стр.</span>
-                <span>${marks.length} отметок</span>
-                <span>${done} выполнено</span>
-                ${item.revision ? `<span>Ред. ${escapeHtml(item.revision)}</span>` : ''}
-              </span>
-            </button>
-          `;
-        }).join('')
-      : `
-          <div class="muted" style="padding:18px 5px;text-align:center">
-            PDF-схемы пока не загружены.
-          </div>
-        `;
-
-    container.querySelectorAll('[data-scheme-id]').forEach(button => {
-      button.addEventListener('click', () => selectScheme(button.dataset.schemeId));
-    });
+  function renderList() {
+    if(!ensure())return; const q=String($s('schSearch')?.value||'').toLowerCase().trim(); const rows=schemes().filter(x=>!q||String(x.name||'').toLowerCase().includes(q)||String(x.fileName||'').toLowerCase().includes(q)); $s('schCount').textContent=schemes().length;
+    $s('schList').innerHTML=rows.length?rows.map(x=>{const m=marks(x.id);return `<button class="sch-item ${String(x.id)===String(state.schemeId)?'active':''}" data-id="${html(x.id)}"><strong>${html(x.name||x.fileName)}</strong><span class="sch-meta"><span>${x.pageCount||'—'} стр.</span><span>${m.length} отметок</span><span>${m.filter(y=>DONE.has(y.status)).length} выполнено</span>${x.revision?`<span>Ред. ${html(x.revision)}</span>`:''}</span></button>`;}).join(''):'<div class="muted" style="padding:18px 5px;text-align:center">PDF-схемы пока не загружены.</div>';
+    $s('schList').querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>select(b.dataset.id));
   }
 
-  function renderStats() {
-    const marks = state.currentSchemeId
-      ? marksForScheme(state.currentSchemeId)
-      : [];
-
-    const inWork = marks.filter(mark => mark.status === 'В работе').length;
-    const completed = marks.filter(mark => COMPLETED_STATUSES.has(mark.status)).length;
-    const average = marks.length
-      ? Math.round(
-          marks.reduce((sum, mark) => sum + Number(mark.progressPercent || 0), 0) /
-          marks.length
-        )
-      : 0;
-
-    el('schemeStatTotal').textContent = String(marks.length);
-    el('schemeStatWork').textContent = String(inWork);
-    el('schemeStatDone').textContent = String(completed);
-    el('schemeStatProgress').textContent = average + '%';
+  function stats() {
+    const rows=state.schemeId?marks(state.schemeId):[], avg=rows.length?Math.round(rows.reduce((sum,x)=>sum+clamp(x.progressPercent,0,100),0)/rows.length):0;
+    $s('schTotal').textContent=rows.length; $s('schWork').textContent=rows.filter(x=>x.status==='В работе').length; $s('schDone').textContent=rows.filter(x=>DONE.has(x.status)).length; $s('schProgress').textContent=`${avg}%`;
   }
 
-  function renderSchemes() {
-    if (!ensureState()) return;
-
-    renderSchemeList();
-    renderStats();
-    updateToolbarState();
-
-    const schemes = activeSchemes();
-
-    if (
-      state.currentSchemeId &&
-      !schemes.some(item => String(item.id) === String(state.currentSchemeId))
-    ) {
-      clearCurrentScheme();
-    }
+  function render() {
+    if(!ensure())return; document.querySelectorAll('.sch-write').forEach(x=>x.classList.toggle('hidden',!canWrite())); renderList(); stats(); toolbar(); if(state.schemeId&&!scheme(state.schemeId))clear();
   }
 
-  function updateToolbarState() {
-    const scheme = schemeById(state.currentSchemeId);
-    const hasScheme = Boolean(scheme);
-    const hasPdf = Boolean(state.currentPdf);
-    const pages = Number(state.currentPdf?.numPages || scheme?.pageCount || 0);
-
-    el('schemeDownloadBtn').disabled = !hasScheme;
-    el('schemeDeleteBtn').disabled = !hasScheme || !canWrite();
-    el('schemePrevPage').disabled = !hasPdf || state.page <= 1;
-    el('schemeNextPage').disabled = !hasPdf || state.page >= pages;
-    el('schemeZoomOut').disabled = !hasPdf || state.zoom <= 0.4;
-    el('schemeZoomFit').disabled = !hasPdf;
-    el('schemeZoomIn').disabled = !hasPdf || state.zoom >= 3;
-    el('schemeMarkMode').disabled = !hasPdf || !canWrite();
-    el('schemeMarkMode').classList.toggle('primary', state.drawMode);
-    el('schemeMarkMode').textContent = state.drawMode
-      ? 'Отмена отметки'
-      : 'Отметить участок';
-    el('schemeOverlay')?.classList.toggle('draw-mode', state.drawMode);
-
-    el('schemePageLabel').textContent = hasPdf
-      ? `Страница ${state.page} / ${pages}`
-      : 'Страница —';
+  function toolbar() {
+    const item=scheme(state.schemeId), pages=state.pdf?.numPages||item?.pageCount||0, has=!!state.pdf;
+    $s('schDownload').disabled=!item; $s('schDelete').disabled=!item||!canWrite(); $s('schPrev').disabled=!has||state.page<=1; $s('schNext').disabled=!has||state.page>=pages; $s('schMinus').disabled=!has||state.zoom<=.4; $s('schPlus').disabled=!has||state.zoom>=3; $s('schFit').disabled=!has; $s('schDraw').disabled=!has||!canWrite(); $s('schDraw').textContent=state.draw?'Отмена отметки':'Отметить участок'; $s('schOverlay')?.classList.toggle('draw',state.draw); $s('schPage').textContent=has?`Страница ${state.page} / ${pages}`:'Страница —';
   }
 
-  async function selectScheme(id) {
-    if (!id || String(id) === String(state.currentSchemeId)) {
-      renderSchemeList();
-      return;
-    }
+  async function select(id) { state.schemeId=id; state.page=1; state.zoom=1; state.draw=false; state.filter='all'; $s('schFilter').value='all'; renderList(); stats(); await loadPdf(); }
+  function clear() { state.schemeId='';state.pdf=null;state.page=1;state.zoom=1;state.draw=false;cancelDraw();$s('schStage').classList.add('hidden');$s('schEmpty').classList.remove('hidden');$s('schOverlay').innerHTML='';render(); }
+  function loading(on,text='Загрузка схемы...'){const x=$s('schLoading');x.textContent=text;x.classList.toggle('hidden',!on);}
 
-    state.currentSchemeId = id;
-    state.page = 1;
-    state.zoom = 1;
-    state.drawMode = false;
-    state.statusFilter = 'all';
-
-    if (el('schemeStatusFilter')) {
-      el('schemeStatusFilter').value = 'all';
-    }
-
-    renderSchemeList();
-    renderStats();
-    await loadSchemePdf();
+  async function pdfjs() {
+    if(window.pdfjsLib){window.pdfjsLib.GlobalWorkerOptions.workerSrc=WORKER;return window.pdfjsLib;} if(window.LIV_PDFJS_PROMISE)return window.LIV_PDFJS_PROMISE;
+    window.LIV_PDFJS_PROMISE=new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=PDFJS;s.onload=()=>{if(!window.pdfjsLib)return reject(new Error('PDF.js не инициализирован'));window.pdfjsLib.GlobalWorkerOptions.workerSrc=WORKER;resolve(window.pdfjsLib);};s.onerror=()=>reject(new Error('Не удалось загрузить PDF.js'));document.head.appendChild(s);});return window.LIV_PDFJS_PROMISE;
   }
 
-  function clearCurrentScheme() {
-    state.currentSchemeId = '';
-    state.currentPdf = null;
-    state.currentPdfSchemeId = '';
-    state.page = 1;
-    state.zoom = 1;
-    state.drawMode = false;
-
-    el('schemeStage')?.classList.add('hidden');
-    el('schemeEmpty')?.classList.remove('hidden');
-    el('schemeOverlay').innerHTML = '';
-    updateToolbarState();
-    renderStats();
-    renderSchemeList();
+  async function loadPdf() {
+    const item=scheme(state.schemeId); if(!item)return clear(); loading(true);
+    try { let doc=state.cache.get(item.id); if(!doc){const client=window.LIV_SUPABASE;if(!client)throw new Error('Нет подключения к Supabase');const d=await client.storage.from(BUCKET).download(item.storagePath);if(d.error)throw d.error;const lib=await pdfjs();doc=await lib.getDocument({data:new Uint8Array(await d.data.arrayBuffer())}).promise;state.cache.set(item.id,doc);} state.pdf=doc;if(item.pageCount!==doc.numPages){item.pageCount=doc.numPages;item.updatedAt=now();await syncScheme(item);await saveProject();}await renderPage(); }
+    catch(error){console.error(error);state.pdf=null;$s('schStage').classList.add('hidden');$s('schEmpty').classList.remove('hidden');$s('schEmpty').innerHTML=`<strong>Не удалось открыть PDF</strong><span>${html(error.message||error)}</span>`;} finally{loading(false);toolbar();renderList();}
   }
 
-  async function ensurePdfJs() {
-    if (window.pdfjsLib) {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
-      return window.pdfjsLib;
-    }
-
-    if (window.LIV_PDFJS_PROMISE) {
-      return window.LIV_PDFJS_PROMISE;
-    }
-
-    window.LIV_PDFJS_PROMISE = new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = PDFJS_URL;
-      script.async = true;
-      script.onload = () => {
-        if (!window.pdfjsLib) {
-          reject(new Error('PDF.js не инициализирован.'));
-          return;
-        }
-
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
-        resolve(window.pdfjsLib);
-      };
-      script.onerror = () => reject(new Error('Не удалось загрузить PDF.js.'));
-      document.head.appendChild(script);
-    });
-
-    return window.LIV_PDFJS_PROMISE;
-  }
-
-  function setLoading(value, text = 'Загрузка схемы...') {
-    state.loading = Boolean(value);
-    const layer = el('schemeLoading');
-
-    if (!layer) return;
-
-    layer.textContent = text;
-    layer.classList.toggle('hidden', !value);
-  }
-
-  async function loadSchemePdf() {
-    const scheme = schemeById(state.currentSchemeId);
-
-    if (!scheme) {
-      clearCurrentScheme();
-      return;
-    }
-
-    setLoading(true, 'Загрузка PDF-схемы...');
-    el('schemeEmpty')?.classList.add('hidden');
-
-    try {
-      let documentProxy = state.pdfCache.get(scheme.id) || null;
-
-      if (!documentProxy) {
-        const client = window.LIV_SUPABASE;
-
-        if (!client) {
-          throw new Error('Нет подключения к Supabase.');
-        }
-
-        const download = await client.storage
-          .from(STORAGE_BUCKET)
-          .download(scheme.storagePath);
-
-        if (download.error) {
-          throw download.error;
-        }
-
-        const pdfjs = await ensurePdfJs();
-        const buffer = await download.data.arrayBuffer();
-        documentProxy = await pdfjs.getDocument({
-          data: new Uint8Array(buffer)
-        }).promise;
-
-        state.pdfCache.set(scheme.id, documentProxy);
-      }
-
-      state.currentPdf = documentProxy;
-      state.currentPdfSchemeId = scheme.id;
-      state.page = Math.min(Math.max(1, state.page), documentProxy.numPages);
-
-      if (Number(scheme.pageCount || 0) !== Number(documentProxy.numPages)) {
-        scheme.pageCount = documentProxy.numPages;
-        scheme.updatedAt = new Date().toISOString();
-        await syncSchemeServer(scheme);
-        await saveProject();
-      }
-
-      await renderCurrentPage();
-    } catch (error) {
-      console.error('LIV Schemes: PDF load failed', error);
-      state.currentPdf = null;
-      el('schemeStage')?.classList.add('hidden');
-      el('schemeEmpty')?.classList.remove('hidden');
-      el('schemeEmpty').innerHTML = `
-        <strong>Не удалось открыть PDF</strong>
-        <span>${escapeHtml(error?.message || error)}</span>
-      `;
-    } finally {
-      setLoading(false);
-      updateToolbarState();
-      renderSchemeList();
-    }
-  }
-
-  async function renderCurrentPage() {
-    if (!state.currentPdf) return;
-
-    setLoading(true, 'Отрисовка страницы...');
-
-    try {
-      const page = await state.currentPdf.getPage(state.page);
-      const scroll = el('schemeCanvasScroll');
-      const canvas = el('schemeCanvas');
-      const stage = el('schemeStage');
-      const overlay = el('schemeOverlay');
-      const baseViewport = page.getViewport({ scale: 1 });
-      const availableWidth = Math.max(320, (scroll?.clientWidth || 900) - 42);
-      const fitScale = availableWidth / baseViewport.width;
-      const viewport = page.getViewport({ scale: fitScale * state.zoom });
-      const ratio = Math.min(window.devicePixelRatio || 1, 2);
-      const context = canvas.getContext('2d');
-
-      canvas.width = Math.floor(viewport.width * ratio);
-      canvas.height = Math.floor(viewport.height * ratio);
-      canvas.style.width = `${Math.floor(viewport.width)}px`;
-      canvas.style.height = `${Math.floor(viewport.height)}px`;
-      stage.style.width = `${Math.floor(viewport.width)}px`;
-      stage.style.height = `${Math.floor(viewport.height)}px`;
-      overlay.style.width = `${Math.floor(viewport.width)}px`;
-      overlay.style.height = `${Math.floor(viewport.height)}px`;
-
-      context.setTransform(1, 0, 0, 1, 0, 0);
-      context.clearRect(0, 0, canvas.width, canvas.height);
-
-      await page.render({
-        canvasContext: context,
-        viewport,
-        transform: ratio === 1 ? null : [ratio, 0, 0, ratio, 0, 0]
-      }).promise;
-
-      el('schemeEmpty')?.classList.add('hidden');
-      stage.classList.remove('hidden');
-      renderMarks();
-    } catch (error) {
-      console.error('LIV Schemes: page render failed', error);
-      alert('Не удалось отрисовать страницу PDF: ' + (error?.message || error));
-    } finally {
-      setLoading(false);
-      updateToolbarState();
-    }
+  async function renderPage() {
+    if(!state.pdf)return;loading(true,'Отрисовка страницы...');try{const page=await state.pdf.getPage(state.page),scroll=$s('schScroll'),canvas=$s('schCanvas'),stage=$s('schStage'),over=$s('schOverlay'),base=page.getViewport({scale:1}),scale=(Math.max(320,scroll.clientWidth-42)/base.width)*state.zoom,view=page.getViewport({scale}),ratio=Math.min(devicePixelRatio||1,2),ctx=canvas.getContext('2d');canvas.width=Math.floor(view.width*ratio);canvas.height=Math.floor(view.height*ratio);canvas.style.width=`${Math.floor(view.width)}px`;canvas.style.height=`${Math.floor(view.height)}px`;stage.style.width=over.style.width=canvas.style.width;stage.style.height=over.style.height=canvas.style.height;ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,canvas.width,canvas.height);await page.render({canvasContext:ctx,viewport:view,transform:ratio===1?null:[ratio,0,0,ratio,0,0]}).promise;$s('schEmpty').classList.add('hidden');stage.classList.remove('hidden');renderMarks();}catch(error){alert('Не удалось отрисовать страницу: '+(error.message||error));}finally{loading(false);toolbar();}
   }
 
   function renderMarks() {
-    const overlay = el('schemeOverlay');
-    if (!overlay || !state.currentSchemeId) return;
-
-    overlay.querySelectorAll('.scheme-mark').forEach(node => node.remove());
-
-    marksForScheme(state.currentSchemeId, state.page)
-      .filter(mark =>
-        state.statusFilter === 'all' ||
-        mark.status === state.statusFilter
-      )
-      .forEach(mark => {
-        const node = document.createElement('button');
-        node.type = 'button';
-        node.className = `scheme-mark ${statusClass(mark.status)}`;
-        node.dataset.schemeMarkId = mark.id;
-        node.style.left = `${clamp(mark.x) * 100}%`;
-        node.style.top = `${clamp(mark.y) * 100}%`;
-        node.style.width = `${clamp(mark.width, 0.008, 1) * 100}%`;
-        node.style.height = `${clamp(mark.height, 0.008, 1) * 100}%`;
-        node.title = [
-          mark.title || 'Участок',
-          mark.status || '',
-          `${Math.round(Number(mark.progressPercent || 0))}%`
-        ].filter(Boolean).join(' · ');
-        node.innerHTML = `<span>${escapeHtml(mark.title || mark.status || 'Участок')} · ${Math.round(Number(mark.progressPercent || 0))}%</span>`;
-
-        node.addEventListener('pointerdown', event => event.stopPropagation());
-        node.addEventListener('click', event => {
-          event.stopPropagation();
-          openMarkEditor(mark.id);
-        });
-
-        overlay.appendChild(node);
-      });
+    const over=$s('schOverlay');if(!over)return;over.querySelectorAll('.sch-mark').forEach(x=>x.remove());marks(state.schemeId,state.page).filter(x=>state.filter==='all'||x.status===state.filter).forEach(x=>{const b=document.createElement('button');b.className=`sch-mark ${markClass(x.status)}`;b.style.left=`${clamp(x.x)*100}%`;b.style.top=`${clamp(x.y)*100}%`;b.style.width=`${clamp(x.width,.008,1)*100}%`;b.style.height=`${clamp(x.height,.008,1)*100}%`;b.innerHTML=`<span>${html(x.title||x.status||'Участок')} · ${Math.round(clamp(x.progressPercent,0,100))}%</span>`;b.onpointerdown=e=>e.stopPropagation();b.onclick=e=>{e.stopPropagation();openMark(x.id);};over.appendChild(b);});
   }
 
-  function pointFromEvent(event) {
-    const overlay = el('schemeOverlay');
-    const rect = overlay.getBoundingClientRect();
+  function point(e){const r=$s('schOverlay').getBoundingClientRect();return{x:clamp((e.clientX-r.left)/r.width),y:clamp((e.clientY-r.top)/r.height)};}
+  function startDraw(e){if(!state.draw||!canWrite()||e.button!==0||e.target!==$s('schOverlay'))return;e.preventDefault();state.start=point(e);state.draft=document.createElement('div');state.draft.className='sch-draft';$s('schOverlay').appendChild(state.draft);}
+  function moveDraw(e){if(!state.start||!state.draft)return;const q=point(e),x=Math.min(state.start.x,q.x),y=Math.min(state.start.y,q.y),w=Math.abs(q.x-state.start.x),h=Math.abs(q.y-state.start.y);Object.assign(state.draft.style,{left:`${x*100}%`,top:`${y*100}%`,width:`${w*100}%`,height:`${h*100}%`});}
+  function endDraw(e){if(!state.start)return;const q=point(e);let x=Math.min(state.start.x,q.x),y=Math.min(state.start.y,q.y),w=Math.abs(q.x-state.start.x),h=Math.abs(q.y-state.start.y);if(w<.012||h<.012){w=.05;h=.05;x=clamp(q.x-w/2,0,1-w);y=clamp(q.y-h/2,0,1-h);}cancelDraw();state.draw=false;toolbar();openMark(null,{schemeId:state.schemeId,pageNo:state.page,x,y,width:w,height:h});}
+  function cancelDraw(){state.start=null;state.draft?.remove();state.draft=null;}
 
-    return {
-      x: clamp((event.clientX - rect.left) / rect.width),
-      y: clamp((event.clientY - rect.top) / rect.height)
-    };
+  function openMark(id=null,geometry=null) {
+    if(!canWrite())return;const current=p(),existing=id?mark(id):null,x=existing||geometry||{};openModal(existing?'Отметка выполнения':'Новая отметка на схеме',`<div class="form-grid"><div class="field"><label>Участок</label><input id="smTitle" value="${html(x.title||'')}"></div><div class="field"><label>Статус</label><select id="smStatus">${STATUSES.map(s=>`<option ${s===(x.status||'Не начато')?'selected':''}>${s}</option>`).join('')}</select></div><div class="field"><label>Готовность, %</label><input id="smProgress" type="number" min="0" max="100" value="${Math.round(clamp(x.progressPercent,0,100))}"></div><div class="field"><label>Вид работ</label><select id="smWork">${options(current.works,x.workId)}</select></div><div class="field"><label>Организация</label><select id="smOrg">${options(current.organizations,x.organizationId)}</select></div><div class="field"><label>Связанный фронт</label><select id="smFront">${frontOptions(x.frontId)}</select></div></div><div class="field"><label>Комментарий</label><textarea id="smComment">${html(x.comment||'')}</textarea></div><div class="liv-editor-footer">${existing?'<button id="smDelete" class="btn danger-lite">Удалить отметку</button>':''}<button id="smCancel" class="btn">Отмена</button><button id="smSave" class="btn primary">Сохранить</button></div>`);
+    $s('smStatus').onchange=e=>$s('smProgress').value=DONE.has(e.target.value)?100:e.target.value==='В работе'?50:0;$s('smCancel').onclick=closeModal;$s('smSave').onclick=()=>saveMark(existing,x);if($s('smDelete'))$s('smDelete').onclick=()=>deleteMark(existing);
   }
 
-  function beginMarkDraw(event) {
-    if (
-      !state.drawMode ||
-      !canWrite() ||
-      event.button !== 0 ||
-      event.target !== el('schemeOverlay')
-    ) {
-      return;
-    }
-
-    event.preventDefault();
-    const overlay = el('schemeOverlay');
-    const point = pointFromEvent(event);
-    state.drawStart = point;
-
-    const draft = document.createElement('div');
-    draft.className = 'scheme-mark-draft';
-    overlay.appendChild(draft);
-    state.draftElement = draft;
-    overlay.setPointerCapture?.(event.pointerId);
+  async function saveMark(existing,g) {
+    const current=p(),t=now();if(!current)return;let x=existing;if(!x){x={id:makeId('SMK'),schemeId:g.schemeId,pageNo:g.pageNo,x:g.x,y:g.y,width:g.width,height:g.height,active:true,createdAt:t};current.schemeMarks.push(x);}Object.assign(x,{title:$s('smTitle').value.trim(),status:$s('smStatus').value,progressPercent:Math.round(clamp($s('smProgress').value,0,100)),workId:$s('smWork').value,organizationId:$s('smOrg').value,frontId:$s('smFront').value,comment:$s('smComment').value.trim(),active:true,updatedAt:t});if(typeof log==='function')log(existing?'Изменено':'Создано','Отметка на схеме',x.title||'Участок',{schemeId:x.schemeId,markId:x.id,status:x.status,progress:x.progressPercent});await syncMark(x);await saveProject();closeModal();renderMarks();stats();renderList();
   }
 
-  function moveMarkDraw(event) {
-    if (!state.drawStart || !state.draftElement) return;
+  async function deleteMark(x){if(!x||!confirm('Удалить отметку со схемы?'))return;x.active=false;x.updatedAt=x.deletedAt=now();await syncMark(x);await saveProject();closeModal();renderMarks();stats();renderList();}
+  async function page(d){if(!state.pdf)return;const n=Math.min(state.pdf.numPages,Math.max(1,state.page+d));if(n!==state.page){state.page=n;await renderPage();}}
+  function zoom(d){if(!state.pdf)return;state.zoom=clamp(state.zoom+d,.4,3);renderPage();}
 
-    const current = pointFromEvent(event);
-    const left = Math.min(state.drawStart.x, current.x);
-    const top = Math.min(state.drawStart.y, current.y);
-    const width = Math.abs(current.x - state.drawStart.x);
-    const height = Math.abs(current.y - state.drawStart.y);
-
-    state.draftElement.style.left = `${left * 100}%`;
-    state.draftElement.style.top = `${top * 100}%`;
-    state.draftElement.style.width = `${width * 100}%`;
-    state.draftElement.style.height = `${height * 100}%`;
+  function openUpload(file) {
+    if(!canWrite())return;if(file.type!=='application/pdf'&&!file.name.toLowerCase().endsWith('.pdf'))return alert('Можно загрузить только PDF.');if(file.size>100*1024*1024)return alert('PDF превышает 100 МБ.');state.pending=file;const current=p(),name=file.name.replace(/\.pdf$/i,'');openModal('Загрузка PDF-схемы',`<div class="form-grid"><div class="field"><label>Название</label><input id="suName" value="${html(name)}"></div><div class="field"><label>Редакция</label><input id="suRevision" placeholder="Р1"></div><div class="field"><label>Здание</label><select id="suBuilding">${options(current.buildings,'')}</select></div><div class="field"><label>Шахматка</label><select id="suMatrix">${options(current.matrices,'')}</select></div></div><div class="sch-note">Файл: <b>${html(file.name)}</b><br>Размер: ${(file.size/1024/1024).toFixed(1)} МБ.<br>Отметки сохраняются отдельно от PDF и не съезжают при масштабировании.</div><div class="liv-editor-footer"><button id="suCancel" class="btn">Отмена</button><button id="suSave" class="btn primary">Загрузить</button></div>`);$s('suCancel').onclick=()=>{state.pending=null;closeModal();};$s('suSave').onclick=upload;
   }
 
-  function finishMarkDraw(event) {
-    if (!state.drawStart) return;
-
-    const finish = pointFromEvent(event);
-    let x = Math.min(state.drawStart.x, finish.x);
-    let y = Math.min(state.drawStart.y, finish.y);
-    let width = Math.abs(finish.x - state.drawStart.x);
-    let height = Math.abs(finish.y - state.drawStart.y);
-
-    if (width < 0.012 || height < 0.012) {
-      width = 0.05;
-      height = 0.05;
-      x = clamp(finish.x - width / 2, 0, 1 - width);
-      y = clamp(finish.y - height / 2, 0, 1 - height);
-    }
-
-    cancelMarkDraw();
-    state.drawMode = false;
-    updateToolbarState();
-
-    openMarkEditor(null, {
-      schemeId: state.currentSchemeId,
-      pageNo: state.page,
-      x,
-      y,
-      width,
-      height
-    });
+  async function upload() {
+    const file=state.pending,current=p(),client=window.LIV_SUPABASE;if(!file||!current||!client)return alert('Нет подключения к серверу.');const b=$s('suSave');b.disabled=true;b.textContent='Загрузка...';const id=makeId('SCH'),path=`schemes/${id}/${safeName(file.name)}`,t=now();try{const u=await client.storage.from(BUCKET).upload(path,file,{contentType:'application/pdf',upsert:false});if(u.error)throw u.error;const x={id,name:$s('suName').value.trim()||file.name,fileName:file.name,storagePath:path,mimeType:'application/pdf',fileSize:file.size,pageCount:0,buildingId:$s('suBuilding').value,matrixId:$s('suMatrix').value,revision:$s('suRevision').value.trim(),status:'Загружена',active:true,createdAt:t,updatedAt:t};current.schemes.push(x);try{await syncScheme(x);}catch(error){current.schemes=current.schemes.filter(y=>y.id!==x.id);await client.storage.from(BUCKET).remove([path]);throw error;}await saveProject();state.pending=null;closeModal();render();await select(x.id);}catch(error){alert('Не удалось загрузить PDF: '+(error.message||error));b.disabled=false;b.textContent='Загрузить';}
   }
 
-  function cancelMarkDraw() {
-    state.drawStart = null;
-    state.draftElement?.remove();
-    state.draftElement = null;
-  }
-
-  function openMarkEditor(markId = null, draft = null) {
-    if (!canWrite()) return;
-
-    const current = getProject();
-    const existing = markId ? markById(markId) : null;
-    const mark = existing || draft || {};
-
-    if (typeof openModal !== 'function') return;
-
-    openModal(
-      existing ? 'Отметка выполнения' : 'Новая отметка на схеме',
-      `
-        <div class="form-grid">
-          <div class="field">
-            <label>Наименование участка</label>
-            <input id="schemeMarkTitle" value="${escapeHtml(mark.title || '')}" placeholder="Например: Ось А, участок 1">
-          </div>
-
-          <div class="field">
-            <label>Статус</label>
-            <select id="schemeMarkStatus">
-              ${MARK_STATUSES.map(status => `
-                <option ${status === (mark.status || 'Не начато') ? 'selected' : ''}>${escapeHtml(status)}</option>
-              `).join('')}
-            </select>
-          </div>
-
-          <div class="field">
-            <label>Готовность, %</label>
-            <input id="schemeMarkProgress" type="number" min="0" max="100" step="1" value="${Math.round(Number(mark.progressPercent || 0))}">
-          </div>
-
-          <div class="field">
-            <label>Вид работ</label>
-            <select id="schemeMarkWork">${listOptions(current.works, mark.workId)}</select>
-          </div>
-
-          <div class="field">
-            <label>Организация</label>
-            <select id="schemeMarkOrganization">${listOptions(current.organizations, mark.organizationId)}</select>
-          </div>
-
-          <div class="field">
-            <label>Связанный фронт</label>
-            <select id="schemeMarkFront">${frontOptions(mark.frontId)}</select>
-          </div>
-        </div>
-
-        <div class="field">
-          <label>Комментарий</label>
-          <textarea id="schemeMarkComment">${escapeHtml(mark.comment || '')}</textarea>
-        </div>
-
-        <div class="liv-editor-footer">
-          ${existing ? `<button id="schemeMarkDelete" class="btn danger-lite">Удалить отметку</button>` : ''}
-          <button id="schemeMarkCancel" class="btn">Отмена</button>
-          <button id="schemeMarkSave" class="btn primary">Сохранить</button>
-        </div>
-      `
-    );
-
-    el('schemeMarkStatus')?.addEventListener('change', event => {
-      const progress = el('schemeMarkProgress');
-      if (progress) {
-        progress.value = String(statusSuggestedProgress(event.target.value));
-      }
-    });
-
-    el('schemeMarkCancel')?.addEventListener('click', closeModal);
-    el('schemeMarkSave')?.addEventListener('click', () => saveMark(existing, mark));
-    el('schemeMarkDelete')?.addEventListener('click', () => deleteMark(existing));
-  }
-
-  async function saveMark(existing, geometry) {
-    const current = getProject();
-    if (!current || !canWrite()) return;
-
-    const status = el('schemeMarkStatus')?.value || 'Не начато';
-    const progress = clamp(Number(el('schemeMarkProgress')?.value || 0), 0, 100) * 100;
-    const now = new Date().toISOString();
-    let mark = existing;
-
-    if (!mark) {
-      mark = {
-        id: typeof uid === 'function' ? uid('SMK') : `SMK-${crypto.randomUUID()}`,
-        schemeId: geometry.schemeId,
-        pageNo: geometry.pageNo,
-        x: geometry.x,
-        y: geometry.y,
-        width: geometry.width,
-        height: geometry.height,
-        markType: 'area',
-        active: true,
-        createdAt: now
-      };
-
-      current.schemeMarks.push(mark);
-    }
-
-    Object.assign(mark, {
-      title: String(el('schemeMarkTitle')?.value || '').trim(),
-      status,
-      progressPercent: Math.round(progress) / 100,
-      workId: el('schemeMarkWork')?.value || '',
-      organizationId: el('schemeMarkOrganization')?.value || '',
-      frontId: el('schemeMarkFront')?.value || '',
-      comment: String(el('schemeMarkComment')?.value || '').trim(),
-      active: true,
-      updatedAt: now
-    });
-
-    if (typeof log === 'function') {
-      log(
-        existing ? 'Изменено' : 'Создано',
-        'Отметка на схеме',
-        mark.title || schemeById(mark.schemeId)?.name || 'Участок',
-        {
-          schemeId: mark.schemeId,
-          markId: mark.id,
-          pageNo: mark.pageNo,
-          status: mark.status,
-          progressPercent: mark.progressPercent
-        }
-      );
-    }
-
-    await syncMarkServer(mark);
-    await saveProject();
-    closeModal();
-    renderMarks();
-    renderStats();
-    renderSchemeList();
-  }
-
-  async function deleteMark(mark) {
-    if (!mark || !canWrite()) return;
-
-    if (!confirm('Удалить отметку со схемы?')) return;
-
-    mark.active = false;
-    mark.deletedAt = new Date().toISOString();
-    mark.updatedAt = mark.deletedAt;
-
-    if (typeof log === 'function') {
-      log('Удалено', 'Отметка на схеме', mark.title || 'Участок', {
-        schemeId: mark.schemeId,
-        markId: mark.id
-      });
-    }
-
-    await syncMarkServer(mark);
-    await saveProject();
-    closeModal();
-    renderMarks();
-    renderStats();
-    renderSchemeList();
-  }
-
-  async function changePage(delta) {
-    if (!state.currentPdf) return;
-
-    const next = Math.min(
-      state.currentPdf.numPages,
-      Math.max(1, state.page + delta)
-    );
-
-    if (next === state.page) return;
-    state.page = next;
-    await renderCurrentPage();
-  }
-
-  function changeZoom(delta) {
-    if (!state.currentPdf) return;
-    state.zoom = clamp(state.zoom + delta, 0.4, 3);
-    renderCurrentPage();
-  }
-
-  function beginSchemeUpload(file) {
-    if (!canWrite()) return;
-
-    if (
-      file.type !== 'application/pdf' &&
-      !String(file.name || '').toLowerCase().endsWith('.pdf')
-    ) {
-      alert('Можно загрузить только PDF-файл.');
-      return;
-    }
-
-    if (file.size > MAX_FILE_SIZE) {
-      alert('Размер PDF превышает 100 МБ.');
-      return;
-    }
-
-    state.pendingFile = file;
-    const current = getProject();
-    const defaultName = String(file.name || 'Схема')
-      .replace(/\.pdf$/i, '')
-      .trim();
-
-    openModal(
-      'Загрузка PDF-схемы',
-      `
-        <div class="form-grid">
-          <div class="field">
-            <label>Название схемы</label>
-            <input id="schemeUploadName" value="${escapeHtml(defaultName)}">
-          </div>
-
-          <div class="field">
-            <label>Редакция</label>
-            <input id="schemeUploadRevision" placeholder="Например: Р1">
-          </div>
-
-          <div class="field">
-            <label>Здание</label>
-            <select id="schemeUploadBuilding">${listOptions(current.buildings, '')}</select>
-          </div>
-
-          <div class="field">
-            <label>Связанная шахматка</label>
-            <select id="schemeUploadMatrix">${listOptions(current.matrices, '')}</select>
-          </div>
-        </div>
-
-        <div class="scheme-upload-note">
-          Файл: <b>${escapeHtml(file.name)}</b><br>
-          Размер: ${(file.size / 1024 / 1024).toFixed(1)} МБ.<br>
-          PDF будет храниться в защищённом хранилище Supabase. Координаты отметок сохраняются отдельно, поэтому они не зависят от масштаба экрана.
-        </div>
-
-        <div class="liv-editor-footer">
-          <button id="schemeUploadCancel" class="btn">Отмена</button>
-          <button id="schemeUploadSave" class="btn primary">Загрузить</button>
-        </div>
-      `
-    );
-
-    el('schemeUploadCancel')?.addEventListener('click', () => {
-      state.pendingFile = null;
-      closeModal();
-    });
-
-    el('schemeUploadSave')?.addEventListener('click', uploadPendingScheme);
-  }
-
-  async function uploadPendingScheme() {
-    const file = state.pendingFile;
-    const current = getProject();
-    const client = window.LIV_SUPABASE;
-
-    if (!file || !current || !client || !canWrite()) {
-      alert('Не удалось начать загрузку. Проверь подключение и права доступа.');
-      return;
-    }
-
-    const button = el('schemeUploadSave');
-    button.disabled = true;
-    button.textContent = 'Загрузка...';
-
-    const id = typeof uid === 'function'
-      ? uid('SCH')
-      : `SCH-${crypto.randomUUID()}`;
-    const name = String(el('schemeUploadName')?.value || '').trim() || file.name;
-    const path = `schemes/${id}/${safeFileName(file.name)}`;
-    const now = new Date().toISOString();
-
-    try {
-      const result = await client.storage
-        .from(STORAGE_BUCKET)
-        .upload(path, file, {
-          cacheControl: '3600',
-          contentType: 'application/pdf',
-          upsert: false
-        });
-
-      if (result.error) {
-        throw result.error;
-      }
-
-      const scheme = {
-        id,
-        name,
-        fileName: file.name,
-        storagePath: path,
-        mimeType: 'application/pdf',
-        fileSize: file.size,
-        pageCount: 0,
-        buildingId: el('schemeUploadBuilding')?.value || '',
-        matrixId: el('schemeUploadMatrix')?.value || '',
-        revision: String(el('schemeUploadRevision')?.value || '').trim(),
-        status: 'Загружена',
-        active: true,
-        createdAt: now,
-        updatedAt: now
-      };
-
-      current.schemes.push(scheme);
-      await syncSchemeServer(scheme);
-
-      if (typeof log === 'function') {
-        log('Загружено', 'PDF-схема', scheme.name, {
-          schemeId: scheme.id,
-          fileName: scheme.fileName,
-          revision: scheme.revision
-        });
-      }
-
-      await saveProject();
-      state.pendingFile = null;
-      closeModal();
-      renderSchemes();
-      await selectScheme(scheme.id);
-    } catch (error) {
-      console.error('LIV Schemes: upload failed', error);
-      alert('Не удалось загрузить PDF: ' + (error?.message || error));
-      button.disabled = false;
-      button.textContent = 'Загрузить';
-    }
-  }
-
-  async function syncSchemeServer(scheme) {
-    const client = window.LIV_SUPABASE;
-    if (!client || !scheme) return;
-
-    try {
-      const payload = {
-        external_id: scheme.id,
-        name: scheme.name,
-        file_name: scheme.fileName,
-        storage_path: scheme.storagePath,
-        mime_type: scheme.mimeType || 'application/pdf',
-        page_count: Number(scheme.pageCount || 0),
-        revision: scheme.revision || null,
-        status: scheme.status || 'Загружена',
-        active: scheme.active !== false,
-        updated_at: scheme.updatedAt || new Date().toISOString()
-      };
-
-      if (scheme.serverId) {
-        const update = await client
-          .from('schemes')
-          .update(payload)
-          .eq('id', scheme.serverId)
-          .select('id')
-          .maybeSingle();
-
-        if (update.error) throw update.error;
-        return;
-      }
-
-      const existing = await client
-        .from('schemes')
-        .select('id')
-        .eq('external_id', scheme.id)
-        .maybeSingle();
-
-      if (existing.error) throw existing.error;
-
-      if (existing.data?.id) {
-        scheme.serverId = existing.data.id;
-        await client.from('schemes').update(payload).eq('id', scheme.serverId);
-        return;
-      }
-
-      const insert = await client
-        .from('schemes')
-        .insert(payload)
-        .select('id')
-        .single();
-
-      if (insert.error) throw insert.error;
-      scheme.serverId = insert.data?.id || '';
-    } catch (error) {
-      console.warn('LIV Schemes: scheme server sync failed', error);
-    }
-  }
-
-  async function syncMarkServer(mark) {
-    const client = window.LIV_SUPABASE;
-    const scheme = schemeById(mark?.schemeId);
-
-    if (!client || !mark || !scheme?.serverId) return;
-
-    try {
-      const payload = {
-        external_id: mark.id,
-        scheme_id: scheme.serverId,
-        page_no: Number(mark.pageNo || 1),
-        x: clamp(mark.x),
-        y: clamp(mark.y),
-        width: clamp(mark.width),
-        height: clamp(mark.height),
-        mark_type: mark.markType || 'area',
-        title: mark.title || null,
-        status: mark.status || 'Не начато',
-        progress_percent: clamp(mark.progressPercent, 0, 100) * 100,
-        comment: mark.comment || null,
-        active: mark.active !== false,
-        updated_at: mark.updatedAt || new Date().toISOString()
-      };
-
-      if (mark.serverId) {
-        const update = await client
-          .from('scheme_marks')
-          .update(payload)
-          .eq('id', mark.serverId)
-          .select('id')
-          .maybeSingle();
-
-        if (update.error) throw update.error;
-        return;
-      }
-
-      const existing = await client
-        .from('scheme_marks')
-        .select('id')
-        .eq('external_id', mark.id)
-        .maybeSingle();
-
-      if (existing.error) throw existing.error;
-
-      if (existing.data?.id) {
-        mark.serverId = existing.data.id;
-        await client.from('scheme_marks').update(payload).eq('id', mark.serverId);
-        return;
-      }
-
-      const insert = await client
-        .from('scheme_marks')
-        .insert(payload)
-        .select('id')
-        .single();
-
-      if (insert.error) throw insert.error;
-      mark.serverId = insert.data?.id || '';
-    } catch (error) {
-      console.warn('LIV Schemes: mark server sync failed', error);
-    }
-  }
-
-  async function downloadCurrentScheme() {
-    const scheme = schemeById(state.currentSchemeId);
-    const client = window.LIV_SUPABASE;
-    if (!scheme || !client) return;
-
-    setLoading(true, 'Подготовка файла...');
-
-    try {
-      const result = await client.storage
-        .from(STORAGE_BUCKET)
-        .download(scheme.storagePath);
-
-      if (result.error) throw result.error;
-
-      const url = URL.createObjectURL(result.data);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = scheme.fileName || `${scheme.name}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      alert('Не удалось скачать PDF: ' + (error?.message || error));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function openDeleteSchemeDialog() {
-    const scheme = schemeById(state.currentSchemeId);
-    if (!scheme || !canWrite()) return;
-
-    const marks = marksForScheme(scheme.id);
-
-    openModal(
-      'Удаление PDF-схемы',
-      `
-        <div class="scheme-delete-note">
-          Будет удалена схема <b>${escapeHtml(scheme.name)}</b>, исходный PDF и ${marks.length} отметок выполнения.
-          Фронты, организации, виды работ и шахматки при этом не удаляются.
-        </div>
-
-        <div class="liv-editor-footer">
-          <button id="schemeDeleteCancel" class="btn">Отмена</button>
-          <button id="schemeDeleteConfirm" class="btn danger">Удалить схему</button>
-        </div>
-      `
-    );
-
-    el('schemeDeleteCancel')?.addEventListener('click', closeModal);
-    el('schemeDeleteConfirm')?.addEventListener('click', deleteCurrentScheme);
-  }
-
-  async function deleteCurrentScheme() {
-    const scheme = schemeById(state.currentSchemeId);
-    const client = window.LIV_SUPABASE;
-    if (!scheme || !canWrite()) return;
-
-    const button = el('schemeDeleteConfirm');
-    button.disabled = true;
-    button.textContent = 'Удаление...';
-
-    try {
-      if (client && scheme.storagePath) {
-        const storageResult = await client.storage
-          .from(STORAGE_BUCKET)
-          .remove([scheme.storagePath]);
-
-        if (storageResult.error) {
-          console.warn('LIV Schemes: storage delete failed', storageResult.error);
-        }
-      }
-
-      scheme.active = false;
-      scheme.deletedAt = new Date().toISOString();
-      scheme.updatedAt = scheme.deletedAt;
-
-      marksForScheme(scheme.id).forEach(mark => {
-        mark.active = false;
-        mark.deletedAt = scheme.deletedAt;
-        mark.updatedAt = scheme.deletedAt;
-      });
-
-      if (client) {
-        if (scheme.serverId) {
-          await client.from('schemes').delete().eq('id', scheme.serverId);
-        } else {
-          await client.from('schemes').delete().eq('external_id', scheme.id);
-        }
-      }
-
-      if (typeof log === 'function') {
-        log('Удалено', 'PDF-схема', scheme.name, {
-          schemeId: scheme.id
-        });
-      }
-
-      await saveProject();
-      state.pdfCache.delete(scheme.id);
-      closeModal();
-      clearCurrentScheme();
-      renderSchemes();
-    } catch (error) {
-      console.error('LIV Schemes: delete failed', error);
-      alert('Не удалось удалить схему: ' + (error?.message || error));
-      button.disabled = false;
-      button.textContent = 'Удалить схему';
-    }
-  }
-
-  function bootstrap() {
-    injectStyles();
-    injectUi();
-    bindUi();
-
-    const wait = setInterval(() => {
-      if (ensureState()) {
-        clearInterval(wait);
-        renderSchemes();
-      }
-    }, 150);
-
-    setTimeout(() => clearInterval(wait), 15000);
-  }
-
-  window.addEventListener('liv-remote-project', () => {
-    setTimeout(() => {
-      ensureState();
-      renderSchemes();
-
-      if (
-        state.currentSchemeId &&
-        !schemeById(state.currentSchemeId)
-      ) {
-        clearCurrentScheme();
-      }
-    }, 0);
-  });
-
-  window.addEventListener('liv-auth-session', () => {
-    setTimeout(renderSchemes, 0);
-  });
-
-  let resizeTimer = null;
-  window.addEventListener('resize', () => {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => {
-      if (
-        state.currentPdf &&
-        !el('tab-schemes')?.classList.contains('hidden')
-      ) {
-        renderCurrentPage();
-      }
-    }, 250);
-  });
-
-  window.LIV_SCHEMES = {
-    render: renderSchemes,
-    select: selectScheme,
-    upload: beginSchemeUpload,
-    openMarkEditor
-  };
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', bootstrap, { once: true });
-  } else {
-    bootstrap();
-  }
+  const userId=()=>window.LIV_REMOTE_SYNC?.userId?.()||null;
+  async function syncScheme(x){const client=window.LIV_SUPABASE;if(!client)return;const data={external_id:x.id,name:x.name,file_name:x.fileName,storage_path:x.storagePath,mime_type:'application/pdf',page_count:Number(x.pageCount||0),revision:x.revision||null,status:x.status||'Загружена',active:x.active!==false,updated_at:x.updatedAt||now(),custom_data:{buildingExternalId:x.buildingId||'',matrixExternalId:x.matrixId||'',fileSize:Number(x.fileSize||0)}};if(x.serverId){const r=await client.from('schemes').update(data).eq('id',x.serverId);if(r.error)throw r.error;return;}const e=await client.from('schemes').select('id').eq('external_id',x.id).maybeSingle();if(e.error)throw e.error;if(e.data?.id){x.serverId=e.data.id;const r=await client.from('schemes').update(data).eq('id',x.serverId);if(r.error)throw r.error;return;}const r=await client.from('schemes').insert({...data,created_by:userId()}).select('id').single();if(r.error)throw r.error;x.serverId=r.data.id;}
+  async function syncMark(x){const client=window.LIV_SUPABASE,item=scheme(x.schemeId);if(!client||!item)return;if(!item.serverId)await syncScheme(item);const data={external_id:x.id,scheme_id:item.serverId,page_no:Number(x.pageNo||1),x:clamp(x.x),y:clamp(x.y),width:clamp(x.width),height:clamp(x.height),mark_type:'area',title:x.title||null,status:x.status||'Не начато',progress_percent:Math.round(clamp(x.progressPercent,0,100)),comment:x.comment||null,active:x.active!==false,updated_at:x.updatedAt||now(),custom_data:{workExternalId:x.workId||'',organizationExternalId:x.organizationId||'',frontExternalId:x.frontId||''}};try{if(x.serverId){const r=await client.from('scheme_marks').update(data).eq('id',x.serverId);if(r.error)throw r.error;return;}const e=await client.from('scheme_marks').select('id').eq('external_id',x.id).maybeSingle();if(e.error)throw e.error;if(e.data?.id){x.serverId=e.data.id;const r=await client.from('scheme_marks').update(data).eq('id',x.serverId);if(r.error)throw r.error;return;}const r=await client.from('scheme_marks').insert({...data,created_by:userId()}).select('id').single();if(r.error)throw r.error;x.serverId=r.data.id;}catch(error){console.warn('LIV Schemes: sync mark failed',error);}}
+
+  async function download(){const x=scheme(state.schemeId),client=window.LIV_SUPABASE;if(!x||!client)return;loading(true,'Подготовка файла...');try{const r=await client.storage.from(BUCKET).download(x.storagePath);if(r.error)throw r.error;const url=URL.createObjectURL(r.data),a=document.createElement('a');a.href=url;a.download=x.fileName||`${x.name}.pdf`;a.click();URL.revokeObjectURL(url);}catch(error){alert('Не удалось скачать PDF: '+(error.message||error));}finally{loading(false);}}
+  function openDelete(){const x=scheme(state.schemeId);if(!x||!canWrite())return;openModal('Удаление PDF-схемы',`<div class="notice bad">Будет удалена схема <b>${html(x.name)}</b>, исходный PDF и ${marks(x.id).length} отметок. Фронты и шахматки не удаляются.</div><div class="liv-editor-footer"><button id="sdCancel" class="btn">Отмена</button><button id="sdConfirm" class="btn danger">Удалить</button></div>`);$s('sdCancel').onclick=closeModal;$s('sdConfirm').onclick=removeScheme;}
+  async function removeScheme(){const x=scheme(state.schemeId),client=window.LIV_SUPABASE;if(!x)return;try{if(client){if(x.storagePath)await client.storage.from(BUCKET).remove([x.storagePath]);const r=x.serverId?await client.from('schemes').delete().eq('id',x.serverId):await client.from('schemes').delete().eq('external_id',x.id);if(r.error)throw r.error;}x.active=false;x.deletedAt=x.updatedAt=now();marks(x.id).forEach(m=>{m.active=false;m.deletedAt=m.updatedAt=x.deletedAt;});await saveProject();state.cache.delete(x.id);closeModal();clear();}catch(error){alert('Не удалось удалить схему: '+(error.message||error));}}
+
+  function boot(){addStyles();addUi();bind();const timer=setInterval(()=>{if(ensure()){clearInterval(timer);render();}},150);setTimeout(()=>clearInterval(timer),15000);}
+  window.addEventListener('liv-remote-project',()=>setTimeout(render,0));window.addEventListener('liv-auth-session',()=>setTimeout(render,0));let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(state.pdf&&!$s('tab-schemes')?.classList.contains('hidden'))renderPage();},250);});
+  window.LIV_SCHEMES={render,select,upload:openUpload,openMark};
+  document.readyState==='loading'?document.addEventListener('DOMContentLoaded',boot,{once:true}):boot();
 })();
