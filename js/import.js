@@ -1746,6 +1746,625 @@ function applyFillDown(
    ЧТЕНИЕ EXCEL
    ========================================================= */
 
+function canonicalMatrixWorkName(
+  value
+){
+
+  const text =
+    normText(
+      value
+    );
+
+  const key =
+    normKey(
+      text
+    );
+
+
+  if (
+    key.includes(
+      'кладка наружных стен'
+    )
+  ) {
+    return 'Кладка наружных стен';
+  }
+
+
+  if (
+    key.includes(
+      'вертикальн'
+    ) &&
+    key.includes(
+      'армирован'
+    )
+  ) {
+    return 'Вертикальное армирование';
+  }
+
+
+  if (
+    key.includes(
+      'штукатур'
+    )
+  ) {
+    return 'Штукатурка';
+  }
+
+
+  if (
+    key.includes(
+      'гидроизоляц'
+    )
+  ) {
+    return 'Гидроизоляция балконов';
+  }
+
+
+  if (
+    key.includes(
+      'перегород'
+    )
+  ) {
+    return 'Перегородки';
+  }
+
+
+  return text;
+}
+
+
+function matrixReadyStatus(
+  value
+){
+
+  const key =
+    normKey(
+      value
+    );
+
+
+  if (
+    /^(да|готово|выполнено|завершено|готов)$/.test(
+      key
+    )
+  ) {
+    return 'Завершено';
+  }
+
+
+  if (
+    /^(нет|не готово|не выполнено)$/.test(
+      key
+    )
+  ) {
+    return 'Не начато';
+  }
+
+
+  return '';
+}
+
+
+function detectMatrixScheduleLayout(
+  matrix
+){
+
+  if (
+    !Array.isArray(
+      matrix
+    ) ||
+    matrix.length <
+      3
+  ) {
+    return null;
+  }
+
+
+  let subHeaderIndex =
+    -1;
+
+
+  for (
+    let index =
+      0;
+    index <
+      Math.min(
+        matrix.length,
+        12
+      );
+    index++
+  ) {
+
+    const keys =
+      (
+        matrix[
+          index
+        ] ||
+        []
+      )
+        .map(
+          normKey
+        );
+
+
+    if (
+      keys.includes(
+        'здание'
+      ) &&
+      keys.includes(
+        'блок'
+      ) &&
+      keys.includes(
+        'этаж'
+      ) &&
+      keys.some(
+        value =>
+          value ===
+            'вид работ' ||
+          value ===
+            'работа'
+      ) &&
+      keys.includes(
+        'ось'
+      ) &&
+      keys.filter(
+        value =>
+          value ===
+          'подрядчик'
+      ).length >=
+        2
+    ) {
+
+      subHeaderIndex =
+        index;
+
+      break;
+    }
+  }
+
+
+  if (
+    subHeaderIndex <=
+      0
+  ) {
+    return null;
+  }
+
+
+  const groupRow =
+    matrix[
+      subHeaderIndex -
+      1
+    ] ||
+    [];
+
+  const subRow =
+    matrix[
+      subHeaderIndex
+    ] ||
+    [];
+
+
+  const buildingIndex =
+    subRow.findIndex(
+      value =>
+        normKey(
+          value
+        ) ===
+        'здание'
+    );
+
+  const blockIndex =
+    subRow.findIndex(
+      value =>
+        normKey(
+          value
+        ) ===
+        'блок'
+    );
+
+  const floorIndex =
+    subRow.findIndex(
+      value =>
+        normKey(
+          value
+        ) ===
+        'этаж'
+    );
+
+  const sourceWorkIndex =
+    subRow.findIndex(
+      value =>
+        [
+          'вид работ',
+          'работа'
+        ].includes(
+          normKey(
+            value
+          )
+        )
+    );
+
+  const axisIndex =
+    subRow.findIndex(
+      value =>
+        normKey(
+          value
+        ) ===
+        'ось'
+    );
+
+
+  if (
+    [
+      buildingIndex,
+      blockIndex,
+      floorIndex,
+      sourceWorkIndex,
+      axisIndex
+    ]
+      .some(
+        index =>
+          index <
+          0
+      )
+  ) {
+    return null;
+  }
+
+
+  const groupStarts =
+    [];
+
+
+  groupRow.forEach(
+    (
+      value,
+      index
+    ) => {
+
+      if (
+        index >=
+          axisIndex &&
+        normText(
+          value
+        )
+      ) {
+
+        groupStarts.push(
+          index
+        );
+      }
+    }
+  );
+
+
+  if (
+    groupStarts.length <
+      2
+  ) {
+    return null;
+  }
+
+
+  const groups =
+    groupStarts
+      .map(
+        (
+          start,
+          position
+        ) => {
+
+          const end =
+            position <
+              groupStarts.length -
+                1
+              ? groupStarts[
+                  position +
+                  1
+                ] -
+                1
+              : Math.max(
+                  groupRow.length,
+                  subRow.length
+                ) -
+                1;
+
+
+          const dataStart =
+            Math.max(
+              start,
+              axisIndex +
+                1
+            );
+
+
+          const columns =
+            {};
+
+
+          for (
+            let column =
+              dataStart;
+            column <=
+              end;
+            column++
+          ) {
+
+            const key =
+              normKey(
+                subRow[
+                  column
+                ]
+              );
+
+
+            if (
+              key ===
+                'подрядчик' ||
+              key ===
+                'организация'
+            ) {
+              columns.organization =
+                column;
+            }
+
+
+            if (
+              key ===
+              'начало'
+            ) {
+              columns.start =
+                column;
+            }
+
+
+            if (
+              key ===
+              'окончание'
+            ) {
+              columns.end =
+                column;
+            }
+
+
+            if (
+              key.includes(
+                'готовность'
+              )
+            ) {
+              columns.ready =
+                column;
+            }
+          }
+
+
+          return {
+            name:
+              canonicalMatrixWorkName(
+                groupRow[
+                  start
+                ]
+              ),
+            sourceName:
+              normText(
+                groupRow[
+                  start
+                ]
+              ),
+            start:
+              dataStart,
+            end,
+            columns
+          };
+        }
+      )
+      .filter(
+        group =>
+          group.name &&
+          (
+            group.columns.organization !==
+              undefined ||
+            group.columns.start !==
+              undefined ||
+            group.columns.end !==
+              undefined
+          )
+      );
+
+
+  if (
+    groups.length <
+      2
+  ) {
+    return null;
+  }
+
+
+  return {
+    subHeaderIndex,
+    dataStartIndex:
+      subHeaderIndex +
+      1,
+    buildingIndex,
+    blockIndex,
+    floorIndex,
+    sourceWorkIndex,
+    axisIndex,
+    groups
+  };
+}
+
+
+function matrixLayoutRows(
+  matrix,
+  layout
+){
+
+  const result =
+    [];
+
+
+  (
+    matrix
+      .slice(
+        layout.dataStartIndex
+      ) ||
+    []
+  )
+    .forEach(
+      (
+        sourceRow,
+        rowOffset
+      ) => {
+
+        const building =
+          normText(
+            sourceRow[
+              layout.buildingIndex
+            ]
+          );
+
+        const block =
+          normText(
+            sourceRow[
+              layout.blockIndex
+            ]
+          );
+
+        const floor =
+          sourceRow[
+            layout.floorIndex
+          ];
+
+        const sourceWork =
+          normText(
+            sourceRow[
+              layout.sourceWorkIndex
+            ]
+          );
+
+        const axis =
+          normText(
+            sourceRow[
+              layout.axisIndex
+            ]
+          );
+
+
+        if (
+          !building &&
+          !block &&
+          !normText(
+            floor
+          ) &&
+          !axis
+        ) {
+          return;
+        }
+
+
+        layout.groups
+          .forEach(
+            group => {
+
+              const organization =
+                group.columns.organization !==
+                  undefined
+                  ? normText(
+                      sourceRow[
+                        group.columns.organization
+                      ]
+                    )
+                  : '';
+
+              const start =
+                group.columns.start !==
+                  undefined
+                  ? sourceRow[
+                      group.columns.start
+                    ]
+                  : '';
+
+              const end =
+                group.columns.end !==
+                  undefined
+                  ? sourceRow[
+                      group.columns.end
+                    ]
+                  : '';
+
+              const ready =
+                group.columns.ready !==
+                  undefined
+                  ? sourceRow[
+                      group.columns.ready
+                    ]
+                  : '';
+
+
+              if (
+                !organization &&
+                !normText(
+                  start
+                ) &&
+                !normText(
+                  end
+                ) &&
+                !normText(
+                  ready
+                )
+              ) {
+                return;
+              }
+
+
+              result.push({
+                'Здание':
+                  building,
+                'Блок':
+                  block,
+                'Этаж':
+                  floor,
+                'Ось':
+                  axis,
+                'Сторона':
+                  sourceWork,
+                'Работа':
+                  group.name,
+                'Организация':
+                  organization,
+                'План начало':
+                  start,
+                'План окончание':
+                  end,
+                'Статус':
+                  matrixReadyStatus(
+                    ready
+                  ),
+                'Комментарий':
+                  group.sourceName !==
+                    group.name
+                    ? 'Источник: ' +
+                      group.sourceName
+                    : '',
+                __sourceRow:
+                  layout.dataStartIndex +
+                  rowOffset +
+                  1,
+                __matrixGroup:
+                  group.sourceName
+              });
+            }
+          );
+      }
+    );
+
+
+  return result;
+}
+
+
 function readSelectedSheet(){
 
   if (
@@ -1754,6 +2373,14 @@ function readSelectedSheet(){
     return;
   }
 
+
+  importMatrixLayoutDetected =
+    false;
+
+  importMatrixLayoutInfo =
+    '';
+
+
   importSheetName =
     $('importSheet')?.value ||
     importWorkbook
@@ -1761,11 +2388,13 @@ function readSelectedSheet(){
         0
       ];
 
+
   const sheet =
     importWorkbook
       .Sheets[
         importSheetName
       ];
+
 
   const matrix =
     XLSX.utils
@@ -1783,10 +2412,60 @@ function readSelectedSheet(){
         }
       );
 
+
+  const matrixLayout =
+    detectMatrixScheduleLayout(
+      matrix
+    );
+
+
+  if (
+    matrixLayout
+  ) {
+
+    importMatrixLayoutDetected =
+      true;
+
+
+    importRawRows =
+      matrixLayoutRows(
+        matrix,
+        matrixLayout
+      );
+
+
+    importHeaders = [
+      'Здание',
+      'Блок',
+      'Этаж',
+      'Ось',
+      'Сторона',
+      'Работа',
+      'Организация',
+      'План начало',
+      'План окончание',
+      'Статус',
+      'Комментарий'
+    ];
+
+
+    importMatrixLayoutInfo =
+      'Распознана шахматка: ' +
+      matrixLayout.groups.length +
+      ' групп работ → ' +
+      importRawRows.length +
+      ' записей.';
+
+
+    return;
+  }
+
+
   const headerIndex =
     detectHeaderRow(
       matrix
     );
+
 
   importHeaders =
     uniqueHeaders(
@@ -1795,6 +2474,7 @@ function readSelectedSheet(){
       ] ||
       []
     );
+
 
   importRawRows =
     matrix
@@ -1830,7 +2510,6 @@ function readSelectedSheet(){
           )
       );
 }
-
 
 async function readImportFile(
   event
@@ -1925,7 +2604,13 @@ async function readImportFile(
 
       $('importInfo')
         .textContent =
-          `Файл загружен: ${file.name}. Выбери лист и нажми «Анализировать».`;
+          `Файл загружен: ${file.name}. ` +
+          (
+            importMatrixLayoutDetected
+              ? importMatrixLayoutInfo + ' '
+              : ''
+          ) +
+          'Нажми «Анализировать». ';
     }
 
   } catch (
@@ -2212,8 +2897,11 @@ function previewImportRow(
 ){
 
   const rowNumber =
-    index +
-    2;
+    raw.__sourceRow ||
+    (
+      index +
+      2
+    );
 
 
   if (
@@ -2594,7 +3282,12 @@ function renderImportPreview(){
         `Файл: ${importFileName}\n` +
         `Лист: ${importSheetName}\n` +
         `Режим: ${MODE_LABELS[importModeResolved]}\n` +
-        `Строк: ${importRows.length}\n` +
+        (
+          importMatrixLayoutDetected
+            ? importMatrixLayoutInfo + '\n'
+            : ''
+        ) +
+        `Записей к проверке: ${importRows.length}\n` +
 
         Object.entries(
           counts
@@ -2772,12 +3465,16 @@ function analyzeImport(){
 
 
   importModeResolved =
+    importMatrixLayoutDetected &&
     requested ===
       'auto'
-      ? detectImportMode(
-          importHeaders
-        )
-      : requested;
+      ? 'fronts'
+      : requested ===
+          'auto'
+        ? detectImportMode(
+            importHeaders
+          )
+        : requested;
 
 
   if (
@@ -2849,75 +3546,136 @@ function findMatchingFrontByMapped(
     );
 
 
-  const building =
-    (
+  const buildingMatch =
+    findNamedMatch(
       project.buildings ||
-      []
-    )
-      .find(
-        item =>
-          strictNameKey(
-            item.name
-          ) ===
-          strictNameKey(
-            buildingName
-          )
-      );
+      [],
+      buildingName
+    );
 
-
-  const work =
-    (
+  const workMatch =
+    findNamedMatch(
       project.works ||
-      []
-    )
-      .find(
-        item =>
-          strictNameKey(
-            item.name
-          ) ===
-          strictNameKey(
-            workName
-          )
-      );
+      [],
+      workName
+    );
 
-
-  const organization =
-    (
+  const organizationMatch =
+    findNamedMatch(
       project.organizations ||
-      []
-    )
-      .find(
-        item =>
-          strictNameKey(
-            item.name
-          ) ===
-          strictNameKey(
-            organizationName
-          )
-      );
+      [],
+      organizationName
+    );
+
+
+  const structureCandidate = {
+    buildingId:
+      buildingMatch.item?.id ||
+      '',
+    block:
+      normText(
+        mappedValue(
+          row,
+          'block'
+        )
+      ),
+    floor:
+      normText(
+        mappedValue(
+          row,
+          'floor'
+        )
+      ),
+    capture:
+      normText(
+        mappedValue(
+          row,
+          'capture'
+        )
+      ),
+    axis:
+      normText(
+        mappedValue(
+          row,
+          'axis'
+        )
+      ),
+    side:
+      normText(
+        mappedValue(
+          row,
+          'side'
+        )
+      ),
+    zone:
+      normText(
+        mappedValue(
+          row,
+          'zone'
+        )
+      ),
+    roomNo:
+      normText(
+        mappedValue(
+          row,
+          'roomNo'
+        )
+      ),
+    roomName:
+      normText(
+        mappedValue(
+          row,
+          'roomName'
+        )
+      )
+  };
+
+
+  const signature =
+    structureSignature(
+      structureCandidate
+    );
 
 
   return activeFronts()
     .find(
-      front =>
-        (
-          !building ||
-          front.buildingId ===
-          building.id
-        ) &&
-        (
-          !work ||
-          front.workId ===
-          work.id
-        ) &&
-        (
-          !organization ||
-          front.organizationId ===
-          organization.id
-        )
+      front => {
+
+        const structure =
+          byId(
+            project.structures,
+            front.structureId
+          );
+
+
+        const sameStructure =
+          structure &&
+          (
+            structure.signature ||
+            structureSignature(
+              structure
+            )
+          ) ===
+            signature;
+
+
+        return (
+          sameStructure &&
+          (
+            !workMatch.item ||
+            front.workId ===
+              workMatch.item.id
+          ) &&
+          (
+            !organizationName ||
+            !organizationMatch.item ||
+            front.organizationId ===
+              organizationMatch.item.id
+          )
+        );
+      }
     );
 }
-
 
 function ensureFrontFromImport(
   row
