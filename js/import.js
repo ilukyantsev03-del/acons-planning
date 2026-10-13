@@ -154,6 +154,163 @@ function strictNameKey(
 }
 
 
+function smartNameKey(value) {
+  return strictNameKey(value)
+    .replace(/ё/g, 'е')
+    .replace(/[«»"'“”„]/g, '')
+    .replace(/[()\[\]{},.;:]+/g, ' ')
+    .replace(/[\/_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+
+function nameSimilarity(a, b) {
+  const left = smartNameKey(a);
+  const right = smartNameKey(b);
+
+  if (!left || !right) return 0;
+  if (left === right) return 1;
+
+  const aTokens = new Set(left.split(' ').filter(Boolean));
+  const bTokens = new Set(right.split(' ').filter(Boolean));
+  const union = new Set([...aTokens, ...bTokens]);
+
+  let common = 0;
+
+  aTokens.forEach(token => {
+    if (bTokens.has(token)) {
+      common++;
+    }
+  });
+
+  const jaccard =
+    union.size
+      ? common / union.size
+      : 0;
+
+  const containment =
+    Math.min(aTokens.size, bTokens.size)
+      ? common / Math.min(aTokens.size, bTokens.size)
+      : 0;
+
+  return (
+    jaccard * 0.7 +
+    containment * 0.3
+  );
+}
+
+
+function findNamedMatch(list, name) {
+  const clean = normText(name);
+
+  if (!clean) {
+    return {
+      kind: 'empty',
+      item: null,
+      score: 0
+    };
+  }
+
+  const exact = (list || []).find(
+    row =>
+      strictNameKey(row.name) ===
+      strictNameKey(clean)
+  );
+
+  if (exact) {
+    return {
+      kind: 'exact',
+      item: exact,
+      score: 1
+    };
+  }
+
+  const canonical = (list || []).find(
+    row =>
+      smartNameKey(row.name) ===
+      smartNameKey(clean)
+  );
+
+  if (canonical) {
+    return {
+      kind: 'smart',
+      item: canonical,
+      score: 1
+    };
+  }
+
+  const ranked = (list || [])
+    .map(item => ({
+      item,
+      score: nameSimilarity(item.name, clean)
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  const first = ranked[0];
+  const second = ranked[1];
+
+  if (
+    first &&
+    first.score >= 0.96 &&
+    (
+      !second ||
+      first.score - second.score >= 0.08
+    )
+  ) {
+    return {
+      kind: 'smart',
+      item: first.item,
+      score: first.score
+    };
+  }
+
+  if (
+    first &&
+    first.score >= 0.72
+  ) {
+    return {
+      kind: 'suggest',
+      item: first.item,
+      score: first.score
+    };
+  }
+
+  return {
+    kind: 'new',
+    item: null,
+    score: 0
+  };
+}
+
+
+function namedMatchText(label, list, sourceName) {
+  const match =
+    findNamedMatch(
+      list,
+      sourceName
+    );
+
+  if (match.kind === 'exact') {
+    return label + ': совпало с «' + match.item.name + '»';
+  }
+
+  if (match.kind === 'smart') {
+    return label + ': сопоставлено с «' + match.item.name + '»';
+  }
+
+  if (match.kind === 'suggest') {
+    return label + ': похоже на «' + match.item.name + '» — будет создано отдельно';
+  }
+
+  if (match.kind === 'new') {
+    return label + ': новое значение';
+  }
+
+  return label + ': не задано';
+}
+
+
 /*
   ВАЖНО:
   для организаций НЕ используем агрессивную нормализацию.
@@ -186,16 +343,19 @@ function ensureNamed(
   }
 
 
-  let item =
-    list.find(
-      row =>
-        strictNameKey(
-          row.name
-        ) ===
-        strictNameKey(
-          clean
-        )
+  const match =
+    findNamedMatch(
+      list,
+      clean
     );
+
+  let item =
+    (
+      match.kind === 'exact' ||
+      match.kind === 'smart'
+    )
+      ? match.item
+      : null;
 
 
   if (
@@ -1964,6 +2124,88 @@ function resourceValuesFromRow(
    ПРЕДПРОСМОТР
    ========================================================= */
 
+function findMatchingImportedMilestone(row) {
+  const title =
+    normText(
+      mappedValue(
+        row,
+        'title'
+      )
+    );
+
+  if (!title) {
+    return null;
+  }
+
+  const organizationMatch =
+    findNamedMatch(
+      project.organizations || [],
+      importSheetName
+    );
+
+  const buildingName =
+    normText(
+      mappedValue(
+        row,
+        'building'
+      )
+    );
+
+  const buildingMatch =
+    findNamedMatch(
+      project.buildings || [],
+      buildingName
+    );
+
+  const contractNo =
+    normText(
+      mappedValue(
+        row,
+        'contractNo'
+      )
+    );
+
+  return (
+    project.milestones ||
+    []
+  ).find(item => {
+    if (
+      normKey(item.title) !==
+      normKey(title)
+    ) {
+      return false;
+    }
+
+    if (
+      organizationMatch.item &&
+      String(item.organizationId || '') !==
+      String(organizationMatch.item.id)
+    ) {
+      return false;
+    }
+
+    if (
+      buildingMatch.item &&
+      String(item.buildingId || '') !==
+      String(buildingMatch.item.id)
+    ) {
+      return false;
+    }
+
+    if (
+      contractNo &&
+      item.contractNo &&
+      normKey(item.contractNo) !==
+      normKey(contractNo)
+    ) {
+      return false;
+    }
+
+    return true;
+  }) || null;
+}
+
+
 function previewImportRow(
   raw,
   index
@@ -2173,15 +2415,52 @@ function previewImportRow(
       };
     }
 
+    const existing =
+      findMatchingImportedMilestone(
+        raw
+      );
+
+    const buildingName =
+      normText(
+        mappedValue(
+          raw,
+          'building'
+        )
+      );
+
+    const matchText = [
+      namedMatchText(
+        'Подрядчик',
+        project.organizations || [],
+        importSheetName
+      ),
+      namedMatchText(
+        'Здание',
+        project.buildings || [],
+        buildingName
+      )
+    ].join(' · ');
+
     return {
       raw,
       rowNumber,
       status:
-        'Готово',
+        existing
+          ? 'Совпадение'
+          : 'Готово',
       message:
-        title,
+        (
+          existing
+            ? 'Обновится существующая КД: ' + title
+            : 'Новая КД: ' + title
+        ) +
+        ' · ' +
+        matchText,
       selected:
-        true
+        true,
+      existingId:
+        existing?.id ||
+        ''
     };
   }
 
@@ -3464,9 +3743,34 @@ async function commitImport(){
             item
           )
         }
-      });
+      };
 
-      appended++;
+      if (existingMilestone) {
+        const correspondence =
+          existingMilestone.correspondence ||
+          [];
+
+        Object.assign(
+          existingMilestone,
+          importedMilestone,
+          {
+            correspondence,
+            createdAt:
+              existingMilestone.createdAt ||
+              importedMilestone.createdAt,
+            updatedAt:
+              nowIso()
+          }
+        );
+
+        updated++;
+      } else {
+        project.milestones.push(
+          importedMilestone
+        );
+
+        appended++;
+      }
 
       continue;
     }
@@ -3748,9 +4052,15 @@ async function commitImport(){
           : null;
 
 
-      project.milestones.push({
+      const existingMilestone =
+        findMatchingImportedMilestone(
+          row
+        );
+
+      const importedMilestone = {
 
         id:
+          existingMilestone?.id ||
           uid(
             'M'
           ),
