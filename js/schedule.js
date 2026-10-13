@@ -185,7 +185,8 @@
     if (typeof project === 'undefined' || !project) return false;
     const names = [
       'tasks','taskDates','taskQuantities','dependencies',
-      'dailyReports','factHistory','quantityHistory','forecastSnapshots'
+      'dailyReports','factHistory','quantityHistory','forecastSnapshots',
+      'scheduleStaging','scheduleVersions'
     ];
     names.forEach(name => {
       if (!Array.isArray(project[name])) project[name] = [];
@@ -283,6 +284,7 @@
               Загрузить график
               <input id="scheduleFileInput" type="file" accept=".xlsx,.xls,.csv" hidden>
             </label>
+            <button id="schedulePromoteBtn" class="btn" type="button">Принять как рабочий график</button>
             <button id="scheduleClearTestBtn" class="btn danger-lite" type="button">Удалить тестовый импорт</button>
           </div>
         </section>
@@ -312,7 +314,7 @@
           <div id="scheduleMapping" class="schedule-mapping"></div>
           <div id="schedulePreview" class="table-wrap schedule-preview"></div>
           <div class="editor-actions">
-            <button id="scheduleImportBtn" class="btn primary" type="button">Импортировать в LIV</button>
+            <button id="scheduleImportBtn" class="btn primary" type="button">Загрузить в тестовый контур</button>
             <span id="scheduleImportHint" class="muted"></span>
           </div>
         </section>
@@ -389,6 +391,7 @@
       ],
       actions: [
         { id: 'upload', selector: '.schedule-hero-actions .btn.primary', label: 'Загрузить график' },
+        { id: 'promote', selector: '#schedulePromoteBtn', label: 'Принять как рабочий график' },
         { id: 'clear', selector: '#scheduleClearTestBtn', label: 'Удалить тестовый импорт' }
       ],
       kpis: [
@@ -432,6 +435,12 @@
     if (importBtn && !importBtn.dataset.bound) {
       importBtn.dataset.bound = '1';
       importBtn.addEventListener('click', importSchedule);
+    }
+
+    const promoteBtn = document.getElementById('schedulePromoteBtn');
+    if (promoteBtn && !promoteBtn.dataset.bound) {
+      promoteBtn.dataset.bound = '1';
+      promoteBtn.addEventListener('click', promoteTestImport);
     }
 
     const clearBtn = document.getElementById('scheduleClearTestBtn');
@@ -623,7 +632,7 @@
 
     const importId = uid('SIMP');
     const createdAt = new Date().toISOString();
-    let created = 0;
+    const staged = [];
 
     state.dataRows.forEach((row, index) => {
       const name = text(value(row,'name'));
@@ -654,75 +663,133 @@
         successorsRaw: text(value(row,'successors')),
         comment: text(value(row,'comment')),
         active: true,
+        testOnly: true,
         createdAt,
         updatedAt: createdAt
       };
 
-      project.tasks.push(task);
-
-      [
-        makeDate(taskId,'working',value(row,'workingStart'),value(row,'workingFinish'),'import'),
-        makeDate(taskId,'baseline',value(row,'baselineStart'),value(row,'baselineFinish'),'import'),
-        makeDate(taskId,'contract',value(row,'contractStart'),value(row,'contractFinish'),'import'),
-        makeDate(taskId,'actual',value(row,'factStart'),value(row,'factFinish'),'import')
-      ].filter(Boolean).forEach(d => project.taskDates.push(d));
+      const dates = [
+        makeDate(taskId,'working',value(row,'workingStart'),value(row,'workingFinish'),'test-import'),
+        makeDate(taskId,'baseline',value(row,'baselineStart'),value(row,'baselineFinish'),'test-import'),
+        makeDate(taskId,'contract',value(row,'contractStart'),value(row,'contractFinish'),'test-import'),
+        makeDate(taskId,'actual',value(row,'factStart'),value(row,'factFinish'),'test-import')
+      ].filter(Boolean);
 
       const q = num(value(row,'quantity'));
-      if (q != null) {
-        project.taskQuantities.push({
-          id: uid('TQTY'),
-          taskId,
-          name: 'Основной объем',
-          quantityType: 'primary',
-          unit: text(value(row,'unit')),
-          plannedQty: q,
-          isPrimary: true,
-          createdAt
-        });
-      }
+      const quantities = q == null ? [] : [{
+        id: uid('TQTY'),
+        taskId,
+        name: 'Основной объем',
+        quantityType: 'primary',
+        unit: text(value(row,'unit')),
+        plannedQty: q,
+        isPrimary: true,
+        createdAt
+      }];
 
-      created += 1;
+      staged.push({ task, dates, quantities });
     });
 
-    if (!Array.isArray(project.importHistory)) project.importHistory = [];
-    project.importHistory.unshift({
+    project.scheduleStaging = staged;
+    project.scheduleVersions.unshift({
       id: importId,
-      type: 'schedule',
+      type: 'test',
       fileName: state.fileName,
       sheetName: state.sheetName,
       sourceType: state.sourceType,
       rowsTotal: state.dataRows.length,
-      rowsCreated: created,
-      createdAt
+      rowsCreated: staged.length,
+      createdAt,
+      status: 'Тест'
     });
 
     if (typeof window.log === 'function') {
-      log('Импорт графика', state.fileName+' · '+state.sheetName+' · '+created+' задач');
+      log('Тестовая загрузка графика', state.fileName+' · '+state.sheetName+' · '+staged.length+' задач');
     }
     if (typeof window.saveProject === 'function') await saveProject();
 
     renderSchedule();
-    alert('Импорт завершен. Добавлено задач: '+created);
+    alert('Тестовая загрузка завершена. В рабочий график ничего не записано. Загружено задач: '+staged.length);
+  }
+
+  async function promoteTestImport() {
+    if (!ensureCollections()) return;
+    const staged = Array.isArray(project.scheduleStaging) ? project.scheduleStaging : [];
+    if (!staged.length) {
+      alert('Сначала загрузите график в тестовый контур.');
+      return;
+    }
+
+    if (!confirm(
+      'Принять тестовый график как рабочий?\n\n' +
+      'Будет добавлено задач: '+staged.length+'\n' +
+      'Текущий рабочий график не удаляется автоматически.'
+    )) return;
+
+    staged.forEach(item => {
+      const task = { ...item.task, testOnly: false, acceptedAt: new Date().toISOString() };
+      project.tasks.push(task);
+      (item.dates || []).forEach(d => project.taskDates.push({ ...d, source: 'accepted-import' }));
+      (item.quantities || []).forEach(q => project.taskQuantities.push({ ...q }));
+    });
+
+    const lastVersion = (project.scheduleVersions || []).find(v => v.status === 'Тест');
+    if (lastVersion) {
+      lastVersion.status = 'Принят';
+      lastVersion.acceptedAt = new Date().toISOString();
+    }
+
+    if (!Array.isArray(project.importHistory)) project.importHistory = [];
+    project.importHistory.unshift({
+      id: lastVersion?.id || uid('SIMP'),
+      type: 'schedule',
+      fileName: lastVersion?.fileName || state.fileName,
+      sheetName: lastVersion?.sheetName || state.sheetName,
+      sourceType: lastVersion?.sourceType || state.sourceType,
+      rowsTotal: staged.length,
+      rowsCreated: staged.length,
+      createdAt: new Date().toISOString()
+    });
+
+    project.scheduleStaging = [];
+
+    if (typeof window.log === 'function') {
+      log('Принят рабочий график', (lastVersion?.fileName || state.fileName)+' · '+staged.length+' задач');
+    }
+    if (typeof window.saveProject === 'function') await saveProject();
+
+    renderSchedule();
+    alert('График принят. Добавлено рабочих задач: '+staged.length);
   }
 
   async function clearTestImport() {
     if (!ensureCollections()) return;
-    const imported = project.tasks.filter(t => t.sourceImportId);
-    if (!imported.length) {
-      alert('Тестовых импортов графика нет.');
+    const staged = Array.isArray(project.scheduleStaging) ? project.scheduleStaging : [];
+    if (!staged.length) {
+      alert('Тестовых загрузок графика нет.');
       return;
     }
-    if (!confirm('Удалить все задачи, загруженные через тестовый импорт графиков?\n\nРучные задачи и старые фронты не будут затронуты.')) return;
+    if (!confirm('Удалить текущую тестовую загрузку графика?\n\nРабочие задачи не будут затронуты.')) return;
 
-    const ids = new Set(imported.map(t => String(t.id)));
-    project.tasks = project.tasks.filter(t => !ids.has(String(t.id)));
-    project.taskDates = project.taskDates.filter(d => !ids.has(String(d.taskId)));
-    project.taskQuantities = project.taskQuantities.filter(q => !ids.has(String(q.taskId)));
-    project.dependencies = project.dependencies.filter(d => !ids.has(String(d.taskId)) && !ids.has(String(d.predecessorTaskId)));
-    project.importHistory = (project.importHistory || []).filter(x => x.type !== 'schedule');
+    project.scheduleStaging = [];
+    const current = (project.scheduleVersions || []).find(v => v.status === 'Тест');
+    if (current) {
+      current.status = 'Удален';
+      current.deletedAt = new Date().toISOString();
+    }
 
     if (typeof window.saveProject === 'function') await saveProject();
     renderSchedule();
+  }
+
+  function stagedDateFor(taskId, type) {
+    const staged = Array.isArray(project.scheduleStaging) ? project.scheduleStaging : [];
+    for (const item of staged) {
+      if (String(item.task?.id) !== String(taskId)) continue;
+      const row = (item.dates || []).find(d => d.type === type);
+      if (row) return row;
+    }
+    return null;
   }
 
   function dateFor(taskId, type) {
@@ -748,7 +815,14 @@
     ensureCollections();
 
     const search = key(document.getElementById('scheduleSearch')?.value || '');
-    let tasks = project.tasks.filter(t => t.active !== false);
+    const stagedTasks = (project.scheduleStaging || [])
+      .map(item => ({ ...item.task, testOnly: true }))
+      .filter(t => t.active !== false);
+
+    let tasks = [
+      ...project.tasks.filter(t => t.active !== false),
+      ...stagedTasks
+    ];
 
     if (search) {
       tasks = tasks.filter(t => key([
@@ -762,14 +836,16 @@
     const empty = document.getElementById('scheduleEmpty');
     if (!tbody || !table || !empty) return;
 
-    const all = project.tasks.filter(t => t.active !== false);
-    const imported = all.filter(t => t.sourceImportId);
+    const official = project.tasks.filter(t => t.active !== false);
+    const all = [...official, ...stagedTasks];
+    const imported = official.filter(t => t.sourceImportId);
+    const stagedCount = stagedTasks.length;
 
     document.getElementById('scheduleTotal').textContent = all.length;
     document.getElementById('scheduleInWork').textContent = all.filter(t => t.status === 'В работе').length;
     document.getElementById('scheduleDone').textContent = all.filter(t => t.status === 'Завершено' || t.progressPercent >= 100).length;
     document.getElementById('scheduleWithDates').textContent = all.filter(t => !!dateFor(t.id,'working')).length;
-    document.getElementById('scheduleImported').textContent = imported.length;
+    document.getElementById('scheduleImported').textContent = stagedCount ? stagedCount+' тест' : imported.length;
 
     if (!tasks.length) {
       table.classList.add('hidden');
@@ -783,12 +859,12 @@
     table.classList.remove('hidden');
 
     tbody.innerHTML = tasks.slice(0,1000).map((task,index) => {
-      const working = dateFor(task.id,'working') || {};
-      const baseline = dateFor(task.id,'baseline') || {};
+      const working = (task.testOnly ? stagedDateFor(task.id,'working') : dateFor(task.id,'working')) || {};
+      const baseline = (task.testOnly ? stagedDateFor(task.id,'baseline') : dateFor(task.id,'baseline')) || {};
       return `
         <tr>
           <td>${index+1}</td>
-          <td><b>${esc(task.name)}</b>${task.sourceSheet ? '<div class="muted schedule-source">'+esc(task.sourceSheet)+'</div>' : ''}</td>
+          <td><b>${esc(task.name)}</b>${task.testOnly ? '<div class="schedule-test-badge">ТЕСТ</div>' : ''}${task.sourceSheet ? '<div class="muted schedule-source">'+esc(task.sourceSheet)+'</div>' : ''}</td>
           <td>${esc(contextText(task) || '—')}</td>
           <td>${esc(task.organizationName || '—')}</td>
           <td><span class="schedule-status">${esc(task.status || 'Не начато')}</span></td>
