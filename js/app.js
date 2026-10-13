@@ -1107,6 +1107,17 @@ function renderMilestones() {
 
 
                 ${
+                  risk &&
+                  typeof milestoneRiskHtml ===
+                    'function'
+                    ? milestoneRiskHtml(
+                        risk
+                      )
+                    : ''
+                }
+
+
+                ${
                   letters.length
                     ? `
                         <div class="tiny">
