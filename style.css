@@ -2527,3 +2527,314 @@ tbody tr:hover {
     grid-template-columns: minmax(0, 1fr) auto 34px;
   }
 }
+
+
+/* =========================================================
+   LIV UI KIT — ВСЕ РАЗДЕЛЫ И ПРЕДСТАВЛЕНИЯ
+   ========================================================= */
+
+.liv-page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 4px 0 14px;
+}
+
+.liv-page-head h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: 26px;
+  line-height: 1.1;
+}
+
+.liv-page-head p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.panel > .card,
+.resource-view > .card,
+.resource-view > .grid2 > .card,
+.panel > .grid2 > .card {
+  border-color: #dfe4eb;
+  box-shadow: 0 7px 20px rgba(15, 23, 42, .045);
+}
+
+.liv-filter-bar,
+.liv-section-toolbar {
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: none;
+}
+
+.liv-filter-bar {
+  padding: 13px 14px;
+}
+
+.liv-filter-bar .field label,
+.liv-section-toolbar .field label {
+  color: #667085;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.liv-filter-bar .field input,
+.liv-filter-bar .field select,
+.liv-section-toolbar .field input,
+.liv-section-toolbar .field select {
+  height: 38px;
+  border-color: #dfe4eb;
+  background: #fff;
+}
+
+.liv-metrics {
+  gap: 9px;
+}
+
+.liv-metrics .stat {
+  min-height: 78px;
+  padding: 13px 14px;
+  border-color: #dfe4eb;
+  border-radius: 10px;
+  box-shadow: none;
+  background: #fff;
+}
+
+.liv-metrics .stat span {
+  margin-bottom: 6px;
+  color: #667085;
+  font-size: 11px;
+}
+
+.liv-metrics .stat strong {
+  color: #172033;
+  font-size: 20px;
+}
+
+.liv-table-surface {
+  border-radius: 11px;
+}
+
+.liv-table-surface table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.liv-table-surface th {
+  height: 38px;
+  padding: 8px 10px;
+  background: #f8fafc;
+  color: #667085;
+  border-bottom: 1px solid #e5e9ef;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .035em;
+}
+
+.liv-table-surface td {
+  min-height: 44px;
+  padding: 9px 10px;
+  border-bottom: 1px solid #edf0f4;
+  color: #253044;
+  font-size: 12px;
+}
+
+.liv-table-surface tbody tr:hover {
+  background: #f8fafc;
+}
+
+.row-btn {
+  color: #182230;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.row-btn:hover {
+  color: #2458a6;
+  text-decoration: none;
+}
+
+.badge {
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.liv-subnav {
+  padding: 6px;
+  border-color: #dfe4eb;
+  box-shadow: none;
+}
+
+.resource-tabs {
+  gap: 4px;
+}
+
+.resource-tab {
+  min-height: 34px;
+  padding: 7px 10px;
+  border-color: transparent;
+  background: transparent;
+  color: #475467;
+  font-size: 12px;
+}
+
+.resource-tab:hover {
+  background: #f4f6f8;
+  border-color: transparent;
+}
+
+.resource-tab.active {
+  background: #172033;
+  border-color: #172033;
+  color: #fff;
+}
+
+.card > h2 {
+  color: #182230;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.organization-title {
+  align-items: center;
+  border-color: #dfe4eb;
+  box-shadow: none;
+}
+
+.organization-title h2 {
+  font-size: 21px;
+}
+
+.organization-resource-date {
+  padding: 8px 10px;
+  border: 1px solid #e1e6ed;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #667085;
+  font-size: 11px;
+}
+
+/* Общий вид редактора для всех сущностей */
+
+.modal {
+  padding: 3vh 16px;
+  background: rgba(15, 23, 42, .48);
+  backdrop-filter: blur(2px);
+}
+
+.modal-card {
+  width: min(1040px, 100%);
+  padding: 0;
+  border: 1px solid #dfe4eb;
+  border-radius: 14px;
+  overflow: auto;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, .24);
+}
+
+.modal-head {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  margin: 0;
+  padding: 15px 18px;
+  border-bottom: 1px solid #e5e9ef;
+  background: rgba(255, 255, 255, .98);
+}
+
+.modal-head h2 {
+  font-size: 18px;
+}
+
+#modalBody {
+  padding: 18px;
+}
+
+#modalBody .form-grid {
+  gap: 12px;
+}
+
+#modalBody .field {
+  gap: 6px;
+}
+
+#modalBody .field label {
+  color: #475467;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+#modalBody .field input,
+#modalBody .field select,
+#modalBody .field textarea {
+  border-color: #dfe4eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+#modalBody .editor-actions {
+  position: sticky;
+  bottom: -18px;
+  z-index: 8;
+  margin: 18px -18px -18px;
+  padding: 13px 18px;
+  border-top: 1px solid #e5e9ef;
+  background: rgba(255, 255, 255, .98);
+}
+
+#modalBody .editor-actions.left-actions {
+  justify-content: flex-start;
+}
+
+.icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  color: #667085;
+  font-size: 24px;
+}
+
+.icon-btn:hover {
+  background: #f4f6f8;
+}
+
+.btn {
+  font-weight: 600;
+}
+
+.btn.primary {
+  background: #172033;
+  border-color: #172033;
+}
+
+.btn.primary:hover:not(:disabled) {
+  background: #24344c;
+  border-color: #24344c;
+}
+
+.notice {
+  border: 1px solid #e5e9ef;
+}
+
+.mapping-item {
+  border-color: #e1e6ed;
+  background: #fff;
+}
+
+.chart-box,
+.chart-box-large {
+  border-radius: 10px;
+}
+
+@media (max-width: 900px) {
+  .liv-page-head h1 {
+    font-size: 22px;
+  }
+
+  .modal-card {
+    width: 100%;
+  }
+}
