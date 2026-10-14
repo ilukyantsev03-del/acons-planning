@@ -5301,10 +5301,21 @@ async function commitImport(){
           code:
             'primary',
           name:
-            nameById(
-              project.works,
-              front.workId
-            ) ||
+            (
+              project.works ||
+              []
+            )
+              .find(
+                item =>
+                  String(
+                    item.id
+                  ) ===
+                  String(
+                    front.workId ||
+                    ''
+                  )
+              )
+              ?.name ||
             'Основной объём',
           unit:
             front.unit ||
