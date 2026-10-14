@@ -1,7 +1,7 @@
 'use strict';
 
 (function () {
-  const VERSION = '2026.10.13.5';
+  const VERSION = '2026.10.14.1';
   const COMPLETE = new Set(['выполнено','выполнен','сделано','завершено','освидетельствовано','принято','выполнена','выполнена с просрочкой']);
   const LABELS = {
     green: 'Норма',
@@ -182,7 +182,9 @@
     const seen = new Set();
 
     function add(row, legacy) {
-      const linked = row.frontId && frontIds.has(String(row.frontId)) || row.metricId && metricIds.has(String(row.metricId));
+      const linked = metricIds.size
+        ? Boolean(row.metricId && metricIds.has(String(row.metricId)))
+        : Boolean(row.frontId && frontIds.has(String(row.frontId)));
       if (!linked) return;
       const identity = row.id || row.sourceFingerprint || row.importFingerprint || JSON.stringify(row);
       if (seen.has(identity)) return;
@@ -245,6 +247,14 @@
     let unit = text(item.targetUnit) || inferred.unit;
     if (quantity == null) quantity = inferred.quantity;
 
+    if (quantity == null && item.metricId) {
+      const metric = (current.workMetrics || []).find(row =>
+        row.active !== false &&
+        String(row.id) === String(item.metricId)
+      );
+      quantity = num(metric?.targetQty);
+      unit = unit || metric?.unit || '';
+    }
     if (quantity == null && item.elementGroupId) {
       const group = (current.numberedElementGroups || []).find(row => String(row.id) === String(item.elementGroupId));
       quantity = num(group?.totalQty);
