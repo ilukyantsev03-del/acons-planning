@@ -1,7 +1,7 @@
 'use strict';
 
 (function () {
-  const MODULE_VERSION = '2026.10.14.2';
+  const MODULE_VERSION = '2026.10.14.3';
   const state = {
     workbook: null,
     fileName: '',
@@ -388,6 +388,7 @@
         contractDate: targetDate,
         organizationId: organizationMatch.item?.id || '',
         organizationName: organizationMatch.item?.name || organizationMatch.sourceName,
+        organizationSource: organizationSource,
         organizationStatus: organizationMatch.status,
         contractNo: rawContract || inheritedContract,
         milestoneNo,
@@ -680,21 +681,68 @@
 
   function ensureOrganization(row) {
     const current = currentProject();
-    if (row.organizationId) return current.organizations.find(item => String(item.id) === String(row.organizationId)) || null;
-    if (!row.organizationName) return null;
-    let organization = current.organizations.find(item => same(item.name, row.organizationName));
-    if (!organization) {
+    if (!current) return null;
+
+    let organization = null;
+
+    if (row.organizationId) {
+      organization = current.organizations.find(
+        item => String(item.id) === String(row.organizationId)
+      ) || null;
+    }
+
+    if (!organization && row.organizationName) {
+      organization = current.organizations.find(
+        item =>
+          same(item.name, row.organizationName) ||
+          (
+            Array.isArray(item.aliases) &&
+            item.aliases.some(alias => same(alias,row.organizationName))
+          )
+      ) || null;
+    }
+
+    if (!organization && row.organizationName) {
       organization = {
         id: uidValue('ORG'),
         name: row.organizationName,
         organizationType: 'contractor',
+        aliases: [],
         active: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
       current.organizations.push(organization);
     }
-    row.organizationId = organization.id;
+
+    if (!organization) return null;
+
+    const sourceValue = text(row.organizationSource || row.organizationName);
+    if (
+      sourceValue &&
+      !same(sourceValue, organization.name)
+    ) {
+      organization.aliases = Array.isArray(organization.aliases)
+        ? organization.aliases
+        : [];
+
+      if (!organization.aliases.some(alias => same(alias,sourceValue))) {
+        organization.aliases.push(sourceValue);
+      }
+    }
+
+    if (sourceValue) {
+      window.LIV_SOURCE_MAPPINGS?.remember?.({
+        sourceName: state.fileName || 'key-date-import',
+        sourceEntityType: 'organization',
+        sourceValue,
+        targetEntityType: 'organization',
+        targetLocalId: organization.id,
+        confidence: row.organizationStatus === 'Похоже' ? 0.8 : 1,
+        decision: 'confirmed'
+      });
+    }
+
     return organization;
   }
 
