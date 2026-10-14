@@ -1,7 +1,7 @@
 'use strict';
 
 (function () {
-  const VERSION = '2026.10.14.1';
+  const VERSION = '2026.10.14.2';
 
   function currentProject() {
     try {
@@ -219,6 +219,19 @@
     current.reportSnapshots = Array.isArray(current.reportSnapshots)
       ? current.reportSnapshots
       : [];
+
+    const duplicate = current.reportSnapshots.find(item =>
+      item &&
+      item.reportType === reportType &&
+      item.reportDate === reportDate &&
+      text(item.title) === title
+    );
+
+    if (duplicate) {
+      throw new Error(
+        'Снимок с таким типом, датой и названием уже существует. Измени название либо отчётную дату.'
+      );
+    }
 
     const dataSnapshot = buildSnapshot(reportDate,previousReportDate);
 
