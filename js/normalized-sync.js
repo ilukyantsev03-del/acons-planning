@@ -1,7 +1,7 @@
 'use strict';
 
 (function () {
-  const MODULE_VERSION = '2026.10.14.2';
+  const MODULE_VERSION = '2026.10.14.4';
   const PROJECT_EXTERNAL_ID = 'LIV-MAIN';
   const SAVE_DELAY = 1200;
   const PAGE_SIZE = 1000;
@@ -1007,7 +1007,8 @@
             sourceFingerprint: item.sourceFingerprint || undefined,
             responsibility: item.responsibility || undefined,
             riskCalendarId: item.riskCalendarId || undefined,
-            elementGroupId: item.elementGroupId || undefined
+            elementGroupId: item.elementGroupId || undefined,
+            metricId: item.metricId || undefined
           },
           source_batch_id: mapValue('importBatch', item.source?.batchId),
           source_file: text(item.source?.file) || null,
