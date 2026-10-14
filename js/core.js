@@ -4903,51 +4903,228 @@ function pfFrontIds() {
 function canonicalFactRows() {
 
   if (
-    Array.isArray(
+    !Array.isArray(
       project.progressFacts
-    ) &&
-    project.progressFacts.length
+    ) ||
+    !project.progressFacts.length
   ) {
 
-    return project.progressFacts
-      .filter(
-        row =>
-          row.factType !==
-          'cumulative_snapshot'
-      )
-      .map(
-        row => ({
-          id:
-            row.id,
-          frontId:
-            row.frontId,
-          date:
-            row.factDate ||
-            row.date,
-          qty:
-            num(
-              row.quantity ??
-              row.qty
-            ),
-          cumulative:
-            row.cumulativeQty ??
-            row.cumulative,
-          people:
-            row.people,
-          comment:
-            row.comment ||
-            ''
-        })
-      );
+    return (
+      project.factLog ||
+      []
+    );
   }
 
 
-  return (
-    project.factLog ||
-    []
-  );
-}
+  const primaryMetricIds =
+    new Set(
+      (
+        project.workMetrics ||
+        []
+      )
+        .filter(
+          metric =>
+            metric &&
+            metric.active !==
+              false &&
+            metric.isPrimary ===
+              true
+        )
+        .map(
+          metric =>
+            String(
+              metric.id
+            )
+        )
+    );
 
+
+  const rows =
+    project.progressFacts
+      .filter(
+        row =>
+          !row.metricId ||
+          primaryMetricIds.has(
+            String(
+              row.metricId
+            )
+          )
+      );
+
+
+  const groups =
+    new Map();
+
+
+  rows.forEach(
+    row => {
+
+      const key =
+        [
+          row.frontId ||
+          '',
+          row.metricId ||
+          ''
+        ]
+          .join(
+            '|'
+          );
+
+
+      if (
+        !groups.has(
+          key
+        )
+      ) {
+        groups.set(
+          key,
+          []
+        );
+      }
+
+
+      groups
+        .get(
+          key
+        )
+        .push(
+          row
+        );
+    }
+  );
+
+
+  const result =
+    [];
+
+
+  groups.forEach(
+    group => {
+
+      const quantityRows =
+        group
+          .filter(
+            row =>
+              row.factType !==
+              'cumulative_snapshot'
+          );
+
+
+      if (
+        quantityRows.length
+      ) {
+
+        quantityRows
+          .forEach(
+            row => {
+
+              result.push({
+                id:
+                  row.id,
+                frontId:
+                  row.frontId,
+                date:
+                  row.factDate ||
+                  row.date,
+                qty:
+                  num(
+                    row.quantity ??
+                    row.qty
+                  ),
+                cumulative:
+                  row.cumulativeQty ??
+                  row.cumulative,
+                people:
+                  row.people,
+                comment:
+                  row.comment ||
+                  ''
+              });
+            }
+          );
+
+
+        return;
+      }
+
+
+      let previous =
+        0;
+
+
+      group
+        .filter(
+          row =>
+            row.factType ===
+              'cumulative_snapshot'
+        )
+        .sort(
+          (
+            left,
+            right
+          ) =>
+            String(
+              left.factDate ||
+              left.date ||
+              ''
+            )
+              .localeCompare(
+                String(
+                  right.factDate ||
+                  right.date ||
+                  ''
+                )
+              )
+        )
+        .forEach(
+          row => {
+
+            const cumulative =
+              num(
+                row.cumulativeQty ??
+                row.cumulative
+              );
+
+
+            const qty =
+              Math.max(
+                0,
+                cumulative -
+                previous
+              );
+
+
+            previous =
+              Math.max(
+                previous,
+                cumulative
+              );
+
+
+            result.push({
+              id:
+                row.id,
+              frontId:
+                row.frontId,
+              date:
+                row.factDate ||
+                row.date,
+              qty,
+              cumulative,
+              people:
+                row.people,
+              comment:
+                row.comment ||
+                ''
+            });
+          }
+        );
+    }
+  );
+
+
+  return result;
+}
 
 function renderPlanFact() {
 
