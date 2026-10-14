@@ -3212,6 +3212,475 @@ function closeModal() {
    ========================================================= */
 
 
+function frontMetricRows(
+  frontId
+) {
+
+  return (
+    project.workMetrics ||
+    []
+  )
+    .filter(
+      item =>
+        item.active !==
+          false &&
+        String(
+          item.frontId ||
+          ''
+        ) ===
+          String(
+            frontId ||
+            ''
+          ) &&
+        item.isPrimary !==
+          true
+    );
+}
+
+
+function frontMetricRowHtml(
+  metric =
+    {}
+) {
+
+  const methods = [
+    [
+      'quantity',
+      'Объём'
+    ],
+    [
+      'length',
+      'Длина'
+    ],
+    [
+      'area',
+      'Площадь'
+    ],
+    [
+      'elements',
+      'Элементы'
+    ],
+    [
+      'status',
+      'Статус'
+    ],
+    [
+      'manual',
+      'Ручной'
+    ]
+  ];
+
+
+  return `
+    <tr
+      data-front-metric-row
+      data-metric-id="${esc(
+        metric.id ||
+        ''
+      )}">
+
+      <td>
+        <input
+          data-metric-name
+          value="${esc(
+            metric.name ||
+            ''
+          )}"
+          placeholder="Например: Труба"
+        >
+      </td>
+
+      <td>
+        <input
+          data-metric-unit
+          value="${esc(
+            metric.unit ||
+            ''
+          )}"
+          placeholder="м.п. / м³ / шт."
+        >
+      </td>
+
+      <td>
+        <input
+          data-metric-target
+          type="number"
+          min="0"
+          step="any"
+          value="${metric.targetQty ?? ''}"
+          placeholder="0"
+        >
+      </td>
+
+      <td>
+        <select data-metric-method>
+          ${
+            methods
+              .map(
+                (
+                  [
+                    value,
+                    label
+                  ]
+                ) =>
+                  `
+                    <option
+                      value="${value}"
+                      ${
+                        value ===
+                        (
+                          metric.calculationMethod ||
+                          'quantity'
+                        )
+                          ? 'selected'
+                          : ''
+                      }>
+                      ${label}
+                    </option>
+                  `
+              )
+              .join('')
+          }
+        </select>
+      </td>
+
+      <td>
+        <button
+          type="button"
+          class="btn"
+          data-remove-front-metric>
+          ×
+        </button>
+      </td>
+
+    </tr>
+  `;
+}
+
+
+function bindFrontMetricEditor() {
+
+  const body =
+    $('frontMetricsBody');
+
+
+  const add =
+    $('addFrontMetric');
+
+
+  if (
+    !body ||
+    !add
+  ) {
+    return;
+  }
+
+
+  const bindRemove =
+    () => {
+
+      body
+        .querySelectorAll(
+          '[data-remove-front-metric]'
+        )
+        .forEach(
+          button => {
+
+            button.onclick =
+              () =>
+                button
+                  .closest(
+                    '[data-front-metric-row]'
+                  )
+                  ?.remove();
+          }
+        );
+    };
+
+
+  add.onclick =
+    () => {
+
+      body.insertAdjacentHTML(
+        'beforeend',
+        frontMetricRowHtml()
+      );
+
+
+      bindRemove();
+    };
+
+
+  bindRemove();
+}
+
+
+function saveFrontMetrics(
+  front
+) {
+
+  project.workMetrics =
+    Array.isArray(
+      project.workMetrics
+    )
+      ? project.workMetrics
+      : [];
+
+
+  const work =
+    byId(
+      project.works,
+      front.workId
+    );
+
+
+  const primaryId =
+    'METRIC-' +
+    front.id +
+    '-PRIMARY';
+
+
+  let primary =
+    project.workMetrics
+      .find(
+        item =>
+          String(
+            item.id
+          ) ===
+          primaryId
+      );
+
+
+  if (!primary) {
+
+    primary = {
+      id:
+        primaryId,
+      frontId:
+        front.id,
+      createdAt:
+        nowIso()
+    };
+
+
+    project.workMetrics.push(
+      primary
+    );
+  }
+
+
+  Object.assign(
+    primary,
+    {
+      frontId:
+        front.id,
+      code:
+        'primary',
+      name:
+        work?.name ||
+        'Основной объём',
+      unit:
+        front.unit ||
+        work?.unit ||
+        'ед.',
+      targetQty:
+        num(
+          front.totalQty
+        ),
+      weight:
+        1,
+      calculationMethod:
+        /шт/i
+          .test(
+            front.unit ||
+            work?.unit ||
+            ''
+          )
+          ? 'elements'
+          : 'quantity',
+      isPrimary:
+        true,
+      active:
+        true,
+      updatedAt:
+        nowIso()
+    }
+  );
+
+
+  const seen =
+    new Set([
+      primaryId
+    ]);
+
+
+  document
+    .querySelectorAll(
+      '[data-front-metric-row]'
+    )
+    .forEach(
+      row => {
+
+        const name =
+          row.querySelector(
+            '[data-metric-name]'
+          )
+            ?.value
+            .trim() ||
+          '';
+
+
+        const unit =
+          row.querySelector(
+            '[data-metric-unit]'
+          )
+            ?.value
+            .trim() ||
+          '';
+
+
+        if (
+          !name &&
+          !unit
+        ) {
+          return;
+        }
+
+
+        let id =
+          row.dataset
+            .metricId ||
+          '';
+
+
+        if (!id) {
+
+          id =
+            uid(
+              'MET'
+            );
+        }
+
+
+        let metric =
+          project.workMetrics
+            .find(
+              item =>
+                String(
+                  item.id
+                ) ===
+                String(
+                  id
+                )
+            );
+
+
+        if (!metric) {
+
+          metric = {
+            id,
+            frontId:
+              front.id,
+            createdAt:
+              nowIso()
+          };
+
+
+          project.workMetrics.push(
+            metric
+          );
+        }
+
+
+        Object.assign(
+          metric,
+          {
+            frontId:
+              front.id,
+            code:
+              metric.code ||
+              (
+                'metric-' +
+                id
+              ),
+            name:
+              name ||
+              'Показатель',
+            unit:
+              unit ||
+              'ед.',
+            targetQty:
+              num(
+                row.querySelector(
+                  '[data-metric-target]'
+                )
+                  ?.value
+              ),
+            weight:
+              num(
+                metric.weight ||
+                1
+              ) ||
+              1,
+            calculationMethod:
+              row.querySelector(
+                '[data-metric-method]'
+              )
+                ?.value ||
+              'quantity',
+            isPrimary:
+              false,
+            active:
+              true,
+            updatedAt:
+              nowIso()
+          }
+        );
+
+
+        seen.add(
+          String(
+            metric.id
+          )
+        );
+      }
+    );
+
+
+  project.workMetrics
+    .filter(
+      item =>
+        String(
+          item.frontId ||
+          ''
+        ) ===
+          String(
+            front.id
+          ) &&
+        item.isPrimary !==
+          true &&
+        !seen.has(
+          String(
+            item.id
+          )
+        )
+    )
+    .forEach(
+      item => {
+
+        item.active =
+          false;
+
+        item.archivedAt =
+          nowIso();
+
+        item.updatedAt =
+          nowIso();
+      }
+    );
+}
+
+
 function frontForm(
   front =
     {}
@@ -3654,6 +4123,56 @@ function frontForm(
     </div>
 
 
+    <div
+      class="field"
+      style="grid-column:1/-1">
+
+      <label>
+        Дополнительные показатели объёма
+      </label>
+
+      <div class="muted">
+        Для инженерных сетей и сложных фронтов можно учитывать несколько показателей:
+        труба, траншея, колодцы, изоляция и т. п.
+        Основной объём выше остаётся главным показателем фронта.
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Показатель</th>
+              <th>Ед.</th>
+              <th>Общий объём</th>
+              <th>Метод</th>
+              <th></th>
+            </tr>
+          </thead>
+
+          <tbody id="frontMetricsBody">
+            ${
+              frontMetricRows(
+                front.id
+              )
+                .map(
+                  frontMetricRowHtml
+                )
+                .join('')
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <button
+        type="button"
+        id="addFrontMetric"
+        class="btn">
+        + Показатель
+      </button>
+
+    </div>
+
+
     <div class="field">
 
       <label>
@@ -3731,6 +4250,9 @@ function openFrontEditor(
       front
     )
   );
+
+
+  bindFrontMetricEditor();
 
 
   $('saveFront').onclick =
@@ -3993,6 +4515,11 @@ async function saveFrontFromModal(
         matrixId;
     }
   }
+
+
+  saveFrontMetrics(
+    front
+  );
 
 
   log(
