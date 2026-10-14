@@ -1,7 +1,7 @@
 'use strict';
 
 (function () {
-  const MODULE_VERSION = '2026.10.14.3';
+  const MODULE_VERSION = '2026.10.14.4';
   const state = {
     workbook: null,
     fileName: '',
@@ -456,6 +456,15 @@
       select.addEventListener('change', () => {
         if (select.value === '') delete state.mapping[select.dataset.kdField];
         else state.mapping[select.dataset.kdField] = Number(select.value);
+
+        if (state.sheetName && state.sheetName !== '__ALL__') {
+          state.sheetMappings[state.sheetName] = {
+            headerRow: state.headerRow,
+            headers: [...state.headers],
+            mapping: { ...state.mapping }
+          };
+        }
+
         buildRows();
         renderPreview();
       });
@@ -525,7 +534,6 @@
       state.headerRow = -1;
       state.headers = [];
       state.mapping = {};
-      state.sheetMappings = {};
       state.rows = [];
 
       state.workbook.SheetNames.forEach(name => {
@@ -537,14 +545,17 @@
           cellDates: true,
           blankrows: false
         });
-        const headerRow = detectHeaderRow(matrix);
+        const saved = state.sheetMappings[name] || null;
+        const headerRow = saved?.headerRow ?? detectHeaderRow(matrix);
         const headers = uniqueHeaders(matrix[headerRow] || []);
-        const mapping = autoMapping(headers);
+        const mapping = saved?.mapping
+          ? { ...saved.mapping }
+          : autoMapping(headers);
 
         state.sheetMappings[name] = {
           headerRow,
-          headers,
-          mapping
+          headers: [...headers],
+          mapping: { ...mapping }
         };
 
         const rows = buildRowsFromContext({
@@ -577,15 +588,17 @@
       cellDates: true,
       blankrows: false
     });
-    state.headerRow = detectHeaderRow(state.matrix);
+    const saved = state.sheetMappings[state.sheetName] || null;
+    state.headerRow = saved?.headerRow ?? detectHeaderRow(state.matrix);
     state.headers = uniqueHeaders(state.matrix[state.headerRow] || []);
-    state.mapping = autoMapping(state.headers);
-    state.sheetMappings = {
-      [state.sheetName]: {
-        headerRow: state.headerRow,
-        headers: state.headers,
-        mapping: state.sheetName === '__ALL__' ? state.sheetMappings : state.mapping
-      }
+    state.mapping = saved?.mapping
+      ? { ...saved.mapping }
+      : autoMapping(state.headers);
+
+    state.sheetMappings[state.sheetName] = {
+      headerRow: state.headerRow,
+      headers: [...state.headers],
+      mapping: { ...state.mapping }
     };
     buildRows();
     renderMapping();
