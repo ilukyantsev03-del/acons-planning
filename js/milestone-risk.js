@@ -1,7 +1,7 @@
 'use strict';
 
 (function () {
-  const VERSION = '2026.10.14.1';
+  const VERSION = '2026.10.14.2';
   const COMPLETE = new Set(['выполнено','выполнен','сделано','завершено','освидетельствовано','принято','выполнена','выполнена с просрочкой']);
   const LABELS = {
     green: 'Норма',
@@ -503,11 +503,37 @@
     if (!grid) return;
     const item = editorItem() || {};
     const inferred = inferTarget(title.value);
+    const current = currentProject();
+
+    const metricOptions = (frontId, selectedId) => {
+      const rows = (current?.workMetrics || [])
+        .filter(metric =>
+          metric.active !== false &&
+          (
+            !frontId ||
+            String(metric.frontId || '') === String(frontId)
+          )
+        );
+
+      return [
+        '<option value="">— основной объём фронта —</option>',
+        ...rows.map(metric =>
+          '<option value="' + escapeHtml(metric.id) + '" ' +
+          (String(metric.id) === String(selectedId || '') ? 'selected' : '') +
+          '>' +
+          escapeHtml(metric.name || metric.code || 'Показатель') +
+          (metric.unit ? ' · ' + escapeHtml(metric.unit) : '') +
+          '</option>'
+        )
+      ].join('');
+    };
+
     const holder = document.createElement('div');
     holder.style.display = 'contents';
     holder.innerHTML = `
       <div class="field"><label>Целевой объём</label><input id="mTargetQty" type="number" min="0" step="any" value="${escapeHtml(item.targetQty ?? inferred.quantity ?? '')}" placeholder="Например: 190"></div>
       <div class="field"><label>Единица цели</label><input id="mTargetUnit" value="${escapeHtml(item.targetUnit || inferred.unit || '')}" placeholder="шт., м³, м², м.п."></div>
+      <div class="field"><label>Показатель для расчёта</label><select id="mRiskMetric">${metricOptions(item.frontId || $id('mFrontId')?.value || '', item.metricId || '')}</select></div>
       <div class="field"><label>Окно темпа, дней</label><input id="mRiskWindow" type="number" min="1" max="90" value="${escapeHtml(item.riskWindowDays || 7)}"></div>
       <div class="field"><label>Календарь</label><select id="mRiskCalendar"><option value="7x0" ${(item.riskCalendarId || '7x0') === '7x0' ? 'selected' : ''}>7/0</option><option value="6x1" ${item.riskCalendarId === '6x1' ? 'selected' : ''}>6/1</option><option value="5x2" ${item.riskCalendarId === '5x2' ? 'selected' : ''}>5/2</option></select></div>
       <div class="milestone-risk-editor-card"><b>Прогноз риска</b><span id="mRiskPreview" class="muted">После связи с фронтом или группой элементов LIV рассчитает риск автоматически.</span></div>
@@ -523,6 +549,7 @@
         frontId: $id('mFrontId')?.value,
         buildingId: $id('mBuilding')?.value,
         workId: $id('mWorkId')?.value,
+        metricId: $id('mRiskMetric')?.value || '',
         targetQty: num($id('mTargetQty')?.value),
         targetUnit: text($id('mTargetUnit')?.value),
         riskWindowDays: num($id('mRiskWindow')?.value) || 7,
@@ -532,8 +559,33 @@
       if ($id('mRiskPreview') && risk) $id('mRiskPreview').textContent = risk.label + ': ' + risk.reason;
     }
 
-    ['mTitle','mContract','mWork','mFrontId','mBuilding','mWorkId','mTargetQty','mTargetUnit','mRiskWindow','mRiskCalendar']
+    ['mTitle','mContract','mWork','mBuilding','mWorkId','mTargetQty','mTargetUnit','mRiskWindow','mRiskCalendar']
       .forEach(id => $id(id)?.addEventListener('change', preview));
+
+    $id('mFrontId')?.addEventListener('change', () => {
+      const select = $id('mRiskMetric');
+      if (select) {
+        select.innerHTML = metricOptions($id('mFrontId')?.value || '', '');
+      }
+      preview();
+    });
+
+    $id('mRiskMetric')?.addEventListener('change', () => {
+      const metric = (current?.workMetrics || []).find(row =>
+        String(row.id) === String($id('mRiskMetric')?.value || '')
+      );
+
+      if (metric) {
+        if ($id('mTargetQty') && !$id('mTargetQty').value && metric.targetQty != null) {
+          $id('mTargetQty').value = metric.targetQty;
+        }
+        if ($id('mTargetUnit') && !$id('mTargetUnit').value && metric.unit) {
+          $id('mTargetUnit').value = metric.unit;
+        }
+      }
+
+      preview();
+    });
     title.addEventListener('input', () => {
       const inferredNow = inferTarget(title.value);
       if ($id('mTargetQty') && !$id('mTargetQty').value && inferredNow.quantity != null) $id('mTargetQty').value = inferredNow.quantity;
@@ -551,6 +603,7 @@
       const before = new Set((current?.milestones || []).map(item => String(item.id)));
       const title = text($id('mTitle')?.value);
       const extras = {
+        metricId: $id('mRiskMetric')?.value || '',
         targetQty: num($id('mTargetQty')?.value),
         targetUnit: text($id('mTargetUnit')?.value),
         riskWindowDays: Math.max(1, Math.min(90, Math.round(num($id('mRiskWindow')?.value) || 7))),
