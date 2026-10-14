@@ -275,7 +275,7 @@
     ['liv-key-date-import-guard', 'js/key-date-import-guard.js?v=20261013-2'],
     ['liv-numbered-elements-v2', 'js/numbered-elements-v2.js?v=20261013-5'],
     ['liv-report-snapshots', 'js/report-snapshots.js?v=20261014-2'],
-    ['liv-preflight', 'js/preflight.js?v=20261014-2']
+    ['liv-preflight', 'js/preflight.js?v=20261014-3']
   ];
 
   function loadModule(index) {
