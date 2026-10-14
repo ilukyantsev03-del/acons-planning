@@ -921,6 +921,21 @@ const FIELD_DEFS = {
     ]
   },
 
+  metric: {
+    label:
+      'Показатель объёма',
+    aliases: [
+      'показатель',
+      'показатель объёма',
+      'показатель объема',
+      'позиция объёма',
+      'позиция объема',
+      'состав работ',
+      'вид объёма',
+      'вид объема'
+    ]
+  },
+
   totalQty: {
     label:
       'Общий объем',
@@ -1292,6 +1307,7 @@ const MODE_FIELDS = {
     'roomNo',
     'work',
     'organization',
+    'metric',
     'qty',
     'cumulative',
     'people',
@@ -5176,6 +5192,157 @@ async function commitImport(){
       }
 
 
+      const metricName =
+        normText(
+          mappedValue(
+            row,
+            'metric'
+          )
+        );
+
+
+      project.workMetrics =
+        project.workMetrics ||
+        [];
+
+
+      let metric =
+        project.workMetrics
+          .find(
+            item =>
+              item.active !==
+                false &&
+              String(
+                item.frontId ||
+                ''
+              ) ===
+                String(
+                  front.id
+                ) &&
+              (
+                metricName
+                  ? (
+                      normKey(
+                        item.name
+                      ) ===
+                        normKey(
+                          metricName
+                        ) ||
+                      normKey(
+                        item.code
+                      ) ===
+                        normKey(
+                          metricName
+                        )
+                    )
+                  : item.isPrimary ===
+                    true
+              )
+          );
+
+
+      if (
+        metricName &&
+        !metric
+      ) {
+
+        metric = {
+          id:
+            uid(
+              'MET'
+            ),
+          frontId:
+            front.id,
+          code:
+            'metric-' +
+            normKey(
+              metricName
+            ),
+          name:
+            metricName,
+          unit:
+            front.unit ||
+            'ед.',
+          targetQty:
+            null,
+          weight:
+            1,
+          calculationMethod:
+            'quantity',
+          isPrimary:
+            false,
+          active:
+            true,
+          createdAt:
+            nowIso(),
+          updatedAt:
+            nowIso()
+        };
+
+
+        project.workMetrics.push(
+          metric
+        );
+      }
+
+
+      if (
+        !metricName &&
+        !metric
+      ) {
+
+        metric = {
+          id:
+            'METRIC-' +
+            front.id +
+            '-PRIMARY',
+          frontId:
+            front.id,
+          code:
+            'primary',
+          name:
+            nameById(
+              project.works,
+              front.workId
+            ) ||
+            'Основной объём',
+          unit:
+            front.unit ||
+            'ед.',
+          targetQty:
+            front.totalQty,
+          weight:
+            1,
+          calculationMethod:
+            /шт/i
+              .test(
+                front.unit ||
+                ''
+              )
+              ? 'elements'
+              : 'quantity',
+          isPrimary:
+            true,
+          active:
+            true,
+          createdAt:
+            nowIso(),
+          updatedAt:
+            nowIso()
+        };
+
+
+        project.workMetrics.push(
+          metric
+        );
+      }
+
+
+      const metricId =
+        metric?.id ||
+        '';
+
+
       const quantity =
         num(
           mappedValue(
@@ -5197,6 +5364,7 @@ async function commitImport(){
       const fingerprint =
         [
           front.id,
+          metricId,
           date,
           quantity,
           people,
@@ -5265,15 +5433,33 @@ async function commitImport(){
               cumulativeRaw
             )
           : (
-              project.factLog ||
+              project.progressFacts ||
               []
             )
               .filter(
                 fact =>
-                  fact.frontId ===
-                    front.id &&
-                  fact.date <=
-                    date
+                  String(
+                    fact.frontId ||
+                    ''
+                  ) ===
+                    String(
+                      front.id
+                    ) &&
+                  String(
+                    fact.metricId ||
+                    ''
+                  ) ===
+                    String(
+                      metricId
+                    ) &&
+                  (
+                    fact.factDate ||
+                    fact.date ||
+                    ''
+                  ) <=
+                    date &&
+                  fact.factType !==
+                    'cumulative_snapshot'
               )
               .reduce(
                 (
@@ -5282,6 +5468,7 @@ async function commitImport(){
                 ) =>
                   sum +
                   num(
+                    fact.quantity ??
                     fact.qty
                   ),
                 0
@@ -5314,6 +5501,7 @@ async function commitImport(){
           factId,
         frontId:
           front.id,
+        metricId,
         factDate:
           date,
         factType:
@@ -5366,75 +5554,82 @@ async function commitImport(){
       });
 
 
-      front.doneQty =
-        Math.max(
-          num(
-            front.doneQty
-          ),
-          cumulative
-        );
-
-
       if (
-        !front.factStart ||
-        date <
-          front.factStart
-      ) {
-        front.factStart =
-          date;
-      }
-
-
-      const totalQty =
-        num(
-          front.totalQty
-        );
-
-
-      if (
-        totalQty >
-          0 &&
-        cumulative >=
-          totalQty
+        !metric ||
+        metric.isPrimary ===
+          true
       ) {
 
-        front.status =
-          'Завершено';
+        front.doneQty =
+          Math.max(
+            num(
+              front.doneQty
+            ),
+            cumulative
+          );
 
-        front.completed =
-          true;
 
         if (
-          !front.factEnd ||
-          date >
-            front.factEnd
+          !front.factStart ||
+          date <
+            front.factStart
         ) {
-          front.factEnd =
+          front.factStart =
             date;
         }
 
-      } else if (
-        cumulative >
-          0 &&
-        ![
-          'Ограничение',
-          'Приостановлено'
-        ]
-          .includes(
-            front.status
-          )
-      ) {
 
-        front.status =
-          'В работе';
+        const totalQty =
+          num(
+            front.totalQty
+          );
 
-        front.completed =
-          false;
+
+        if (
+          totalQty >
+            0 &&
+          cumulative >=
+            totalQty
+        ) {
+
+          front.status =
+            'Завершено';
+
+          front.completed =
+            true;
+
+          if (
+            !front.factEnd ||
+            date >
+              front.factEnd
+          ) {
+            front.factEnd =
+              date;
+          }
+
+        } else if (
+          cumulative >
+            0 &&
+          ![
+            'Ограничение',
+            'Приостановлено'
+          ]
+            .includes(
+              front.status
+            )
+        ) {
+
+          front.status =
+            'В работе';
+
+          front.completed =
+            false;
+        }
+
+
+        front.updatedAt =
+          nowIso();
       }
-
-
-      front.updatedAt =
-        nowIso();
 
 
       appended++;
