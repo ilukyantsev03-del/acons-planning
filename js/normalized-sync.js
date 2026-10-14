@@ -1561,13 +1561,11 @@
           resourceProgress: Math.min(index + chunk.length, pending.length),
           resourceTotal: pending.length
         });
-        const result = await client().from('resource_log').upsert(chunk, {
-          onConflict: 'external_id',
-          ignoreDuplicates: false
-        });
-        if (result.error) throw result.error;
+        written += await writeVersionedRows(
+          'resource_log',
+          chunk
+        );
         markRows('resource_log', chunk);
-        written += chunk.length;
         saveHashes();
         await new Promise(resolve => setTimeout(resolve, 20));
       }
