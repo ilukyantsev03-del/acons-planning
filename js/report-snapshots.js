@@ -1,7 +1,7 @@
 'use strict';
 
 (function () {
-  const VERSION = '2026.10.14.2';
+  const VERSION = '2026.10.14.3';
 
   function currentProject() {
     try {
@@ -51,14 +51,30 @@
     return row.factDate || row.date || '';
   }
 
-  function factValueAt(frontId, reportDate) {
+  function factValueAt(
+    frontId,
+    reportDate,
+    metricId = '',
+    includeUnassigned = true
+  ) {
     const current = currentProject();
+
     const facts = (current?.progressFacts || [])
-      .filter(row =>
-        String(row.frontId || '') === String(frontId || '') &&
-        factDate(row) &&
-        factDate(row) <= reportDate
-      )
+      .filter(row => {
+        if (
+          String(row.frontId || '') !== String(frontId || '') ||
+          !factDate(row) ||
+          factDate(row) > reportDate
+        ) {
+          return false;
+        }
+
+        if (!metricId) return true;
+
+        const rowMetricId = String(row.metricId || '');
+        return rowMetricId === String(metricId) ||
+          (includeUnassigned && !rowMetricId);
+      })
       .sort((a,b) => String(factDate(a)).localeCompare(String(factDate(b))));
 
     const snapshots = facts.filter(row =>
@@ -77,8 +93,11 @@
         .reduce((sum,row) => sum + num(row.quantity ?? row.qty),0));
     }
 
-    const front = byId(current?.fronts,frontId);
-    if (reportDate >= todayIso()) return Math.max(0,num(front?.doneQty));
+    if (!metricId || includeUnassigned) {
+      const front = byId(current?.fronts,frontId);
+      if (reportDate >= todayIso()) return Math.max(0,num(front?.doneQty));
+    }
+
     return 0;
   }
 
@@ -116,8 +135,28 @@
         const building = byId(current.buildings,structure.buildingId);
         const work = byId(current.works,front.workId);
         const organization = byId(current.organizations,front.organizationId);
-        const done = factValueAt(front.id,reportDate);
-        const previous = previousDate ? factValueAt(front.id,previousDate) : 0;
+        const primaryMetric = (current.workMetrics || []).find(metric =>
+          metric.active !== false &&
+          metric.isPrimary === true &&
+          String(metric.frontId || '') === String(front.id)
+        ) || null;
+
+        const done = factValueAt(
+          front.id,
+          reportDate,
+          primaryMetric?.id || '',
+          true
+        );
+
+        const previous = previousDate
+          ? factValueAt(
+              front.id,
+              previousDate,
+              primaryMetric?.id || '',
+              true
+            )
+          : 0;
+
         const total = Math.max(0,num(front.totalQty));
         return {
           frontId: front.id,
@@ -139,6 +178,54 @@
         };
       });
   }
+
+  function snapshotMetrics(reportDate, previousDate) {
+    const current = currentProject();
+
+    return (current?.workMetrics || [])
+      .filter(metric => metric && metric.active !== false)
+      .map(metric => {
+        const front = byId(current.fronts,metric.frontId);
+        if (!front || front.active === false) return null;
+
+        const done = factValueAt(
+          front.id,
+          reportDate,
+          metric.id,
+          metric.isPrimary === true
+        );
+
+        const previous = previousDate
+          ? factValueAt(
+              front.id,
+              previousDate,
+              metric.id,
+              metric.isPrimary === true
+            )
+          : 0;
+
+        const total = Math.max(0,num(metric.targetQty));
+
+        return {
+          metricId: metric.id,
+          frontId: front.id,
+          code: metric.code || '',
+          name: metric.name || '',
+          unit: metric.unit || '',
+          targetQty: total || null,
+          doneQty: done,
+          previousQty: previous,
+          periodQty: done - previous,
+          percent: total > 0
+            ? Math.max(0,Math.min(100,Math.round(done / total * 10000) / 100))
+            : null,
+          calculationMethod: metric.calculationMethod || 'quantity',
+          isPrimary: metric.isPrimary === true
+        };
+      })
+      .filter(Boolean);
+  }
+
 
   function snapshotMilestones() {
     const current = currentProject();
@@ -202,6 +289,7 @@
       previousReportDate: previousDate || '',
       filters: currentFilters(),
       fronts: snapshotFronts(reportDate,previousDate),
+      metrics: snapshotMetrics(reportDate,previousDate),
       milestones: snapshotMilestones(),
       numberedGroups: snapshotNumbered(reportDate,previousDate)
     };
