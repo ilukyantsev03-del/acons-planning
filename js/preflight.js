@@ -1,7 +1,7 @@
 'use strict';
 
 (function () {
-  const VERSION = '2026.10.14.4';
+  const VERSION = '2026.10.14.5';
   const state = {
     running: false,
     last: null
@@ -80,8 +80,29 @@
     }
   }
 
+  async function schemeFilesCheck() {
+    try {
+      const projectId=await projectContext(),client=window.LIV_SUPABASE;
+      let offset=0,checked=0;const missing=[];
+      while(true){
+        const response=await client.from('schemes').select('external_id,name,storage_path').eq('project_id',projectId).eq('active',true).range(offset,offset+99);
+        if(response.error)throw response.error;
+        for(const row of response.data||[]){
+          const path=String(row.storage_path||''),split=path.lastIndexOf('/');
+          const listing=await client.storage.from('liv-schemes').list(path.slice(0,split),{search:path.slice(split+1),limit:100});
+          if(listing.error)throw listing.error;
+          checked++;
+          if(!(listing.data||[]).some(file=>file.name===path.slice(split+1)))missing.push(row.name||row.external_id);
+        }
+        if((response.data||[]).length<100)break;offset+=100;
+      }
+      return result('Исходные PDF',!missing.length,missing.length?'Файл отсутствует: '+missing.join('; ')+'. Нужна повторная загрузка исходного PDF.':'Проверено файлов: '+checked);
+    }catch(error){return result('Исходные PDF',false,error?.message||error);}
+  }
+
   function moduleChecks() {
     return [
+      result('Расчёт факта', Boolean(window.LIV_FACT_SERIES)),
       result('Серверная синхронизация', Boolean(window.LIV_NORMALIZED_SYNC)),
       result('Память сопоставлений', Boolean(window.LIV_SOURCE_MAPPINGS)),
       result('Импорт КД', Boolean(window.LIV_KEY_DATE_IMPORT)),
@@ -263,6 +284,7 @@
 
     if (showDialog) {
       checks.push(...await identityChecks());
+      checks.push(await schemeFilesCheck());
     }
 
     const failed = checks.filter(item => !item.ok);

@@ -44,4 +44,6 @@ jobs:
           print('All local script references exist.')
 
       - name: Check import, PDF and synchronization regressions
-        run: node --test tests/*.test.cjs
+        run: |
+          curl --fail --location --retry 2 --output "$RUNNER_TEMP/liv-xlsx.js" https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js
+          LIV_XLSX_TEST_PATH="$RUNNER_TEMP/liv-xlsx.js" node --test tests/*.test.cjs

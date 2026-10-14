@@ -331,3 +331,70 @@ test('PDF: отпускание мыши не открывает карточк�
   assert.equal(dialogs,0);assert.equal(env.api.state.draw,true);assert.equal(env.api.state.dirty.size,1);
   assert.match(env.element('schSaveDrawings').textContent,/\(1\)/);
 });
+
+function factModel() {return moduleContext('js/fact-series.js','series,primaryRows').api;}
+const mixedFacts=[
+ {id:'before',frontId:'F1',factDate:'2026-10-01',factType:'quantity',quantity:10},
+ {id:'baseline',frontId:'F1',factDate:'2026-10-02',factType:'cumulative_snapshot',cumulativeQty:50},
+ {id:'same-day',frontId:'F1',factDate:'2026-10-02',factType:'quantity',quantity:5},
+ {id:'after',frontId:'F1',factDate:'2026-10-03',factType:'quantity',quantity:10,cumulativeQty:999},
+ {id:'future',frontId:'F1',factDate:'2026-11-01',factType:'quantity',quantity:500},
+ {id:'deleted',frontId:'F1',factDate:'2026-10-03',quantity:1000,active:false}
+];
+test('Факт: накопительная отсечка заменяет предыдущий итог, последующий прирост добавляется',()=>{
+ const api=factModel();const result=api.series(mixedFacts,'2026-10-03');
+ assert.equal(result.actual,60);assert.equal(result.entries.reduce((s,r)=>s+r.qty,0),60);
+ assert.equal(api.series(mixedFacts,'2026-10-01').actual,10);
+ assert.equal(api.series(mixedFacts,'2026-10-02').actual,50);
+});
+test('Факт: исходная отсечка не выдаётся за дневную выработку, исправленная отсечка уменьшает итог',()=>{
+ const api=factModel();const rows=[mixedFacts[1],mixedFacts[3]];
+ assert.equal(api.series(rows,'2026-10-03').daily.get('2026-10-02'),undefined);
+ rows.push({id:'correction',frontId:'F1',factDate:'2026-10-04',factType:'cumulative_snapshot',cumulativeQty:45});
+ assert.equal(api.series(rows,'2026-10-04').actual,45);
+});
+test('Факт: старый журнал не удваивает факты, дополнительные показатели не смешиваются с основным',()=>{
+ const api=factModel();const current={workMetrics:[{id:'pipe',frontId:'F1',isPrimary:true},{id:'wells',frontId:'F1'}],progressFacts:[{...mixedFacts[0],metricId:'pipe'},{id:'w',frontId:'F1',metricId:'wells',factDate:'2026-10-01',quantity:100}],factLog:[{id:'before',frontId:'F1',date:'2026-10-01',qty:10}]};
+ assert.equal(api.series(api.primaryRows(current)).actual,10);
+});
+test('Отчёт и риск КД используют один итог на выбранную дату без будущего и дополнительных показателей',()=>{
+ const api=factModel();const env=moduleContext('js/report-snapshots.js','factValueAt,snapshotFronts');env.window.LIV_FACT_SERIES=api;
+ env.context.project.progressFacts=mixedFacts;env.context.project.workMetrics=[{id:'wells',frontId:'F1'}];
+ env.context.project.progressFacts=[...mixedFacts,{id:'w',frontId:'F1',metricId:'wells',factDate:'2026-10-03',quantity:900}];
+ assert.equal(env.api.factValueAt('F1','2026-10-03'),60);
+ env.context.project.fronts=[{id:'F1',totalQty:100}];
+ const report=env.api.snapshotFronts('2026-10-03','2026-10-02')[0];
+ assert.equal(report.doneQty,60);assert.equal(report.previousQty,50);assert.equal(report.periodQty,10);
+ const risk=moduleContext('js/milestone-risk.js','compute');risk.window.LIV_FACT_SERIES=api;
+ Object.assign(risk.context.project,{progressFacts:env.context.project.progressFacts,workMetrics:env.context.project.workMetrics,fronts:[{id:'F1',totalQty:100}]});
+ const r=risk.api.compute({id:'M1',frontId:'F1',targetQty:100,contractDate:'2026-10-10'},{asOf:'2026-10-03'});
+ assert.equal(r.actualQty,60);assert.equal(r.remainingQty,40);
+});
+
+test('XLSX: реальный двулистовой файл → предпросмотр → импорт → повтор без дублей', {skip:!process.env.LIV_XLSX_TEST_PATH}, async()=>{
+ const env=importer();vm.runInContext(fs.readFileSync(process.env.LIV_XLSX_TEST_PATH,'utf8'),env.context);env.window.XLSX=env.context.XLSX;
+ const X=env.context.XLSX,book=X.utils.book_new();
+ const header=['№','Подрядчик','№ договора','Наименование ключевой даты','Дата окончания','Здание'];
+ X.utils.book_append_sheet(book,X.utils.aoa_to_sheet([header,['1','Подрядчик','Д-1','Выполнить 190 свай','25.10.2026','ГК'],['2','Подрядчик','Д-1','Кровля выполнена','31.10.2026','ГК']]),'Договор 1');
+ X.utils.book_append_sheet(book,X.utils.aoa_to_sheet([header,['1','Подрядчик','Д-2','Выполнить 50 анкеров','28.10.2026','ГК']]),'Договор 2');
+ const data=X.write(book,{type:'array',bookType:'xlsx'});
+ await env.api.readFile({name:'Проба КД.xlsx',arrayBuffer:async()=>data});
+ assert.equal(env.api.state.rows.length,3);assert.equal(env.context.project.milestones.length,0);
+ assert.equal(env.api.state.rows.filter(x=>x.result==='Ошибка').length,0);
+ assert.equal(env.api.state.rows[0].targetQty,190);
+ env.api.state.rows.forEach(x=>x.selected=true);await env.api.commitImport();assert.equal(env.context.project.milestones.length,3);assert.equal(env.context.project.contracts.length,2);
+ await env.api.readFile({name:'Проба КД.xlsx',arrayBuffer:async()=>data});env.api.state.rows.forEach(x=>x.selected=true);await env.api.commitImport();assert.equal(env.context.project.milestones.length,3);
+});
+
+test('Отчёт: снимок неизменяем, повтор блокируется, ошибка сохранения позволяет повторить',async()=>{
+ let fail=true;
+ const env=moduleContext('js/report-snapshots.js','capture',{saveProject:async()=>{if(fail)throw Error('offline');}});
+ env.context.document.querySelector=()=>null;env.window.LIV_FACT_SERIES=factModel();
+ env.context.project.milestones=[{id:'M1',riskDetails:{nested:{value:1}}}];
+ const input={reportDate:'2026-10-14',previousReportDate:'2026-10-07',title:'Проверка'};
+ await assert.rejects(env.api.capture(input),/offline/);assert.equal(env.context.project.reportSnapshots.length,0);
+ fail=false;const snapshot=await env.api.capture(input);
+ env.context.project.milestones[0].riskDetails.nested.value=99;
+ assert.equal(snapshot.dataSnapshot.milestones[0].riskDetails.nested.value,1);
+ await assert.rejects(env.api.capture(input),/уже существует/);
+});

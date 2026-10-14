@@ -5435,56 +5435,10 @@ async function commitImport(){
         );
 
 
-      const cumulative =
-        normText(
-          cumulativeRaw
-        ) !==
-          ''
-          ? num(
-              cumulativeRaw
-            )
-          : (
-              project.progressFacts ||
-              []
-            )
-              .filter(
-                fact =>
-                  String(
-                    fact.frontId ||
-                    ''
-                  ) ===
-                    String(
-                      front.id
-                    ) &&
-                  String(
-                    fact.metricId ||
-                    ''
-                  ) ===
-                    String(
-                      metricId
-                    ) &&
-                  (
-                    fact.factDate ||
-                    fact.date ||
-                    ''
-                  ) <=
-                    date &&
-                  fact.factType !==
-                    'cumulative_snapshot'
-              )
-              .reduce(
-                (
-                  sum,
-                  fact
-                ) =>
-                  sum +
-                  num(
-                    fact.quantity ??
-                    fact.qty
-                  ),
-                0
-              ) +
-            quantity;
+      const cumulative = normText(cumulativeRaw) !== '' ? num(cumulativeRaw)
+        : window.LIV_FACT_SERIES.series((project.progressFacts||[]).filter(fact=>
+          String(fact.frontId||'')===String(front.id)&&String(fact.metricId||'')===String(metricId)
+        ),date).actual + quantity;
 
 
       const factId =

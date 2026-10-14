@@ -1,7 +1,7 @@
 'use strict';
 
 (function () {
-  const VERSION = '2026.10.14.2';
+  const VERSION = '2026.10.14.3';
   const COMPLETE = new Set(['выполнено','выполнен','сделано','завершено','освидетельствовано','принято','выполнена','выполнена с просрочкой']);
   const LABELS = {
     green: 'Норма',
@@ -162,67 +162,28 @@
     return COMPLETE.has(norm(value));
   }
 
-  function elementSeries(elements) {
+  function elementSeries(elements, asOf) {
     const daily = new Map();
     let actual = 0;
     elements.forEach(element => {
       if (!isCompleted(element.status)) return;
-      actual += 1;
       const date = element.completedDate || element.factDate || text(element.updatedAt).slice(0,10);
+      if(date&&date>asOf)return;
+      actual += 1;
       if (parseDate(date)) daily.set(date, (daily.get(date) || 0) + 1);
     });
     return { actual, daily, mode: 'elements' };
   }
 
-  function factSeries(item, current, fronts) {
-    const frontIds = new Set(fronts.map(row => String(row.id)));
-    const metricIds = new Set([item.metricId, ...(item.riskDetails?.metricIds || [])].filter(Boolean).map(String));
-    const cumulative = new Map();
-    const quantities = new Map();
-    const seen = new Set();
-
-    function add(row, legacy) {
-      const linked = metricIds.size
-        ? Boolean(row.metricId && metricIds.has(String(row.metricId)))
-        : Boolean(row.frontId && frontIds.has(String(row.frontId)));
-      if (!linked) return;
-      const identity = row.id || row.sourceFingerprint || row.importFingerprint || JSON.stringify(row);
-      if (seen.has(identity)) return;
-      seen.add(identity);
-      const date = row.factDate || row.date || '';
-      if (!parseDate(date)) return;
-      const cum = num(row.cumulativeQty ?? row.cumulative);
-      const qty = num(row.quantity ?? row.qty);
-      if (cum != null) cumulative.set(date, Math.max(cumulative.get(date) || 0, cum));
-      else if (qty != null) quantities.set(date, (quantities.get(date) || 0) + qty);
-    }
-
-    (current.progressFacts || []).forEach(row => add(row, false));
-    (current.factLog || []).forEach(row => add(row, true));
-
-    if (cumulative.size) {
-      const daily = new Map();
-      let previous = 0;
-      [...cumulative.entries()].sort((a,b) => a[0].localeCompare(b[0])).forEach(([date,value]) => {
-        daily.set(date, Math.max(0, value - previous));
-        previous = Math.max(previous, value);
-      });
-      return { actual: previous, daily, mode: 'cumulative' };
-    }
-
-    if (quantities.size) {
-      return {
-        actual: [...quantities.values()].reduce((sum,value) => sum + value, 0),
-        daily: quantities,
-        mode: 'quantity'
-      };
-    }
-
-    return {
-      actual: fronts.reduce((sum,front) => sum + (num(front.doneQty) || 0), 0),
-      daily: new Map(),
-      mode: 'front'
-    };
+  function factSeries(item, current, fronts, asOf) {
+    const frontIds=new Set(fronts.map(row=>String(row.id)));
+    const metricIds=new Set([item.metricId,...(item.riskDetails?.metricIds||[])].filter(Boolean).map(String));
+    const rows=metricIds.size
+      ? [...(current.progressFacts||[]),...(current.factLog||[]),...window.LIV_FACT_SERIES.primaryRows(current)].filter(row=>row.metricId&&metricIds.has(String(row.metricId)))
+      : window.LIV_FACT_SERIES.primaryRows(current,frontIds);
+    const series=window.LIV_FACT_SERIES.series(rows,asOf);
+    if(series.hasFacts)return series;
+    return {actual:asOf>=iso()?fronts.reduce((sum,front)=>sum+(num(front.doneQty)||0),0):0,daily:new Map(),mode:'front'};
   }
 
   function averageRate(daily, asOf, days, calendar) {
@@ -279,7 +240,7 @@
     const elements = linkedElements(item, current);
     const target = targetFor(item, fronts, elements, current);
     const useElements = elements.length && (elementHint(item) || item.elementGroupId || /шт/i.test(target.unit));
-    const series = useElements ? elementSeries(elements) : factSeries(item, current, fronts);
+    const series = useElements ? elementSeries(elements, asOf) : factSeries(item, current, fronts, asOf);
     const actual = Math.max(0, num(item.actualQty) ?? series.actual ?? 0);
     const targetDate = item.contractDate || item.workDate || item.baselineDate || '';
     const calendar = item.riskCalendarId || item.riskDetails?.calendarId || fronts[0]?.calendarId || '7x0';

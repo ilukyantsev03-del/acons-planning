@@ -1,7 +1,7 @@
 'use strict';
 
 (function () {
-  const VERSION = '2026.10.14.3';
+  const VERSION = '2026.10.14.4';
 
   function currentProject() {
     try {
@@ -59,39 +59,14 @@
   ) {
     const current = currentProject();
 
-    const facts = (current?.progressFacts || [])
-      .filter(row => {
-        if (
-          String(row.frontId || '') !== String(frontId || '') ||
-          !factDate(row) ||
-          factDate(row) > reportDate
-        ) {
-          return false;
-        }
-
-        if (!metricId) return true;
-
-        const rowMetricId = String(row.metricId || '');
-        return rowMetricId === String(metricId) ||
-          (includeUnassigned && !rowMetricId);
-      })
-      .sort((a,b) => String(factDate(a)).localeCompare(String(factDate(b))));
-
-    const snapshots = facts.filter(row =>
-      row.factType === 'cumulative_snapshot' &&
-      row.cumulativeQty !== null &&
-      row.cumulativeQty !== undefined
-    );
-
-    if (snapshots.length) {
-      return Math.max(0,num(snapshots[snapshots.length-1].cumulativeQty));
-    }
-
-    if (facts.length) {
-      return Math.max(0,facts
-        .filter(row => row.factType !== 'cumulative_snapshot')
-        .reduce((sum,row) => sum + num(row.quantity ?? row.qty),0));
-    }
+    const primary = (current?.workMetrics||[]).find(x=>x.active!==false&&x.isPrimary===true&&String(x.frontId)===String(frontId));
+    const selectedMetric=metricId||primary?.id||'';
+    const facts = [...(current?.progressFacts||[]),...(current?.factLog||[])].filter(row=>
+      String(row.frontId||'')===String(frontId||'') &&
+      (selectedMetric ? String(row.metricId||'')===String(selectedMetric)||(includeUnassigned&&!row.metricId) : !row.metricId)
+    ).map(row=>({...row,metricId:selectedMetric}));
+    const series=window.LIV_FACT_SERIES.series(facts,reportDate);
+    if(series.hasFacts)return Math.max(0,series.actual);
 
     if (!metricId || includeUnassigned) {
       const front = byId(current?.fronts,frontId);
@@ -242,7 +217,7 @@
         targetQty: item.targetQty ?? null,
         targetUnit: item.targetUnit || '',
         riskLevel: item.riskLevel || '',
-        riskDetails: item.riskDetails || {}
+        riskDetails: JSON.parse(JSON.stringify(item.riskDetails || {}))
       }));
   }
 
@@ -347,7 +322,12 @@
       });
     }
 
-    if (typeof saveProject === 'function') await saveProject();
+    try {
+      if (typeof saveProject === 'function') await saveProject();
+    } catch(error) {
+      current.reportSnapshots=current.reportSnapshots.filter(item=>item!==snapshot);
+      throw error;
+    }
 
     return snapshot;
   }
