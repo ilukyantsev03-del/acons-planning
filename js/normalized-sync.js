@@ -26,7 +26,9 @@
     'source_mappings',
     'entity_aliases',
     'resource_log',
-    'import_log'
+    'import_log',
+    'network_segments',
+    'report_snapshots'
   ]);
 
   const state = {
@@ -761,6 +763,8 @@
       ['progress_facts', current.progressFacts.length, true],
       ['schedule_versions', current.scheduleVersions.length, true],
       ['schedule_tasks', current.tasks.filter(item => item.active !== false && item.testOnly !== true).length, true],
+      ['network_segments', current.networkSegments.filter(item => item.active !== false).length, true],
+      ['report_snapshots', current.reportSnapshots.length, true],
       ['resource_log', current.resources.length, true]
     ];
 
@@ -1482,6 +1486,51 @@
     }
   }
 
+  async function syncNetworkSegments(current) {
+    const rows = (current.networkSegments || [])
+      .filter(item => item?.id && item?.networkCode && item?.segmentCode)
+      .map(item => ({
+        external_id: String(item.id),
+        project_id: state.projectId,
+        network_code: text(item.networkCode),
+        segment_code: text(item.segmentCode),
+        from_node: text(item.fromNode) || null,
+        to_node: text(item.toNode) || null,
+        typical_work_code: text(item.typicalWorkCode) || null,
+        front_id: mapValue('front', item.frontId),
+        active: item.active !== false,
+        custom_data: item.customData || {},
+        updated_at: item.updatedAt || new Date().toISOString()
+      }));
+
+    await upsertRows('network_segments', rows, 'external_id');
+    await refreshMap('network_segments', 'networkSegment', true);
+  }
+
+
+  async function syncReportSnapshots(current) {
+    const rows = (current.reportSnapshots || [])
+      .filter(item => item?.id && (item.reportDate || item.date))
+      .map(item => ({
+        external_id: String(item.id),
+        project_id: state.projectId,
+        report_type: text(item.reportType ?? item.type) || 'weekly',
+        report_date: dateValue(item.reportDate ?? item.date),
+        previous_report_date: dateValue(item.previousReportDate),
+        title: text(item.title) || null,
+        filters: item.filters || {},
+        data_snapshot: item.dataSnapshot || item.data || {},
+        storage_path: text(item.storagePath) || null,
+        created_by: remoteSync()?.userId?.() || null,
+        updated_at: item.updatedAt || new Date().toISOString()
+      }))
+      .filter(item => item.report_date);
+
+    await upsertRows('report_snapshots', rows, 'external_id');
+    await refreshMap('report_snapshots', 'reportSnapshot', true);
+  }
+
+
   async function syncImportHistory(current) {
     const rows = current.importHistory
       .filter(item => item?.id)
@@ -1728,6 +1777,8 @@
       await syncStep('Ключевые даты', () => syncMilestones(current));
       await syncStep('Номерные элементы', () => syncNumberedElements(current));
       await syncStep('Объёмы и факты', () => syncMetricsAndFacts(current));
+      await syncStep('Наружные сети', () => syncNetworkSegments(current));
+      await syncStep('Снимки отчётов', () => syncReportSnapshots(current));
       await syncStep('Рабочий график', () => syncSchedule(current));
       await syncStep('Ключевые даты · связи графика', () => syncMilestones(current));
       await syncStep('Ключевые даты · цели', () => syncMilestoneTargets(current));
