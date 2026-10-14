@@ -1,7 +1,7 @@
 'use strict';
 
 (function () {
-  const VERSION = '2026.10.14.1';
+  const VERSION = '2026.10.14.2';
   const state = {
     running: false,
     last: null
@@ -87,7 +87,8 @@
       result('Импорт КД', Boolean(window.LIV_KEY_DATE_IMPORT)),
       result('Прогноз КД', Boolean(window.LIV_MILESTONE_RISK)),
       result('Номерные элементы', Boolean(window.LIV_NUMBERED_ELEMENTS_V2)),
-      result('PDF-схемы', Boolean(window.LIV_SCHEMES))
+      result('PDF-схемы', Boolean(window.LIV_SCHEMES)),
+      result('Снимки отчётов', Boolean(window.LIV_REPORT_SNAPSHOTS))
     ];
   }
 
