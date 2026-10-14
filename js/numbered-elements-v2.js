@@ -60,8 +60,8 @@
   }
 
   function groupCodeFor(element) {
-    const modalValue = el('neGroup')?.value || el('neGroupCode')?.value;
-    return text(element?.groupCode || element?.mark || modalValue || element?.capture || element?.zone || 'Основная группа');
+    const group = (currentProject()?.numberedElementGroups || []).find(item => String(item.id) === String(element?.groupId || ''));
+    return text(element?.groupCode || group?.groupCode || element?.mark || element?.capture || element?.zone || 'Основная группа');
   }
 
   function contextualElementKey(element) {
@@ -206,7 +206,8 @@
         groupTotal: Number(el('neGroupTotal')?.value || 0)
       };
 
-      await originalSave(id);
+      const saved = await originalSave(id);
+      if (saved !== true) return;
 
       const current = currentProject();
       const element = id

@@ -42,3 +42,6 @@ jobs:
           if missing:
               raise SystemExit('Missing scripts: ' + ', '.join(sorted(set(missing))))
           print('All local script references exist.')
+
+      - name: Check import, PDF and synchronization regressions
+        run: node --test tests/*.test.cjs

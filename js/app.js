@@ -3124,6 +3124,7 @@ async function saveElement(
 
 
   renderAll();
+  return true;
 }
 
 

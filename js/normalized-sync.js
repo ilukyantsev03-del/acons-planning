@@ -1,7 +1,7 @@
 'use strict';
 
 (function () {
-  const MODULE_VERSION = '2026.10.14.4';
+  const MODULE_VERSION = '2026.10.14.5';
   const PROJECT_EXTERNAL_ID = 'LIV-MAIN';
   const SAVE_DELAY = 1200;
   const PAGE_SIZE = 1000;
@@ -155,12 +155,13 @@
   }
 
   function versionsStorageKey() {
-    return 'liv-normalized-versions:' + MODULE_VERSION + ':' + (state.projectId || 'pending');
+    return 'liv-normalized-versions:' + (state.projectId || 'pending');
   }
 
   function loadServerVersions() {
     try {
-      const parsed = JSON.parse(localStorage.getItem(versionsStorageKey()) || '{}');
+      const previousKey = 'liv-normalized-versions:2026.10.14.4:' + (state.projectId || 'pending');
+      const parsed = JSON.parse(localStorage.getItem(versionsStorageKey()) || localStorage.getItem(previousKey) || '{}');
       state.serverVersions = parsed && typeof parsed === 'object' ? parsed : {};
     } catch (error) {
       state.serverVersions = {};
@@ -471,7 +472,7 @@
 
     const lookup = await client()
       .from(table)
-      .select('external_id,row_version')
+      .select('*')
       .in('external_id', ids);
 
     if (lookup.error) throw dbError('Таблица ' + table + ' · чтение версии', lookup.error);
@@ -514,6 +515,11 @@
 
       const serverVersion = Number(serverRow.row_version || 1);
       const knownVersion = Number(state.serverVersions[versionKey] || 0);
+
+      if (samePayload(row, serverRow)) {
+        state.serverVersions[versionKey] = serverVersion;
+        continue;
+      }
 
       if (knownVersion > 0 && serverVersion !== knownVersion) {
         throw new Error(
@@ -1462,9 +1468,16 @@
         parent_task_id: mapValue('scheduleTask', item.parentTaskId)
       }));
     for (const update of parentUpdates) {
-      const result = await client().from('schedule_tasks').update({ parent_task_id: update.parent_task_id }).eq('id', update.id);
-      if (result.error) throw result.error;
+      const row = taskRows.find(item => mapValue('scheduleTask', item.external_id) === update.id);
+      if (!row || row.parent_task_id === update.parent_task_id) continue;
+      await writeVersionedRows('schedule_tasks', [{
+        external_id: row.external_id,
+        parent_task_id: update.parent_task_id
+      }]);
+      row.parent_task_id = update.parent_task_id;
     }
+    markRows('schedule_tasks', taskRows);
+    saveHashes();
 
     const dependencyRows = current.dependencies
       .map(item => ({
@@ -1747,7 +1760,7 @@
       }
     } catch (error) {
       console.error('LIV normalized sync: resource migration failed', error);
-      setStatus('error', 'Ошибка переноса ресурсов');
+      setStatus('error', 'Ошибка переноса ресурсов: ' + (error?.message || error));
     } finally {
       state.resourceRunning = false;
     }

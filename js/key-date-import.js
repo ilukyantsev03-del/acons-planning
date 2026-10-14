@@ -1,7 +1,7 @@
 'use strict';
 
 (function () {
-  const MODULE_VERSION = '2026.10.14.4';
+  const MODULE_VERSION = '2026.10.14.5';
   const state = {
     workbook: null,
     fileName: '',
@@ -106,17 +106,23 @@
     }
     if (typeof value === 'number' && window.XLSX && value > 20000 && value < 80000) {
       const parsed = XLSX.SSF.parse_date_code(value);
-      if (parsed) return parsed.y + '-' + String(parsed.m).padStart(2, '0') + '-' + String(parsed.d).padStart(2, '0');
+      if (parsed) return validDate(parsed.y, parsed.m, parsed.d);
     }
     const raw = text(value);
     let match = raw.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})/);
     if (match) {
       const year = match[3].length === 2 ? '20' + match[3] : match[3];
-      return year + '-' + match[2].padStart(2, '0') + '-' + match[1].padStart(2, '0');
+      return validDate(Number(year), Number(match[2]), Number(match[1]));
     }
     match = raw.match(/^(\d{4})[.\/-](\d{1,2})[.\/-](\d{1,2})/);
-    if (match) return match[1] + '-' + match[2].padStart(2, '0') + '-' + match[3].padStart(2, '0');
+    if (match) return validDate(Number(match[1]), Number(match[2]), Number(match[3]));
     return '';
+  }
+
+  function validDate(year, month, day) {
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return '';
+    return year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
   }
 
   function same(a, b) {
@@ -219,7 +225,11 @@
     if (!current) return '';
     const explicit = text(name);
     if (explicit) {
-      const exact = current.buildings.find(item => same(item.name, explicit));
+      const remembered = window.LIV_SOURCE_MAPPINGS?.resolve?.(state.fileName || 'key-date-import', 'building', explicit, 'building');
+      const exact = current.buildings.find(item =>
+        String(item.id) === String(remembered?.targetLocalId || '') ||
+        same(item.name, explicit) || (item.aliases || []).some(alias => same(alias, explicit))
+      );
       if (exact) return exact.id;
     }
     const haystack = normalized(title);
@@ -309,8 +319,7 @@
     return [
       row.organizationId || normalized(row.organizationName),
       normalized(row.contractNo),
-      normalized(row.milestoneNo || row.title),
-      row.contractDate
+      normalized(row.milestoneNo || row.title)
     ].join('|');
   }
 
@@ -395,7 +404,7 @@
         buildingId: findBuildingId(rawBuilding || inheritedBuilding, title),
         blockCapture: text(valueAt(sourceRow, 'block')),
         floorCapture: text(valueAt(sourceRow, 'floor')),
-        status: text(valueAt(sourceRow, 'status')) || 'Не наступила',
+        status: text(valueAt(sourceRow, 'status')),
         comment: text(valueAt(sourceRow, 'comment')),
         responsibility,
         targetQty: target.quantity,
@@ -543,7 +552,7 @@
           defval: '',
           raw: true,
           cellDates: true,
-          blankrows: false
+          blankrows: true
         });
         const saved = state.sheetMappings[name] || null;
         const headerRow = saved?.headerRow ?? detectHeaderRow(matrix);
@@ -586,7 +595,7 @@
       defval: '',
       raw: true,
       cellDates: true,
-      blankrows: false
+      blankrows: true
     });
     const saved = state.sheetMappings[state.sheetName] || null;
     state.headerRow = saved?.headerRow ?? detectHeaderRow(state.matrix);
@@ -615,6 +624,7 @@
         cellText: false
       });
       state.fileName = file.name;
+      state.sheetMappings = {};
       const sheetSelect = el('keyDateSheet');
       sheetSelect.innerHTML =
         (state.workbook.SheetNames.length > 1
@@ -685,8 +695,7 @@
     el('keyDateSheet')?.addEventListener('change', readSheet);
     ['keyDateDefaultOrg','keyDateDefaultContract'].forEach(id => el(id)?.addEventListener('change', () => {
       if (!state.workbook) return;
-      buildRows();
-      renderPreview();
+      readSheet();
     }));
     el('keyDateCancel')?.addEventListener('click', closeModal);
     el('keyDateCommit')?.addEventListener('click', commitImport);
@@ -828,11 +837,11 @@
         status: row.status || milestone.status || 'Не наступила',
         comment: row.comment || milestone.comment || '',
         responsibility: row.responsibility,
-        targetQty: row.targetQty,
-        targetUnit: row.targetUnit,
+        targetQty: row.targetQty ?? milestone.targetQty ?? null,
+        targetUnit: row.targetUnit || milestone.targetUnit || '',
         riskWindowDays: milestone.riskWindowDays || 7,
         riskCalendarId: milestone.riskCalendarId || '7x0',
-        sourceFingerprint: row.sourceFingerprint,
+        sourceFingerprint: milestoneFingerprint({ ...row, organizationId: organization.id }),
         source: {
           batchId,
           file: state.fileName,
@@ -861,7 +870,8 @@
       details: {
         importer: 'key-date-import',
         version: MODULE_VERSION,
-        mapping: state.mapping
+        mapping: state.mapping,
+        sheetMappings: state.sheetMappings
       }
     });
 
