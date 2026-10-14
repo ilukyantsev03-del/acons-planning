@@ -10,6 +10,7 @@
     headerRow: -1,
     headers: [],
     mapping: {},
+    sheetMappings: {},
     rows: [],
     responsibility: ''
   };
@@ -331,7 +332,11 @@
     }) || null;
   }
 
-  function buildRows() {
+  function buildRowsFromContext(context) {
+    const matrix = context.matrix || [];
+    const headerRow = Number(context.headerRow ?? -1);
+    const mapping = context.mapping || {};
+    const sheetName = context.sheetName || state.sheetName || '';
     const defaultOrganizationId = el('keyDateDefaultOrg')?.value || '';
     const defaultContract = text(el('keyDateDefaultContract')?.value);
     const rows = [];
@@ -340,18 +345,23 @@
     let inheritedContract = defaultContract;
     let inheritedBuilding = '';
 
-    state.matrix.slice(state.headerRow + 1).forEach((sourceRow, index) => {
+    const valueAt = (row, field) => {
+      const index = mapping[field];
+      return index == null ? '' : row[index];
+    };
+
+    matrix.slice(headerRow + 1).forEach((sourceRow, index) => {
       const section = sectionText(sourceRow);
       if (section) {
         responsibility = section;
         return;
       }
 
-      const title = text(value(sourceRow, 'title'));
-      const targetDate = isoDate(value(sourceRow, 'date'));
-      const rawOrganization = text(value(sourceRow, 'organization'));
-      const rawContract = text(value(sourceRow, 'contract'));
-      const rawBuilding = text(value(sourceRow, 'building'));
+      const title = text(valueAt(sourceRow, 'title'));
+      const targetDate = isoDate(valueAt(sourceRow, 'date'));
+      const rawOrganization = text(valueAt(sourceRow, 'organization'));
+      const rawContract = text(valueAt(sourceRow, 'contract'));
+      const rawBuilding = text(valueAt(sourceRow, 'building'));
 
       if (rawOrganization) inheritedOrganization = rawOrganization;
       if (rawContract) inheritedContract = rawContract;
@@ -364,14 +374,15 @@
         (
           defaultOrganizationId
             ? ''
-            : state.sheetName
+            : sheetName
         );
 
       const organizationMatch = findOrganization(organizationSource, defaultOrganizationId);
-      const milestoneNo = parseMilestoneNo(title, value(sourceRow, 'number'));
+      const milestoneNo = parseMilestoneNo(title, valueAt(sourceRow, 'number'));
       const target = inferTarget(title);
       const parsed = {
-        rowNumber: state.headerRow + 2 + index,
+        sourceSheet: sheetName,
+        rowNumber: headerRow + 2 + index,
         selected: Boolean(title && targetDate),
         title,
         contractDate: targetDate,
@@ -381,10 +392,10 @@
         contractNo: rawContract || inheritedContract,
         milestoneNo,
         buildingId: findBuildingId(rawBuilding || inheritedBuilding, title),
-        blockCapture: text(value(sourceRow, 'block')),
-        floorCapture: text(value(sourceRow, 'floor')),
-        status: text(value(sourceRow, 'status')) || 'Не наступила',
-        comment: text(value(sourceRow, 'comment')),
+        blockCapture: text(valueAt(sourceRow, 'block')),
+        floorCapture: text(valueAt(sourceRow, 'floor')),
+        status: text(valueAt(sourceRow, 'status')) || 'Не наступила',
+        comment: text(valueAt(sourceRow, 'comment')),
         responsibility,
         targetQty: target.quantity,
         targetUnit: target.unit,
@@ -402,7 +413,16 @@
       rows.push(parsed);
     });
 
-    state.rows = rows;
+    return rows;
+  }
+
+  function buildRows() {
+    state.rows = buildRowsFromContext({
+      matrix: state.matrix,
+      headerRow: state.headerRow,
+      mapping: state.mapping,
+      sheetName: state.sheetName
+    });
   }
 
   function mappingOptions(field) {
@@ -450,21 +470,26 @@
       result[row.result] = (result[row.result] || 0) + 1;
       return result;
     }, {});
+    const selectedSheets = [...new Set(state.rows.map(row => row.sourceSheet).filter(Boolean))];
     el('keyDateSummary').textContent =
-      'Лист: ' + state.sheetName + ' · строк: ' + state.rows.length + ' · ' +
+      (state.sheetName === '__ALL__'
+        ? 'Листов: ' + selectedSheets.length
+        : 'Лист: ' + state.sheetName) +
+      ' · строк: ' + state.rows.length + ' · ' +
       Object.entries(counts).map(([name, count]) => name + ': ' + count).join(' · ');
 
     host.innerHTML = `
       <table>
         <thead>
           <tr>
-            <th></th><th>Строка</th><th>Результат</th><th>Подрядчик</th><th>Договор</th><th>КД</th><th>Дата</th><th>Цель</th>
+            <th></th><th>Лист</th><th>Строка</th><th>Результат</th><th>Подрядчик</th><th>Договор</th><th>КД</th><th>Дата</th><th>Цель</th>
           </tr>
         </thead>
         <tbody>
           ${state.rows.slice(0, 500).map((row, index) => `
             <tr>
               <td><input type="checkbox" data-kd-row="${index}" ${row.selected ? 'checked' : ''} ${row.result === 'Ошибка' ? 'disabled' : ''}></td>
+              <td>${escapeHtml(row.sourceSheet || '—')}</td>
               <td>${row.rowNumber}</td>
               <td>${escapeHtml(row.result)}</td>
               <td>${escapeHtml(row.organizationName || '—')}</td>
@@ -473,7 +498,7 @@
               <td>${escapeHtml(row.contractDate || '—')}</td>
               <td>${row.targetQty == null ? '—' : escapeHtml(row.targetQty + ' ' + row.targetUnit)}</td>
             </tr>
-          `).join('') || '<tr><td colspan="8"><div class="empty-state">Строки ключевых дат не найдены.</div></td></tr>'}
+          `).join('') || '<tr><td colspan="9"><div class="empty-state">Строки ключевых дат не найдены.</div></td></tr>'}
         </tbody>
       </table>
     `;
@@ -490,7 +515,59 @@
 
   function readSheet() {
     if (!state.workbook) return;
-    state.sheetName = el('keyDateSheet')?.value || state.workbook.SheetNames[0];
+
+    const selected = el('keyDateSheet')?.value || state.workbook.SheetNames[0];
+
+    if (selected === '__ALL__') {
+      state.sheetName = '__ALL__';
+      state.matrix = [];
+      state.headerRow = -1;
+      state.headers = [];
+      state.mapping = {};
+      state.sheetMappings = {};
+      state.rows = [];
+
+      state.workbook.SheetNames.forEach(name => {
+        const sheet = state.workbook.Sheets[name];
+        const matrix = XLSX.utils.sheet_to_json(sheet, {
+          header: 1,
+          defval: '',
+          raw: true,
+          cellDates: true,
+          blankrows: false
+        });
+        const headerRow = detectHeaderRow(matrix);
+        const headers = uniqueHeaders(matrix[headerRow] || []);
+        const mapping = autoMapping(headers);
+
+        state.sheetMappings[name] = {
+          headerRow,
+          headers,
+          mapping
+        };
+
+        const rows = buildRowsFromContext({
+          matrix,
+          headerRow,
+          mapping,
+          sheetName: name
+        });
+
+        state.rows.push(...rows);
+      });
+
+      const mappingHost = el('keyDateMapping');
+      if (mappingHost) {
+        mappingHost.innerHTML =
+          '<div class="notice">Все листы сопоставлены автоматически отдельно. ' +
+          'Если у конкретного листа нестандартная шапка, выбери его в поле «Лист» и скорректируй сопоставление вручную.</div>';
+      }
+
+      renderPreview();
+      return;
+    }
+
+    state.sheetName = selected;
     const sheet = state.workbook.Sheets[state.sheetName];
     state.matrix = XLSX.utils.sheet_to_json(sheet, {
       header: 1,
@@ -502,6 +579,13 @@
     state.headerRow = detectHeaderRow(state.matrix);
     state.headers = uniqueHeaders(state.matrix[state.headerRow] || []);
     state.mapping = autoMapping(state.headers);
+    state.sheetMappings = {
+      [state.sheetName]: {
+        headerRow: state.headerRow,
+        headers: state.headers,
+        mapping: state.sheetName === '__ALL__' ? state.sheetMappings : state.mapping
+      }
+    };
     buildRows();
     renderMapping();
     renderPreview();
@@ -518,9 +602,17 @@
       });
       state.fileName = file.name;
       const sheetSelect = el('keyDateSheet');
-      sheetSelect.innerHTML = state.workbook.SheetNames.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+      sheetSelect.innerHTML =
+        (state.workbook.SheetNames.length > 1
+          ? '<option value="__ALL__">Все листы</option>'
+          : '') +
+        state.workbook.SheetNames
+          .map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`)
+          .join('');
       sheetSelect.disabled = false;
-      sheetSelect.value = state.workbook.SheetNames[0];
+      sheetSelect.value = state.workbook.SheetNames.length > 1
+        ? '__ALL__'
+        : state.workbook.SheetNames[0];
       readSheet();
     } catch (error) {
       console.error('LIV key date import:', error);
@@ -538,6 +630,7 @@
       headerRow: -1,
       headers: [],
       mapping: {},
+      sheetMappings: {},
       rows: []
     });
 
@@ -682,7 +775,7 @@
         source: {
           batchId,
           file: state.fileName,
-          sheet: state.sheetName,
+          sheet: row.sourceSheet || state.sheetName,
           row: row.rowNumber,
           importedAt: now
         },
@@ -697,7 +790,7 @@
       type: 'milestones',
       mode: 'milestones',
       file: state.fileName,
-      sheet: state.sheetName,
+      sheet: state.sheetName === '__ALL__' ? 'Все листы' : state.sheetName,
       status: 'accepted',
       at: new Date().toISOString(),
       totalRows: state.rows.length,
