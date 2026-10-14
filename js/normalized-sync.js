@@ -974,6 +974,7 @@
           milestone_no: text(item.milestoneNo) || null,
           work_id: mapValue('work', item.workId),
           front_id: mapValue('front', item.frontId),
+          schedule_task_id: mapValue('scheduleTask', item.scheduleTaskId),
           responsible_name: text(item.responsible ?? item.responsibleName) || null,
           block_capture: text(item.blockCapture) || null,
           floor_capture: text(item.floorCapture) || null,
@@ -1014,6 +1015,111 @@
     await upsertRows('milestones', rows, 'external_id');
     await refreshMap('milestones', 'milestone', true);
   }
+
+  async function syncMilestoneTargets(current) {
+    const rows = [];
+
+    for (const item of current.milestones || []) {
+      if (!item?.id || item.active === false) continue;
+
+      const milestoneId = mapValue('milestone', item.id);
+      if (!milestoneId) continue;
+
+      const riskDetails = item.riskDetails || {};
+      const candidates = [
+        {
+          type: 'metric',
+          localId: item.metricId || riskDetails.metricId || '',
+          map: 'metric',
+          column: 'metric_id'
+        },
+        {
+          type: 'element_group',
+          localId: item.elementGroupId || riskDetails.elementGroupId || '',
+          map: 'elementGroup',
+          column: 'element_group_id'
+        },
+        {
+          type: 'front',
+          localId: item.frontId || '',
+          map: 'front',
+          column: 'front_id'
+        },
+        {
+          type: 'schedule_task',
+          localId: item.scheduleTaskId || '',
+          map: 'scheduleTask',
+          column: 'schedule_task_id'
+        }
+      ];
+
+      const selected = candidates.find(candidate =>
+        candidate.localId && mapValue(candidate.map, candidate.localId)
+      );
+
+      if (!selected) continue;
+
+      const serverTargetId = mapValue(selected.map, selected.localId);
+      rows.push({
+        project_id: state.projectId,
+        milestone_id: milestoneId,
+        target_type: selected.type,
+        external_key: selected.type + ':' + serverTargetId,
+        metric_id: selected.type === 'metric' ? serverTargetId : null,
+        element_group_id: selected.type === 'element_group' ? serverTargetId : null,
+        front_id: selected.type === 'front' ? serverTargetId : null,
+        schedule_task_id: selected.type === 'schedule_task' ? serverTargetId : null,
+        target_qty: numberOrNull(item.targetQty),
+        target_unit: text(item.targetUnit) || null,
+        weight: 1,
+        active: true,
+        updated_at: new Date().toISOString()
+      });
+    }
+
+    if (rows.length) {
+      const result = await client()
+        .from('milestone_targets')
+        .upsert(rows, {
+          onConflict: 'project_id,milestone_id,external_key',
+          ignoreDuplicates: false
+        });
+
+      if (result.error) throw result.error;
+    }
+
+    const existing = await fetchAll(
+      'milestone_targets',
+      'id,milestone_id,external_key,active',
+      query => query.eq('project_id', state.projectId)
+    );
+
+    const desired = new Set(
+      rows.map(row => row.milestone_id + '|' + row.external_key)
+    );
+
+    const staleIds = existing
+      .filter(row =>
+        row.active !== false &&
+        row.external_key &&
+        !desired.has(row.milestone_id + '|' + row.external_key)
+      )
+      .map(row => row.id);
+
+    for (let index = 0; index < staleIds.length; index += WRITE_CHUNK) {
+      const chunk = staleIds.slice(index, index + WRITE_CHUNK);
+      const result = await client()
+        .from('milestone_targets')
+        .update({
+          active: false,
+          updated_at: new Date().toISOString()
+        })
+        .in('id', chunk);
+
+      if (result.error) throw result.error;
+    }
+  }
+
 
   function buildElementGroups(current) {
     const explicit = current.numberedElementGroups.filter(item => item?.id);
@@ -1623,6 +1729,8 @@
       await syncStep('Номерные элементы', () => syncNumberedElements(current));
       await syncStep('Объёмы и факты', () => syncMetricsAndFacts(current));
       await syncStep('Рабочий график', () => syncSchedule(current));
+      await syncStep('Ключевые даты · связи графика', () => syncMilestones(current));
+      await syncStep('Ключевые даты · цели', () => syncMilestoneTargets(current));
 
       const migrationCheck =
         await syncStep(
