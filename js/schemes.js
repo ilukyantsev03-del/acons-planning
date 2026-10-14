@@ -286,11 +286,22 @@
   }
 
   async function upload() {
-    const file=state.pending,current=p(),client=window.LIV_SUPABASE;if(!file||!current||!client)return alert('Нет подключения к серверу.');if(!window.LIV_NORMALIZED_SYNC?.projectId?.())return alert('Дождись подключения серверного проекта и повтори.');const b=$s('suSave');if(b.disabled)return;b.disabled=true;b.textContent='Загрузка...';const id=makeId('SCH'),path=`schemes/${safeName(id)}/source.pdf`,t=now();try{const u=await client.storage.from(BUCKET).upload(path,file,{contentType:'application/pdf',upsert:false});if(u.error)throw u.error;const x={id,name:$s('suName').value.trim()||file.name,fileName:file.name,storagePath:path,mimeType:'application/pdf',fileSize:file.size,pageCount:0,buildingId:$s('suBuilding').value,matrixId:$s('suMatrix').value,revision:$s('suRevision').value.trim(),status:'Загружена',active:true,createdAt:t,updatedAt:t};current.schemes.push(x);try{await syncScheme(x);}catch(error){current.schemes=current.schemes.filter(y=>y.id!==x.id);await client.storage.from(BUCKET).remove([path]);throw error;}await saveProject();state.pending=null;closeModal();render();await select(x.id);}catch(error){alert('Не удалось загрузить PDF: '+(error.message||error));b.disabled=false;b.textContent='Загрузить';}
+    const file=state.pending,current=p(),client=window.LIV_SUPABASE;if(!file||!current||!client)return alert('Нет подключения к серверу.');if(!window.LIV_NORMALIZED_SYNC?.projectId?.())return alert('Дождись подключения серверного проекта и повтори.');const b=$s('suSave');if(b.disabled)return;b.disabled=true;b.textContent='Загрузка...';const id=makeId('SCH'),path=`schemes/${safeName(id)}/source.pdf`,t=now();try{const u=await client.storage.from(BUCKET).upload(path,file,{contentType:'application/pdf',upsert:false});if(u.error)throw u.error;const x={id,name:$s('suName').value.trim()||file.name,fileName:file.name,storagePath:path,mimeType:'application/pdf',fileSize:file.size,pageCount:0,buildingId:$s('suBuilding').value,matrixId:$s('suMatrix').value,revision:$s('suRevision').value.trim(),status:'Загружена',active:true,createdAt:t,updatedAt:t};try{await syncScheme(x);}catch(error){current.schemes=current.schemes.filter(y=>y.id!==x.id);await client.storage.from(BUCKET).remove([path]);throw error;}current.schemes.push(x);await saveProject();state.pending=null;closeModal();render();await select(x.id);}catch(error){alert('Не удалось загрузить PDF: '+(error.message||error));b.disabled=false;b.textContent='Загрузить';}
   }
 
   const userId=()=>window.LIV_REMOTE_SYNC?.userId?.()||null;
+  // Serialize writes to one entity: upload, editing and background link refresh
+  // must not race between the existence check and INSERT/versioned UPDATE.
+  const entityWrites = new Map();
   async function writeVersioned(table,x,data){
+    const key=table+':'+x.id;
+    const previous=entityWrites.get(key)||Promise.resolve();
+    const task=previous.catch(()=>{}).then(()=>writeVersionedUnlocked(table,x,data));
+    entityWrites.set(key,task);
+    try{return await task;}
+    finally{if(entityWrites.get(key)===task)entityWrites.delete(key);}
+  }
+  async function writeVersionedUnlocked(table,x,data){
     const client=window.LIV_SUPABASE;
     if(!client)return;
 

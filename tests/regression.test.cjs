@@ -264,3 +264,18 @@ test('Проверка: ожидает разрешения UUID перед за
   env.window.LIV_SUPABASE={from(){assert.ok(resolved);return {select(){return this;},range(){return this;},eq(column,value){assert.equal(column,'project_id');assert.equal(value,uuid);return Promise.resolve({data:[]});}};}};
   assert.equal((await env.api.serverIdentitySet('fronts','external_id',true)).size,0);
 });
+
+test('PDF: загрузка и фоновая синхронизация одной схемы не создают дубликат', async () => {
+  const env=moduleContext('js/schemes.js','writeVersioned,entityWrites');
+  let inserts=0,updates=0,version=0;
+  env.window.LIV_SUPABASE={from(){return {
+    select(){return this;},eq(){return this;},
+    async maybeSingle(){await Promise.resolve();return {data:null};},
+    insert(){inserts++;return {select(){return this;},async single(){await Promise.resolve();version=1;return {data:{id:'server-1',row_version:version}};}};},
+    update(){updates++;return {eq(){return this;},async select(){return {data:[{row_version:++version}]};}};}
+  };}};
+  const x={id:'SCHEME-1'};
+  await Promise.all([env.api.writeVersioned('schemes',x,{name:'PDF'}),env.api.writeVersioned('schemes',x,{name:'PDF'})]);
+  assert.equal(inserts,1);assert.equal(updates,1);assert.equal(x.serverVersion,2);
+  assert.equal(env.api.entityWrites.size,0);
+});
