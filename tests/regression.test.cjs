@@ -279,3 +279,55 @@ test('PDF: загрузка и фоновая синхронизация одн�
   assert.equal(inserts,1);assert.equal(updates,1);assert.equal(x.serverVersion,2);
   assert.equal(env.api.entityWrites.size,0);
 });
+
+test('PDF: серия рисунков остаётся черновиками без открытия карточки и хранит собственный стиль', () => {
+  let modals=0;
+  const env=moduleContext('js/schemes.js','state,stageDrawing,visibleMarks,appearance',{openModal(){modals++;}});
+  env.api.state.schemeId='S1';env.api.state.draw=true;
+  env.api.state.ink={color:'#ff0000',width:8,fill:.3};
+  const first=env.api.stageDrawing({x:.1,y:.2,width:.2,height:.1,markType:'line'});
+  env.api.state.ink={color:'#00ff00',width:2,fill:0};
+  env.api.stageDrawing({x:.5,y:.2,width:.1,height:.1,markType:'circle'});
+  assert.equal(modals,0);assert.equal(env.api.state.draw,true);
+  assert.equal(env.api.visibleMarks().length,2);assert.equal(env.context.project.schemeMarks.length,0);
+  assert.equal(first.appearance.color,'#ff0000');assert.equal(first.appearance.width,8);
+});
+
+test('PDF: некорректный цвет и толщина ограничиваются безопасными значениями', () => {
+  const {api}=moduleContext('js/schemes.js','appearance');
+  const ink=api.appearance({appearance:{color:'bad; color:red',width:100,fill:-1}});
+  assert.equal(ink.color,null);assert.equal(ink.width,20);assert.equal(ink.fill,0);
+  assert.equal(api.appearance({}).color,null);
+});
+
+test('PDF: ошибка пакетного сохранения оставляет рисунок для повторной попытки, стиль пишется на сервер', async () => {
+  let fail=true,payload;
+  const env=moduleContext('js/schemes.js','state,stageDrawing,saveDrawings');
+  env.window.LIV_ACCESS={role:'planner'};
+  env.window.LIV_NORMALIZED_SYNC={projectId:()=> 'project-1'};
+  env.context.project.schemes=[{id:'S1',serverId:'server-s1'}];
+  env.context.document.createElement=()=>({style:{},dataset:{},classList:{add(){},toggle(){}}});
+  env.element('schOverlay').appendChild=()=>{};
+  env.window.LIV_SUPABASE={from(){return {select(){return this;},eq(){return this;},async maybeSingle(){return {data:null};},insert(data){payload=data;return {select(){return this;},async single(){return fail?{error:{message:'test offline'}}:{data:{id:'server-m1',row_version:1}};}};}};}};
+  env.api.state.schemeId='S1';env.api.state.ink={color:'#ff0000',width:7,fill:.3};
+  const x=env.api.stageDrawing({x:.1,y:.1,width:.1,height:.1,markType:'circle'});
+  await env.api.saveDrawings();
+  assert.equal(env.api.state.dirty.size,1);assert.equal(env.context.project.schemeMarks.length,0);
+  assert.match(env.element('schHint').textContent,/Не удалось сохранить/);
+  fail=false;await env.api.saveDrawings();
+  assert.equal(env.api.state.dirty.size,0);assert.equal(env.context.project.schemeMarks[0].id,x.id);
+  assert.equal(payload.custom_data.appearance.color,'#ff0000');assert.equal(payload.custom_data.appearance.width,7);
+});
+
+test('PDF: отпускание мыши не открывает карточку и не выключает рисование', () => {
+  let dialogs=0;
+  const env=moduleContext('js/schemes.js','state,endDraw',{openModal(){dialogs++;}});
+  env.window.LIV_ACCESS={role:'planner'};
+  env.context.document.createElement=()=>({style:{},dataset:{},classList:{add(){},toggle(){}}});
+  env.element('schOverlay').appendChild=()=>{};
+  env.element('schOverlay').getBoundingClientRect=()=>({left:0,top:0,width:1000,height:500});
+  Object.assign(env.api.state,{schemeId:'S1',draw:true,start:{x:.1,y:.1},tool:'line',pdf:{numPages:1}});
+  env.api.endDraw({clientX:400,clientY:150});
+  assert.equal(dialogs,0);assert.equal(env.api.state.draw,true);assert.equal(env.api.state.dirty.size,1);
+  assert.match(env.element('schSaveDrawings').textContent,/\(1\)/);
+});

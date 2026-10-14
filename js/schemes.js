@@ -7,7 +7,7 @@
   const WRITERS = new Set(['admin', 'planner']);
   const STATUSES = ['Не начато','В работе','Выполнено','Освидетельствовано','Принято','Ограничение'];
   const DONE = new Set(['Выполнено','Освидетельствовано','Принято']);
-  const state = { schemeId:'', pdf:null, page:1, zoom:1, draw:false, tool:'area', start:null, draft:null, filter:'all', cache:new Map(), pending:null, linksRunning:false };
+  const state = { schemeId:'', pdf:null, page:1, zoom:1, draw:false, tool:'area', ink:{color:'#2563eb',width:3,fill:0}, selected:'', dirty:new Map(), saving:false, start:null, draft:null, filter:'all', cache:new Map(), pending:null, linksRunning:false };
 
   const $s = id => document.getElementById(id);
   const p = () => { try { return project || null; } catch (_) { return null; } };
@@ -66,7 +66,7 @@
 
   const schemes = () => (p()?.schemes||[]).filter(x=>x.active!==false).sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
   const scheme = id => (p()?.schemes||[]).find(x=>String(x.id)===String(id))||null;
-  const mark = id => (p()?.schemeMarks||[]).find(x=>String(x.id)===String(id))||null;
+  const mark = id => state.dirty.get(String(id)) || (p()?.schemeMarks||[]).find(x=>String(x.id)===String(id))||null;
   const marks = (schemeId,page=null) => (p()?.schemeMarks||[]).filter(x=>x.active!==false&&String(x.schemeId)===String(schemeId)&&(page===null||Number(x.pageNo||1)===Number(page)));
   const markClass = status => DONE.has(status)?'sch-done':status==='В работе'?'sch-work':status==='Ограничение'?'sch-risk':'sch-idle';
 
@@ -96,7 +96,7 @@
       .sch-layout{display:grid;grid-template-columns:280px minmax(0,1fr);gap:14px;align-items:start}.sch-side{padding:14px;position:sticky;top:78px}.sch-side h2{margin:0 0 10px;font-size:16px}.sch-search{width:100%;height:38px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:9px}.sch-list{display:grid;gap:6px;max-height:650px;overflow:auto}.sch-item{padding:10px;border:1px solid #e3e7ed;border-radius:9px;background:#fff;text-align:left;cursor:pointer}.sch-item.active{background:#eef4ff;border-color:#829ac0}.sch-item strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px}.sch-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:5px;color:#667085;font-size:10px}
       .sch-view{padding:0;overflow:hidden}.sch-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid #e6eaf0;flex-wrap:wrap}.sch-group{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.sch-toolbar .btn{min-height:34px;padding:6px 9px;font-size:12px}.sch-page{min-width:90px;text-align:center;font-size:12px;color:#475467}.sch-filter{height:34px;border:1px solid var(--line);border-radius:7px;padding:5px 8px;background:#fff}
       .sch-scroll{position:relative;min-height:620px;max-height:calc(100vh - 235px);overflow:auto;background:#e8edf3;padding:20px}.sch-empty{min-height:570px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:#667085;text-align:center}.sch-empty strong{font-size:17px;color:#344054}.sch-stage{position:relative;width:max-content;margin:0 auto;background:#fff;box-shadow:0 8px 28px rgba(15,23,42,.15)}.sch-stage canvas{display:block}.sch-overlay{position:absolute;inset:0;touch-action:none}.sch-overlay.draw{cursor:crosshair}
-      .sch-mark{position:absolute;display:flex;align-items:center;justify-content:center;min-width:12px;min-height:12px;border:2px solid currentColor;border-radius:4px;cursor:pointer;overflow:hidden}.sch-mark span{max-width:100%;padding:2px 4px;background:rgba(255,255,255,.86);color:#182230;font-size:9px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}.sch-done{color:#16825d;background:rgba(22,130,93,.18)}.sch-work{color:#d2860b;background:rgba(210,134,11,.18)}.sch-risk{color:#c23a3a;background:rgba(194,58,58,.18)}.sch-idle{color:#667085;background:rgba(102,112,133,.16)}.sch-no-label span{display:none}.sch-draft{color:#2563eb;position:absolute;border:2px dashed #2563eb;background:rgba(37,99,235,.12);pointer-events:none}
+      .sch-mark.selected{outline:2px dashed #2563eb;outline-offset:5px}.sch-overlay.draw .sch-mark,.sch-overlay.draw .sch-mark *{pointer-events:none!important}.sch-tools label{display:flex;align-items:center;gap:5px;font-size:12px}.sch-tools input[type=color]{width:38px;height:32px;padding:2px}.sch-tools input[type=number]{width:62px}.sch-hint{padding:8px 12px;font-size:12px;color:#475467;background:#f4f7fb}.sch-mark{padding:0;box-sizing:border-box;position:absolute;display:flex;align-items:center;justify-content:center;min-width:12px;min-height:12px;border:2px solid currentColor;border-radius:4px;cursor:pointer;overflow:hidden}.sch-mark span{max-width:100%;padding:2px 4px;background:rgba(255,255,255,.86);color:#182230;font-size:9px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}.sch-done{color:#16825d;background:rgba(22,130,93,.18)}.sch-work{color:#d2860b;background:rgba(210,134,11,.18)}.sch-risk{color:#c23a3a;background:rgba(194,58,58,.18)}.sch-idle{color:#667085;background:rgba(102,112,133,.16)}.sch-no-label span{display:none}.sch-draft{color:#2563eb;position:absolute;border:2px dashed #2563eb;background:rgba(37,99,235,.12);pointer-events:none}
       .sch-load{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(232,237,243,.82);z-index:8;font-weight:700}.sch-legend{display:flex;gap:12px;flex-wrap:wrap;padding:9px 13px;border-top:1px solid #e6eaf0;background:#fff;color:#667085;font-size:10px}.sch-dot{width:8px;height:8px;border-radius:50%;display:inline-block;background:currentColor;margin-right:4px}.sch-note{padding:10px 12px;border:1px solid #dbe7ff;border-radius:8px;background:#f4f8ff;color:#475467;font-size:12px;line-height:1.45}
       @media(max-width:980px){.sch-layout{grid-template-columns:1fr}.sch-side{position:static}.sch-list{max-height:220px}.sch-stats{grid-template-columns:repeat(2,1fr)}}`;
     document.head.appendChild(style);
@@ -111,6 +111,7 @@
       <section class="sch-stats"><div class="sch-stat"><span>Отметок</span><strong id="schTotal">0</strong></div><div class="sch-stat"><span>В работе</span><strong id="schWork">0</strong></div><div class="sch-stat"><span>Выполнено</span><strong id="schDone">0</strong></div><div class="sch-stat"><span>Средняя готовность</span><strong id="schProgress">0%</strong></div></section>
       <section class="sch-layout"><aside class="card sch-side no-print"><h2>Загруженные схемы <span id="schCount" class="badge">0</span></h2><input id="schSearch" class="sch-search" type="search" placeholder="Поиск по схемам..."><div id="schList" class="sch-list"></div></aside>
       <section class="card sch-view"><div class="sch-toolbar no-print"><div class="sch-group"><button id="schPrev" class="btn" disabled>‹</button><span id="schPage" class="sch-page">Страница —</span><button id="schNext" class="btn" disabled>›</button><button id="schMinus" class="btn" disabled>−</button><button id="schFit" class="btn" disabled>По ширине</button><button id="schPlus" class="btn" disabled>+</button></div><div class="sch-group"><select id="schFilter" class="sch-filter"><option value="all">Все статусы</option>${STATUSES.map(x=>`<option>${x}</option>`).join('')}</select><select id="schTool" class="sch-filter sch-write" aria-label="Форма отметки"><option value="area">Прямоугольник</option><option value="line">Линия</option><option value="point">Точка</option><option value="circle">Круг</option></select><button id="schDraw" class="btn primary sch-write" disabled>Отметить участок</button></div></div>
+      <div class="sch-toolbar sch-tools no-print sch-write"><div class="sch-group"><label>Цвет <select id="schColorMode" class="sch-filter"><option value="custom">Свой</option><option value="status">По статусу</option></select><input id="schColor" type="color" value="#2563eb" aria-label="Цвет линии"></label><label>Толщина <input id="schWidth" class="sch-filter" type="number" min="1" max="20" value="3"> пкс</label><label>Заливка <select id="schFill" class="sch-filter"><option value="0">Нет</option><option value="0.15">15%</option><option value="0.3">30%</option><option value="0.5">50%</option></select></label></div><div class="sch-group"><button id="schDetails" class="btn" disabled>Данные отметки</button><button id="schRemoveMark" class="btn danger-lite" disabled>Удалить отметку</button><button id="schSaveDrawings" class="btn primary" disabled>Сохранить рисунки</button></div></div><div id="schHint" class="sch-hint" role="status" aria-live="polite">Выбери форму и рисуй. Карточка открывается отдельно — кнопкой «Данные отметки».</div>
       <div id="schScroll" class="sch-scroll"><div id="schEmpty" class="sch-empty"><strong>Выбери или загрузи PDF-схему</strong><span>После загрузки можно выделять участки и отмечать выполнение.</span></div><div id="schStage" class="sch-stage hidden"><canvas id="schCanvas"></canvas><div id="schOverlay" class="sch-overlay"></div></div><div id="schLoading" class="sch-load hidden">Загрузка схемы...</div></div>
       <div class="sch-legend"><span class="sch-idle"><i class="sch-dot"></i>Не начато</span><span class="sch-work"><i class="sch-dot"></i>В работе</span><span class="sch-done"><i class="sch-dot"></i>Выполнено</span><span class="sch-risk"><i class="sch-dot"></i>Ограничение</span></div></section></section>`;
     main.insertBefore(panel,$s('tab-import'));
@@ -123,8 +124,14 @@
     $s('schSearch').oninput=renderList; $s('schPrev').onclick=()=>page(-1); $s('schNext').onclick=()=>page(1);
     $s('schMinus').onclick=()=>zoom(-.15); $s('schPlus').onclick=()=>zoom(.15); $s('schFit').onclick=()=>{state.zoom=1;renderPage();};
     $s('schFilter').onchange=e=>{state.filter=e.target.value;renderMarks();}; $s('schDownload').onclick=download; $s('schDelete').onclick=openDelete;
-    $s('schDraw').onclick=()=>{if(!canWrite()||!state.pdf)return;state.draw=!state.draw;cancelDraw();toolbar();};
-    $s('schTool').onchange=e=>{cancelDraw();state.tool=e.target.value;state.draw=true;toolbar();};
+    $s('schDraw').onclick=()=>{if(!canWrite()||!state.pdf)return;state.draw=!state.draw;state.selected='';cancelDraw();renderMarks();toolbar();};
+    $s('schTool').onchange=e=>{cancelDraw();state.tool=e.target.value;state.draw=true;state.selected='';renderMarks();toolbar();};
+    ['schColorMode','schColor','schWidth','schFill'].forEach(id=>$s(id).onchange=changeInk);
+    $s('schDetails').onclick=()=>{if(state.selected&&!state.saving)openMark(state.selected);};
+    $s('schRemoveMark').onclick=removeSelected;
+    $s('schSaveDrawings').onclick=saveDrawings;
+    window.addEventListener('beforeunload',e=>{if(state.dirty.size){e.preventDefault();e.returnValue='';}});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&state.draw){cancelDraw();state.draw=false;toolbar();}});
     const over=$s('schOverlay'); over.onpointerdown=startDraw; over.onpointermove=moveDraw; over.onpointerup=endDraw; over.onpointercancel=cancelDraw;
   }
 
@@ -150,10 +157,20 @@
 
   function toolbar() {
     const item=scheme(state.schemeId), pages=state.pdf?.numPages||item?.pageCount||0, has=!!state.pdf;
-    $s('schDownload').disabled=!item; $s('schDelete').disabled=!item||!canWrite(); $s('schPrev').disabled=!has||state.page<=1; $s('schNext').disabled=!has||state.page>=pages; $s('schMinus').disabled=!has||state.zoom<=.4; $s('schPlus').disabled=!has||state.zoom>=3; $s('schFit').disabled=!has; $s('schDraw').disabled=!has||!canWrite(); $s('schDraw').textContent=state.draw?'Отмена отметки':'Нарисовать отметку'; $s('schOverlay')?.classList.toggle('draw',state.draw); $s('schPage').textContent=has?`Страница ${state.page} / ${pages}`:'Страница —';
+    $s('schDownload').disabled=!item; $s('schDelete').disabled=!item||!canWrite(); $s('schPrev').disabled=!has||state.page<=1; $s('schNext').disabled=!has||state.page>=pages; $s('schMinus').disabled=!has||state.zoom<=.4; $s('schPlus').disabled=!has||state.zoom>=3; $s('schFit').disabled=!has; $s('schDraw').disabled=!has||!canWrite(); $s('schDraw').textContent=state.draw?'Завершить рисование':'Рисовать'; $s('schOverlay')?.classList.toggle('draw',state.draw); $s('schPage').textContent=has?`Страница ${state.page} / ${pages}`:'Страница —';
+    ['schTool','schDraw','schColorMode','schColor','schWidth','schFill'].forEach(id=>{$s(id).disabled=!has||!canWrite()||state.saving;});
+    $s('schDetails').disabled=$s('schRemoveMark').disabled=!state.selected||state.draw||state.saving||!canWrite();
+    $s('schSaveDrawings').disabled=!state.dirty.size||state.saving||!canWrite();
+    $s('schSaveDrawings').textContent=state.saving?'Сохранение…':`Сохранить рисунки${state.dirty.size?' ('+state.dirty.size+')':''}`;
+    const ink=state.selected&&!state.draw?appearance(mark(state.selected)):state.ink;
+    $s('schColorMode').value=ink.color?'custom':'status';$s('schColor').value=ink.color||'#2563eb';
+    $s('schColor').disabled=$s('schColor').disabled||!ink.color;
+    $s('schWidth').value=ink.width;$s('schFill').value=String(ink.fill);
+    $s('schHint').textContent=state.saving?'Сохраняем отметки…':state.dirty.size?`Есть несохранённые изменения: ${state.dirty.size}. Нажми «Сохранить рисунки».`:state.draw?'Рисуй несколько фигур подряд. Esc или «Завершить рисование» — перейти к выбору отметок.':'Щелчок выбирает отметку; «Данные отметки» или двойной щелчок открывает карточку.';
+
   }
 
-  async function select(id) { state.schemeId=id; state.page=1; state.zoom=1; state.draw=false; state.filter='all'; $s('schFilter').value='all'; renderList(); stats(); await loadPdf(); }
+  async function select(id) { state.selected='';state.schemeId=id; state.page=1; state.zoom=1; state.draw=false; state.filter='all'; $s('schFilter').value='all'; renderList(); stats(); await loadPdf(); }
   function clear() { state.schemeId='';state.pdf=null;state.page=1;state.zoom=1;state.draw=false;cancelDraw();$s('schStage').classList.add('hidden');$s('schEmpty').classList.remove('hidden');$s('schOverlay').innerHTML='';render(); }
   function loading(on,text='Загрузка схемы...'){const x=$s('schLoading');x.textContent=text;x.classList.toggle('hidden',!on);}
 
@@ -214,8 +231,62 @@
     if(!state.pdf)return;loading(true,'Отрисовка страницы...');try{const page=await state.pdf.getPage(state.page),scroll=$s('schScroll'),canvas=$s('schCanvas'),stage=$s('schStage'),over=$s('schOverlay'),base=page.getViewport({scale:1}),scale=(Math.max(320,scroll.clientWidth-42)/base.width)*state.zoom,view=page.getViewport({scale}),ratio=Math.min(devicePixelRatio||1,2),ctx=canvas.getContext('2d');canvas.width=Math.floor(view.width*ratio);canvas.height=Math.floor(view.height*ratio);canvas.style.width=`${Math.floor(view.width)}px`;canvas.style.height=`${Math.floor(view.height)}px`;stage.style.width=over.style.width=canvas.style.width;stage.style.height=over.style.height=canvas.style.height;ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,canvas.width,canvas.height);await page.render({canvasContext:ctx,viewport:view,transform:ratio===1?null:[ratio,0,0,ratio,0,0]}).promise;$s('schEmpty').classList.add('hidden');stage.classList.remove('hidden');renderMarks();}catch(error){alert('Не удалось отрисовать страницу: '+(error.message||error));}finally{loading(false);toolbar();}
   }
 
+  function visibleMarks() {
+    const merged=new Map((p()?.schemeMarks||[]).map(x=>[String(x.id),x]));
+    state.dirty.forEach((x,id)=>merged.set(id,x));
+    return [...merged.values()].filter(x=>x.active!==false&&x.schemeId===state.schemeId&&Number(x.pageNo||1)===state.page);
+  }
   function renderMarks() {
-    const over=$s('schOverlay');if(!over)return;over.querySelectorAll('.sch-mark').forEach(x=>x.remove());marks(state.schemeId,state.page).filter(x=>state.filter==='all'||x.status===state.filter).forEach(x=>{const b=document.createElement('button');b.className=`sch-mark ${markClass(x.status)}`;b.style.left=`${clamp(x.x)*100}%`;b.style.top=`${clamp(x.y)*100}%`;b.style.width=`${clamp(x.width,.008,1)*100}%`;b.style.height=`${clamp(x.height,.008,1)*100}%`;paintShape(b,x);b.title=x.title||x.status||'Отметка';b.innerHTML+=`<span>${html(x.title||x.status||'Участок')}${x.progressPercent!==null&&x.progressPercent!==undefined&&x.progressPercent!==''?' · '+Math.round(Number(x.progressPercent||0))+'%':''}</span>`;b.onpointerdown=e=>e.stopPropagation();b.onclick=e=>{e.stopPropagation();openMark(x.id);};over.appendChild(b);});
+    const over=$s('schOverlay');if(!over)return;
+    over.querySelectorAll('.sch-mark').forEach(x=>x.remove());
+    visibleMarks().filter(x=>state.filter==='all'||x.status===state.filter).forEach(x=>{
+      const b=document.createElement('button');b.type='button';b.dataset.markId=x.id;
+      b.className=`sch-mark ${markClass(x.status)}${state.selected===x.id?' selected':''}`;
+      paintShape(b,x);b.title=(x.title||x.status||'Отметка')+(state.dirty.has(String(x.id))?' · не сохранено':'');
+      if(x.title)b.innerHTML+=`<span>${html(x.title)}</span>`;
+      b.onpointerdown=e=>e.stopPropagation();
+      b.onclick=e=>{e.stopPropagation();if(state.draw||state.saving)return;state.selected=x.id;over.querySelectorAll('.sch-mark').forEach(n=>n.classList.toggle('selected',n.dataset.markId===x.id));toolbar();};
+      b.ondblclick=e=>{e.stopPropagation();if(!state.draw&&!state.saving)openMark(x.id);};
+      over.appendChild(b);
+    });
+  }
+  function appearance(x) {
+    const value=x?.appearance||{};
+    return {color:/^#[0-9a-f]{6}$/i.test(value.color||'')?value.color:null,width:clamp(value.width??3,1,20),fill:clamp(value.fill??.15,0,1)};
+  }
+  function changeInk() {
+    if(!canWrite()||state.saving)return;
+    const ink={color:$s('schColorMode').value==='status'?null:$s('schColor').value,width:clamp($s('schWidth').value,1,20),fill:clamp($s('schFill').value)};
+    if(state.selected&&!state.draw){const x=mark(state.selected);if(x)state.dirty.set(String(x.id),{...x,appearance:ink,updatedAt:now()});}
+    else state.ink=ink;
+    renderMarks();toolbar();
+  }
+  function stageDrawing(g) {
+    const t=now();const x={id:makeId('SMK'),schemeId:state.schemeId,pageNo:state.page,...g,appearance:{...state.ink},status:'Не начато',progressPercent:null,active:true,createdAt:t,updatedAt:t};
+    state.dirty.set(String(x.id),x);return x;
+  }
+  async function saveDrawings() {
+    if(state.saving||!canWrite()||!state.dirty.size)return;
+    state.saving=true;cancelDraw();toolbar();
+    let error=null;
+    try{
+      for(const [id,x] of [...state.dirty]){
+        await syncMark(x);
+        const list=p().schemeMarks,index=list.findIndex(item=>String(item.id)===id);
+        if(index<0)list.push(x);else list[index]=x;
+        // Keep the entry dirty until both the row and project snapshot are saved.
+        await saveProject();
+        state.dirty.delete(id);
+      }
+    }catch(e){error=e;}
+    finally{state.saving=false;renderMarks();stats();renderList();toolbar();}
+    if(error)$s('schHint').textContent='Не удалось сохранить: '+(error.message||error)+'. Несохранённые отметки оставлены на схеме — повтори сохранение.';
+  }
+  async function removeSelected() {
+    if(state.saving||!canWrite())return;
+    const x=mark(state.selected);if(!x)return;
+    if(!x.serverId&&state.dirty.has(String(x.id))){state.dirty.delete(String(x.id));state.selected='';renderMarks();toolbar();return;}
+    await deleteMark(x);
   }
 
   function point(e){const r=$s('schOverlay').getBoundingClientRect();return{x:clamp((e.clientX-r.left)/r.width),y:clamp((e.clientY-r.top)/r.height)};}
@@ -227,24 +298,26 @@
     return {x,y,width,height,markType:type,lineReverse:(end.x-start.x)*(end.y-start.y)<0};
   }
   function paintShape(node,g) {
+    const ink=appearance(g);const color=ink.color||({'В работе':'#d2860b','Ограничение':'#c23a3a'}[g.status]||(DONE.has(g.status)?'#16825d':'#667085'));
+    Object.assign(node.style,{color,borderColor:color,borderWidth:`${ink.width}px`,borderStyle:'solid',background:ink.fill?color+Math.round(ink.fill*255).toString(16).padStart(2,'0'):'transparent'});
     Object.assign(node.style,{left:`${g.x*100}%`,top:`${g.y*100}%`,width:`${Math.max(g.width,.001)*100}%`,height:`${Math.max(g.height,.001)*100}%`,minWidth:'0',minHeight:'0'});
     if(g.markType==='circle'||g.markType==='point')node.style.borderRadius='50%';
     if(g.markType==='point')node.style.background='currentColor';
     if(g.markType==='line') {
       Object.assign(node.style,{border:'none',background:'transparent',overflow:'visible'});
-      node.innerHTML=`<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:100%;height:100%;overflow:visible"><line x1="0" y1="${g.lineReverse?100:0}" x2="100" y2="${g.lineReverse?0:100}" stroke="currentColor" stroke-width="3" vector-effect="non-scaling-stroke" style="pointer-events:stroke"/></svg>`;
+      node.innerHTML=`<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:100%;height:100%;overflow:visible"><line x1="0" y1="${g.lineReverse?100:0}" x2="100" y2="${g.lineReverse?0:100}" stroke="currentColor" stroke-width="${ink.width}" vector-effect="non-scaling-stroke" style="pointer-events:stroke"/></svg>`;
     }
     if(g.markType==='point'||g.markType==='line')node.classList.add('sch-no-label');
   }
-  function startDraw(e){if(!state.draw||!canWrite()||e.button!==0||e.target!==$s('schOverlay'))return;e.preventDefault();state.start=point(e);state.draft=document.createElement('div');state.draft.className='sch-draft';$s('schOverlay').appendChild(state.draft);$s('schOverlay').setPointerCapture?.(e.pointerId);moveDraw(e);}
-  function moveDraw(e){if(!state.start||!state.draft)return;paintShape(state.draft,geometry(state.start,point(e),state.tool,$s('schOverlay').getBoundingClientRect()));}
-  function endDraw(e){if(!state.start)return;const g=geometry(state.start,point(e),state.tool,$s('schOverlay').getBoundingClientRect());cancelDraw();state.draw=false;toolbar();openMark(null,{schemeId:state.schemeId,pageNo:state.page,...g});}
+  function startDraw(e){if(state.saving||!state.draw||!canWrite()||e.button!==0||e.target!==$s('schOverlay'))return;e.preventDefault();state.start=point(e);state.draft=document.createElement('div');state.draft.className='sch-draft';$s('schOverlay').appendChild(state.draft);$s('schOverlay').setPointerCapture?.(e.pointerId);moveDraw(e);}
+  function moveDraw(e){if(!state.start||!state.draft)return;paintShape(state.draft,{...geometry(state.start,point(e),state.tool,$s('schOverlay').getBoundingClientRect()),appearance:state.ink});}
+  function endDraw(e){if(!state.start)return;const g=geometry(state.start,point(e),state.tool,$s('schOverlay').getBoundingClientRect());cancelDraw();stageDrawing(g);state.filter='all';$s('schFilter').value='all';renderMarks();toolbar();}
   function cancelDraw(){state.start=null;state.draft?.remove();state.draft=null;}
 
   function openMark(id=null,geometry=null) {
     if(!canWrite())return;
     const current=p(),existing=id?mark(id):null,x=existing||geometry||{};
-    openModal(existing?'Отметка выполнения':'Новая отметка на схеме',`<div class="sch-note">Фигура уже размещена на схеме. Укажи данные и нажми «Сохранить», чтобы закрепить отметку.</div><div class="form-grid"><div class="field"><label>Участок</label><input id="smTitle" value="${html(x.title||'')}"></div><div class="field"><label>Статус</label><select id="smStatus">${STATUSES.map(s=>`<option ${s===(x.status||'Не начато')?'selected':''}>${s}</option>`).join('')}</select></div><div class="field"><label>Вид работ</label><select id="smWork">${options(current.works,x.workId)}</select></div><div class="field"><label>Организация</label><select id="smOrg">${options(current.organizations,x.organizationId)}</select></div><div class="field"><label>Связанный фронт</label><select id="smFront">${frontOptions(x.frontId)}</select></div><div class="field"><label>Группа номерных элементов</label><select id="smGroup">${options(current.numberedElementGroups,x.elementGroupId)}</select></div><div class="field"><label>Номерной элемент</label><select id="smElement">${elementOptions(x.numberedElementId)}</select></div></div><div class="sch-note">Процент вручную не вводится. Готовность рассчитывается по выбранному номерному элементу, группе с заданным общим количеством либо измеряемому фронту.</div><div class="field"><label>Комментарий</label><textarea id="smComment">${html(x.comment||'')}</textarea></div><div class="liv-editor-footer">${existing?'<button id="smDelete" class="btn danger-lite">Удалить отметку</button>':''}<button id="smCancel" class="btn">Отмена</button><button id="smSave" class="btn primary">Сохранить</button></div>`);
+    openModal(existing?'Отметка выполнения':'Новая отметка на схеме',`<div class="sch-note">Данные и связи отметки. Цвет, толщину и заливку можно менять на панели схемы без открытия этой карточки.</div><div class="form-grid"><div class="field"><label>Участок</label><input id="smTitle" value="${html(x.title||'')}"></div><div class="field"><label>Статус</label><select id="smStatus">${STATUSES.map(s=>`<option ${s===(x.status||'Не начато')?'selected':''}>${s}</option>`).join('')}</select></div><div class="field"><label>Вид работ</label><select id="smWork">${options(current.works,x.workId)}</select></div><div class="field"><label>Организация</label><select id="smOrg">${options(current.organizations,x.organizationId)}</select></div><div class="field"><label>Связанный фронт</label><select id="smFront">${frontOptions(x.frontId)}</select></div><div class="field"><label>Группа номерных элементов</label><select id="smGroup">${options(current.numberedElementGroups,x.elementGroupId)}</select></div><div class="field"><label>Номерной элемент</label><select id="smElement">${elementOptions(x.numberedElementId)}</select></div></div><div class="sch-note">Процент вручную не вводится. Готовность рассчитывается по выбранному номерному элементу, группе с заданным общим количеством либо измеряемому фронту.</div><div class="field"><label>Комментарий</label><textarea id="smComment">${html(x.comment||'')}</textarea></div><div class="liv-editor-footer">${existing?'<button id="smDelete" class="btn danger-lite">Удалить отметку</button>':''}<button id="smCancel" class="btn">Отмена</button><button id="smSave" class="btn primary">Сохранить</button></div>`);
     $s('smCancel').onclick=closeModal;
     $s('smSave').onclick=()=>saveMark(existing,x);
     if($s('smDelete'))$s('smDelete').onclick=()=>deleteMark(existing);
@@ -269,7 +342,8 @@
       await syncMark(x);
       synced=true;
       if(typeof log==='function')log(existing?'Изменено':'Создано','Отметка на схеме',x.title||'Участок',{schemeId:x.schemeId,markId:x.id,status:x.status,progress:x.progressPercent});
-      await saveProject();closeModal();renderMarks();stats();renderList();
+      if(!current.schemeMarks.some(item=>item.id===x.id))current.schemeMarks.push(x);
+      await saveProject();state.dirty.delete(String(x.id));closeModal();renderMarks();stats();renderList();toolbar();
     }catch(error){
       if(!synced&&!previous)current.schemeMarks=current.schemeMarks.filter(item=>item!==x);
       else if(!synced&&previous){Object.keys(x).forEach(key=>{if(!(key in previous))delete x[key];});Object.assign(x,previous);}
@@ -277,7 +351,7 @@
     }finally{button.disabled=false;}
   }
 
-  async function deleteMark(x){if(!x||!confirm('Удалить отметку со схемы?'))return;const previous={...x};let synced=false;x.active=false;x.updatedAt=x.deletedAt=now();try{await syncMark(x);synced=true;await saveProject();closeModal();renderMarks();stats();renderList();}catch(error){if(!synced){Object.keys(x).forEach(key=>{if(!(key in previous))delete x[key];});Object.assign(x,previous);}alert('Не удалось удалить отметку: '+(error.message||error));}}
+  async function deleteMark(x){if(!x||!confirm('Удалить отметку со схемы?'))return;const previous={...x};let synced=false;x.active=false;x.updatedAt=x.deletedAt=now();try{await syncMark(x);synced=true;const stored=p().schemeMarks.find(item=>item.id===x.id);if(stored)Object.assign(stored,x);await saveProject();state.dirty.delete(String(x.id));state.selected='';closeModal();renderMarks();stats();renderList();toolbar();}catch(error){if(!synced){Object.keys(x).forEach(key=>{if(!(key in previous))delete x[key];});Object.assign(x,previous);}alert('Не удалось удалить отметку: '+(error.message||error));}}
   async function page(d){if(!state.pdf)return;const n=Math.min(state.pdf.numPages,Math.max(1,state.page+d));if(n!==state.page){state.page=n;await renderPage();}}
   function zoom(d){if(!state.pdf)return;state.zoom=clamp(state.zoom+d,.4,3);renderPage();}
 
@@ -425,7 +499,7 @@
 
   async function syncMark(x){
     const client=window.LIV_SUPABASE,item=scheme(x.schemeId);
-    if(!client||!item)return;
+    if(!client||!item)throw new Error('Схема или подключение к серверу недоступны');
     if(!item.serverId)await syncScheme(item);
     const normalizer=window.LIV_NORMALIZED_SYNC;
     const data={
@@ -453,6 +527,7 @@
       updated_at:x.updatedAt||now(),
       custom_data:{
         lineReverse:!!x.lineReverse,
+        appearance:appearance(x),
         workExternalId:x.workId||'',
         organizationExternalId:x.organizationId||'',
         frontExternalId:x.frontId||'',
@@ -489,6 +564,7 @@
       x.active=false;
       x.deletedAt=x.updatedAt=now();
       marks(x.id).forEach(m=>{m.active=false;m.deletedAt=m.updatedAt=x.deletedAt;});
+      state.dirty.forEach((m,id)=>{if(m.schemeId===x.id)state.dirty.delete(id);});state.selected='';
       await saveProject();
 
       const cached=state.cache.get(x.id);
@@ -514,6 +590,7 @@
     }
 
     for(const item of (current.schemeMarks||[]).filter(x=>x.active!==false)){
+      if(state.dirty.has(String(item.id)))continue;
       item.progressPercent=derivedProgress(item.status,item.frontId,item.elementGroupId,item.numberedElementId);
       try{await syncMark(item);}catch(error){console.warn('LIV Schemes: mark relation sync failed',error);}
     }
