@@ -9202,6 +9202,8 @@ async function init() {
 
 
     renderAll();
+    window.LIV_PROJECT_READY = true;
+    window.dispatchEvent(new CustomEvent('liv-project-ready'));
   }
 
 

@@ -7,7 +7,7 @@
   const WRITERS = new Set(['admin', 'planner']);
   const STATUSES = ['Не начато','В работе','Выполнено','Освидетельствовано','Принято','Ограничение'];
   const DONE = new Set(['Выполнено','Освидетельствовано','Принято']);
-  const state = { schemeId:'', pdf:null, page:1, zoom:1, draw:false, start:null, draft:null, filter:'all', cache:new Map(), pending:null, linksRunning:false };
+  const state = { schemeId:'', pdf:null, page:1, zoom:1, draw:false, tool:'area', start:null, draft:null, filter:'all', cache:new Map(), pending:null, linksRunning:false };
 
   const $s = id => document.getElementById(id);
   const p = () => { try { return project || null; } catch (_) { return null; } };
@@ -96,7 +96,7 @@
       .sch-layout{display:grid;grid-template-columns:280px minmax(0,1fr);gap:14px;align-items:start}.sch-side{padding:14px;position:sticky;top:78px}.sch-side h2{margin:0 0 10px;font-size:16px}.sch-search{width:100%;height:38px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:9px}.sch-list{display:grid;gap:6px;max-height:650px;overflow:auto}.sch-item{padding:10px;border:1px solid #e3e7ed;border-radius:9px;background:#fff;text-align:left;cursor:pointer}.sch-item.active{background:#eef4ff;border-color:#829ac0}.sch-item strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px}.sch-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:5px;color:#667085;font-size:10px}
       .sch-view{padding:0;overflow:hidden}.sch-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid #e6eaf0;flex-wrap:wrap}.sch-group{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.sch-toolbar .btn{min-height:34px;padding:6px 9px;font-size:12px}.sch-page{min-width:90px;text-align:center;font-size:12px;color:#475467}.sch-filter{height:34px;border:1px solid var(--line);border-radius:7px;padding:5px 8px;background:#fff}
       .sch-scroll{position:relative;min-height:620px;max-height:calc(100vh - 235px);overflow:auto;background:#e8edf3;padding:20px}.sch-empty{min-height:570px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:#667085;text-align:center}.sch-empty strong{font-size:17px;color:#344054}.sch-stage{position:relative;width:max-content;margin:0 auto;background:#fff;box-shadow:0 8px 28px rgba(15,23,42,.15)}.sch-stage canvas{display:block}.sch-overlay{position:absolute;inset:0;touch-action:none}.sch-overlay.draw{cursor:crosshair}
-      .sch-mark{position:absolute;display:flex;align-items:center;justify-content:center;min-width:12px;min-height:12px;border:2px solid currentColor;border-radius:4px;cursor:pointer;overflow:hidden}.sch-mark span{max-width:100%;padding:2px 4px;background:rgba(255,255,255,.86);color:#182230;font-size:9px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}.sch-done{color:#16825d;background:rgba(22,130,93,.18)}.sch-work{color:#d2860b;background:rgba(210,134,11,.18)}.sch-risk{color:#c23a3a;background:rgba(194,58,58,.18)}.sch-idle{color:#667085;background:rgba(102,112,133,.16)}.sch-draft{position:absolute;border:2px dashed #2563eb;background:rgba(37,99,235,.12);pointer-events:none}
+      .sch-mark{position:absolute;display:flex;align-items:center;justify-content:center;min-width:12px;min-height:12px;border:2px solid currentColor;border-radius:4px;cursor:pointer;overflow:hidden}.sch-mark span{max-width:100%;padding:2px 4px;background:rgba(255,255,255,.86);color:#182230;font-size:9px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}.sch-done{color:#16825d;background:rgba(22,130,93,.18)}.sch-work{color:#d2860b;background:rgba(210,134,11,.18)}.sch-risk{color:#c23a3a;background:rgba(194,58,58,.18)}.sch-idle{color:#667085;background:rgba(102,112,133,.16)}.sch-no-label span{display:none}.sch-draft{color:#2563eb;position:absolute;border:2px dashed #2563eb;background:rgba(37,99,235,.12);pointer-events:none}
       .sch-load{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(232,237,243,.82);z-index:8;font-weight:700}.sch-legend{display:flex;gap:12px;flex-wrap:wrap;padding:9px 13px;border-top:1px solid #e6eaf0;background:#fff;color:#667085;font-size:10px}.sch-dot{width:8px;height:8px;border-radius:50%;display:inline-block;background:currentColor;margin-right:4px}.sch-note{padding:10px 12px;border:1px solid #dbe7ff;border-radius:8px;background:#f4f8ff;color:#475467;font-size:12px;line-height:1.45}
       @media(max-width:980px){.sch-layout{grid-template-columns:1fr}.sch-side{position:static}.sch-list{max-height:220px}.sch-stats{grid-template-columns:repeat(2,1fr)}}`;
     document.head.appendChild(style);
@@ -110,7 +110,7 @@
       <section class="sch-head"><div><h1>Схемы</h1><p>PDF-схемы и визуальная фиксация выполнения</p></div><div class="sch-group no-print"><button id="schUpload" class="btn primary sch-write">+ Загрузить PDF</button><input id="schFile" type="file" accept="application/pdf,.pdf" hidden><button id="schDownload" class="btn" disabled>Скачать PDF</button><button id="schDelete" class="btn danger-lite sch-write" disabled>Удалить схему</button></div></section>
       <section class="sch-stats"><div class="sch-stat"><span>Отметок</span><strong id="schTotal">0</strong></div><div class="sch-stat"><span>В работе</span><strong id="schWork">0</strong></div><div class="sch-stat"><span>Выполнено</span><strong id="schDone">0</strong></div><div class="sch-stat"><span>Средняя готовность</span><strong id="schProgress">0%</strong></div></section>
       <section class="sch-layout"><aside class="card sch-side no-print"><h2>Загруженные схемы <span id="schCount" class="badge">0</span></h2><input id="schSearch" class="sch-search" type="search" placeholder="Поиск по схемам..."><div id="schList" class="sch-list"></div></aside>
-      <section class="card sch-view"><div class="sch-toolbar no-print"><div class="sch-group"><button id="schPrev" class="btn" disabled>‹</button><span id="schPage" class="sch-page">Страница —</span><button id="schNext" class="btn" disabled>›</button><button id="schMinus" class="btn" disabled>−</button><button id="schFit" class="btn" disabled>По ширине</button><button id="schPlus" class="btn" disabled>+</button></div><div class="sch-group"><select id="schFilter" class="sch-filter"><option value="all">Все статусы</option>${STATUSES.map(x=>`<option>${x}</option>`).join('')}</select><button id="schDraw" class="btn primary sch-write" disabled>Отметить участок</button></div></div>
+      <section class="card sch-view"><div class="sch-toolbar no-print"><div class="sch-group"><button id="schPrev" class="btn" disabled>‹</button><span id="schPage" class="sch-page">Страница —</span><button id="schNext" class="btn" disabled>›</button><button id="schMinus" class="btn" disabled>−</button><button id="schFit" class="btn" disabled>По ширине</button><button id="schPlus" class="btn" disabled>+</button></div><div class="sch-group"><select id="schFilter" class="sch-filter"><option value="all">Все статусы</option>${STATUSES.map(x=>`<option>${x}</option>`).join('')}</select><select id="schTool" class="sch-filter sch-write" aria-label="Форма отметки"><option value="area">Прямоугольник</option><option value="line">Линия</option><option value="point">Точка</option><option value="circle">Круг</option></select><button id="schDraw" class="btn primary sch-write" disabled>Отметить участок</button></div></div>
       <div id="schScroll" class="sch-scroll"><div id="schEmpty" class="sch-empty"><strong>Выбери или загрузи PDF-схему</strong><span>После загрузки можно выделять участки и отмечать выполнение.</span></div><div id="schStage" class="sch-stage hidden"><canvas id="schCanvas"></canvas><div id="schOverlay" class="sch-overlay"></div></div><div id="schLoading" class="sch-load hidden">Загрузка схемы...</div></div>
       <div class="sch-legend"><span class="sch-idle"><i class="sch-dot"></i>Не начато</span><span class="sch-work"><i class="sch-dot"></i>В работе</span><span class="sch-done"><i class="sch-dot"></i>Выполнено</span><span class="sch-risk"><i class="sch-dot"></i>Ограничение</span></div></section></section>`;
     main.insertBefore(panel,$s('tab-import'));
@@ -124,6 +124,7 @@
     $s('schMinus').onclick=()=>zoom(-.15); $s('schPlus').onclick=()=>zoom(.15); $s('schFit').onclick=()=>{state.zoom=1;renderPage();};
     $s('schFilter').onchange=e=>{state.filter=e.target.value;renderMarks();}; $s('schDownload').onclick=download; $s('schDelete').onclick=openDelete;
     $s('schDraw').onclick=()=>{if(!canWrite()||!state.pdf)return;state.draw=!state.draw;cancelDraw();toolbar();};
+    $s('schTool').onchange=e=>{cancelDraw();state.tool=e.target.value;state.draw=true;toolbar();};
     const over=$s('schOverlay'); over.onpointerdown=startDraw; over.onpointermove=moveDraw; over.onpointerup=endDraw; over.onpointercancel=cancelDraw;
   }
 
@@ -149,7 +150,7 @@
 
   function toolbar() {
     const item=scheme(state.schemeId), pages=state.pdf?.numPages||item?.pageCount||0, has=!!state.pdf;
-    $s('schDownload').disabled=!item; $s('schDelete').disabled=!item||!canWrite(); $s('schPrev').disabled=!has||state.page<=1; $s('schNext').disabled=!has||state.page>=pages; $s('schMinus').disabled=!has||state.zoom<=.4; $s('schPlus').disabled=!has||state.zoom>=3; $s('schFit').disabled=!has; $s('schDraw').disabled=!has||!canWrite(); $s('schDraw').textContent=state.draw?'Отмена отметки':'Отметить участок'; $s('schOverlay')?.classList.toggle('draw',state.draw); $s('schPage').textContent=has?`Страница ${state.page} / ${pages}`:'Страница —';
+    $s('schDownload').disabled=!item; $s('schDelete').disabled=!item||!canWrite(); $s('schPrev').disabled=!has||state.page<=1; $s('schNext').disabled=!has||state.page>=pages; $s('schMinus').disabled=!has||state.zoom<=.4; $s('schPlus').disabled=!has||state.zoom>=3; $s('schFit').disabled=!has; $s('schDraw').disabled=!has||!canWrite(); $s('schDraw').textContent=state.draw?'Отмена отметки':'Нарисовать отметку'; $s('schOverlay')?.classList.toggle('draw',state.draw); $s('schPage').textContent=has?`Страница ${state.page} / ${pages}`:'Страница —';
   }
 
   async function select(id) { state.schemeId=id; state.page=1; state.zoom=1; state.draw=false; state.filter='all'; $s('schFilter').value='all'; renderList(); stats(); await loadPdf(); }
@@ -214,19 +215,36 @@
   }
 
   function renderMarks() {
-    const over=$s('schOverlay');if(!over)return;over.querySelectorAll('.sch-mark').forEach(x=>x.remove());marks(state.schemeId,state.page).filter(x=>state.filter==='all'||x.status===state.filter).forEach(x=>{const b=document.createElement('button');b.className=`sch-mark ${markClass(x.status)}`;b.style.left=`${clamp(x.x)*100}%`;b.style.top=`${clamp(x.y)*100}%`;b.style.width=`${clamp(x.width,.008,1)*100}%`;b.style.height=`${clamp(x.height,.008,1)*100}%`;b.innerHTML=`<span>${html(x.title||x.status||'Участок')}${x.progressPercent!==null&&x.progressPercent!==undefined&&x.progressPercent!==''?' · '+Math.round(Number(x.progressPercent||0))+'%':''}</span>`;b.onpointerdown=e=>e.stopPropagation();b.onclick=e=>{e.stopPropagation();openMark(x.id);};over.appendChild(b);});
+    const over=$s('schOverlay');if(!over)return;over.querySelectorAll('.sch-mark').forEach(x=>x.remove());marks(state.schemeId,state.page).filter(x=>state.filter==='all'||x.status===state.filter).forEach(x=>{const b=document.createElement('button');b.className=`sch-mark ${markClass(x.status)}`;b.style.left=`${clamp(x.x)*100}%`;b.style.top=`${clamp(x.y)*100}%`;b.style.width=`${clamp(x.width,.008,1)*100}%`;b.style.height=`${clamp(x.height,.008,1)*100}%`;paintShape(b,x);b.title=x.title||x.status||'Отметка';b.innerHTML+=`<span>${html(x.title||x.status||'Участок')}${x.progressPercent!==null&&x.progressPercent!==undefined&&x.progressPercent!==''?' · '+Math.round(Number(x.progressPercent||0))+'%':''}</span>`;b.onpointerdown=e=>e.stopPropagation();b.onclick=e=>{e.stopPropagation();openMark(x.id);};over.appendChild(b);});
   }
 
   function point(e){const r=$s('schOverlay').getBoundingClientRect();return{x:clamp((e.clientX-r.left)/r.width),y:clamp((e.clientY-r.top)/r.height)};}
-  function startDraw(e){if(!state.draw||!canWrite()||e.button!==0||e.target!==$s('schOverlay'))return;e.preventDefault();state.start=point(e);state.draft=document.createElement('div');state.draft.className='sch-draft';$s('schOverlay').appendChild(state.draft);}
-  function moveDraw(e){if(!state.start||!state.draft)return;const q=point(e),x=Math.min(state.start.x,q.x),y=Math.min(state.start.y,q.y),w=Math.abs(q.x-state.start.x),h=Math.abs(q.y-state.start.y);Object.assign(state.draft.style,{left:`${x*100}%`,top:`${y*100}%`,width:`${w*100}%`,height:`${h*100}%`});}
-  function endDraw(e){if(!state.start)return;const q=point(e);let x=Math.min(state.start.x,q.x),y=Math.min(state.start.y,q.y),w=Math.abs(q.x-state.start.x),h=Math.abs(q.y-state.start.y);if(w<.012||h<.012){w=.05;h=.05;x=clamp(q.x-w/2,0,1-w);y=clamp(q.y-h/2,0,1-h);}cancelDraw();state.draw=false;toolbar();openMark(null,{schemeId:state.schemeId,pageNo:state.page,x,y,width:w,height:h});}
+  function geometry(start, end, type, size) {
+    let x=Math.min(start.x,end.x),y=Math.min(start.y,end.y),width=Math.abs(end.x-start.x),height=Math.abs(end.y-start.y);
+    if(type==='point') { width=12/size.width;height=12/size.height;x=clamp(end.x-width/2,0,1-width);y=clamp(end.y-height/2,0,1-height); }
+    else if(type==='circle') { const d=Math.max(width*size.width,height*size.height,12);width=Math.min(d/size.width,1);height=Math.min(d/size.height,1);x=clamp(start.x+(end.x<start.x?-width:0),0,1-width);y=clamp(start.y+(end.y<start.y?-height:0),0,1-height); }
+    else if(type==='area'&&(width<.003||height<.003)) {width=.05;height=.05;x=clamp(end.x-width/2,0,1-width);y=clamp(end.y-height/2,0,1-height);}
+    return {x,y,width,height,markType:type,lineReverse:(end.x-start.x)*(end.y-start.y)<0};
+  }
+  function paintShape(node,g) {
+    Object.assign(node.style,{left:`${g.x*100}%`,top:`${g.y*100}%`,width:`${Math.max(g.width,.001)*100}%`,height:`${Math.max(g.height,.001)*100}%`,minWidth:'0',minHeight:'0'});
+    if(g.markType==='circle'||g.markType==='point')node.style.borderRadius='50%';
+    if(g.markType==='point')node.style.background='currentColor';
+    if(g.markType==='line') {
+      Object.assign(node.style,{border:'none',background:'transparent',overflow:'visible'});
+      node.innerHTML=`<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:100%;height:100%;overflow:visible"><line x1="0" y1="${g.lineReverse?100:0}" x2="100" y2="${g.lineReverse?0:100}" stroke="currentColor" stroke-width="3" vector-effect="non-scaling-stroke" style="pointer-events:stroke"/></svg>`;
+    }
+    if(g.markType==='point'||g.markType==='line')node.classList.add('sch-no-label');
+  }
+  function startDraw(e){if(!state.draw||!canWrite()||e.button!==0||e.target!==$s('schOverlay'))return;e.preventDefault();state.start=point(e);state.draft=document.createElement('div');state.draft.className='sch-draft';$s('schOverlay').appendChild(state.draft);$s('schOverlay').setPointerCapture?.(e.pointerId);moveDraw(e);}
+  function moveDraw(e){if(!state.start||!state.draft)return;paintShape(state.draft,geometry(state.start,point(e),state.tool,$s('schOverlay').getBoundingClientRect()));}
+  function endDraw(e){if(!state.start)return;const g=geometry(state.start,point(e),state.tool,$s('schOverlay').getBoundingClientRect());cancelDraw();state.draw=false;toolbar();openMark(null,{schemeId:state.schemeId,pageNo:state.page,...g});}
   function cancelDraw(){state.start=null;state.draft?.remove();state.draft=null;}
 
   function openMark(id=null,geometry=null) {
     if(!canWrite())return;
     const current=p(),existing=id?mark(id):null,x=existing||geometry||{};
-    openModal(existing?'Отметка выполнения':'Новая отметка на схеме',`<div class="form-grid"><div class="field"><label>Участок</label><input id="smTitle" value="${html(x.title||'')}"></div><div class="field"><label>Статус</label><select id="smStatus">${STATUSES.map(s=>`<option ${s===(x.status||'Не начато')?'selected':''}>${s}</option>`).join('')}</select></div><div class="field"><label>Вид работ</label><select id="smWork">${options(current.works,x.workId)}</select></div><div class="field"><label>Организация</label><select id="smOrg">${options(current.organizations,x.organizationId)}</select></div><div class="field"><label>Связанный фронт</label><select id="smFront">${frontOptions(x.frontId)}</select></div><div class="field"><label>Группа номерных элементов</label><select id="smGroup">${options(current.numberedElementGroups,x.elementGroupId)}</select></div><div class="field"><label>Номерной элемент</label><select id="smElement">${elementOptions(x.numberedElementId)}</select></div></div><div class="sch-note">Процент вручную не вводится. Готовность рассчитывается по выбранному номерному элементу, группе с заданным общим количеством либо измеряемому фронту.</div><div class="field"><label>Комментарий</label><textarea id="smComment">${html(x.comment||'')}</textarea></div><div class="liv-editor-footer">${existing?'<button id="smDelete" class="btn danger-lite">Удалить отметку</button>':''}<button id="smCancel" class="btn">Отмена</button><button id="smSave" class="btn primary">Сохранить</button></div>`);
+    openModal(existing?'Отметка выполнения':'Новая отметка на схеме',`<div class="sch-note">Фигура уже размещена на схеме. Укажи данные и нажми «Сохранить», чтобы закрепить отметку.</div><div class="form-grid"><div class="field"><label>Участок</label><input id="smTitle" value="${html(x.title||'')}"></div><div class="field"><label>Статус</label><select id="smStatus">${STATUSES.map(s=>`<option ${s===(x.status||'Не начато')?'selected':''}>${s}</option>`).join('')}</select></div><div class="field"><label>Вид работ</label><select id="smWork">${options(current.works,x.workId)}</select></div><div class="field"><label>Организация</label><select id="smOrg">${options(current.organizations,x.organizationId)}</select></div><div class="field"><label>Связанный фронт</label><select id="smFront">${frontOptions(x.frontId)}</select></div><div class="field"><label>Группа номерных элементов</label><select id="smGroup">${options(current.numberedElementGroups,x.elementGroupId)}</select></div><div class="field"><label>Номерной элемент</label><select id="smElement">${elementOptions(x.numberedElementId)}</select></div></div><div class="sch-note">Процент вручную не вводится. Готовность рассчитывается по выбранному номерному элементу, группе с заданным общим количеством либо измеряемому фронту.</div><div class="field"><label>Комментарий</label><textarea id="smComment">${html(x.comment||'')}</textarea></div><div class="liv-editor-footer">${existing?'<button id="smDelete" class="btn danger-lite">Удалить отметку</button>':''}<button id="smCancel" class="btn">Отмена</button><button id="smSave" class="btn primary">Сохранить</button></div>`);
     $s('smCancel').onclick=closeModal;
     $s('smSave').onclick=()=>saveMark(existing,x);
     if($s('smDelete'))$s('smDelete').onclick=()=>deleteMark(existing);
@@ -238,7 +256,7 @@
     let synced=false;
     const button=$s('smSave');if(button.disabled)return;button.disabled=true;
     let x=existing;
-    if(!x){x={id:makeId('SMK'),schemeId:g.schemeId,pageNo:g.pageNo,x:g.x,y:g.y,width:g.width,height:g.height,active:true,createdAt:t};current.schemeMarks.push(x);}
+    if(!x){x={id:makeId('SMK'),schemeId:g.schemeId,pageNo:g.pageNo,x:g.x,y:g.y,width:g.width,height:g.height,markType:g.markType||'area',lineReverse:!!g.lineReverse,active:true,createdAt:t};current.schemeMarks.push(x);}
     const status=$s('smStatus').value;
     const frontId=$s('smFront').value;
     const elementGroupId=$s('smGroup').value;
@@ -369,7 +387,7 @@
     const client=window.LIV_SUPABASE;
     if(!client)return;
     const normalizer=window.LIV_NORMALIZED_SYNC;
-    const projectId=normalizer?.projectId?.();
+    const projectId=normalizer?.ensureProjectId?await normalizer.ensureProjectId():normalizer?.projectId?.();
     if(!projectId)throw new Error('Дождись подключения серверного проекта и повтори.');
     const data={
       project_id:projectId,
@@ -423,6 +441,7 @@
       active:x.active!==false,
       updated_at:x.updatedAt||now(),
       custom_data:{
+        lineReverse:!!x.lineReverse,
         workExternalId:x.workId||'',
         organizationExternalId:x.organizationId||'',
         frontExternalId:x.frontId||'',

@@ -256,7 +256,7 @@
   if (document.querySelector('script[data-liv-schemes]')) return;
 
   const script = document.createElement('script');
-  script.src = 'js/schemes.js?v=20261014-2';
+  script.src = 'js/schemes.js?v=20261014-3';
   script.async = true;
   script.dataset.livSchemes = '1';
   script.onerror = () => {
@@ -267,7 +267,7 @@
 
 (function loadLivDataModules() {
   const modules = [
-    ['liv-normalized-sync', 'js/normalized-sync.js?v=20261014-5'],
+    ['liv-normalized-sync', 'js/normalized-sync.js?v=20261014-6'],
     ['liv-source-mappings', 'js/source-mappings.js?v=20261013-5'],
     ['liv-milestone-risk', 'js/milestone-risk.js?v=20261014-2'],
     ['liv-milestone-risk-groups', 'js/milestone-risk-groups.js?v=20261013-2'],
@@ -275,7 +275,7 @@
     ['liv-key-date-import-guard', 'js/key-date-import-guard.js?v=20261013-2'],
     ['liv-numbered-elements-v2', 'js/numbered-elements-v2.js?v=20261014-1'],
     ['liv-report-snapshots', 'js/report-snapshots.js?v=20261014-3'],
-    ['liv-preflight', 'js/preflight.js?v=20261014-3']
+    ['liv-preflight', 'js/preflight.js?v=20261014-4']
   ];
 
   function loadModule(index) {

@@ -1,7 +1,7 @@
 'use strict';
 
 (function () {
-  const MODULE_VERSION = '2026.10.14.5';
+  const MODULE_VERSION = '2026.10.14.6';
   const PROJECT_EXTERNAL_ID = 'LIV-MAIN';
   const SAVE_DELAY = 1200;
   const PAGE_SIZE = 1000;
@@ -398,6 +398,7 @@
 
   async function resolveProjectId() {
     if (state.projectId) return state.projectId;
+    if (!client()) throw new Error('Подключение к серверу ещё не готово. Повтори проверку после входа.');
     const result = await client()
       .from('projects')
       .select('id')
@@ -753,6 +754,9 @@
 
 
   async function verifyMigration(current) {
+    if (!current) throw new Error('Локальный проект ещё не загружен. Повтори проверку после загрузки.');
+    await resolveProjectId();
+    ensureCollections(current);
 
     const checks = [
       ['buildings', current.buildings.filter(item => item.active !== false).length, true],
@@ -1779,7 +1783,7 @@
 
     try {
       ensureCollections(current);
-      await resolveProjectId();
+      await syncStep('Подключение проекта', resolveProjectId);
       await syncStep('Справочники', () => syncDictionaries(current));
       await syncStep('Алиасы и сопоставления', () => syncAliasesAndMappings(current));
       await syncStep('Договоры', () => syncContracts(current));
@@ -1889,7 +1893,7 @@
 
     const projectTimer = setInterval(() => {
       const current = localProject();
-      if (!current || !client()) return;
+      if (!current || !client() || !window.LIV_PROJECT_READY) return;
       clearInterval(projectTimer);
       if (canWrite()) queue(current);
       else setStatus('idle', 'Серверная база: только чтение');
@@ -1898,18 +1902,14 @@
   }
 
   window.addEventListener('liv-auth-session', event => {
-    if (event?.detail?.signedIn) {
-      setTimeout(() => {
-        attachToRemoteSync();
-        const current = localProject();
-        if (current && canWrite()) queue(current);
-      }, 250);
-    } else {
-      setStatus('idle', 'Серверная база: нет входа');
-    }
+    window.LIV_PROJECT_READY = false;
+    clearTimeout(state.timer);
+    state.queuedProject = null;
+    setStatus('idle', event?.detail?.signedIn ? 'Серверная база: загрузка проекта' : 'Серверная база: нет входа');
   });
 
-  window.addEventListener('liv-remote-project', () => {
+  window.addEventListener('liv-project-ready', () => {
+    attachToRemoteSync();
     const current = localProject();
     if (current && canWrite()) queue(current);
   });
@@ -1922,6 +1922,7 @@
     syncResources: () => syncResourcesBackground(localProject()),
     state: () => ({ ...state, maps: undefined, hashes: undefined }),
     projectId: () => state.projectId,
+    ensureProjectId: resolveProjectId,
     serverId: mapValue,
     inferMilestoneTarget: targetFromTitle,
     verifyMigration:

@@ -228,3 +228,39 @@ test('PDF: готовность элемента и группы считает�
   assert.equal(env.api.derivedProgress('В работе','','','E3'), 0);
   assert.equal(env.api.derivedProgress('Выполнено',''), null);
 });
+
+test('PDF: точка, круг и линии сохраняют геометрию при разных пропорциях страницы', () => {
+  const {api}=moduleContext('js/schemes.js','geometry');
+  const size={width:1000,height:500};
+  const circle=api.geometry({x:.2,y:.2},{x:.3,y:.4},'circle',size);
+  assert.equal(circle.width*size.width,circle.height*size.height);
+  const dot=api.geometry({x:1,y:1},{x:1,y:1},'point',size);
+  assert.equal(dot.width*size.width,12);
+  assert.ok(dot.x+dot.width<=1 && dot.y+dot.height<=1);
+  const line=api.geometry({x:.8,y:.2},{x:.2,y:.8},'line',size);
+  assert.equal(line.lineReverse,true);
+  const horizontal=api.geometry({x:.1,y:.5},{x:.9,y:.5},'line',size);
+  assert.equal(horizontal.height,0);
+  assert.equal(horizontal.width,.8);
+});
+
+test('Проверка: пустой ID проекта не отправляется в серверные таблицы', async () => {
+  const env=moduleContext('js/preflight.js','identityChecks');
+  let calls=0;
+  env.window.LIV_SUPABASE={from(){calls++;throw new Error('Unexpected query');}};
+  env.window.LIV_NORMALIZED_SYNC={projectId:()=>''};
+  const results=await env.api.identityChecks();
+  assert.equal(calls,0);
+  assert.equal(results.length,1);
+  assert.equal(results[0].ok,false);
+  assert.match(results[0].detail,/проект ещё не определён/);
+});
+
+test('Проверка: ожидает разрешения UUID перед запросом таблицы', async () => {
+  const env=moduleContext('js/preflight.js','serverIdentitySet');
+  const uuid='6cfe4b12-a8f9-4189-81b6-77ced8d99f7e';
+  let resolved=false;
+  env.window.LIV_NORMALIZED_SYNC={ensureProjectId:async()=>{await Promise.resolve();resolved=true;return uuid;}};
+  env.window.LIV_SUPABASE={from(){assert.ok(resolved);return {select(){return this;},range(){return this;},eq(column,value){assert.equal(column,'project_id');assert.equal(value,uuid);return Promise.resolve({data:[]});}};}};
+  assert.equal((await env.api.serverIdentitySet('fronts','external_id',true)).size,0);
+});

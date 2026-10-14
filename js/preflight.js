@@ -1,7 +1,7 @@
 'use strict';
 
 (function () {
-  const VERSION = '2026.10.14.3';
+  const VERSION = '2026.10.14.4';
   const state = {
     running: false,
     last: null
@@ -100,9 +100,20 @@
     }
   }
 
-  async function serverIdentitySet(table, column, projectScoped) {
+  async function projectContext() {
+    const normalizer = window.LIV_NORMALIZED_SYNC;
+    const projectId = normalizer?.ensureProjectId
+      ? await normalizer.ensureProjectId()
+      : normalizer?.projectId?.();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId || '')) {
+      throw new Error('Серверный проект ещё не определён. Дождись входа и загрузки проекта, затем повтори проверку.');
+    }
+    return projectId;
+  }
+
+  async function serverIdentitySet(table, column, projectScoped, resolvedProjectId) {
     const client = window.LIV_SUPABASE;
-    const projectId = window.LIV_NORMALIZED_SYNC?.projectId?.() || '';
+    const projectId = projectScoped ? (resolvedProjectId || await projectContext()) : null;
     const values = new Set();
     let from = 0;
     const pageSize = 1000;
@@ -137,6 +148,13 @@
     const current = currentProject();
     if (!current || !window.LIV_SUPABASE) {
       return [result('Сверка ID', false, 'Проект или Supabase не загружен')];
+    }
+
+    let projectId;
+    try {
+      projectId = await projectContext();
+    } catch (error) {
+      return [result('Подключение проекта · сверка ID', false, error?.message || error)];
     }
 
     const active = list => (list || []).filter(item => item && item.active !== false);
@@ -174,7 +192,7 @@
 
       let serverSet;
       try {
-        serverSet = await serverIdentitySet(table, column, scoped);
+        serverSet = await serverIdentitySet(table, column, scoped, projectId);
       } catch (error) {
         checks.push(result('ID · ' + table, false, error?.message || error));
         continue;
