@@ -1,7 +1,7 @@
 'use strict';
 
 (function () {
-  const VERSION = '2026.10.14.2';
+  const VERSION = '2026.10.14.3';
   const state = {
     running: false,
     last: null
@@ -92,6 +92,112 @@
     ];
   }
 
+  function currentProject() {
+    try {
+      return typeof project !== 'undefined' ? project : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async function serverIdentitySet(table, column, projectScoped) {
+    const client = window.LIV_SUPABASE;
+    const projectId = window.LIV_NORMALIZED_SYNC?.projectId?.() || '';
+    const values = new Set();
+    let from = 0;
+    const pageSize = 1000;
+
+    while (true) {
+      let query = client
+        .from(table)
+        .select(column)
+        .range(from, from + pageSize - 1);
+
+      if (projectScoped) {
+        query = query.eq('project_id', projectId);
+      }
+
+      const response = await query;
+      if (response.error) throw response.error;
+
+      const rows = response.data || [];
+      rows.forEach(row => {
+        const value = String(row[column] || '');
+        if (value) values.add(value);
+      });
+
+      if (rows.length < pageSize) break;
+      from += pageSize;
+    }
+
+    return values;
+  }
+
+  async function identityChecks() {
+    const current = currentProject();
+    if (!current || !window.LIV_SUPABASE) {
+      return [result('Сверка ID', false, 'Проект или Supabase не загружен')];
+    }
+
+    const active = list => (list || []).filter(item => item && item.active !== false);
+
+    const specs = [
+      ['buildings', active(current.buildings), 'external_id', true, item => item.id],
+      ['organizations', active(current.organizations), 'external_id', false, item => item.id],
+      ['works', active(current.works), 'external_id', false, item => item.id],
+      ['contracts', active(current.contracts), 'external_id', true, item => item.id],
+      ['structures', active(current.structures), 'external_id', true, item => item.id],
+      ['fronts', active(current.fronts), 'external_id', true, item => item.id],
+      ['matrices', active(current.matrices), 'external_id', true, item => item.id],
+      ['milestones', active(current.milestones), 'external_id', true, item => item.id],
+      ['numbered_elements', active(current.numberedElements), 'external_id', true, item => item.id],
+      ['schedule_versions', current.scheduleVersions || [], 'external_id', true, item => item.id],
+      ['schedule_tasks', (current.tasks || []).filter(item => item && item.active !== false && item.testOnly !== true), 'external_id', true, item => item.id],
+      ['network_segments', active(current.networkSegments), 'external_id', true, item => item.id],
+      ['report_snapshots', current.reportSnapshots || [], 'external_id', true, item => item.id],
+      ['resource_log', current.resources || [], 'external_id', true, item => item.id],
+      ['schemes', active(current.schemes), 'external_id', true, item => item.id],
+      ['scheme_marks', active(current.schemeMarks), 'external_id', true, item => item.id],
+      ['progress_facts', current.progressFacts || [], 'source_fingerprint', true, item => item.sourceFingerprint || (item.id ? 'progress:' + item.id : '')]
+    ];
+
+    const checks = [];
+
+    for (const [table, items, column, scoped, getId] of specs) {
+      const localRaw = items
+        .map(getId)
+        .map(value => String(value || ''))
+        .filter(Boolean);
+
+      const localSet = new Set(localRaw);
+      const duplicates = Math.max(0, localRaw.length - localSet.size);
+
+      let serverSet;
+      try {
+        serverSet = await serverIdentitySet(table, column, scoped);
+      } catch (error) {
+        checks.push(result('ID · ' + table, false, error?.message || error));
+        continue;
+      }
+
+      const missing = [...localSet].filter(id => !serverSet.has(id));
+      const extra = [...serverSet].filter(id => !localSet.has(id));
+
+      checks.push(result(
+        'ID · ' + table,
+        missing.length === 0 && duplicates === 0,
+        'локально ' + localSet.size +
+        ' · сервер ' + serverSet.size +
+        ' · отсутствует ' + missing.length +
+        ' · дублей локально ' + duplicates +
+        (['organizations','works'].includes(table) ? '' : ' · лишних ' + extra.length)
+      ));
+    }
+
+    return checks;
+  }
+
+
   async function migrationChecks() {
     if (!window.LIV_NORMALIZED_SYNC?.verifyMigration) {
       return [result('Сверка миграции', false, 'Модуль не загружен')];
@@ -136,6 +242,10 @@
     checks.push(...moduleChecks());
     checks.push(await storageCheck());
     checks.push(...await migrationChecks());
+
+    if (showDialog) {
+      checks.push(...await identityChecks());
+    }
 
     const failed = checks.filter(item => !item.ok);
     state.last = {
