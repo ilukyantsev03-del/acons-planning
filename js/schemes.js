@@ -7,7 +7,7 @@
   const WRITERS = new Set(['admin', 'planner']);
   const STATUSES = ['Не начато','В работе','Выполнено','Освидетельствовано','Принято','Ограничение'];
   const DONE = new Set(['Выполнено','Освидетельствовано','Принято']);
-  const state = { schemeId:'', pdf:null, page:1, zoom:1, draw:false, tool:'area', ink:{color:'#2563eb',width:3,fill:0}, selected:'', dirty:new Map(), saving:false, start:null, draft:null, filter:'all', cache:new Map(), pending:null, linksRunning:false };
+  const state = { schemeId:'', pdf:null, page:1, zoom:1, draw:false, tool:'area', ink:{color:'#2563eb',width:3,fill:0}, selected:'', designation:'', undo:[], redo:[], deleting:new Set(), dirty:new Map(), saving:false, start:null, draft:null, filter:'all', cache:new Map(), pending:null, linksRunning:false };
 
   const $s = id => document.getElementById(id);
   const p = () => { try { return project || null; } catch (_) { return null; } };
@@ -107,13 +107,13 @@
     const nav=document.querySelector('.tabs'), main=document.querySelector('main.container'); if(!nav||!main)return;
     const tab=document.createElement('button'); tab.className='tab'; tab.dataset.tab='schemes'; tab.textContent='Схемы'; nav.insertBefore(tab,nav.querySelector('[data-tab="import"]'));
     const panel=document.createElement('section'); panel.id='tab-schemes'; panel.className='panel hidden'; panel.innerHTML=`
-      <section class="sch-head"><div><h1>Схемы</h1><p>PDF-схемы и визуальная фиксация выполнения</p></div><div class="sch-group no-print"><button id="schUpload" class="btn primary sch-write">+ Загрузить PDF</button><input id="schFile" type="file" accept="application/pdf,.pdf" hidden><button id="schDownload" class="btn" disabled>Скачать PDF</button><button id="schDelete" class="btn danger-lite sch-write" disabled>Удалить схему</button></div></section>
+      <section class="sch-head"><div><h1>Схемы</h1><p>PDF, изображения и визуальные обозначения</p></div><div class="sch-group no-print"><button id="schUpload" class="btn primary sch-write">+ Загрузить схему</button><input id="schFile" type="file" accept="application/pdf,image/png,image/jpeg,.pdf,.png,.jpg,.jpeg" hidden><button id="schDownload" class="btn" disabled>Скачать исходник</button><button id="schDelete" class="btn danger-lite sch-write" disabled>Удалить схему</button></div></section>
       <section class="sch-stats"><div class="sch-stat"><span>Отметок</span><strong id="schTotal">0</strong></div><div class="sch-stat"><span>В работе</span><strong id="schWork">0</strong></div><div class="sch-stat"><span>Выполнено</span><strong id="schDone">0</strong></div><div class="sch-stat"><span>Средняя готовность</span><strong id="schProgress">0%</strong></div></section>
       <section class="sch-layout"><aside class="card sch-side no-print"><h2>Загруженные схемы <span id="schCount" class="badge">0</span></h2><input id="schSearch" class="sch-search" type="search" placeholder="Поиск по схемам..."><div id="schList" class="sch-list"></div></aside>
       <section class="card sch-view"><div class="sch-toolbar no-print"><div class="sch-group"><button id="schPrev" class="btn" disabled>‹</button><span id="schPage" class="sch-page">Страница —</span><button id="schNext" class="btn" disabled>›</button><button id="schMinus" class="btn" disabled>−</button><button id="schFit" class="btn" disabled>По ширине</button><button id="schPlus" class="btn" disabled>+</button></div><div class="sch-group"><select id="schFilter" class="sch-filter"><option value="all">Все статусы</option>${STATUSES.map(x=>`<option>${x}</option>`).join('')}</select><select id="schTool" class="sch-filter sch-write" aria-label="Форма отметки"><option value="area">Прямоугольник</option><option value="line">Линия</option><option value="point">Точка</option><option value="circle">Круг</option></select><button id="schDraw" class="btn primary sch-write" disabled>Отметить участок</button></div></div>
-      <div class="sch-toolbar sch-tools no-print sch-write"><div class="sch-group"><label>Цвет <select id="schColorMode" class="sch-filter"><option value="custom">Свой</option><option value="status">По статусу</option></select><input id="schColor" type="color" value="#2563eb" aria-label="Цвет линии"></label><label>Толщина <input id="schWidth" class="sch-filter" type="number" min="1" max="20" value="3"> пкс</label><label>Заливка <select id="schFill" class="sch-filter"><option value="0">Нет</option><option value="0.15">15%</option><option value="0.3">30%</option><option value="0.5">50%</option></select></label></div><div class="sch-group"><button id="schDetails" class="btn" disabled>Данные отметки</button><button id="schRemoveMark" class="btn danger-lite" disabled>Удалить отметку</button><button id="schSaveDrawings" class="btn primary" disabled>Сохранить рисунки</button></div></div><div id="schHint" class="sch-hint" role="status" aria-live="polite">Выбери форму и рисуй. Карточка открывается отдельно — кнопкой «Данные отметки».</div>
-      <div id="schScroll" class="sch-scroll"><div id="schEmpty" class="sch-empty"><strong>Выбери или загрузи PDF-схему</strong><span>После загрузки можно выделять участки и отмечать выполнение.</span></div><div id="schStage" class="sch-stage hidden"><canvas id="schCanvas"></canvas><div id="schOverlay" class="sch-overlay"></div></div><div id="schLoading" class="sch-load hidden">Загрузка схемы...</div></div>
-      <div class="sch-legend"><span class="sch-idle"><i class="sch-dot"></i>Не начато</span><span class="sch-work"><i class="sch-dot"></i>В работе</span><span class="sch-done"><i class="sch-dot"></i>Выполнено</span><span class="sch-risk"><i class="sch-dot"></i>Ограничение</span></div></section></section>`;
+      <div class="sch-toolbar sch-tools no-print sch-write"><div class="sch-group"><label>Обозначение <input id="schDesignation" class="sch-filter" maxlength="120" placeholder="Например: монтаж выполнен"></label><select id="schSymbols" class="sch-filter" aria-label="Использовать обозначение"><option value="">Из легенды…</option></select><button id="schUndo" class="btn" disabled>Отменить</button><button id="schRedo" class="btn" disabled>Повторить</button></div><div class="sch-group"><label>Цвет <select id="schColorMode" class="sch-filter"><option value="custom">Свой</option><option value="status">По статусу</option></select><input id="schColor" type="color" value="#2563eb" aria-label="Цвет линии"></label><label>Толщина <input id="schWidth" class="sch-filter" type="number" min="1" max="20" value="3"> пкс</label><label>Заливка <select id="schFill" class="sch-filter"><option value="0">Нет</option><option value="0.15">15%</option><option value="0.3">30%</option><option value="0.5">50%</option><option value="1">Сплошная</option></select></label></div><div class="sch-group"><button id="schDetails" class="btn" disabled>Данные отметки</button><button id="schRemoveMark" class="btn danger-lite" disabled>Удалить отметку</button><button id="schSaveDrawings" class="btn primary" disabled>Сохранить рисунки</button></div></div><div id="schHint" class="sch-hint" role="status" aria-live="polite">Выбери форму и рисуй. Карточка открывается отдельно — кнопкой «Данные отметки».</div>
+      <div id="schScroll" class="sch-scroll"><div id="schEmpty" class="sch-empty"><strong>Выбери или загрузи PDF / изображение</strong><span>После загрузки можно выделять участки и отмечать выполнение.</span></div><div id="schStage" class="sch-stage hidden"><canvas id="schCanvas"></canvas><div id="schOverlay" class="sch-overlay"></div></div><div id="schLoading" class="sch-load hidden">Загрузка схемы...</div></div>
+      <div id="schLegend" class="sch-legend"></div></section></section>`;
     main.insertBefore(panel,$s('tab-import'));
     tab.onclick=()=>{ typeof switchTab==='function'?switchTab('schemes'):(document.querySelectorAll('main>.panel').forEach(x=>x.classList.add('hidden')),panel.classList.remove('hidden')); render(); };
   }
@@ -129,6 +129,27 @@
     ['schColorMode','schColor','schWidth','schFill'].forEach(id=>$s(id).onchange=changeInk);
     $s('schDetails').onclick=()=>{if(state.selected&&!state.saving)openMark(state.selected);};
     $s('schRemoveMark').onclick=removeSelected;
+    $s('schUndo').onclick=()=>historyStep(false);$s('schRedo').onclick=()=>historyStep(true);
+    $s('schDesignation').onchange=()=>{
+      const label=$s('schDesignation').value.trim();
+      if(state.selected&&!state.draw){const x=mark(state.selected);if(x)editMark({...x,designation:label,updatedAt:now()});}
+      else state.designation=label;
+      renderMarks();toolbar();
+    };
+    $s('schSymbols').onchange=e=>{
+      const x=visibleMarks().find(x=>String(x.id)===e.target.value);if(!x)return;
+      state.designation=x.designation||x.title||x.status||'Отметка';state.ink=appearance(x);state.tool=x.markType||'area';
+      state.selected='';state.draw=true;$s('schTool').value=state.tool;renderMarks();toolbar();
+    };
+    document.addEventListener('paste',e=>{
+      if(!canWrite()||$s('tab-schemes')?.classList.contains('hidden')||e.target?.closest?.('input,textarea,[contenteditable=true]'))return;
+      const item=[...(e.clipboardData?.items||[])].find(x=>['image/png','image/jpeg'].includes(x.type));
+      if(item){e.preventDefault();const file=item.getAsFile();if(file)openUpload(file);}
+    });
+    document.addEventListener('keydown',e=>{
+      if($s('tab-schemes')?.classList.contains('hidden')||e.target?.closest?.('input,textarea,select,[contenteditable=true]'))return;
+      if((e.ctrlKey||e.metaKey)&&(['KeyZ','KeyY'].includes(e.code)||['z','y'].includes(e.key.toLowerCase()))){e.preventDefault();historyStep(e.code==='KeyY'||e.key.toLowerCase()==='y'||e.shiftKey);}
+    });
     $s('schSaveDrawings').onclick=saveDrawings;
     window.addEventListener('beforeunload',e=>{if(state.dirty.size){e.preventDefault();e.returnValue='';}});
     document.addEventListener('keydown',e=>{if(e.key==='Escape'&&state.draw){cancelDraw();state.draw=false;toolbar();}});
@@ -137,7 +158,7 @@
 
   function renderList() {
     if(!ensure())return; const q=String($s('schSearch')?.value||'').toLowerCase().trim(); const rows=schemes().filter(x=>!q||String(x.name||'').toLowerCase().includes(q)||String(x.fileName||'').toLowerCase().includes(q)); $s('schCount').textContent=schemes().length;
-    $s('schList').innerHTML=rows.length?rows.map(x=>{const m=marks(x.id);return `<button class="sch-item ${String(x.id)===String(state.schemeId)?'active':''}" data-id="${html(x.id)}"><strong>${html(x.name||x.fileName)}</strong><span class="sch-meta"><span>${x.pageCount||'—'} стр.</span><span>${m.length} отметок</span><span>${m.filter(y=>DONE.has(y.status)).length} выполнено</span>${x.revision?`<span>Ред. ${html(x.revision)}</span>`:''}</span></button>`;}).join(''):'<div class="muted" style="padding:18px 5px;text-align:center">PDF-схемы пока не загружены.</div>';
+    $s('schList').innerHTML=rows.length?rows.map(x=>{const m=marks(x.id);return `<button class="sch-item ${String(x.id)===String(state.schemeId)?'active':''}" data-id="${html(x.id)}"><strong>${html(x.name||x.fileName)}</strong><span class="sch-meta"><span>${x.pageCount||'—'} стр.</span><span>${m.length} отметок</span><span>${m.filter(y=>DONE.has(y.status)).length} выполнено</span>${x.revision?`<span>Ред. ${html(x.revision)}</span>`:''}</span></button>`;}).join(''):'<div class="muted" style="padding:18px 5px;text-align:center">Схемы пока не загружены. Можно загрузить PDF, PNG, JPG или вставить скриншот через Ctrl+V.</div>';
     $s('schList').querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>select(b.dataset.id));
   }
 
@@ -158,20 +179,22 @@
   function toolbar() {
     const item=scheme(state.schemeId), pages=state.pdf?.numPages||item?.pageCount||0, has=!!state.pdf;
     $s('schDownload').disabled=!item; $s('schDelete').disabled=!item||!canWrite(); $s('schPrev').disabled=!has||state.page<=1; $s('schNext').disabled=!has||state.page>=pages; $s('schMinus').disabled=!has||state.zoom<=.4; $s('schPlus').disabled=!has||state.zoom>=3; $s('schFit').disabled=!has; $s('schDraw').disabled=!has||!canWrite(); $s('schDraw').textContent=state.draw?'Завершить рисование':'Рисовать'; $s('schOverlay')?.classList.toggle('draw',state.draw); $s('schPage').textContent=has?`Страница ${state.page} / ${pages}`:'Страница —';
-    ['schTool','schDraw','schColorMode','schColor','schWidth','schFill'].forEach(id=>{$s(id).disabled=!has||!canWrite()||state.saving;});
+    ['schTool','schDraw','schColorMode','schColor','schWidth','schFill','schDesignation','schSymbols'].forEach(id=>{$s(id).disabled=!has||!canWrite()||state.saving;});
     $s('schDetails').disabled=$s('schRemoveMark').disabled=!state.selected||state.draw||state.saving||!canWrite();
     $s('schSaveDrawings').disabled=!state.dirty.size||state.saving||!canWrite();
     $s('schSaveDrawings').textContent=state.saving?'Сохранение…':`Сохранить рисунки${state.dirty.size?' ('+state.dirty.size+')':''}`;
     const ink=state.selected&&!state.draw?appearance(mark(state.selected)):state.ink;
     $s('schColorMode').value=ink.color?'custom':'status';$s('schColor').value=ink.color||'#2563eb';
     $s('schColor').disabled=$s('schColor').disabled||!ink.color;
+    $s('schDesignation').value=state.selected&&!state.draw?(mark(state.selected)?.designation||''):state.designation;
+    $s('schUndo').disabled=historyIndex(state.undo)<0||state.saving||!canWrite();$s('schRedo').disabled=historyIndex(state.redo)<0||state.saving||!canWrite();
     $s('schWidth').value=ink.width;$s('schFill').value=String(ink.fill);
     $s('schHint').textContent=state.saving?'Сохраняем отметки…':state.dirty.size?`Есть несохранённые изменения: ${state.dirty.size}. Нажми «Сохранить рисунки».`:state.draw?'Рисуй несколько фигур подряд. Esc или «Завершить рисование» — перейти к выбору отметок.':'Щелчок выбирает отметку; «Данные отметки» или двойной щелчок открывает карточку.';
 
   }
 
-  async function select(id) { state.selected='';state.schemeId=id; state.page=1; state.zoom=1; state.draw=false; state.filter='all'; $s('schFilter').value='all'; renderList(); stats(); await loadPdf(); }
-  function clear() { state.schemeId='';state.pdf=null;state.page=1;state.zoom=1;state.draw=false;cancelDraw();$s('schStage').classList.add('hidden');$s('schEmpty').classList.remove('hidden');$s('schOverlay').innerHTML='';render(); }
+  async function select(id) { state.selected='';state.pdf=null;state.schemeId=id; state.page=1; state.zoom=1; state.draw=false; state.filter='all'; $s('schFilter').value='all'; renderList(); stats(); await loadPdf(); }
+  function clear() { state.schemeId='';state.pdf=null;state.page=1;state.zoom=1;state.draw=false;cancelDraw();$s('schStage').classList.add('hidden');$s('schEmpty').classList.remove('hidden');$s('schOverlay').innerHTML='';renderLegend();render(); }
   function loading(on,text='Загрузка схемы...'){const x=$s('schLoading');x.textContent=text;x.classList.toggle('hidden',!on);}
 
   async function pdfjs() {
@@ -221,13 +244,26 @@
     return window.LIV_PDFJS_PROMISE;
   }
 
-  async function loadPdf() {
-    const item=scheme(state.schemeId); if(!item)return clear(); loading(true);
-    try { let doc=state.cache.get(item.id); if(!doc){const client=window.LIV_SUPABASE;if(!client)throw new Error('Нет подключения к Supabase');const d=await client.storage.from(BUCKET).download(item.storagePath);if(d.error)throw d.error;const lib=await pdfjs();doc=await lib.getDocument({data:new Uint8Array(await d.data.arrayBuffer())}).promise;await rememberPdf(item.id,doc);} if(state.schemeId!==item.id)return;state.pdf=doc;if(item.pageCount!==doc.numPages){item.pageCount=doc.numPages;if(canWrite()){item.updatedAt=now();await syncScheme(item);await saveProject();}}await renderPage(); }
-    catch(error){console.error(error);state.pdf=null;$s('schStage').classList.add('hidden');$s('schEmpty').classList.remove('hidden');$s('schEmpty').innerHTML=`<strong>Не удалось открыть PDF</strong><span>${html(error.message||error)}</span>`;} finally{loading(false);toolbar();renderList();}
+  async function imageDocument(blob) {
+    const url=URL.createObjectURL(blob),img=new Image();
+    try{img.src=url;await img.decode();}finally{URL.revokeObjectURL(url);}
+    if(img.naturalWidth*img.naturalHeight>40000000)throw new Error('Изображение слишком большое. Уменьши его до 40 мегапикселей.');
+    if(!img.naturalWidth||!img.naturalHeight)throw new Error('Изображение пустое или повреждено');
+    return {numPages:1,destroy(){img.src='';},async getPage(){return {
+      getViewport({scale}){return {width:img.naturalWidth*scale,height:img.naturalHeight*scale};},
+      render({canvasContext:ctx,viewport,transform}){ctx.save();if(transform)ctx.transform(...transform);ctx.drawImage(img,0,0,viewport.width,viewport.height);ctx.restore();return {promise:Promise.resolve()};}
+    };}};
   }
 
-  async function renderPage() {
+  async function loadPdf() {
+    const item=scheme(state.schemeId); if(!item)return clear(); loading(true);
+    try { let doc=state.cache.get(item.id); if(!doc){const client=window.LIV_SUPABASE;if(!client)throw new Error('Нет подключения к Supabase');const d=await client.storage.from(BUCKET).download(item.storagePath);if(d.error)throw d.error;if((item.mimeType||'').startsWith('image/'))doc=await imageDocument(d.data);else {const lib=await pdfjs();doc=await lib.getDocument({data:new Uint8Array(await d.data.arrayBuffer())}).promise;}await rememberPdf(item.id,doc);} if(state.schemeId!==item.id)return;state.pdf=doc;if(item.pageCount!==doc.numPages){item.pageCount=doc.numPages;if(canWrite()){item.updatedAt=now();await syncScheme(item);await saveProject();}}await renderPage(); }
+    catch(error){console.error(error);state.pdf=null;$s('schStage').classList.add('hidden');$s('schEmpty').classList.remove('hidden');$s('schEmpty').innerHTML=`<strong>Не удалось открыть схему</strong><span>${html(error.message||error)}</span>`;} finally{loading(false);toolbar();renderList();}
+  }
+
+  let pageRender=Promise.resolve(),renderRequest=0;
+  function renderPage(){const request=++renderRequest;const task=pageRender.catch(()=>{}).then(()=>request===renderRequest?renderPageNow():undefined);pageRender=task;return task;}
+  async function renderPageNow() {
     if(!state.pdf)return;loading(true,'Отрисовка страницы...');try{const page=await state.pdf.getPage(state.page),scroll=$s('schScroll'),canvas=$s('schCanvas'),stage=$s('schStage'),over=$s('schOverlay'),base=page.getViewport({scale:1}),scale=(Math.max(320,scroll.clientWidth-42)/base.width)*state.zoom,view=page.getViewport({scale}),ratio=Math.min(devicePixelRatio||1,2),ctx=canvas.getContext('2d');canvas.width=Math.floor(view.width*ratio);canvas.height=Math.floor(view.height*ratio);canvas.style.width=`${Math.floor(view.width)}px`;canvas.style.height=`${Math.floor(view.height)}px`;stage.style.width=over.style.width=canvas.style.width;stage.style.height=over.style.height=canvas.style.height;ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,canvas.width,canvas.height);await page.render({canvasContext:ctx,viewport:view,transform:ratio===1?null:[ratio,0,0,ratio,0,0]}).promise;$s('schEmpty').classList.add('hidden');stage.classList.remove('hidden');renderMarks();}catch(error){alert('Не удалось отрисовать страницу: '+(error.message||error));}finally{loading(false);toolbar();}
   }
 
@@ -242,13 +278,51 @@
     visibleMarks().filter(x=>state.filter==='all'||x.status===state.filter).forEach(x=>{
       const b=document.createElement('button');b.type='button';b.dataset.markId=x.id;
       b.className=`sch-mark ${markClass(x.status)}${state.selected===x.id?' selected':''}`;
-      paintShape(b,x);b.title=(x.title||x.status||'Отметка')+(state.dirty.has(String(x.id))?' · не сохранено':'');
+      paintShape(b,x);b.title=([x.designation,x.title].filter(Boolean).join(' · ')||x.status||'Отметка')+(state.dirty.has(String(x.id))?' · не сохранено':'');
       if(x.title)b.innerHTML+=`<span>${html(x.title)}</span>`;
       b.onpointerdown=e=>e.stopPropagation();
       b.onclick=e=>{e.stopPropagation();if(state.draw||state.saving)return;state.selected=x.id;over.querySelectorAll('.sch-mark').forEach(n=>n.classList.toggle('selected',n.dataset.markId===x.id));toolbar();};
       b.ondblclick=e=>{e.stopPropagation();if(!state.draw&&!state.saving)openMark(x.id);};
       over.appendChild(b);
     });
+    renderLegend();
+  }
+  const copy=x=>x?JSON.parse(JSON.stringify(x)):null;
+  function editMark(next) {
+    const before=copy(mark(next.id));
+    state.undo.push({id:String(next.id),before,after:copy(next)});if(state.undo.length>100)state.undo.shift();state.redo=[];
+    state.dirty.set(String(next.id),next);
+  }
+  function historyIndex(list){for(let i=list.length-1;i>=0;i--){const x=list[i].after||list[i].before;if(x?.schemeId===state.schemeId&&Number(x.pageNo||1)===state.page)return i;}return -1;}
+  function historyStep(redo=false) {
+    if(state.saving||!canWrite())return;
+    const from=redo?state.redo:state.undo,to=redo?state.undo:state.redo,index=historyIndex(from);if(index<0)return;const [entry]=from.splice(index,1);
+    const current=mark(entry.id),target=copy(redo?entry.after:entry.before);
+    if(target){
+      // History restores drawing data, never a stale optimistic-lock version.
+      if(current?.serverId){target.serverId=current.serverId;target.serverVersion=current.serverVersion;}
+      target.updatedAt=now();state.dirty.set(entry.id,target);
+    }else if(current?.serverId){state.dirty.set(entry.id,{...current,active:false,updatedAt:now()});}
+    else state.dirty.delete(entry.id);
+    to.push(entry);state.selected='';renderMarks();toolbar();
+  }
+  const markColor=x=>appearance(x).color||({'В работе':'#d2860b','Ограничение':'#c23a3a'}[x.status]||(DONE.has(x.status)?'#16825d':'#667085'));
+  function legendEntries(rows) {
+    const entries=new Map();
+    for(const x of rows){const label=x.designation||x.title||x.status||'Без обозначения',ink=appearance(x),color=markColor(x),shape=x.markType||'area';
+      const key=JSON.stringify([label,color,shape,ink.width,ink.fill]);
+      if(entries.has(key))entries.get(key).count++;else entries.set(key,{id:x.id,label,shape,...ink,color,count:1});
+    }
+    return [...entries.values()];
+  }
+  function renderLegend() {
+    const entries=legendEntries(visibleMarks().filter(x=>state.filter==='all'||x.status===state.filter));
+    $s('schLegend').innerHTML=entries.length?entries.map(x=>{
+      const line=x.shape==='line',point=x.shape==='point',round=point||x.shape==='circle';
+      const fill=point?x.color:x.fill?x.color+Math.round(x.fill*255).toString(16).padStart(2,'0'):'transparent';
+      return `<span style="display:inline-flex;align-items:center;gap:6px"><i style="display:inline-block;box-sizing:border-box;width:24px;height:${line?0:16}px;border:${x.width}px solid ${x.color};${line?'border-width:'+x.width+'px 0 0;':''}border-radius:${round?'50%':'2px'};background:${fill}"></i>${html(x.label)} (${x.count})</span>`;
+    }).join(''):'На этой странице пока нет обозначений.';
+    $s('schSymbols').innerHTML='<option value="">Из легенды…</option>'+legendEntries(visibleMarks()).map(x=>`<option value="${html(x.id)}">${html(x.label)}</option>`).join('');
   }
   function appearance(x) {
     const value=x?.appearance||{};
@@ -257,13 +331,13 @@
   function changeInk() {
     if(!canWrite()||state.saving)return;
     const ink={color:$s('schColorMode').value==='status'?null:$s('schColor').value,width:clamp($s('schWidth').value,1,20),fill:clamp($s('schFill').value)};
-    if(state.selected&&!state.draw){const x=mark(state.selected);if(x)state.dirty.set(String(x.id),{...x,appearance:ink,updatedAt:now()});}
+    if(state.selected&&!state.draw){const x=mark(state.selected);if(x)editMark({...x,appearance:ink,updatedAt:now()});}
     else state.ink=ink;
     renderMarks();toolbar();
   }
   function stageDrawing(g) {
-    const t=now();const x={id:makeId('SMK'),schemeId:state.schemeId,pageNo:state.page,...g,appearance:{...state.ink},status:'Не начато',progressPercent:null,active:true,createdAt:t,updatedAt:t};
-    state.dirty.set(String(x.id),x);return x;
+    const t=now();const x={id:makeId('SMK'),schemeId:state.schemeId,pageNo:state.page,...g,designation:state.designation,appearance:{...state.ink},status:'Не начато',progressPercent:null,active:true,createdAt:t,updatedAt:t};
+    editMark(x);return x;
   }
   async function saveDrawings() {
     if(state.saving||!canWrite()||!state.dirty.size)return;
@@ -271,6 +345,7 @@
     let error=null;
     try{
       for(const [id,x] of [...state.dirty]){
+        if(x.active===false&&!x.serverId){state.dirty.delete(id);continue;}
         await syncMark(x);
         const list=p().schemeMarks,index=list.findIndex(item=>String(item.id)===id);
         if(index<0)list.push(x);else list[index]=x;
@@ -285,8 +360,7 @@
   async function removeSelected() {
     if(state.saving||!canWrite())return;
     const x=mark(state.selected);if(!x)return;
-    if(!x.serverId&&state.dirty.has(String(x.id))){state.dirty.delete(String(x.id));state.selected='';renderMarks();toolbar();return;}
-    await deleteMark(x);
+    editMark({...x,active:false,updatedAt:now()});state.selected='';renderMarks();toolbar();
   }
 
   function point(e){const r=$s('schOverlay').getBoundingClientRect();return{x:clamp((e.clientX-r.left)/r.width),y:clamp((e.clientY-r.top)/r.height)};}
@@ -298,7 +372,7 @@
     return {x,y,width,height,markType:type,lineReverse:(end.x-start.x)*(end.y-start.y)<0};
   }
   function paintShape(node,g) {
-    const ink=appearance(g);const color=ink.color||({'В работе':'#d2860b','Ограничение':'#c23a3a'}[g.status]||(DONE.has(g.status)?'#16825d':'#667085'));
+    const ink=appearance(g);const color=markColor(g);
     Object.assign(node.style,{color,borderColor:color,borderWidth:`${ink.width}px`,borderStyle:'solid',background:ink.fill?color+Math.round(ink.fill*255).toString(16).padStart(2,'0'):'transparent'});
     Object.assign(node.style,{left:`${g.x*100}%`,top:`${g.y*100}%`,width:`${Math.max(g.width,.001)*100}%`,height:`${Math.max(g.height,.001)*100}%`,minWidth:'0',minHeight:'0'});
     if(g.markType==='circle'||g.markType==='point')node.style.borderRadius='50%';
@@ -309,7 +383,7 @@
     }
     if(g.markType==='point'||g.markType==='line')node.classList.add('sch-no-label');
   }
-  function startDraw(e){if(state.saving||!state.draw||!canWrite()||e.button!==0||e.target!==$s('schOverlay'))return;e.preventDefault();state.start=point(e);state.draft=document.createElement('div');state.draft.className='sch-draft';$s('schOverlay').appendChild(state.draft);$s('schOverlay').setPointerCapture?.(e.pointerId);moveDraw(e);}
+  function startDraw(e){if(state.saving||!state.draw||!canWrite()||e.button!==0||e.target!==$s('schOverlay'))return;if(!state.designation.trim()){$s('schHint').textContent='Укажи обозначение рисунка — оно появится в легенде.';$s('schDesignation').focus();return;}e.preventDefault();state.start=point(e);state.draft=document.createElement('div');state.draft.className='sch-draft';$s('schOverlay').appendChild(state.draft);$s('schOverlay').setPointerCapture?.(e.pointerId);moveDraw(e);}
   function moveDraw(e){if(!state.start||!state.draft)return;paintShape(state.draft,{...geometry(state.start,point(e),state.tool,$s('schOverlay').getBoundingClientRect()),appearance:state.ink});}
   function endDraw(e){if(!state.start)return;const g=geometry(state.start,point(e),state.tool,$s('schOverlay').getBoundingClientRect());cancelDraw();stageDrawing(g);state.filter='all';$s('schFilter').value='all';renderMarks();toolbar();}
   function cancelDraw(){state.start=null;state.draft?.remove();state.draft=null;}
@@ -342,7 +416,7 @@
       await syncMark(x);
       synced=true;
       if(typeof log==='function')log(existing?'Изменено':'Создано','Отметка на схеме',x.title||'Участок',{schemeId:x.schemeId,markId:x.id,status:x.status,progress:x.progressPercent});
-      if(!current.schemeMarks.some(item=>item.id===x.id))current.schemeMarks.push(x);
+      const index=current.schemeMarks.findIndex(item=>item.id===x.id);if(index<0)current.schemeMarks.push(x);else current.schemeMarks[index]=x;
       await saveProject();state.dirty.delete(String(x.id));closeModal();renderMarks();stats();renderList();toolbar();
     }catch(error){
       if(!synced&&!previous)current.schemeMarks=current.schemeMarks.filter(item=>item!==x);
@@ -351,16 +425,24 @@
     }finally{button.disabled=false;}
   }
 
-  async function deleteMark(x){if(!x||!confirm('Удалить отметку со схемы?'))return;const previous={...x};let synced=false;x.active=false;x.updatedAt=x.deletedAt=now();try{await syncMark(x);synced=true;const stored=p().schemeMarks.find(item=>item.id===x.id);if(stored)Object.assign(stored,x);await saveProject();state.dirty.delete(String(x.id));state.selected='';closeModal();renderMarks();stats();renderList();toolbar();}catch(error){if(!synced){Object.keys(x).forEach(key=>{if(!(key in previous))delete x[key];});Object.assign(x,previous);}alert('Не удалось удалить отметку: '+(error.message||error));}}
+  async function deleteMark(x){if(!x||!canWrite()||state.saving)return;editMark({...x,active:false,updatedAt:now()});state.selected='';closeModal();renderMarks();toolbar();}
   async function page(d){if(!state.pdf)return;const n=Math.min(state.pdf.numPages,Math.max(1,state.page+d));if(n!==state.page){state.page=n;await renderPage();}}
   function zoom(d){if(!state.pdf)return;state.zoom=clamp(state.zoom+d,.4,3);renderPage();}
 
+  function fileKind(file){
+    const types={'application/pdf':'pdf','image/png':'png','image/jpeg':'jpg'};
+    if(types[file.type])return {mime:file.type,ext:types[file.type]};
+    if(file.type)return null;
+    const ext=String(file.name||'').split('.').pop().toLowerCase();
+    const mime={pdf:'application/pdf',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg'}[ext];
+    return mime?{mime,ext:types[mime]}:null;
+  }
   function openUpload(file) {
-    if(!canWrite())return;if(file.type!=='application/pdf'&&!file.name.toLowerCase().endsWith('.pdf'))return alert('Можно загрузить только PDF.');if(file.size>100*1024*1024)return alert('PDF превышает 100 МБ.');state.pending=file;const current=p(),name=file.name.replace(/\.pdf$/i,'');openModal('Загрузка PDF-схемы',`<div class="form-grid"><div class="field"><label>Название</label><input id="suName" value="${html(name)}"></div><div class="field"><label>Редакция</label><input id="suRevision" placeholder="Р1"></div><div class="field"><label>Здание</label><select id="suBuilding">${options(current.buildings,'')}</select></div><div class="field"><label>Шахматка</label><select id="suMatrix">${options(current.matrices,'')}</select></div></div><div class="sch-note">Файл: <b>${html(file.name)}</b><br>Размер: ${(file.size/1024/1024).toFixed(1)} МБ.<br>Отметки сохраняются отдельно от PDF и не съезжают при масштабировании.</div><div class="liv-editor-footer"><button id="suCancel" class="btn">Отмена</button><button id="suSave" class="btn primary">Загрузить</button></div>`);$s('suCancel').onclick=()=>{state.pending=null;closeModal();};$s('suSave').onclick=upload;
+    if(!canWrite())return;if(!fileKind(file))return alert('Выбери PDF, PNG или JPG.');if(file.size>100*1024*1024)return alert('Файл превышает 100 МБ.');state.pending=file;const current=p(),name=file.name.replace(/\.(pdf|png|jpe?g)$/i,'');openModal('Загрузка схемы',`<div class="form-grid"><div class="field"><label>Название</label><input id="suName" value="${html(name)}"></div><div class="field"><label>Редакция</label><input id="suRevision" placeholder="Р1"></div><div class="field"><label>Здание</label><select id="suBuilding">${options(current.buildings,'')}</select></div><div class="field"><label>Шахматка</label><select id="suMatrix">${options(current.matrices,'')}</select></div></div><div class="sch-note">Файл: <b>${html(file.name)}</b><br>Размер: ${(file.size/1024/1024).toFixed(1)} МБ.<br>Отметки сохраняются отдельно от исходника и не съезжают при масштабировании.</div><div class="liv-editor-footer"><button id="suCancel" class="btn">Отмена</button><button id="suSave" class="btn primary">Загрузить</button></div>`);$s('suCancel').onclick=()=>{state.pending=null;closeModal();};$s('suSave').onclick=upload;
   }
 
   async function upload() {
-    const file=state.pending,current=p(),client=window.LIV_SUPABASE;if(!file||!current||!client)return alert('Нет подключения к серверу.');if(!window.LIV_NORMALIZED_SYNC?.projectId?.())return alert('Дождись подключения серверного проекта и повтори.');const b=$s('suSave');if(b.disabled)return;b.disabled=true;b.textContent='Загрузка...';const id=makeId('SCH'),path=`schemes/${safeName(id)}/source.pdf`,t=now();try{const u=await client.storage.from(BUCKET).upload(path,file,{contentType:'application/pdf',upsert:false});if(u.error)throw u.error;const x={id,name:$s('suName').value.trim()||file.name,fileName:file.name,storagePath:path,mimeType:'application/pdf',fileSize:file.size,pageCount:0,buildingId:$s('suBuilding').value,matrixId:$s('suMatrix').value,revision:$s('suRevision').value.trim(),status:'Загружена',active:true,createdAt:t,updatedAt:t};try{await syncScheme(x);}catch(error){current.schemes=current.schemes.filter(y=>y.id!==x.id);await client.storage.from(BUCKET).remove([path]);throw error;}current.schemes.push(x);await saveProject();state.pending=null;closeModal();render();await select(x.id);}catch(error){alert('Не удалось загрузить PDF: '+(error.message||error));b.disabled=false;b.textContent='Загрузить';}
+    const file=state.pending,current=p(),client=window.LIV_SUPABASE;if(!file||!current||!client)return alert('Нет подключения к серверу.');if(!window.LIV_NORMALIZED_SYNC?.projectId?.())return alert('Дождись подключения серверного проекта и повтори.');const b=$s('suSave');if(b.disabled)return;b.disabled=true;b.textContent='Загрузка...';const id=makeId('SCH'),kind=fileKind(file),path=`schemes/${safeName(id)}/source.${kind.ext}`,t=now();try{const u=await client.storage.from(BUCKET).upload(path,file,{contentType:kind.mime,upsert:false});if(u.error)throw u.error;const x={id,name:$s('suName').value.trim()||file.name,fileName:file.name,storagePath:path,mimeType:kind.mime,fileSize:file.size,pageCount:0,buildingId:$s('suBuilding').value,matrixId:$s('suMatrix').value,revision:$s('suRevision').value.trim(),status:'Загружена',active:true,createdAt:t,updatedAt:t};try{await syncScheme(x);}catch(error){current.schemes=current.schemes.filter(y=>y.id!==x.id);await client.storage.from(BUCKET).remove([path]);throw error;}current.schemes.push(x);await saveProject();state.pending=null;closeModal();render();await select(x.id);}catch(error){alert('Не удалось загрузить схему: '+(error.message||error));b.disabled=false;b.textContent='Загрузить';}
   }
 
   const userId=()=>window.LIV_REMOTE_SYNC?.userId?.()||null;
@@ -370,7 +452,7 @@
   async function writeVersioned(table,x,data){
     const key=table+':'+x.id;
     const previous=entityWrites.get(key)||Promise.resolve();
-    const task=previous.catch(()=>{}).then(()=>writeVersionedUnlocked(table,x,data));
+    const task=previous.catch(()=>{}).then(()=>{if(table==='schemes'&&(state.deleting.has(x.id)||x.active===false))return;return writeVersionedUnlocked(table,x,data);});
     entityWrites.set(key,task);
     try{return await task;}
     finally{if(entityWrites.get(key)===task)entityWrites.delete(key);}
@@ -430,6 +512,11 @@
   }
 
   async function deleteVersioned(table,x){
+    const key=table+':'+x.id,previous=entityWrites.get(key)||Promise.resolve();
+    const task=previous.catch(()=>{}).then(()=>deleteVersionedUnlocked(table,x));entityWrites.set(key,task);
+    try{return await task;}finally{if(entityWrites.get(key)===task)entityWrites.delete(key);}
+  }
+  async function deleteVersionedUnlocked(table,x){
     const client=window.LIV_SUPABASE;
     if(!client||!x)return;
 
@@ -455,6 +542,14 @@
       x.serverVersion=Number(version.data?.row_version||1);
     }
 
+    if(table==='schemes'){
+      const fresh=await client.from(table).select('id,row_version,name,storage_path,revision,active,building_id,matrix_id,mime_type').eq('id',x.serverId).maybeSingle();
+      if(fresh.error)throw fresh.error;
+      if(!fresh.data)return;
+      const row=fresh.data;
+      if(row.name!==x.name||row.storage_path!==x.storagePath||(row.revision||'')!==(x.revision||'')||row.active!==(x.active!==false)||(row.building_id||null)!==(window.LIV_NORMALIZED_SYNC?.serverId?.('building',x.buildingId)||null)||(row.matrix_id||null)!==(window.LIV_NORMALIZED_SYNC?.serverId?.('matrix',x.matrixId)||null)||(row.mime_type||'application/pdf')!==(x.mimeType||'application/pdf'))throw new Error('Схема изменена в другой сессии. Обнови страницу перед удалением.');
+      x.serverVersion=Number(row.row_version);
+    }
     const removed=await client
       .from(table)
       .delete()
@@ -480,7 +575,7 @@
       name:x.name,
       file_name:x.fileName,
       storage_path:x.storagePath,
-      mime_type:'application/pdf',
+      mime_type:x.mimeType||'application/pdf',
       page_count:Number(x.pageCount||0),
       building_id:normalizer?.serverId?.('building',x.buildingId)||null,
       matrix_id:normalizer?.serverId?.('matrix',x.matrixId)||null,
@@ -527,6 +622,7 @@
       updated_at:x.updatedAt||now(),
       custom_data:{
         lineReverse:!!x.lineReverse,
+        designation:x.designation||'',
         appearance:appearance(x),
         workExternalId:x.workId||'',
         organizationExternalId:x.organizationId||'',
@@ -544,12 +640,14 @@
     }
   }
 
-  async function download(){const x=scheme(state.schemeId),client=window.LIV_SUPABASE;if(!x||!client)return;loading(true,'Подготовка файла...');try{const r=await client.storage.from(BUCKET).download(x.storagePath);if(r.error)throw r.error;const url=URL.createObjectURL(r.data),a=document.createElement('a');a.href=url;a.download=x.fileName||`${x.name}.pdf`;a.click();URL.revokeObjectURL(url);}catch(error){alert('Не удалось скачать PDF: '+(error.message||error));}finally{loading(false);}}
-  function openDelete(){const x=scheme(state.schemeId);if(!x||!canWrite())return;openModal('Удаление PDF-схемы',`<div class="notice bad">Будет удалена схема <b>${html(x.name)}</b>, исходный PDF и ${marks(x.id).length} отметок. Фронты и шахматки не удаляются.</div><div class="liv-editor-footer"><button id="sdCancel" class="btn">Отмена</button><button id="sdConfirm" class="btn danger">Удалить</button></div>`);$s('sdCancel').onclick=closeModal;$s('sdConfirm').onclick=removeScheme;}
+  async function download(){const x=scheme(state.schemeId),client=window.LIV_SUPABASE;if(!x||!client)return;loading(true,'Подготовка файла...');try{const r=await client.storage.from(BUCKET).download(x.storagePath);if(r.error)throw r.error;const url=URL.createObjectURL(r.data),a=document.createElement('a');a.href=url;a.download=x.fileName||`${x.name}.pdf`;a.click();URL.revokeObjectURL(url);}catch(error){alert('Не удалось скачать исходник: '+(error.message||error));}finally{loading(false);}}
+  function openDelete(){const x=scheme(state.schemeId);if(!x||!canWrite())return;openModal('Удаление схемы',`<div class="notice bad">Будет удалена схема <b>${html(x.name)}</b>, исходный файл и ${marks(x.id).length} отметок. Фронты и шахматки не удаляются.</div><div class="liv-editor-footer"><button id="sdCancel" class="btn">Отмена</button><button id="sdConfirm" class="btn danger">Удалить</button></div>`);$s('sdCancel').onclick=closeModal;$s('sdConfirm').onclick=removeScheme;}
   async function removeScheme(){
     const x=scheme(state.schemeId),client=window.LIV_SUPABASE;
-    if(!x)return;
+    if(!x||state.deleting.has(x.id))return;
+    state.deleting.add(x.id);$s('sdConfirm').disabled=true;
     try{
+      if(!client)throw new Error('Нет подключения к серверу');
       if(client){
         await deleteVersioned('schemes',x);
 
@@ -564,7 +662,7 @@
       x.active=false;
       x.deletedAt=x.updatedAt=now();
       marks(x.id).forEach(m=>{m.active=false;m.deletedAt=m.updatedAt=x.deletedAt;});
-      state.dirty.forEach((m,id)=>{if(m.schemeId===x.id)state.dirty.delete(id);});state.selected='';
+      state.dirty.forEach((m,id)=>{if(m.schemeId===x.id)state.dirty.delete(id);});state.selected='';state.undo=state.undo.filter(e=>(e.after||e.before)?.schemeId!==x.id);state.redo=state.redo.filter(e=>(e.after||e.before)?.schemeId!==x.id);
       await saveProject();
 
       const cached=state.cache.get(x.id);
@@ -575,7 +673,7 @@
       clear();
     }catch(error){
       alert('Не удалось удалить схему: '+(error.message||error));
-    }
+    }finally{state.deleting.delete(x.id);if($s('sdConfirm'))$s('sdConfirm').disabled=false;}
   }
 
   async function resyncServerLinks(){
@@ -585,12 +683,12 @@
     state.linksRunning=true;
     try{
 
-    for(const item of (current.schemes||[]).filter(x=>x.active!==false)){
+    for(const item of (current.schemes||[]).filter(x=>x.active!==false&&!state.deleting.has(x.id))){
       try{await syncScheme(item);}catch(error){console.warn('LIV Schemes: relation sync failed',error);}
     }
 
     for(const item of (current.schemeMarks||[]).filter(x=>x.active!==false)){
-      if(state.dirty.has(String(item.id)))continue;
+      if(state.dirty.has(String(item.id))||state.deleting.has(item.schemeId)||scheme(item.schemeId)?.active===false)continue;
       item.progressPercent=derivedProgress(item.status,item.frontId,item.elementGroupId,item.numberedElementId);
       try{await syncMark(item);}catch(error){console.warn('LIV Schemes: mark relation sync failed',error);}
     }

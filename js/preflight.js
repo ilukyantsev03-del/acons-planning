@@ -63,7 +63,7 @@
 
   async function storageCheck() {
     const client = window.LIV_SUPABASE;
-    if (!client) return result('PDF-хранилище', false, 'Нет подключения к Supabase');
+    if (!client) return result('Хранилище схем', false, 'Нет подключения к Supabase');
 
     try {
       const response = await client.storage
@@ -71,12 +71,12 @@
         .list('schemes', { limit: 1 });
 
       if (response.error) {
-        return result('PDF-хранилище', false, response.error.message || response.error);
+        return result('Хранилище схем', false, response.error.message || response.error);
       }
 
-      return result('PDF-хранилище', true, 'bucket liv-schemes доступен');
+      return result('Хранилище схем', true, 'bucket liv-schemes доступен');
     } catch (error) {
-      return result('PDF-хранилище', false, error?.message || error);
+      return result('Хранилище схем', false, error?.message || error);
     }
   }
 
@@ -96,8 +96,8 @@
         }
         if((response.data||[]).length<100)break;offset+=100;
       }
-      return result('Исходные PDF',!missing.length,missing.length?'Файл отсутствует: '+missing.join('; ')+'. Нужна повторная загрузка исходного PDF.':'Проверено файлов: '+checked);
-    }catch(error){return result('Исходные PDF',false,error?.message||error);}
+      return result('Исходники схем',!missing.length,missing.length?'Файл отсутствует: '+missing.join('; ')+'. Нужна повторная загрузка исходного файла.':'Проверено файлов: '+checked);
+    }catch(error){return result('Исходники схем',false,error?.message||error);}
   }
 
   function moduleChecks() {

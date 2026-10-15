@@ -398,3 +398,51 @@ test('Отчёт: снимок неизменяем, повтор блокиру
  assert.equal(snapshot.dataSnapshot.milestones[0].riskDetails.nested.value,1);
  await assert.rejects(env.api.capture(input),/уже существует/);
 });
+
+function editor(){
+ const e=moduleContext('js/schemes.js','state,stageDrawing,historyStep,editMark,visibleMarks,legendEntries,fileKind,deleteVersioned,writeVersioned,imageDocument');
+ e.window.LIV_ACCESS={role:'planner'};e.api.state.schemeId='S1';
+ e.context.document.createElement=()=>({style:{},dataset:{},classList:{add(){},toggle(){}}});e.element('schOverlay').appendChild=()=>{};return e;
+}
+test('Схемы: отмена и повтор создания, стиля и удаления после серверного сохранения',()=>{
+ const e=editor(),a=e.api,x=a.stageDrawing({markType:'circle',x:.1,y:.1,width:.1,height:.1});
+ a.historyStep();assert.equal(a.visibleMarks().length,0);a.historyStep(true);assert.equal(a.visibleMarks().length,1);
+ const saved={...a.state.dirty.get(x.id),serverId:'uuid',serverVersion:5};e.context.project.schemeMarks.push(saved);a.state.dirty.clear();
+ a.editMark({...saved,appearance:{color:'#ff0000',fill:1,width:8}});
+ a.historyStep();assert.equal(a.state.dirty.get(x.id).serverVersion,5);assert.notEqual(a.state.dirty.get(x.id).appearance.color,'#ff0000');
+ a.historyStep(true);assert.equal(a.state.dirty.get(x.id).appearance.fill,1);
+ a.editMark({...a.state.dirty.get(x.id),active:false});a.historyStep();assert.equal(a.visibleMarks().length,1);
+ a.historyStep(true);assert.equal(a.visibleMarks().length,0);
+ a.historyStep();a.historyStep();a.historyStep();assert.equal(a.state.dirty.get(x.id).active,false);
+ a.historyStep(true);assert.equal(a.state.dirty.get(x.id).serverVersion,5);assert.equal(a.visibleMarks().length,1);
+});
+test('Схемы: история не отменяет рисунки другой страницы, новое действие сбрасывает повтор',()=>{
+ const {api:a}=editor();a.stageDrawing({markType:'point'});a.state.page=2;a.stageDrawing({markType:'point'});
+ a.state.page=1;a.historyStep();assert.equal(a.visibleMarks().length,0);a.state.page=2;assert.equal(a.visibleMarks().length,1);
+ a.stageDrawing({markType:'line'});assert.equal(a.state.redo.length,0);
+});
+test('Легенда: объединяет одинаковые обозначения, различает цвета и форму, отражает заливку',()=>{
+ const {api:a}=editor();const row={designation:'Монтаж',markType:'circle',appearance:{color:'#ff0000',width:4,fill:1}};
+ const list=a.legendEntries([row,row,{...row,appearance:{...row.appearance,color:'#00ff00'}},{...row,markType:'line'}]);
+ assert.equal(list.length,3);assert.equal(list[0].count,2);assert.equal(list[0].fill,1);assert.equal(list[1].color,'#00ff00');
+ assert.equal(a.legendEntries([{status:'В работе'}])[0].color,'#d2860b');
+});
+test('Схемы: форматы PDF, PNG, JPEG разрешены, SVG и HTML отклоняются',()=>{
+ const {api:a}=editor();for(const type of ['application/pdf','image/png','image/jpeg'])assert.ok(a.fileKind({type}));
+ assert.equal(a.fileKind({type:'image/svg+xml',name:'image.png'}),null);assert.equal(a.fileKind({type:'text/html'}),null);
+ assert.equal(a.fileKind({type:'',name:'Скриншот.JPG'}).mime,'image/jpeg');
+});
+test('Изображение: одностраничный документ сохраняет пропорции и использует масштаб canvas',async()=>{
+ const e=editor(),calls=[];e.context.URL={createObjectURL:()=> 'blob:test',revokeObjectURL:u=>calls.push(u)};
+ e.context.Image=class{naturalWidth=1600;naturalHeight=900;async decode(){}};
+ const doc=await e.api.imageDocument({}),page=await doc.getPage(1),v=page.getViewport({scale:.5});
+ assert.equal(doc.numPages,1);assert.equal(v.width,800);assert.equal(v.height,450);
+ await page.render({canvasContext:{save(){},restore(){},transform(...args){calls.push(args)},drawImage(img,x,y,w,h){calls.push([w,h])}},viewport:v,transform:[2,0,0,2,0,0]}).promise;
+ assert.deepEqual(calls[2],[800,450]);assert.equal(calls[0],'blob:test');
+});
+test('Удаление схемы: ждёт запись, обновляет техническую версию, сохраняет проверку конфликта',async()=>{
+ const e=editor(),a=e.api;let version=2,deleted=false,changed=false;const x={id:'S1',serverId:'uuid',serverVersion:1,name:'Схема',storagePath:'source.pdf',active:true};
+ e.window.LIV_SUPABASE={from(){return {select(){return this},eq(){return this},async maybeSingle(){return {data:{id:'uuid',row_version:version,name:changed?'Чужое изменение':'Схема',storage_path:'source.pdf',active:true}}},update(){return {eq(){return this},async select(){await Promise.resolve();return {data:[{row_version:++version}]}}}},delete(){return {eq(k,v){if(k==='row_version')assert.equal(v,version);return this},async select(){deleted=true;return {data:[{id:'uuid'}]}}}}}}};
+ await Promise.all([a.writeVersioned('schemes',x,{}),a.deleteVersioned('schemes',x)]);assert.equal(deleted,true);
+ deleted=false;changed=true;await assert.rejects(a.deleteVersioned('schemes',x),/другой сессии/);assert.equal(deleted,false);
+});
