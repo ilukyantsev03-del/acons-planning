@@ -256,7 +256,7 @@
   if (document.querySelector('script[data-liv-schemes]')) return;
 
   const script = document.createElement('script');
-  script.src = 'js/schemes.js?v=20261015-1';
+  script.src = 'js/schemes.js?v=20261015-2';
   script.async = true;
   script.dataset.livSchemes = '1';
   script.onerror = () => {

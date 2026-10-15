@@ -130,6 +130,7 @@
     $s('schDetails').onclick=()=>{if(state.selected&&!state.saving)openMark(state.selected);};
     $s('schRemoveMark').onclick=removeSelected;
     $s('schUndo').onclick=()=>historyStep(false);$s('schRedo').onclick=()=>historyStep(true);
+    $s('schDesignation').oninput=()=>{if(!state.selected||state.draw)state.designation=$s('schDesignation').value;};
     $s('schDesignation').onchange=()=>{
       const label=$s('schDesignation').value.trim();
       if(state.selected&&!state.draw){const x=mark(state.selected);if(x)editMark({...x,designation:label,updatedAt:now()});}
@@ -186,10 +187,10 @@
     const ink=state.selected&&!state.draw?appearance(mark(state.selected)):state.ink;
     $s('schColorMode').value=ink.color?'custom':'status';$s('schColor').value=ink.color||'#2563eb';
     $s('schColor').disabled=$s('schColor').disabled||!ink.color;
-    $s('schDesignation').value=state.selected&&!state.draw?(mark(state.selected)?.designation||''):state.designation;
+    if(document.activeElement!==$s('schDesignation'))$s('schDesignation').value=state.selected&&!state.draw?(mark(state.selected)?.designation||''):state.designation;
     $s('schUndo').disabled=historyIndex(state.undo)<0||state.saving||!canWrite();$s('schRedo').disabled=historyIndex(state.redo)<0||state.saving||!canWrite();
     $s('schWidth').value=ink.width;$s('schFill').value=String(ink.fill);
-    $s('schHint').textContent=state.saving?'Сохраняем отметки…':state.dirty.size?`Есть несохранённые изменения: ${state.dirty.size}. Нажми «Сохранить рисунки».`:state.draw?'Рисуй несколько фигур подряд. Esc или «Завершить рисование» — перейти к выбору отметок.':'Щелчок выбирает отметку; «Данные отметки» или двойной щелчок открывает карточку.';
+    $s('schHint').textContent=state.saving?'Сохраняем отметки…':state.dirty.size?`Есть несохранённые изменения: ${state.dirty.size}. Нажми «Сохранить рисунки».`:state.draw?'Рисуй на схеме. Обозначение для легенды можно задать сейчас или после выбора рисунка. Esc — завершить рисование.':'Щелчок выбирает отметку; «Данные отметки» или двойной щелчок открывает карточку.';
 
   }
 
@@ -309,7 +310,7 @@
   const markColor=x=>appearance(x).color||({'В работе':'#d2860b','Ограничение':'#c23a3a'}[x.status]||(DONE.has(x.status)?'#16825d':'#667085'));
   function legendEntries(rows) {
     const entries=new Map();
-    for(const x of rows){const label=x.designation||x.title||x.status||'Без обозначения',ink=appearance(x),color=markColor(x),shape=x.markType||'area';
+    for(const x of rows){const label=x.designation||x.title||(appearance(x).color?'Без обозначения':x.status)||'Без обозначения',ink=appearance(x),color=markColor(x),shape=x.markType||'area';
       const key=JSON.stringify([label,color,shape,ink.width,ink.fill]);
       if(entries.has(key))entries.get(key).count++;else entries.set(key,{id:x.id,label,shape,...ink,color,count:1});
     }
@@ -336,7 +337,7 @@
     renderMarks();toolbar();
   }
   function stageDrawing(g) {
-    const t=now();const x={id:makeId('SMK'),schemeId:state.schemeId,pageNo:state.page,...g,designation:state.designation,appearance:{...state.ink},status:'Не начато',progressPercent:null,active:true,createdAt:t,updatedAt:t};
+    const t=now();const x={id:makeId('SMK'),schemeId:state.schemeId,pageNo:state.page,...g,designation:state.designation.trim(),appearance:{...state.ink},status:'Не начато',progressPercent:null,active:true,createdAt:t,updatedAt:t};
     editMark(x);return x;
   }
   async function saveDrawings() {
@@ -383,7 +384,7 @@
     }
     if(g.markType==='point'||g.markType==='line')node.classList.add('sch-no-label');
   }
-  function startDraw(e){if(state.saving||!state.draw||!canWrite()||e.button!==0||e.target!==$s('schOverlay'))return;if(!state.designation.trim()){$s('schHint').textContent='Укажи обозначение рисунка — оно появится в легенде.';$s('schDesignation').focus();return;}e.preventDefault();state.start=point(e);state.draft=document.createElement('div');state.draft.className='sch-draft';$s('schOverlay').appendChild(state.draft);$s('schOverlay').setPointerCapture?.(e.pointerId);moveDraw(e);}
+  function startDraw(e){if(state.saving||!state.draw||!canWrite()||e.button!==0||e.target!==$s('schOverlay'))return;e.preventDefault();state.start=point(e);state.draft=document.createElement('div');state.draft.className='sch-draft';$s('schOverlay').appendChild(state.draft);$s('schOverlay').setPointerCapture?.(e.pointerId);moveDraw(e);}
   function moveDraw(e){if(!state.start||!state.draft)return;paintShape(state.draft,{...geometry(state.start,point(e),state.tool,$s('schOverlay').getBoundingClientRect()),appearance:state.ink});}
   function endDraw(e){if(!state.start)return;const g=geometry(state.start,point(e),state.tool,$s('schOverlay').getBoundingClientRect());cancelDraw();stageDrawing(g);state.filter='all';$s('schFilter').value='all';renderMarks();toolbar();}
   function cancelDraw(){state.start=null;state.draft?.remove();state.draft=null;}
@@ -442,7 +443,7 @@
   }
 
   async function upload() {
-    const file=state.pending,current=p(),client=window.LIV_SUPABASE;if(!file||!current||!client)return alert('Нет подключения к серверу.');if(!window.LIV_NORMALIZED_SYNC?.projectId?.())return alert('Дождись подключения серверного проекта и повтори.');const b=$s('suSave');if(b.disabled)return;b.disabled=true;b.textContent='Загрузка...';const id=makeId('SCH'),kind=fileKind(file),path=`schemes/${safeName(id)}/source.${kind.ext}`,t=now();try{const u=await client.storage.from(BUCKET).upload(path,file,{contentType:kind.mime,upsert:false});if(u.error)throw u.error;const x={id,name:$s('suName').value.trim()||file.name,fileName:file.name,storagePath:path,mimeType:kind.mime,fileSize:file.size,pageCount:0,buildingId:$s('suBuilding').value,matrixId:$s('suMatrix').value,revision:$s('suRevision').value.trim(),status:'Загружена',active:true,createdAt:t,updatedAt:t};try{await syncScheme(x);}catch(error){current.schemes=current.schemes.filter(y=>y.id!==x.id);await client.storage.from(BUCKET).remove([path]);throw error;}current.schemes.push(x);await saveProject();state.pending=null;closeModal();render();await select(x.id);}catch(error){alert('Не удалось загрузить схему: '+(error.message||error));b.disabled=false;b.textContent='Загрузить';}
+    const file=state.pending,current=p(),client=window.LIV_SUPABASE;if(!file||!current||!client)return alert('Нет подключения к серверу.');if(!window.LIV_NORMALIZED_SYNC?.projectId?.())return alert('Дождись подключения серверного проекта и повтори.');const b=$s('suSave');if(b.disabled)return;b.disabled=true;b.textContent='Загрузка...';const id=makeId('SCH'),kind=fileKind(file),path=`schemes/${safeName(id)}/source.${kind.ext}`,t=now();try{const u=await client.storage.from(BUCKET).upload(path,file,{contentType:kind.mime,upsert:false});if(u.error)throw u.error;const x={id,name:$s('suName').value.trim()||file.name,fileName:file.name,storagePath:path,mimeType:kind.mime,fileSize:file.size,pageCount:0,buildingId:$s('suBuilding').value,matrixId:$s('suMatrix').value,revision:$s('suRevision').value.trim(),status:'Загружена',active:true,createdAt:t,updatedAt:t};try{await syncScheme(x);}catch(error){current.schemes=current.schemes.filter(y=>y.id!==x.id);await client.storage.from(BUCKET).remove([path]);throw error;}current.schemes.push(x);await saveProject();state.pending=null;closeModal();render();await select(x.id);if(state.pdf&&canWrite()){state.draw=true;toolbar();}}catch(error){alert('Не удалось загрузить схему: '+(error.message||error));b.disabled=false;b.textContent='Загрузить';}
   }
 
   const userId=()=>window.LIV_REMOTE_SYNC?.userId?.()||null;

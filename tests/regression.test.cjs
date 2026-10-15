@@ -446,3 +446,19 @@ test('Удаление схемы: ждёт запись, обновляет т�
  await Promise.all([a.writeVersioned('schemes',x,{}),a.deleteVersioned('schemes',x)]);assert.equal(deleted,true);
  deleted=false;changed=true;await assert.rejects(a.deleteVersioned('schemes',x),/другой сессии/);assert.equal(deleted,false);
 });
+
+test('Изображение: начало и завершение рисунка не блокируются пустым обозначением',async()=>{
+ const e=moduleContext('js/schemes.js','state,imageDocument,startDraw,moveDraw,endDraw,visibleMarks,legendEntries');
+ e.window.LIV_ACCESS={role:'planner'};
+ e.context.URL={createObjectURL:()=> 'blob:test',revokeObjectURL(){}};
+ e.context.Image=class{naturalWidth=1200;naturalHeight=800;async decode(){}};
+ e.context.document.createElement=()=>({style:{},dataset:{},classList:{add(){},toggle(){}},remove(){}});
+ const overlay=e.element('schOverlay');overlay.appendChild=()=>{};overlay.getBoundingClientRect=()=>({left:0,top:0,width:1200,height:800});
+ Object.assign(e.api.state,{schemeId:'S1',pdf:await e.api.imageDocument({}),draw:true,designation:'',tool:'circle'});
+ e.api.startDraw({target:overlay,button:0,pointerId:1,clientX:120,clientY:80,preventDefault(){}});
+ assert.ok(e.api.state.start,'Пустое обозначение не должно блокировать рисование');
+ e.api.endDraw({clientX:360,clientY:320});
+ const rows=e.api.visibleMarks();assert.equal(rows.length,1);assert.equal(rows[0].markType,'circle');
+ assert.equal(e.api.legendEntries(rows)[0].label,'Без обозначения');
+ assert.equal(e.api.state.draw,true);
+});
