@@ -16,6 +16,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install test dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
       - name: Check JavaScript syntax
         shell: bash
         run: |
@@ -32,6 +35,8 @@ jobs:
           import re
 
           html = Path('index.html').read_text(encoding='utf-8')
+          assert '</html>' in html, 'Incomplete HTML document'
+          assert 'js/planning-core.js' in html and 'js/planning-ui.js' in html
           missing = []
           for source in re.findall(r'<script[^>]+src="([^"]+)"', html):
               if source.startswith(('http://', 'https://')):

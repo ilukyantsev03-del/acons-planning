@@ -462,3 +462,13 @@ test('Изображение: начало и завершение рисунк�
  assert.equal(e.api.legendEntries(rows)[0].label,'Без обозначения');
  assert.equal(e.api.state.draw,true);
 });
+
+test('КД по графику: перенос рабочей даты показывает риск без выдуманного объёма',()=>{
+ const e=moduleContext('js/milestone-risk.js','compute');e.context.project.tasks=[{id:'T',versionId:'V',active:true}];e.context.project.scheduleVersions=[{id:'V',effectiveDate:'2026-10-15'}];e.context.project.taskDates=[{taskId:'T',type:'working',finish:'2026-10-25'}];
+ const r=e.api.compute({id:'M',scheduleTaskId:'T',contractDate:'2026-10-20'},{asOf:'2026-10-16'});assert.equal(r.sourceMode,'schedule');assert.equal(r.riskLevel,'red');assert.equal(r.targetQty,null);assert.equal(r.projectedFinishDate,'2026-10-25');
+ const earlier=e.api.compute({id:'M',scheduleTaskId:'T',contractDate:'2026-10-20'},{asOf:'2026-10-10'});assert.equal(earlier.riskLevel,'gray');assert.equal(earlier.projectedFinishDate,'');
+});
+test('КД по графику: процент задачи не подменяет подтверждение выполнения КД',()=>{
+ const e=moduleContext('js/milestone-risk.js','compute');e.context.project.tasks=[{id:'T',progressPercent:100}];e.context.project.taskDates=[{taskId:'T',type:'working',finish:'2026-10-18'}];
+ const r=e.api.compute({id:'M',scheduleTaskId:'T',contractDate:'2026-10-20'},{asOf:'2026-10-16'});assert.equal(r.riskLevel,'yellow');assert.match(r.reason,/требует подтверждения/);
+});

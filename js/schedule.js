@@ -16,13 +16,16 @@
     headers: [],
     dataRows: [],
     mapping: {},
-    sourceType: 'auto'
+    sourceType: 'auto',
+    sheetMappings: {},
+    defaultGroup: ''
   };
 
   const FIELD_DEFS = {
+    element: {label:'Элемент / конструкция', aliases:['наименование элемента','конструкция','элемент']},
     name: {
       label: 'Задача',
-      aliases: ['задача','наименование задачи','название задачи','наименование работ','вид работ','работа','название']
+      aliases: ['task name','задача','наименование задачи','название задачи','наименование работ','вид работ','работа','название']
     },
     building: {
       label: 'Здание / объект',
@@ -66,7 +69,7 @@
     },
     sourceTaskId: {
       label: 'ID задачи',
-      aliases: ['id','id задачи','номер задачи','№ задачи','task id']
+      aliases: ['№ п/п','ид','id','id задачи','номер задачи','№ задачи','task id']
     },
     outlineNumber: {
       label: 'Код структуры',
@@ -74,19 +77,19 @@
     },
     progress: {
       label: '% выполнения',
-      aliases: ['% завершен','% завершено','% выполнения','процент выполнения','готовность']
+      aliases: ['% complete','% завершен','% завершено','% выполнения','процент выполнения','готовность']
     },
     duration: {
       label: 'Длительность',
-      aliases: ['длительность','продолжительность','длительность дни','длительность дн']
+      aliases: ['duration','длит','длительность','продолжительность','длительность дни','длительность дн']
     },
     workingStart: {
       label: 'Рабочее начало',
-      aliases: ['начало','дата начала','начало план','план начало','текущее начало','рабочее начало']
+      aliases: ['start','начало','дата начала','начало план','план начало','текущее начало','рабочее начало']
     },
     workingFinish: {
       label: 'Рабочее окончание',
-      aliases: ['окончание','дата окончания','окончание план','план окончание','текущее окончание','рабочее окончание']
+      aliases: ['finish','окончание','дата окончания','окончание план','план окончание','текущее окончание','рабочее окончание']
     },
     baselineStart: {
       label: 'Базовое начало',
@@ -126,7 +129,7 @@
     },
     quantity: {
       label: 'Объем',
-      aliases: ['объем','объём','общий объем','общий объём','количество']
+      aliases: ['объем ориентировочно','объем','объём','общий объем','общий объём','количество']
     },
     comment: {
       label: 'Комментарий',
@@ -163,26 +166,7 @@
     return Number.isFinite(n) ? n : null;
   }
 
-  function isoDate(v) {
-    if (!v && v !== 0) return '';
-    if (v instanceof Date && !Number.isNaN(v.getTime())) {
-      return v.toISOString().slice(0,10);
-    }
-    if (typeof v === 'number' && window.XLSX && v > 20000 && v < 80000) {
-      const d = XLSX.SSF.parse_date_code(v);
-      if (d) return String(d.y).padStart(4,'0')+'-'+String(d.m).padStart(2,'0')+'-'+String(d.d).padStart(2,'0');
-    }
-    const s = text(v);
-    let m = s.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})/);
-    if (m) {
-      let y = m[3];
-      if (y.length === 2) y = '20'+y;
-      return y+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
-    }
-    m = s.match(/^(\d{4})[.\/-](\d{1,2})[.\/-](\d{1,2})/);
-    if (m) return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
-    return '';
-  }
+  function isoDate(v) { return window.LIV_PLANNING.date(v); }
 
   function uid(prefix) {
     if (typeof window.uid === 'function') return window.uid(prefix);
@@ -233,7 +217,7 @@
         const field = matchHeader(cell);
         if (field) matches.add(field);
       });
-      const score = matches.size * 10 + Math.min(nonEmpty,10);
+      let score = matches.size * 10 + Math.min(nonEmpty,10);
       if (matches.has('name')) score += 20;
       if (matches.has('workingStart') || matches.has('workingFinish')) score += 8;
       if (score > bestScore) {
@@ -319,6 +303,17 @@
               </div>
             </div>
           </div>
+          <div class="schedule-mapping">
+            <label>Группа графика (одинаковая для всех его версий)<input id="scheduleGroup" placeholder="Например: Кровля / договор Ренессанс"></label>
+            <label>Назначение<select id="scheduleRole"><option value="working">Внутренний рабочий</option><option value="contractor">Договор подрядчика</option><option value="customer">График Заказчика</option></select></label>
+            <label>Организация<select id="scheduleOrganization"><option value="">Не выбрана</option></select></label>
+            <label>Номер договора<input id="scheduleContractNo" placeholder="Точный номер договора"></label>
+            <label><input id="scheduleRegisterKD" type="checkbox"> При принятии зарегистрировать КД в договорном журнале</label>
+            <label>Дата версии<input id="scheduleEffective" type="date"></label>
+            <label>Календарь<select id="scheduleCalendar"><option value="7x0">7 дней в неделю</option><option value="6x1">6 дней, воскресенье выходной</option><option value="5x2">5 дней, суббота и воскресенье выходные</option></select></label>
+            <label><input id="scheduleMilestoneFallback" type="checkbox"> Для строк КД использовать единственную дату из «Начала» как срок КД</label>
+            <p class="muted">Рабочие дни считаются включительно. Исходные даты сохраняются без пересчёта. Договорные сроки не изменяются прогнозом.</p>
+          </div>
           <div id="scheduleMapping" class="schedule-mapping"></div>
           <div id="schedulePreview" class="table-wrap schedule-preview"></div>
           <div class="editor-actions">
@@ -338,7 +333,7 @@
               <select id="scheduleViewMode">
                 <option value="classic">Классический</option>
                 <option value="matrix">Шахматка</option>
-                <option value="linear">Линейный</option>
+                <option value="all">Таблица и шахматка</option>
               </select>
             </div>
           </div>
@@ -416,6 +411,8 @@
   }
 
   function bindUi() {
+    const fallback=document.getElementById('scheduleMilestoneFallback');
+    if(fallback&&!fallback.dataset.bound){fallback.dataset.bound='1';fallback.addEventListener('change',()=>renderImportPreview());}
     const input = document.getElementById('scheduleFileInput');
     if (input && !input.dataset.bound) {
       input.dataset.bound = '1';
@@ -426,7 +423,12 @@
     if (sheet && !sheet.dataset.bound) {
       sheet.dataset.bound = '1';
       sheet.addEventListener('change', () => {
+        state.sheetMappings[state.sheetName]={...state.mapping};
         state.sheetName = sheet.value;
+        const group=document.getElementById('scheduleGroup');
+        const nextGroup=state.fileName.replace(/\.(xlsx?|csv)$/i,'').replace(/\d{2}[._-]\d{2}[._-]\d{2,4}/g,'').trim()+' / '+state.sheetName;
+        if(group.value===state.defaultGroup)group.value=nextGroup;
+        state.defaultGroup=nextGroup;
         parseSheet();
       });
     }
@@ -475,7 +477,8 @@
     if (!file || !window.XLSX) return;
 
     const buffer = await file.arrayBuffer();
-    state.workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+    state.sheetMappings={};
+    state.workbook = XLSX.read(buffer, { type: 'array', cellDates: false, cellNF: true });
     state.fileName = file.name;
     state.sheetName = state.workbook.SheetNames[0] || '';
 
@@ -486,6 +489,13 @@
     select.value = state.sheetName;
 
     document.getElementById('scheduleImportCard').classList.remove('hidden');
+    document.getElementById('scheduleOrganization').innerHTML='<option value="">Не выбрана</option>'+(project.organizations||[]).filter(o=>o.active!==false).map(o=>'<option value="'+esc(o.id)+'">'+esc(o.name)+'</option>').join('');
+    document.getElementById('scheduleRegisterKD').checked=false;
+    document.getElementById('scheduleContractNo').value='';
+    state.defaultGroup=state.fileName.replace(/\.(xlsx?|csv)$/i,'').replace(/\d{2}[._-]\d{2}[._-]\d{2,4}/g,'').trim()+' / '+state.sheetName;
+    document.getElementById('scheduleGroup').value=state.defaultGroup;
+    document.getElementById('scheduleEffective').value=new Date().toISOString().slice(0,10);
+    document.getElementById('scheduleMilestoneFallback').checked=false;
     parseSheet();
   }
 
@@ -504,8 +514,8 @@
     }
 
     state.headers = (rows[state.headerRow] || []).map((h,i) => text(h) || 'Колонка '+(i+1));
-    state.dataRows = rows.slice(state.headerRow + 1).filter(row => (row || []).some(cell => text(cell)));
-    state.mapping = autoMap(state.headers);
+    state.dataRows = rows.slice(state.headerRow + 1); // Preserve original source row numbers.
+    state.mapping = state.sheetMappings[state.sheetName]||autoMap(state.headers);
 
     renderMapping();
     renderImportPreview();
@@ -570,28 +580,11 @@
       return;
     }
 
-    const preview = state.dataRows.slice(0,12);
-    const fields = ['name','building','block','floor','network','segment','organization','workingStart','workingFinish','baselineFinish','progress'];
-    const visible = fields.filter(f => state.mapping[f] != null);
-
-    host.innerHTML = `
-      <table>
-        <thead><tr>${visible.map(f => '<th>'+esc(FIELD_DEFS[f].label)+'</th>').join('')}</tr></thead>
-        <tbody>
-          ${preview.map(row => '<tr>'+visible.map(f => {
-            let v = value(row,f);
-            if (/Start|Finish/.test(f)) v = isoDate(v) || text(v);
-            return '<td>'+esc(v)+'</td>';
-          }).join('')+'</tr>').join('')}
-        </tbody>
-      </table>
-    `;
-
-    if (hint) {
-      hint.textContent = state.mapping.name == null
-        ? 'Нужно выбрать колонку «Задача».'
-        : 'Будет добавлено до '+state.dataRows.length+' строк. Пустые строки и строки без задачи пропускаются.';
-    }
+    const prepared=prepareRows({milestoneFallback:document.getElementById('scheduleMilestoneFallback')?.checked});
+    host.innerHTML='<table><thead><tr><th>Строка</th><th>Тип</th><th>Здание</th><th>Работа</th><th>Элемент</th><th>Захватка</th><th>Начало</th><th>Окончание</th></tr></thead><tbody>'+prepared.rows.map(r=>'<tr><td>'+r.sourceRow+'</td><td>'+(r.isMilestone?'КД':'Работа')+'</td><td>'+esc(r.building||'Не определено')+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.element)+'</td><td>'+esc(r.capture)+'</td><td>'+esc(r.start||'—')+'</td><td>'+esc(r.finish||'—')+'</td></tr>').join('')+'</tbody></table>'+
+      (prepared.errors.length?'<p class="planning-late">'+prepared.errors.map(esc).join('<br>')+'</p>':'')+
+      (prepared.warnings.length?'<p class="muted">'+prepared.warnings.map(esc).join('<br>')+'</p>':'');
+    if(hint)hint.textContent=state.mapping.name==null?'Нужно выбрать колонку «Задача».':'Распознано: '+prepared.rows.length+' строк. Ошибок: '+prepared.errors.length+'.';
   }
 
   function detectStatus(progress, status) {
@@ -612,7 +605,8 @@
       capture: text(value(row,'capture')),
       zone: text(value(row,'zone')),
       network: text(value(row,'network')),
-      segment: text(value(row,'segment'))
+      segment: text(value(row,'segment')),
+      element: text(value(row,'element'))
     };
   }
 
@@ -954,35 +948,7 @@
     };
   }
 
-  function scheduleTaskIdentity(task) {
-
-    return (
-      text(
-        task.sourceTaskId
-      ) ||
-      [
-        key(
-          task.name
-        ),
-        key(
-          task.building
-        ),
-        key(
-          task.block
-        ),
-        key(
-          task.floor
-        ),
-        key(
-          task.axis
-        )
-      ]
-        .join(
-          '|'
-        )
-    );
-  }
-
+  function scheduleTaskIdentity(task) { return window.LIV_PLANNING.identity(task); }
 
   function stagedWorkingDate(item) {
 
@@ -1172,246 +1138,122 @@
   }
 
 
-  async function importSchedule() {
-    if (!ensureCollections()) return;
-    if (state.mapping.name == null) {
-      alert('Выберите колонку «Задача».');
-      return;
-    }
-
-    const importId = uid('SIMP');
-    const createdAt = new Date().toISOString();
-    const staged = [];
-
-    state.dataRows.forEach((row, index) => {
-      const name = text(value(row,'name'));
-      if (!name) return;
-
-      const progressRaw = num(value(row,'progress'));
-      const progress = progressRaw == null ? 0 : Math.max(0, Math.min(100, progressRaw <= 1 ? progressRaw * 100 : progressRaw));
-      const taskId = uid('TASK');
-      const ctx = taskContext(row);
-
-      const task = {
-        id: taskId,
-        projectId: 'local-main',
-        parentTaskId: '',
-        sourceRow: state.headerRow + 2 + index,
-        sourceImportId: importId,
-        sourceFile: state.fileName,
-        sourceSheet: state.sheetName,
-        sourceType: state.sourceType,
-        sourceTaskId:
-          text(
-            value(
-              row,
-              'sourceTaskId'
-            )
-          ) ||
-          String(
-            index +
-            1
-          ),
-        outlineNumber:
-          text(
-            value(
-              row,
-              'outlineNumber'
-            )
-          ),
-        name,
-        ...ctx,
-        organizationName: text(value(row,'organization')),
-        status: detectStatus(progress, value(row,'status')),
-        progressPercent: progress,
-        durationAccepted: num(value(row,'duration')),
-        unit: text(value(row,'unit')),
-        predecessorsRaw: text(value(row,'predecessors')),
-        successorsRaw: text(value(row,'successors')),
-        comment: text(value(row,'comment')),
-        active: true,
-        testOnly: true,
-        createdAt,
-        updatedAt: createdAt
-      };
-
-      const dates = [
-        makeDate(taskId,'working',value(row,'workingStart'),value(row,'workingFinish'),'test-import'),
-        makeDate(taskId,'baseline',value(row,'baselineStart'),value(row,'baselineFinish'),'test-import'),
-        makeDate(taskId,'contract',value(row,'contractStart'),value(row,'contractFinish'),'test-import'),
-        makeDate(taskId,'actual',value(row,'factStart'),value(row,'factFinish'),'test-import')
-      ].filter(Boolean);
-
-      const q = num(value(row,'quantity'));
-      const quantities = q == null ? [] : [{
-        id: uid('TQTY'),
-        taskId,
-        name: 'Основной объем',
-        quantityType: 'primary',
-        unit: text(value(row,'unit')),
-        plannedQty: q,
-        isPrimary: true,
-        createdAt
-      }];
-
-      staged.push({ task, dates, quantities });
-    });
-
-    const stagedDependencies =
-      buildStagedDependencies(
-        staged,
-        importId
-      );
-
-
-    const comparison =
-      buildScheduleComparison(
-        staged
-      );
-
-
-    staged.forEach(
-      item => {
-        item.dependencies =
-          stagedDependencies
-            .filter(
-              dependency =>
-                dependency.predecessorTaskId ===
-                  item.task.id ||
-                dependency.successorTaskId ===
-                  item.task.id
-            );
+  function prepareRows(options={}) {
+    const rows=[],errors=[],warnings=[],sections=[];
+    let section='';
+    state.dataRows.forEach((row,index)=>{
+      const sourceRow=state.headerRow+2+index;
+      const nonempty=(row||[]).filter(v=>text(v));
+      if(!nonempty.length)return;
+      let name=text(value(row,'name'));
+      if(nonempty.length===1&&!name){section=text(nonempty[0]);sections.push(section);return;}
+      if(!name)return;
+      const isMilestone=/ключев[а-яё]*\s+дат|контрольн[а-яё]*\s+дат/i.test(name);
+      const rawStart=value(row,'workingStart'),rawFinish=value(row,'workingFinish');
+      let start=isoDate(rawStart),finish=isoDate(rawFinish);
+      for(const field of ['workingStart','workingFinish','baselineStart','baselineFinish','contractStart','contractFinish','factStart','factFinish']) {
+        const v=value(row,field);if(text(v)&&!isoDate(v))errors.push('Строка '+sourceRow+': некорректная дата «'+text(v)+'».');
       }
-    );
-
-
-    project.scheduleStaging = staged;
-    project.scheduleVersions.unshift({
-      id: importId,
-      type: 'test',
-      fileName: state.fileName,
-      sheetName: state.sheetName,
-      sourceType: state.sourceType,
-      rowsTotal: state.dataRows.length,
-      rowsCreated: staged.length,
-      dependencyCount:
-        stagedDependencies.length,
-      comparison,
-      createdAt,
-      status: 'Тест'
+      if(isMilestone&&!finish&&start){
+        if(options.milestoneFallback){finish=start;warnings.push('Строка '+sourceRow+': срок КД взят из колонки начала.');}
+        else errors.push('Строка '+sourceRow+': КД имеет дату только в «Начале». Подтвердите правило переноса даты над таблицей.');
+      }
+      if(isMilestone){start=finish;if(!finish)errors.push('Строка '+sourceRow+': у КД отсутствует срок.');}
+      if(start&&finish&&finish<start)errors.push('Строка '+sourceRow+': окончание раньше начала.');
+      const ctx=taskContext(row);if(!ctx.building)ctx.building=section;
+      if(!start&&!finish&&!isMilestone){warnings.push('Строка '+sourceRow+': нет дат, строка пропущена.');return;}
+      let progress=0;const raw=value(row,'progress');
+      if(text(raw)) {progress=num(text(raw).replace('%',''));if(!text(raw).includes('%')&&progress>0&&progress<1)progress*=100;
+        const column=state.mapping.progress,sheet=state.workbook?.Sheets?.[state.sheetName];
+        if(typeof raw==='number'&&sheet&&window.XLSX&&column!=null){const cell=sheet[XLSX.utils.encode_cell({r:sourceRow-1,c:column})];if(/%/.test(cell?.z||'')&&raw>=0&&raw<=1)progress=raw*100;}}
+      const durationRaw=text(value(row,'duration')).replace(/\s*(дней|дня|день|дн\.?|days?|д)\s*$/i,'');
+      const duration=durationRaw?num(durationRaw):null;
+      rows.push({sourceRow,name,...ctx,isMilestone,start,finish,progress:Math.max(0,Math.min(100,progress||0)),duration:isMilestone?0:duration,
+        sourceTaskId:text(value(row,'sourceTaskId')),organizationName:text(value(row,'organization')),
+        status:detectStatus(progress,value(row,'status')),outlineNumber:text(value(row,'outlineNumber')),
+        unit:text(value(row,'unit')),quantity:text(value(row,'quantity'))?num(value(row,'quantity')):null,
+        predecessorsRaw:text(value(row,'predecessors')),successorsRaw:text(value(row,'successors')),comment:text(value(row,'comment')),raw:row});
     });
-
-    if (typeof window.log === 'function') {
-      log('Тестовая загрузка графика', state.fileName+' · '+state.sheetName+' · '+staged.length+' задач');
+    const compact=v=>text(v).toLowerCase().replace(/[^а-яёa-z0-9]/g,'');
+    for(const r of rows.filter(r=>r.isMilestone&&!text(value(r.raw,'building')))){
+      const matches=[...new Set(sections)].filter(b=>compact(r.name).includes(compact(b)));
+      r.building=matches.length===1?matches[0]:'';
+      if(matches.length!==1)warnings.push('Строка '+r.sourceRow+': КД относится к нескольким зданиям или здание не определено. Привязка к последнему разделу не выполняется.');
     }
-    if (typeof window.saveProject === 'function') await saveProject();
+    const seen=new Set();for(const r of rows){const id=scheduleTaskIdentity(r);if(seen.has(id))errors.push('Строка '+r.sourceRow+': неоднозначный повтор работы. Уточните элемент, захватку или зону.');seen.add(id);}
+    return {rows,errors,warnings};
+  }
 
-    renderSchedule();
-    alert(
-      'Тестовая загрузка завершена. В рабочий график ничего не записано.\n\n' +
-      'Задач в файле: ' + staged.length + '\n' +
-      'Новых: ' + comparison.added + '\n' +
-      'Изменено: ' + comparison.changed + '\n' +
-      'Без изменений: ' + comparison.unchanged + '\n' +
-      'Нет в новой версии: ' + comparison.removed + '\n' +
-      'Зависимостей: ' + stagedDependencies.length
-    );
+  async function importSchedule() {
+    if(window.LIV_ACCESS?.canEdit===false){alert('Нет права изменять график.');return;}
+    if(!ensureCollections())return;
+    if(state.mapping.name==null){alert('Выберите колонку «Задача».');return;}
+    const group=text(document.getElementById('scheduleGroup')?.value),role=document.getElementById('scheduleRole')?.value||'working';
+    const effectiveDate=isoDate(document.getElementById('scheduleEffective')?.value),calendar=document.getElementById('scheduleCalendar')?.value||'7x0';
+    if(!group||!effectiveDate){alert('Укажите группу графика и дату версии.');return;}
+    const registerMilestones=Boolean(document.getElementById('scheduleRegisterKD')?.checked),organizationId=document.getElementById('scheduleOrganization')?.value||'',contractNo=text(document.getElementById('scheduleContractNo')?.value);
+    if(registerMilestones&&(role==='working'||!organizationId||!contractNo)){alert('Для регистрации договорных КД выберите договорный график, организацию и номер договора.');return;}
+    const prepared=prepareRows({milestoneFallback:document.getElementById('scheduleMilestoneFallback')?.checked});
+    if(prepared.errors.length){alert(prepared.errors.join('\n'));return;}
+    if(!prepared.rows.length){alert('Нет строк с работами и датами.');return;}
+    if(prepared.warnings.length&&!confirm(prepared.warnings.join('\n')+'\nПродолжить тестовую загрузку?'))return;
+    const importId=uid('SIMP'),createdAt=new Date().toISOString(),scheduleKey=[role,key(group),organizationId,key(contractNo)].join('|');
+    const staged=prepared.rows.map(r=>{
+      const taskId=uid('TASK');
+      const task={...r,id:taskId,raw:undefined,versionId:importId,sourceImportId:importId,sourceFile:state.fileName,sourceSheet:state.sheetName,
+        scheduleKey,role,effectiveDate,calendar,organizationId,active:true,testOnly:true,createdAt,updatedAt:createdAt,progressPercent:r.progress,durationAccepted:r.duration,
+        sourceTaskId:r.sourceTaskId||String(r.sourceRow),logicalId:scheduleTaskIdentity(r),isMilestone:r.isMilestone};
+      const dates=[makeDate(taskId,'working',r.start,r.finish,'test-import'),
+        makeDate(taskId,'baseline',value(r.raw,'baselineStart'),value(r.raw,'baselineFinish'),'test-import'),
+        makeDate(taskId,'contract',role==='working'?value(r.raw,'contractStart'):r.start,role==='working'?value(r.raw,'contractFinish'):r.finish,'test-import'),
+        makeDate(taskId,'actual',value(r.raw,'factStart'),value(r.raw,'factFinish'),'test-import')].filter(Boolean);
+      const quantities=r.quantity===null?[]:[{id:uid('TQTY'),taskId,name:'Основной объём',quantityType:'primary',quantity:r.quantity,unit:r.unit}];
+      return {task,dates,quantities};
+    });
+    const dependencies=buildStagedDependencies(staged,importId);
+    const parents=new Set(staged.map(x=>x.task.parentTaskId).filter(Boolean));for(const x of staged)x.task.isSummary=parents.has(x.task.id);
+    const sourceIds=new Set(staged.map(x=>x.task.sourceTaskId));
+    const relationErrors=[];
+    for(const {task} of staged)for(const field of ['predecessorsRaw','successorsRaw'])for(const token of text(task[field]).split(/[;,]+/).filter(Boolean)){
+      const parsed=parseDependencyToken(token);
+      if(!parsed||!sourceIds.has(parsed.sourceTaskId)||parsed.sourceTaskId===task.sourceTaskId)relationErrors.push('Строка '+task.sourceRow+': некорректная или не найденная связь '+token);
+    }
+    if(relationErrors.length){alert(relationErrors.join('\n'));return;}
+    const declared=staged.reduce((n,x)=>n+parseDependencyList(x.task.predecessorsRaw).length+parseDependencyList(x.task.successorsRaw).length,0);
+    if(declared&&!dependencies.length){alert('Связи указаны, но не найдены задачи по ID. Проверьте сопоставление.');return;}
+    // Duplicate source IDs are common inside building sections; links are ambiguous in that case.
+    if(declared&&new Set(staged.map(x=>x.task.sourceTaskId)).size!==staged.length){alert('Номера задач повторяются между разделами. Для связей нужны уникальные ID.');return;}
+    const sourceCounts=new Map();for(const {task} of staged)sourceCounts.set(task.sourceTaskId,(sourceCounts.get(task.sourceTaskId)||0)+1);
+    for(const {task} of staged)if(sourceCounts.get(task.sourceTaskId)>1){task.originalSourceTaskId=task.sourceTaskId;task.sourceTaskId='row:'+task.sourceRow+':'+task.sourceTaskId;}
+    for(const item of staged)item.dependencies=dependencies.filter(d=>d.predecessorTaskId===item.task.id||d.successorTaskId===item.task.id);
+    if(project.scheduleStaging.length&&!confirm('Заменить предыдущую тестовую загрузку? Рабочие версии сохраняются.'))return;
+    project.scheduleVersions.filter(v=>v.status==='Тест').forEach(v=>{v.status='Удален';});
+    project.scheduleStaging=staged;
+    project.scheduleVersions.unshift({id:importId,name:group,versionNo:Math.max(0,...project.scheduleVersions.filter(v=>(v.name||v.fileName)===group).map(v=>Number(v.versionNo)||0),project.scheduleVersions.filter(v=>(v.name||v.fileName)===group).length)+1,fileName:state.fileName,sheetName:state.sheetName,sourceType:state.sourceType,
+      scheduleKey,role,effectiveDate,calendar,organizationId,contractNo,registerMilestones,createdAt,status:'Тест',rowsCreated:staged.length,dependencyCount:dependencies.length});
+    if(typeof saveProject==='function')await saveProject();
+    renderSchedule();alert('В тестовом контуре: '+staged.length+' задач, '+staged.filter(x=>x.task.isMilestone).length+' КД. Проверьте таблицу перед принятием.');
   }
 
   async function promoteTestImport() {
-    if (!ensureCollections()) return;
-    const staged = Array.isArray(project.scheduleStaging) ? project.scheduleStaging : [];
-    if (!staged.length) {
-      alert('Сначала загрузите график в тестовый контур.');
-      return;
-    }
-
-    if (!confirm(
-      'Принять тестовый график как рабочий?\n\n' +
-      'Будет добавлено задач: '+staged.length+'\n' +
-      'Текущий рабочий график не удаляется автоматически.'
-    )) return;
-
-    const acceptedDependencyKeys =
-      new Set(
-        (
-          project.dependencies ||
-          []
-        )
-          .map(
-            dependency =>
-              [
-                dependency.predecessorTaskId,
-                dependency.successorTaskId,
-                dependency.linkType ||
-                  'FS',
-                Number(
-                  dependency.lagDays ||
-                  0
-                )
-              ]
-                .join(
-                  '|'
-                )
-          )
-      );
-
-
-    staged.forEach(item => {
-      const task = { ...item.task, testOnly: false, acceptedAt: new Date().toISOString() };
-      project.tasks.push(task);
-      (item.dates || []).forEach(d => project.taskDates.push({ ...d, source: 'accepted-import' }));
-      (item.quantities || []).forEach(q => project.taskQuantities.push({ ...q }));
-
-      (item.dependencies || []).forEach(dependency => {
-        const key = [
-          dependency.predecessorTaskId,
-          dependency.successorTaskId,
-          dependency.linkType || 'FS',
-          Number(dependency.lagDays || 0)
-        ].join('|');
-
-        if (acceptedDependencyKeys.has(key)) return;
-
-        acceptedDependencyKeys.add(key);
-        project.dependencies.push({
-          ...dependency,
-          source:
-            'accepted-import'
-        });
-      });
-    });
-
-    const lastVersion = (project.scheduleVersions || []).find(v => v.status === 'Тест');
-    if (lastVersion) {
-      lastVersion.status = 'Принят';
-      lastVersion.acceptedAt = new Date().toISOString();
-    }
-
-    if (!Array.isArray(project.importHistory)) project.importHistory = [];
-    project.importHistory.unshift({
-      id: lastVersion?.id || uid('SIMP'),
-      type: 'schedule',
-      fileName: lastVersion?.fileName || state.fileName,
-      sheetName: lastVersion?.sheetName || state.sheetName,
-      sourceType: lastVersion?.sourceType || state.sourceType,
-      rowsTotal: staged.length,
-      rowsCreated: staged.length,
-      createdAt: new Date().toISOString()
-    });
-
-    project.scheduleStaging = [];
-
-    if (typeof window.log === 'function') {
-      log('Принят рабочий график', (lastVersion?.fileName || state.fileName)+' · '+staged.length+' задач');
-    }
-    if (typeof window.saveProject === 'function') await saveProject();
-
-    renderSchedule();
-    alert('График принят. Добавлено рабочих задач: '+staged.length);
+    if(window.LIV_ACCESS?.canEdit===false){alert('Нет права изменять график.');return;}
+    if(!ensureCollections()||!project.scheduleStaging.length){alert('Сначала загрузите график в тестовый контур.');return;}
+    const id=project.scheduleStaging[0].task.sourceImportId;
+    const version=project.scheduleVersions.find(v=>v.id===id);
+    if(!confirm('Принять версию? Предыдущая версия этой группы останется в истории. Другие графики не изменятся.'+(version?.registerMilestones?'\nКД этого договора будут созданы или обновлены в журнале. Изменённые договорные сроки сохранятся в истории.':'\nКД останутся вехами графика; договорный журнал не изменяется.')))return;
+    try {
+      await window.LIV_PLANNING.persist(project,()=>{
+        window.LIV_PLANNING.accept(project,id);
+        const v=project.scheduleVersions.find(x=>x.id===id);
+        project.importHistory=project.importHistory||[];
+        project.importHistory.unshift({id,type:'schedule',fileName:v.fileName,sheetName:v.sheetName,createdAt:v.acceptedAt,rowsCreated:v.rowsCreated});
+      },()=>saveProject());
+    }catch(error){alert('Версия не сохранена: '+error.message);return;}
+    renderSchedule();alert('Версия принята. Предыдущие версии доступны для сравнения.');
   }
 
   async function clearTestImport() {
+    if(window.LIV_ACCESS?.canEdit===false){alert('Нет права изменять график.');return;}
     if (!ensureCollections()) return;
     const staged = Array.isArray(project.scheduleStaging) ? project.scheduleStaging : [];
     if (!staged.length) {
@@ -1456,12 +1298,14 @@
     if (task.segment) parts.push(task.segment);
     if (task.capture) parts.push(task.capture);
     if (task.zone) parts.push(task.zone);
+    if (task.element) parts.push(task.element);
     return parts.join(' · ');
   }
 
   function renderSchedule() {
     if (typeof project === 'undefined' || !project) return;
     ensureCollections();
+    if(window.LIV_PLANNING_UI)window.LIV_PLANNING_UI.render();
 
     const search = key(document.getElementById('scheduleSearch')?.value || '');
     const stagedTasks = (project.scheduleStaging || [])
@@ -1469,7 +1313,7 @@
       .filter(t => t.active !== false);
 
     let tasks = [
-      ...project.tasks.filter(t => t.active !== false),
+      ...window.LIV_PLANNING.currentTasks(project),
       ...stagedTasks
     ];
 
@@ -1485,7 +1329,7 @@
     const empty = document.getElementById('scheduleEmpty');
     if (!tbody || !table || !empty) return;
 
-    const official = project.tasks.filter(t => t.active !== false);
+    const official = window.LIV_PLANNING.currentTasks(project);
     const all = [...official, ...stagedTasks];
     const imported = official.filter(t => t.sourceImportId);
     const stagedCount = stagedTasks.length;
@@ -1507,7 +1351,7 @@
     empty.classList.add('hidden');
     table.classList.remove('hidden');
 
-    tbody.innerHTML = tasks.slice(0,1000).map((task,index) => {
+    tbody.innerHTML = tasks.map((task,index) => {
       const working = (task.testOnly ? stagedDateFor(task.id,'working') : dateFor(task.id,'working')) || {};
       const baseline = (task.testOnly ? stagedDateFor(task.id,'baseline') : dateFor(task.id,'baseline')) || {};
       return `
@@ -1525,6 +1369,10 @@
       `;
     }).join('');
 
+    const viewMode=document.getElementById('scheduleViewMode')?.value||'classic';
+    table.classList.toggle('hidden',viewMode==='matrix');
+    const matrix=document.querySelector('#planningTools .planning-matrix');
+    if(matrix)matrix.classList.toggle('hidden',viewMode==='classic');
     if (window.LIV_VIEW_BUILDER && typeof window.livApplyViewConstructor === 'function') {
       window.livApplyViewConstructor();
     }

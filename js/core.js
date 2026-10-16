@@ -5459,27 +5459,9 @@ async function saveLog(
 
   } else {
 
-    const previous =
-      canonicalFactRows()
-        .filter(
-          row =>
-            row.frontId ===
-              frontId &&
-            row.date <=
-              date
-        )
-        .reduce(
-          (
-            sum,
-            row
-          ) =>
-            sum +
-            num(
-              row.qty
-            ),
-          0
-        );
-
+    const previous = window.LIV_FACT_SERIES.series(
+      window.LIV_FACT_SERIES.primaryRows(project,new Set([String(frontId)])),date
+    ).actual;
 
     const cumulative =
       $('lCum').value ===
@@ -5595,70 +5577,7 @@ async function saveLog(
       );
 
 
-    if (front) {
-
-      front.doneQty =
-        Math.max(
-          num(
-            front.doneQty
-          ),
-          cumulative
-        );
-
-
-      if (
-        !front.factStart ||
-        date <
-        front.factStart
-      ) {
-
-        front.factStart =
-          date;
-      }
-
-      const totalQty =
-        num(
-          front.totalQty
-        );
-
-      if (
-        totalQty > 0 &&
-        cumulative >= totalQty
-      ) {
-        front.status =
-          'Завершено';
-
-        front.completed =
-          true;
-
-        if (
-          !front.factEnd ||
-          date >
-          front.factEnd
-        ) {
-          front.factEnd =
-            date;
-        }
-      } else if (
-        cumulative > 0 &&
-        ![
-          'Ограничение',
-          'Приостановлено'
-        ].includes(
-          front.status
-        )
-      ) {
-        front.status =
-          'В работе';
-
-        front.completed =
-          false;
-      }
-
-      front.updatedAt =
-        nowIso();
-    }
-
+    if(front)window.LIV_FACT_SERIES.refreshFront(project,front,today());
 
     log(
       'Добавлено',

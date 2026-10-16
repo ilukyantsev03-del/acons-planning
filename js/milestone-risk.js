@@ -239,6 +239,27 @@
     const fronts = linkedFronts(item, current);
     const elements = linkedElements(item, current);
     const target = targetFor(item, fronts, elements, current);
+    // Schedule milestones (delivery, acceptance, approvals) need no invented physical quantity.
+    if(item.scheduleTaskId && (item.riskMethod==='schedule'||target.quantity==null)){
+      const task=(current.tasks||[]).find(t=>t.id===item.scheduleTaskId&&t.active!==false);
+      const version=(current.scheduleVersions||[]).find(v=>v.id===(task?.versionId||task?.sourceImportId));
+      const planned=(current.taskDates||[]).filter(d=>d.taskId===task?.id&&d.type==='working').slice(-1)[0];
+      const targetDate=item.contractDate||'',forecast=planned?.finish||'';
+      const completed=Boolean(item.factDate&&item.factDate<=asOf)||isCompleted(item.status);
+      const applicable=task&&forecast&&(!version?.effectiveDate||version.effectiveDate<=asOf);
+      let level='gray',reason='Нет связанной версии графика на отчётную дату.';
+      if(completed){level='green';reason='Выполнение КД подтверждено.';}
+      else if(applicable&&targetDate){
+        if(targetDate<asOf){level='red';reason='Договорный срок прошёл, выполнение КД не подтверждено.';}
+        else if(forecast>targetDate){level='red';reason='Прогноз по связанному графику позже договорного срока.';}
+        else {level='yellow';reason='Прогноз по графику укладывается в срок. Выполнение КД требует подтверждения.';}
+      }
+      return {milestoneId:item.id,reportDate:asOf,targetDate,targetQty:null,targetUnit:'',actualQty:null,remainingQty:null,
+        daysLeft:targetDate?workdays(asOf,targetDate,item.riskCalendarId||'7x0'):null,recentRate:0,longRate:0,requiredRate:0,
+        projectedQty:null,projectedFinishDate:completed?(item.factDate||''):(applicable?forecast:''),gapQty:null,
+        riskLevel:level,label:LABELS[level],reason,calendarId:item.riskCalendarId||'7x0',windowDays:7,
+        sourceMode:'schedule',linkedFrontCount:fronts.length,linkedElementCount:elements.length};
+    }
     const useElements = elements.length && (elementHint(item) || item.elementGroupId || /шт/i.test(target.unit));
     const series = useElements ? elementSeries(elements, asOf) : factSeries(item, current, fronts, asOf);
     const actual = Math.max(0, num(item.actualQty) ?? series.actual ?? 0);
