@@ -47,9 +47,46 @@
   }
   function primaryRows(current, frontIds=null) {
     const primaries=new Map((current.workMetrics||[]).filter(x=>x.active!==false&&x.isPrimary===true).map(x=>[String(x.frontId),String(x.id)]));
-    return [...(current.progressFacts||[]),...(current.factLog||[])].filter(row=>
+    const canonicalIds=new Set((current.progressFacts||[]).filter(r=>r.id).map(r=>String(r.id)));
+    return [...(current.progressFacts||[]),...(current.factLog||[]).filter(r=>!canonicalIds.has(String(r.id)))].filter(row=>
       (!frontIds||frontIds.has(String(row.frontId)))&&(!row.metricId||primaries.get(String(row.frontId))===String(row.metricId))
     ).map(row=>({...row,metricId:row.metricId||primaries.get(String(row.frontId))||''}));
   }
-  window.LIV_FACT_SERIES={series,primaryRows};
+  function refreshFront(current,front,asOf=new Date().toISOString().slice(0,10)) {
+    const result=series(primaryRows(current,new Set([String(front.id)])),asOf);
+    if(!result.hasFacts)return result;
+    front.doneQty=result.actual;
+    const positive=result.entries.filter(r=>r.cumulative>0);
+    // A starting cumulative balance does not prove the historical start date.
+    const firstDaily=positive.find(r=>!r.baseline);
+    if(!front.factStart&&firstDaily)front.factStart=firstDaily.date;
+    const complete=Number(front.totalQty)>0&&result.actual>=Number(front.totalQty);
+    front.completed=complete;
+    if(complete){
+      front.status='Завершено';let reached='';
+      for(const row of [...result.entries].sort((a,b)=>a.date.localeCompare(b.date))){if(row.cumulative<Number(front.totalQty))reached='';else if(!reached)reached=row.date;}
+      front.factEnd=reached||front.factEnd||'';
+    }
+    else {front.factEnd='';if(!['Ограничение','Приостановлено','СМР приостановлены'].includes(front.status))front.status=result.actual>0?'В работе':'Не начато';}
+    front.updatedAt=new Date().toISOString();
+    return result;
+  }
+  function sourceMatch(rows,incoming) {
+    const src=incoming.source||{};
+    if(!src.file||!src.sheet||!src.row)return null;
+    const matches=(rows||[]).filter(r=>r.active!==false&&String(r.frontId)===String(incoming.frontId)&&String(r.metricId||'')===String(incoming.metricId||'')&&
+      (r.factDate||r.date)===(incoming.factDate||incoming.date)&&r.source?.file===src.file&&r.source?.sheet===src.sheet&&r.source?.row===src.row);
+    if(matches.length>1)throw Error('Несколько фактов соответствуют одной строке источника. Требуется ручное сопоставление.');
+    return matches[0]||null;
+  }
+  function replaceFact(current,existing,incoming) {
+    const previous=JSON.parse(JSON.stringify(existing));
+    const revisions=[...(existing.revisions||[]),{...previous,revisions:undefined}];
+    if(incoming.factType==='quantity')incoming={...incoming,cumulativeQty:series([...(current.progressFacts||[]).filter(r=>r.id!==existing.id&&r.frontId===incoming.frontId&&String(r.metricId||'')===String(incoming.metricId||'')),incoming],incoming.factDate).actual};
+    Object.assign(existing,incoming,{id:existing.id,createdAt:previous.createdAt||incoming.createdAt,sourceFingerprint:existing.sourceFingerprint||('progress:'+existing.id),revisions,updatedAt:new Date().toISOString()});
+    const legacy=(current.factLog||[]).find(r=>r.id===existing.id);
+    if(legacy)Object.assign(legacy,{date:existing.factDate,qty:existing.quantity,cumulative:existing.cumulativeQty,people:existing.people,comment:existing.comment,source:existing.source,latestImportFingerprint:existing.latestImportFingerprint,updatedAt:existing.updatedAt});
+    return existing;
+  }
+  window.LIV_FACT_SERIES={series,primaryRows,refreshFront,sourceMatch,replaceFact};
 })();

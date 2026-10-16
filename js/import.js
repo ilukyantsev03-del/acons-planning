@@ -5374,6 +5374,7 @@ async function commitImport(){
 
       const fingerprint =
         [
+          importFileName,importSheetName,item.rowNumber,
           front.id,
           metricId,
           date,
@@ -5405,8 +5406,7 @@ async function commitImport(){
           )
             .some(
               existing =>
-                existing.sourceFingerprint ===
-                fingerprint
+                ((existing.latestImportFingerprint || existing.sourceFingerprint) === fingerprint)
             )
         ) ||
         (
@@ -5416,7 +5416,7 @@ async function commitImport(){
           )
             .some(
               existing =>
-                existing.importFingerprint ===
+                (existing.latestImportFingerprint || existing.importFingerprint) ===
                 fingerprint
             )
         )
@@ -5461,7 +5461,8 @@ async function commitImport(){
         [];
 
 
-      project.progressFacts.push({
+      const incomingFact = {
+        latestImportFingerprint: fingerprint,
         id:
           factId,
         frontId:
@@ -5491,8 +5492,19 @@ async function commitImport(){
             item
           )
         }
-      });
+      };
 
+
+      const existingFact=window.LIV_FACT_SERIES.sourceMatch(project.progressFacts,incomingFact);
+      if(existingFact){
+        const same=existingFact.factType===incomingFact.factType&&Number(existingFact.quantity||0)===Number(incomingFact.quantity||0)&&Number(existingFact.people||0)===Number(incomingFact.people||0)&&String(existingFact.comment||'')===String(incomingFact.comment||'')&&(incomingFact.factType!=='cumulative_snapshot'||Number(existingFact.cumulativeQty)===Number(incomingFact.cumulativeQty));
+        if(same){skipped++;continue;}
+        if(!confirm('Исправление ранее загруженной строки '+incomingFact.source.row+' ('+date+').\nБыло: '+existingFact.quantity+'; накопительно: '+existingFact.cumulativeQty+'\nСтало: '+incomingFact.quantity+'; накопительно: '+incomingFact.cumulativeQty+'\nЗаменить факт с сохранением истории?')){skipped++;continue;}
+        window.LIV_FACT_SERIES.replaceFact(project,existingFact,incomingFact);
+        window.LIV_FACT_SERIES.refreshFront(project,front);
+        updated++;continue;
+      }
+      project.progressFacts.push(incomingFact);
 
       project.factLog.push({
         id:
@@ -5519,83 +5531,7 @@ async function commitImport(){
       });
 
 
-      if (
-        !metric ||
-        metric.isPrimary ===
-          true
-      ) {
-
-        front.doneQty =
-          Math.max(
-            num(
-              front.doneQty
-            ),
-            cumulative
-          );
-
-
-        if (
-          !front.factStart ||
-          date <
-            front.factStart
-        ) {
-          front.factStart =
-            date;
-        }
-
-
-        const totalQty =
-          num(
-            front.totalQty
-          );
-
-
-        if (
-          totalQty >
-            0 &&
-          cumulative >=
-            totalQty
-        ) {
-
-          front.status =
-            'Завершено';
-
-          front.completed =
-            true;
-
-          if (
-            !front.factEnd ||
-            date >
-              front.factEnd
-          ) {
-            front.factEnd =
-              date;
-          }
-
-        } else if (
-          cumulative >
-            0 &&
-          ![
-            'Ограничение',
-            'Приостановлено'
-          ]
-            .includes(
-              front.status
-            )
-        ) {
-
-          front.status =
-            'В работе';
-
-          front.completed =
-            false;
-        }
-
-
-        front.updatedAt =
-          nowIso();
-      }
-
+      if(!metric||metric.isPrimary===true)window.LIV_FACT_SERIES.refreshFront(project,front);
 
       appended++;
 
@@ -6319,6 +6255,17 @@ async function rollbackLastImport(){
   const batchId =
     last.id;
 
+  for(const fact of project.progressFacts||[]){
+    if(fact.source?.batchId===batchId&&fact.revisions?.length){
+      const revisions=[...fact.revisions],previous=revisions.pop();
+      for(const k of Object.keys(fact))delete fact[k];
+      Object.assign(fact,previous,{revisions});
+      const legacy=(project.factLog||[]).find(r=>r.id===fact.id);
+      if(legacy)Object.assign(legacy,{source:fact.source,date:fact.factDate,qty:fact.quantity,cumulative:fact.cumulativeQty,people:fact.people,comment:fact.comment,latestImportFingerprint:fact.latestImportFingerprint||fact.sourceFingerprint});
+    }
+  }
+
+
 
   project.resources =
     (
@@ -6379,6 +6326,8 @@ async function rollbackLastImport(){
           batchId
       );
 
+
+  for(const front of project.fronts||[])window.LIV_FACT_SERIES.refreshFront(project,front);
 
   project.importHistory =
     history.slice(
