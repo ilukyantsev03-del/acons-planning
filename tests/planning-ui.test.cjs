@@ -13,7 +13,7 @@ function setup(){
   for(const file of ['planning-core','fact-series','schedule','planning-ui']){
     let source=fs.readFileSync(path.join(__dirname,'../js/'+file+'.js'),'utf8');
     if(file==='schedule')source=source.replace('  window.renderSchedule = renderSchedule;', '  window.SCHEDULE_TEST={state,prepareRows,importSchedule,promoteTestImport,handleFile};\n  window.renderSchedule = renderSchedule;');
-    if(file==='planning-ui')source=source.replace('  window.LIV_PLANNING_UI={render};','  window.UI_TEST={state,selectedInput,dependenciesFor,readDraft,saveScenario,volumeTable};\n  window.LIV_PLANNING_UI={render};');
+    if(file==='planning-ui')source=source.replace('  window.LIV_PLANNING_UI={render};','  window.UI_TEST={state,selectedInput,dependenciesFor,readDraft,saveScenario,volumeTable,createManual,editManualTask,saveManualFact};\n  window.LIV_PLANNING_UI={render};');
     vm.runInContext(source,c,{filename:file});
   }
   c.renderSchedule=c.window.renderSchedule;
@@ -59,3 +59,22 @@ test('Реальные договорные книги: полный путь ч
     const serialized=JSON.stringify(e.c.project);e.c.project=JSON.parse(serialized);e.c.window.renderSchedule();assert.ok(e.el('planningTask'));assert.equal(e.c.window.LIV_PLANNING.currentTasks(e.c.project).length,count);
   }
 });
+
+ test('Ручной ввод: создание без файла, новая редакция и сохранение базовой версии', {skip:!domPath},async()=>{
+  const e=setup();e.c.window.LIV_PLANNING_UI.render();e.set('manualName','Паркинг');e.set('manualRole','customer');e.set('manualRows','Сваи\tПаркинг\t1\t1\tБП-2\t1\t120\tшт.\t19.10.2026\t30.10.2026\tнет\t0');
+  await e.c.window.UI_TEST.createManual();assert.equal(e.c.project.tasks.length,1);assert.ok(e.el('planningRateSlider'));const source=e.c.project.scheduleVersions[0];source.isBaseline=true;
+  e.set('editTaskFinish','2026-11-02');await e.c.window.UI_TEST.editManualTask();assert.equal(e.c.project.scheduleVersions.length,2);assert.equal(e.c.project.tasks.length,2);assert.equal(source.isBaseline,true);assert.equal(e.c.project.scheduleVersions[0].isBaseline,false);assert.equal(e.c.project.taskDates.find(d=>d.type==='contract'&&d.taskId===e.c.project.tasks.at(-1).id).finish,'2026-11-02');
+ });
+ test('Ползунки: мгновенный сценарий и сброс устаревшего общего прогноза', {skip:!domPath},async()=>{
+  const e=setup(),a=stage(e);await a.importSchedule();await a.promoteTestImport();e.change('planningMode','productivity');e.change('planningRate','10');e.change('planningResources','1');e.el('planningCalculate').dispatchEvent(new e.Event('click',{bubbles:true}));assert.ok(e.el('planningSave'));
+  e.set('planningResourcesSlider','2');e.el('planningResourcesSlider').dispatchEvent(new e.Event('input',{bubbles:true}));assert.equal(e.c.window.UI_TEST.state.preview,null);assert.equal(e.el('planningSave'),null);assert.match(e.el('planningLive').innerHTML,/2026-10-19/);assert.equal(e.el('planningResources').value,'2');
+ });
+ test('Календарь и выравнивание: предпросмотр и сохранение новой версии', {skip:!domPath},async()=>{
+  const e=setup(),a=stage(e);a.state.dataRows.push(['Стены','ДЭС','15.10.2026','20.10.2026',100,'м²']);await a.importSchedule();await a.promoteTestImport();
+  e.change('planningPool','Рабочие');e.change('planningResources','2');e.change('planningTask',e.c.project.tasks[1].id);e.change('planningPool','Рабочие');e.change('planningResources','2');e.change('planningCapacities','Рабочие = 2');e.change('planningHolidays','19.10.2026');
+  e.el('planningLevel').dispatchEvent(new e.Event('click',{bubbles:true}));assert.ok(e.c.window.UI_TEST.state.leveled,e.messages.join(' '));assert.equal(e.c.window.UI_TEST.state.leveled.changes.length,1);await e.c.window.UI_TEST.saveScenario();assert.equal(e.c.project.planningSettings.holidays[0],'2026-10-19');assert.equal(e.c.project.scheduleVersions.length,2);assert.ok(e.c.project.tasks.filter(t=>t.versionId===e.c.project.scheduleVersions[0].id).some(t=>t.planning.start>'2026-10-15'));
+ });
+ test('Факт из графика: ввод, исправление вниз и история', {skip:!domPath},async()=>{
+  const e=setup(),a=stage(e);e.c.project.fronts=[{id:'F',name:'Кровля',unit:'м²',totalQty:100,doneQty:0}];await a.importSchedule();await a.promoteTestImport();e.change('planningFront','F');e.set('planningFactDate','2026-10-15');e.set('planningFactQuantity','85');e.set('planningFactType','cumulative_snapshot');await e.c.window.UI_TEST.saveManualFact();assert.equal(e.c.project.fronts[0].doneQty,85);
+  e.set('planningFactRecord',e.c.project.progressFacts[0].id);e.set('planningFactDate','2026-10-15');e.set('planningFactQuantity','70');e.set('planningFactType','cumulative_snapshot');await e.c.window.UI_TEST.saveManualFact();assert.equal(e.c.project.fronts[0].doneQty,70);assert.equal(e.c.project.progressFacts.length,1);assert.equal(e.c.project.progressFacts[0].revisions[0].cumulativeQty,85);
+ });

@@ -267,7 +267,7 @@
 
 (function loadLivDataModules() {
   const modules = [
-    ['liv-normalized-sync', 'js/normalized-sync.js?v=20261016-1'],
+    ['liv-normalized-sync', 'js/normalized-sync.js?v=20261018-1'],
     ['liv-source-mappings', 'js/source-mappings.js?v=20261013-5'],
     ['liv-milestone-risk', 'js/milestone-risk.js?v=20261016-1'],
     ['liv-milestone-risk-groups', 'js/milestone-risk-groups.js?v=20261013-2'],

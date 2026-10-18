@@ -1449,6 +1449,7 @@
             element: item.element || undefined,
             logicalId: item.logicalId || undefined,
             planning: item.planning || undefined,
+            totalFloat: item.totalFloat ?? undefined,
             calendar: item.calendar || undefined,
             block: item.block || undefined,
             floor: item.floor || undefined,

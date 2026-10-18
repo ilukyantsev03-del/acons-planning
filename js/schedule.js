@@ -362,6 +362,7 @@
                 <th>Статус</th>
                 <th>Рабочее начало</th>
                 <th>Рабочее окончание</th>
+                <th>Базовое начало</th>
                 <th>Базовое окончание</th>
                 <th>%</th>
               </tr>
@@ -1363,6 +1364,7 @@
           <td><span class="schedule-status">${esc(task.status || 'Не начато')}</span></td>
           <td>${esc(working.start || '—')}</td>
           <td>${esc(working.finish || '—')}</td>
+          <td>${esc(baseline.start || '—')}</td>
           <td>${esc(baseline.finish || '—')}</td>
           <td>${Math.round(Number(task.progressPercent)||0)}%</td>
         </tr>
