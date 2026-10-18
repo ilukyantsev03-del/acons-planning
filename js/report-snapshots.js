@@ -132,7 +132,8 @@
             )
           : 0;
 
-        const total = Math.max(0,num(front.totalQty));
+        const datedFront = window.LIV_PLANNING_DOMAIN?.frontView(current,front,reportDate)||front;
+        const total = Math.max(0,num(datedFront.totalQty));
         return {
           frontId: front.id,
           building: building?.name || '',
@@ -179,7 +180,8 @@
             )
           : 0;
 
-        const total = Math.max(0,num(metric.targetQty));
+        const datedFront=metric.isPrimary?window.LIV_PLANNING_DOMAIN?.frontView(current,front,reportDate):null;
+        const total = Math.max(0,num(datedFront?.totalQty??metric.targetQty));
 
         return {
           metricId: metric.id,

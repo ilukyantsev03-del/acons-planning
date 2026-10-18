@@ -186,7 +186,8 @@
         note.style.marginTop = '3px';
         cell.appendChild(note);
       }
-      const nextText = value ? 'Группа: ' + value : '';
+      const scope=window.LIV_PLANNING_DOMAIN?.elementScope(current,element);
+      const nextText = [value ? 'Группа: ' + value : '',scope?.excluded?'Исключено из объёма с '+scope.effectiveDate:''].filter(Boolean).join(' · ');
       if (note.textContent !== nextText) note.textContent = nextText;
     });
   }

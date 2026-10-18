@@ -1251,6 +1251,8 @@ async function dbPutKey(
         () =>
           resolve();
 
+      transaction.onabort = () => reject(transaction.error || new Error('Запись отменена локальной базой.'));
+
       transaction.onerror =
         () =>
           reject(
@@ -1314,6 +1316,9 @@ function normalizeProject(
     'dailyReports',
     'factHistory',
     'quantityHistory',
+    'quantityBaselines',
+    'quantityChanges',
+    'quantityPlans',
     'forecastSnapshots',
     'planLog',
     'factLog',
@@ -1772,6 +1777,8 @@ function hydrateFront(
   return {
 
     ...front,
+
+    ...(window.LIV_PLANNING_DOMAIN?.frontView(project,front)||{}),
 
     structure,
 

@@ -1449,6 +1449,8 @@
             element: item.element || undefined,
             logicalId: item.logicalId || undefined,
             planning: item.planning || undefined,
+            volumeKey: item.volumeKey || undefined,
+            quantityLedger: window.LIV_PLANNING_DOMAIN?.quantityMetadata(current, item),
             totalFloat: item.totalFloat ?? undefined,
             calendar: item.calendar || undefined,
             block: item.block || undefined,

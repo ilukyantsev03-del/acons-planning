@@ -10,10 +10,10 @@ function setup(){
     ArrayBuffer,Uint8Array,
     crypto:require('node:crypto').webcrypto,Date,console,setTimeout:()=>1,alert:m=>messages.push(m),confirm:()=>true,saveProject:async()=>{}};
   c.window.saveProject=c.saveProject;c.window.LIV_ACCESS={canEdit:true};vm.createContext(c);
-  for(const file of ['planning-core','fact-series','schedule','planning-ui']){
+  for(const file of ['planning-core','fact-series','planning-domain','schedule','planning-ui']){
     let source=fs.readFileSync(path.join(__dirname,'../js/'+file+'.js'),'utf8');
     if(file==='schedule')source=source.replace('  window.renderSchedule = renderSchedule;', '  window.SCHEDULE_TEST={state,prepareRows,importSchedule,promoteTestImport,handleFile};\n  window.renderSchedule = renderSchedule;');
-    if(file==='planning-ui')source=source.replace('  window.LIV_PLANNING_UI={render};','  window.UI_TEST={state,selectedInput,dependenciesFor,readDraft,saveScenario,volumeTable,createManual,editManualTask,saveManualFact};\n  window.LIV_PLANNING_UI={render};');
+    if(file==='planning-ui')source=source.replace('  window.LIV_PLANNING_UI={render};','  window.UI_TEST={state,selectedInput,dependenciesFor,readDraft,saveScenario,volumeTable,createManual,editManualTask,saveManualFact,saveQuantity,savePeriodPlan,saveKDLinks,savePlanningReport,saveNamedScenario,loadNamedScenario,verifyStorage};\n  window.LIV_PLANNING_UI={render};');
     vm.runInContext(source,c,{filename:file});
   }
   c.renderSchedule=c.window.renderSchedule;
@@ -78,3 +78,23 @@ test('Реальные договорные книги: полный путь ч
   const e=setup(),a=stage(e);e.c.project.fronts=[{id:'F',name:'Кровля',unit:'м²',totalQty:100,doneQty:0}];await a.importSchedule();await a.promoteTestImport();e.change('planningFront','F');e.set('planningFactDate','2026-10-15');e.set('planningFactQuantity','85');e.set('planningFactType','cumulative_snapshot');await e.c.window.UI_TEST.saveManualFact();assert.equal(e.c.project.fronts[0].doneQty,85);
   e.set('planningFactRecord',e.c.project.progressFacts[0].id);e.set('planningFactDate','2026-10-15');e.set('planningFactQuantity','70');e.set('planningFactType','cumulative_snapshot');await e.c.window.UI_TEST.saveManualFact();assert.equal(e.c.project.fronts[0].doneQty,70);assert.equal(e.c.project.progressFacts.length,1);assert.equal(e.c.project.progressFacts[0].revisions[0].cumulativeQty,85);
  });
+
+test('Сквозной цикл: объём → факт → прогноз КД → отчёт → повторное открытие', {skip:!domPath},async()=>{
+ const e=setup(),a=stage(e);let saved='';e.c.saveProject=async()=>{saved=JSON.stringify(e.c.project);};e.c.dbGetKey=async()=>JSON.parse(saved);
+ e.c.project.fronts=[{id:'F',name:'Кровля',unit:'м²',totalQty:100,doneQty:40}];e.c.project.milestones=[{id:'M',title:'КД Кровля',contractDate:'2026-10-20'}];e.c.project.progressFacts=[{id:'F1',frontId:'F',factDate:'2026-10-15',factType:'cumulative_snapshot',cumulativeQty:40}];
+ await a.importSchedule();await a.promoteTestImport();e.change('planningFront','F');e.set('editTaskName','Кровля');await e.c.window.UI_TEST.editManualTask();
+ e.set('quantityDate','2026-10-16');e.set('quantityAmount','20');e.set('quantityKind','add');e.set('quantityReason','Дополнительная конструкция');e.set('quantityDocument','РД-2');await e.c.window.UI_TEST.saveQuantity();assert.equal(e.c.project.fronts[0].totalQty,120);assert.equal(e.el('planningTotal').value,'120');
+ const kd=e.el('planningKDTargets').querySelector('option');kd.setAttribute('selected','');await e.c.window.UI_TEST.saveKDLinks();
+ e.change('planningMode','productivity');e.change('planningRate','10');e.change('planningResources','1');e.el('planningCalculate').dispatchEvent(new e.Event('click',{bubbles:true}));assert.ok(e.c.window.UI_TEST.state.preview,e.messages.join(' '));await e.c.window.UI_TEST.saveScenario();assert.equal(e.c.project.milestones[0].contractDate,'2026-10-20');assert.equal(e.c.project.milestones[0].workDate,'2026-10-22');
+ e.set('periodPlanRows','2026-10-15 ; 2026-10-18 ; 20\n2026-10-19 ; 2026-10-22 ; 60');await e.c.window.UI_TEST.savePeriodPlan();
+ e.change('planningFrom','2026-10-16');e.change('planningTo','2026-10-18');e.set('planningReportTitle','Контрольный отчёт');await e.c.window.UI_TEST.savePlanningReport();const frozen=JSON.stringify(e.c.project.reportSnapshots[0].dataSnapshot);
+ e.set('planningScenarioName','Две установки');await e.c.window.UI_TEST.saveNamedScenario();await e.c.window.UI_TEST.verifyStorage();assert.match(e.c.window.UI_TEST.state.storageMessage,/Сверка пройдена/);
+ const fresh=setup();fresh.c.project=JSON.parse(saved);fresh.c.window.LIV_PLANNING_UI.render();assert.equal(fresh.c.project.quantityChanges.length,1);assert.equal(fresh.c.project.quantityPlans.length,1);assert.equal(fresh.c.project.planningSettings.scenarios.length,1);assert.equal(JSON.stringify(fresh.c.project.reportSnapshots[0].dataSnapshot),frozen);assert.match(fresh.el('planningReportContent').textContent,/Контрольный отчёт/);fresh.set('planningSavedScenario',fresh.c.project.planningSettings.scenarios[0].id);fresh.c.window.UI_TEST.loadNamedScenario();assert.equal(fresh.el('planningRate').value,'10');assert.match(fresh.el('planningReportContent').textContent,/Шахматка на дату отчёта/);
+ fresh.c.project.quantityChanges.push({...fresh.c.project.quantityChanges[0],id:'later',delta:50,effectiveDate:'2026-10-18',sequence:2});fresh.c.window.LIV_PLANNING_UI.render();assert.equal(JSON.stringify(fresh.c.project.reportSnapshots[0].dataSnapshot),frozen);
+});
+test('Сравнение по датам не подставляет будущую версию и восстанавливает выбранную', {skip:!domPath},async()=>{
+ const e=setup(),a=stage(e);await a.importSchedule();await a.promoteTestImport();e.change('planningComparisonMode','dates');e.change('planningRightDate','2026-10-14');assert.match(e.el('planningTools').textContent,/На выбранную дату нет сохранённой версии/);e.change('planningRightDate','2026-10-16');assert.ok(e.el('planningTask'));assert.equal(e.c.window.UI_TEST.state.right,e.c.project.scheduleVersions[0].id);
+});
+test('Решение об объёме: отказ сохранения не оставляет частичных изменений', {skip:!domPath},async()=>{
+ const e=setup(),a=stage(e);await a.importSchedule();await a.promoteTestImport();e.set('quantityDate','2026-10-16');e.set('quantityAmount','20');e.set('quantityReason','Исключение');e.set('quantityDocument','Письмо');e.c.saveProject=async()=>{throw Error('offline');};await assert.rejects(e.c.window.UI_TEST.saveQuantity(),/offline/);assert.equal(e.c.project.quantityChanges.length,0);assert.equal(e.c.project.quantityBaselines.length,0);
+});

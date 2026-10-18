@@ -104,6 +104,7 @@
     for(const item of staged){project.tasks.push({...item.task,versionId,logicalId:item.task.logicalId||identity(item.task),testOnly:false});project.taskDates.push(...item.dates);project.taskQuantities.push(...item.quantities);}
     const seen=new Set();for(const item of staged)for(const dep of item.dependencies||[]){if(!seen.has(dep.id)){seen.add(dep.id);project.dependencies.push(dep);}}
     registerMilestones(project,v,project.tasks.filter(t=>t.versionId===versionId));
+    window.LIV_PLANNING_DOMAIN?.reviewImportedVolumes(project,v,project.tasks.filter(t=>t.versionId===versionId));
     v.status='Принят';v.isCurrent=true;v.acceptedAt=new Date().toISOString();project.scheduleStaging=[];
   }
   function recalculate(tasks,dependencies,inputs) {
@@ -148,7 +149,7 @@
     return all?total*period/all:null;
   }
   async function persist(current,mutation,save){
-    const names=['fronts','progressFacts','factLog','history','planningSettings','tasks','taskDates','taskQuantities','dependencies','scheduleVersions','scheduleStaging','importHistory','contracts','milestones'];
+    const names=['workMetrics','numberedElements','quantityBaselines','quantityChanges','quantityPlans','reportSnapshots','fronts','progressFacts','factLog','history','planningSettings','tasks','taskDates','taskQuantities','dependencies','scheduleVersions','scheduleStaging','importHistory','contracts','milestones'];
     const before=Object.fromEntries(names.map(k=>[k,JSON.parse(JSON.stringify(current[k]||(k==='planningSettings'?{}:[])))]));
     try{mutation();await save();}catch(error){for(const k of names)current[k]=before[k];throw error;}
   }
