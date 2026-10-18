@@ -1319,6 +1319,8 @@ function normalizeProject(
     'quantityBaselines',
     'quantityChanges',
     'quantityPlans',
+    'planningEdits',
+    'scheduleMatches',
     'forecastSnapshots',
     'planLog',
     'factLog',

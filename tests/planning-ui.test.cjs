@@ -10,7 +10,7 @@ function setup(){
     ArrayBuffer,Uint8Array,
     crypto:require('node:crypto').webcrypto,Date,console,setTimeout:()=>1,alert:m=>messages.push(m),confirm:()=>true,saveProject:async()=>{}};
   c.window.saveProject=c.saveProject;c.window.LIV_ACCESS={canEdit:true};vm.createContext(c);
-  for(const file of ['planning-core','fact-series','planning-domain','schedule','planning-ui']){
+  for(const file of ['planning-core','fact-series','planning-domain','planning-daily','schedule','planning-ui','planning-daily-ui']){
     let source=fs.readFileSync(path.join(__dirname,'../js/'+file+'.js'),'utf8');
     if(file==='schedule')source=source.replace('  window.renderSchedule = renderSchedule;', '  window.SCHEDULE_TEST={state,prepareRows,importSchedule,promoteTestImport,handleFile};\n  window.renderSchedule = renderSchedule;');
     if(file==='planning-ui')source=source.replace('  window.LIV_PLANNING_UI={render};','  window.UI_TEST={state,selectedInput,dependenciesFor,readDraft,saveScenario,volumeTable,createManual,editManualTask,saveManualFact,saveQuantity,savePeriodPlan,saveKDLinks,savePlanningReport,saveNamedScenario,loadNamedScenario,verifyStorage};\n  window.LIV_PLANNING_UI={render};');
@@ -97,4 +97,21 @@ test('Сравнение по датам не подставляет будущ�
 });
 test('Решение об объёме: отказ сохранения не оставляет частичных изменений', {skip:!domPath},async()=>{
  const e=setup(),a=stage(e);await a.importSchedule();await a.promoteTestImport();e.set('quantityDate','2026-10-16');e.set('quantityAmount','20');e.set('quantityReason','Исключение');e.set('quantityDocument','Письмо');e.c.saveProject=async()=>{throw Error('offline');};await assert.rejects(e.c.window.UI_TEST.saveQuantity(),/offline/);assert.equal(e.c.project.quantityChanges.length,0);assert.equal(e.c.project.quantityBaselines.length,0);
+});
+
+test('Рабочее место: табличная правка → отмена → повтор → предпросмотр → рабочая версия', {skip:!domPath},async()=>{
+ const e=setup(),a=stage(e);await a.importSchedule();await a.promoteTestImport();assert.ok(e.el('dailyWorkspace'));const id=e.c.project.tasks[0].id;
+ const field=e.el('dailyWorkspace').querySelector('[data-daily-task="'+id+'"][data-daily-field="name"]');field.value='Кровля уточнённая';field.dispatchEvent(new e.Event('change',{bubbles:true}));assert.match(e.el('dailyDraftCount').textContent,/Изменено строк: 1/);
+ e.el('dailyUndo').dispatchEvent(new e.Event('click',{bubbles:true}));assert.match(e.el('dailyDraftCount').textContent,/Изменено строк: 0/);e.el('dailyRedo').dispatchEvent(new e.Event('click',{bubbles:true}));assert.match(e.el('dailyDraftCount').textContent,/Изменено строк: 1/);
+ e.el('dailyPrepare').dispatchEvent(new e.Event('click',{bubbles:true}));assert.ok(e.el('dailyCommit'),e.el('dailyMessage').textContent);e.el('dailyCommit').dispatchEvent(new e.Event('click',{bubbles:true}));for(let i=0;i<8;i++)await Promise.resolve();assert.equal(e.c.project.scheduleVersions.length,2);assert.equal(e.c.project.tasks.at(-1).name,'Кровля уточнённая');assert.equal(e.c.project.planningEdits.length,1);
+});
+test('Рабочее место: вставка диапазона и массовое изменение с одной отменой', {skip:!domPath},async()=>{
+ const e=setup(),a=stage(e);a.state.dataRows.push(['Стены','ДЭС','15.10.2026','20.10.2026',50,'м²']);await a.importSchedule();await a.promoteTestImport();const start=e.el('dailyWorkspace').querySelector('[data-row="0"][data-col="0"]'),event=new e.Event('paste',{bubbles:true});event.clipboardData={getData:()=> 'Кровля 1\tДЭС\nСтены 1\tДЭС'};start.dispatchEvent(event);assert.match(e.el('dailyDraftCount').textContent,/Изменено строк: 2/);e.el('dailyUndo').dispatchEvent(new e.Event('click',{bubbles:true}));assert.match(e.el('dailyDraftCount').textContent,/Изменено строк: 0/);
+ e.el('dailySelectAll').dispatchEvent(new e.Event('click',{bubbles:true}));e.set('dailyBulkField','status');e.set('dailyBulkValue','СМР приостановлены');e.el('dailyBulkApply').dispatchEvent(new e.Event('click',{bubbles:true}));assert.match(e.el('dailyDraftCount').textContent,/Изменено строк: 2/);
+});
+test('Готовые формы: Заказчик и внутренний прогноз сохраняют отдельную структуру', {skip:!domPath},async()=>{
+ const e=setup(),a=stage(e);await a.importSchedule();await a.promoteTestImport();e.set('planningReportTemplate','customer-weekly');await e.c.window.UI_TEST.savePlanningReport();assert.equal(e.c.project.reportSnapshots[0].reportType,'customer');assert.match(e.el('planningReportContent').textContent,/Еженедельный отчёт Заказчику/);e.set('planningReportTemplate','internal-resources');await e.c.window.UI_TEST.savePlanningReport();assert.match(e.el('planningReportContent').textContent,/Внутренний прогноз объёмов и ресурсов/);assert.ok(Array.isArray(e.c.project.reportSnapshots.at(-1).dataSnapshot.resourceLoad));
+});
+test('Подтверждение соответствия через интерфейс применяется в сравнении', {skip:!domPath},async()=>{
+ const e=setup(),a=stage(e);await a.importSchedule();await a.promoteTestImport();const first=e.c.project.scheduleVersions[0].id,firstTask=e.c.project.tasks[0].id;e.set('scheduleGroup','График подрядчика');a.state.dataRows[0][0]='Устройство покрытия';await a.importSchedule();await a.promoteTestImport();const second=e.c.project.scheduleVersions[0].id,secondTask=e.c.project.tasks.at(-1).id;e.change('planningLeft',first);e.change('planningRight',second);e.set('dailyMatchLeft',firstTask);e.set('dailyMatchRight',secondTask);e.set('dailyMatchReason','Одна работа с разными наименованиями');e.el('dailyMatchSave').dispatchEvent(new e.Event('click',{bubbles:true}));for(let i=0;i<8;i++)await Promise.resolve();assert.equal(e.c.project.scheduleMatches.length,1);assert.match(e.el('planningTools').textContent,/Соответствие подтверждено/);
 });

@@ -149,7 +149,7 @@
     return all?total*period/all:null;
   }
   async function persist(current,mutation,save){
-    const names=['workMetrics','numberedElements','quantityBaselines','quantityChanges','quantityPlans','reportSnapshots','fronts','progressFacts','factLog','history','planningSettings','tasks','taskDates','taskQuantities','dependencies','scheduleVersions','scheduleStaging','importHistory','contracts','milestones'];
+    const names=['planningEdits','scheduleMatches','workMetrics','numberedElements','quantityBaselines','quantityChanges','quantityPlans','reportSnapshots','fronts','progressFacts','factLog','history','planningSettings','tasks','taskDates','taskQuantities','dependencies','scheduleVersions','scheduleStaging','importHistory','contracts','milestones'];
     const before=Object.fromEntries(names.map(k=>[k,JSON.parse(JSON.stringify(current[k]||(k==='planningSettings'?{}:[])))]));
     try{mutation();await save();}catch(error){for(const k of names)current[k]=before[k];throw error;}
   }

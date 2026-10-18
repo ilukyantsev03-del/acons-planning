@@ -80,8 +80,8 @@
     window.LIV_FACT_SERIES.refreshFront(project,front);
   }
   function stateAt(project,t,asOf){const volume=volumeAt(project,t,asOf),fact=factAt(project,t,asOf),actual=fact.actual,total=volume.total;
-    const versionQuantity=P.number((project.taskQuantities||[]).find(q=>q.taskId===t.id)?.quantity??t.planning?.total);
-    return {key:volume.key,volume,versionQuantity,actual,total,remaining:total===null||actual===null?null:Math.max(0,total-actual),progress:total>0&&actual!==null?Math.min(100,actual/total*100):total===0&&actual===0?100:null,overrun:total!==null&&actual!==null?Math.max(0,actual-total):null,fact};}
+    const q=(project.taskQuantities||[]).find(q=>q.taskId===t.id),versionQuantity=P.number(q?.quantity??t.planning?.total),versionUnit=q?.unit||t.unit||volume.unit;
+    return {key:volume.key,volume,versionUnit,versionQuantity,actual,total,remaining:total===null||actual===null?null:Math.max(0,total-actual),progress:total>0&&actual!==null?Math.min(100,actual/total*100):total===0&&actual===0?100:null,overrun:total!==null&&actual!==null?Math.max(0,actual-total):null,fact};}
   function periodProgress(project,t,from,to){
     const before=stateAt(project,t,dayBefore(from)),now=stateAt(project,t,to),base=before.total;
     return {before,now,gain:before.progress!==null&&now.progress!==null?now.progress-before.progress:null,
@@ -91,8 +91,9 @@
   function comparison(project,left,right,leftDate,rightDate){
     const a=(project.tasks||[]).filter(t=>(t.versionId||t.sourceImportId)===left?.id&&t.active!==false),b=(project.tasks||[]).filter(t=>(t.versionId||t.sourceImportId)===right?.id&&t.active!==false);
     if(!left||!right)return [];
-    return P.compare(a,b,t=>taskDates(project,t)).map(row=>{const old=row.old?stateAt(project,row.old,leftDate):null,now=row.now?stateAt(project,row.now,rightDate):null;
-      return {...row,oldState:old,newState:now,scheduleVolumeDelta:old?.versionQuantity!==null&&now?.versionQuantity!==null&&old&&now?now.versionQuantity-old.versionQuantity:null,volumeDelta:old?.total!==null&&now?.total!==null&&old&&now?now.total-old.total:null,actualDelta:old?.actual!==null&&now?.actual!==null&&old&&now?now.actual-old.actual:null,unitMismatch:!!old&&!!now&&old.volume.unit!==now.volume.unit};});
+    const rows=window.LIV_DAILY?window.LIV_DAILY.compareTasks(project,a,b,t=>taskDates(project,t)):P.compare(a,b,t=>taskDates(project,t));
+    return rows.map(row=>{const old=row.oldMembers?window.LIV_DAILY.aggregateState(project,row.oldMembers,leftDate):row.old?stateAt(project,row.old,leftDate):null,now=row.newMembers?window.LIV_DAILY.aggregateState(project,row.newMembers,rightDate):row.now?stateAt(project,row.now,rightDate):null;
+      return {...row,oldState:old,newState:now,scheduleVolumeDelta:old?.versionQuantity!==null&&now?.versionQuantity!==null&&old&&now?now.versionQuantity-old.versionQuantity:null,volumeDelta:old?.total!==null&&now?.total!==null&&old&&now?now.total-old.total:null,actualDelta:old?.actual!==null&&now?.actual!==null&&old&&now?now.actual-old.actual:null,unitMismatch:!!old&&!!now&&(old.versionUnit||old.volume.unit)!==(now.versionUnit||now.volume.unit)};});
   }
   function validatePlan(project,t,versionId,rows,calendar){
     if(!rows.length)throw Error('Введите хотя бы один период плана.');
@@ -125,6 +126,7 @@
       const v=volumeAt(project,t,version.effectiveDate||today());if(v.total===null)continue;
       if(q.unit&&v.unit&&q.unit!==v.unit){t.quantityWarning='Единица новой версии отличается от ведомости. Требуется отдельная работа или подтверждённое сопоставление.';continue;}
       const delta=quantity-v.total;if(Math.abs(delta)<1e-8)continue;
+      const decision=(project.quantityChanges||[]).find(c=>c.id===t.quantityDecisionId&&c.key===key&&c.status==='proposed');if(decision&&Math.abs(decision.baseTotal+decision.delta-quantity)<1e-8)continue;
       const change=recordChange(project,t,{effectiveDate:version.effectiveDate||today(),kind:delta>0?'add':'exclude',quantity:Math.abs(delta),status:'proposed',reason:'Объём из новой версии графика',document:version.fileName||version.name||version.id});change.sourceVersionId=version.id;t.quantityWarning='Объём версии отличается от согласованного. Создано предложение в ведомости объёмов.';
     }
   }
@@ -146,6 +148,6 @@
     return {...result,productionGain:weight?productionGain/weight:null,scopeEffect:weight?scopeEffect/weight:null};
   }
   function csv(rows){return '\uFEFF'+rows.map(row=>row.map(v=>{let s=String(v??'');if(/^[=+@\-]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';}).join(';')).join('\r\n');}
-  function storageProjection(project){return Object.fromEntries(['quantityBaselines','quantityChanges','quantityPlans','workMetrics','numberedElements','planningSettings','scheduleVersions','tasks','taskDates','taskQuantities','dependencies','milestones','fronts','progressFacts','reportSnapshots'].map(k=>[k,project[k]||(k==='planningSettings'?{}:[])]));}
+  function storageProjection(project){return Object.fromEntries(['planningEdits','scheduleMatches','quantityBaselines','quantityChanges','quantityPlans','workMetrics','numberedElements','planningSettings','scheduleVersions','tasks','taskDates','taskQuantities','dependencies','milestones','fronts','progressFacts','reportSnapshots'].map(k=>[k,project[k]||(k==='planningSettings'?{}:[])]));}
   window.LIV_PLANNING_DOMAIN={quantityKey,elementScope,reviewImportedVolumes,seed,frontView,refreshFront,resolveVersion,volumeAt,recordChange,decideProposal,factAt,stateAt,periodProgress,comparison,validatePlan,periodPlan,milestoneForecast,quantityMetadata,freezeReport,aggregateReadiness,csv,storageProjection};
 })();
