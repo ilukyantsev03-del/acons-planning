@@ -3,7 +3,7 @@
   const P=window.LIV_PLANNING,D=window.LIV_PLANNING_DOMAIN;
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const el=id=>document.getElementById(id);
-  let ganttOptions=null;
+  let ganttOptions=null,lastSource='',renderedProject=null;
   const state={gantt:{},left:'',right:'',task:'',drafts:{},links:{},preview:null,critical:null,leveled:null,scenario:0,scenarios:{},settings:null,comparisonMode:'versions',leftDate:'',rightDate:'',leftGroup:'',rightGroup:'',reportId:'',storageMessage:'',settingsProject:null,matrixRow:'place',matrixCol:'name',matrixMetric:'progress',organization:'',organizations:[],method:'average',from:new Date().toISOString().slice(0,7)+'-01',to:new Date().toISOString().slice(0,10)};
   const versionTasks=id=>(project.tasks||[]).filter(t=>(t.versionId||t.sourceImportId)===id&&t.active!==false);
   const dates=(task,type='working')=>(project.taskDates||[]).filter(d=>d.taskId===task.id&&d.type===type).slice(-1)[0]||{};
@@ -11,8 +11,54 @@
   function host(){
     const panel=el('tab-schedule');if(!panel)return null;
     let h=el('planningTools');if(h)return h;
-    h=document.createElement('section');h.id='planningTools';h.className='card planning-tools';panel.appendChild(h);
-    h.addEventListener('input',liveInput);h.addEventListener('change',event=>{try{change(event);}catch(e){alert(e.message);}});h.addEventListener('click',click);return h;
+    h=document.createElement('section');h.id='planningTools';h.className='card planning-tools';h.dataset.planningSurface='schedule';panel.appendChild(h);
+    bindSurface(h);return h;
+  }
+  const destinations={gantt:'Гант',matrix:'Шахматка',planfact:'План / факт',resources:'Ресурсы',dashboard:'Сводка',milestones:'Ключевые даты',reports:'Отчёты',settings:'Настройки'};
+  function bindSurface(node){node.addEventListener('input',liveInput);node.addEventListener('change',event=>{try{change(event);}catch(e){alert(e.message);}});node.addEventListener('click',click);}
+  function part(destination,id,html){return `<section id="${id}" data-planning-destination="${destination}">${html}</section>`;}
+  function sourceStamp(){return JSON.stringify(['scheduleVersions','tasks','taskDates','taskQuantities','dependencies','fronts','progressFacts','factLog','milestones','planningSettings','quantityBaselines','quantityChanges','quantityPlans','reportSnapshots'].map(k=>project[k]));}
+  function navigate(tab){if(typeof switchTab==='function')switchTab(tab);else{for(const panel of document.querySelectorAll('main > .panel'))panel.classList.toggle('hidden',panel.id!=='tab-'+tab);for(const b of document.querySelectorAll('.tab[data-tab]'))b.classList.toggle('active',b.dataset.tab===tab);}}
+  function openTask(id){if(!versionTasks(state.right).some(t=>t.id===id))return;state.task=id;render();navigate('schedule');el('planningTask')?.scrollIntoView?.({block:'center'});}
+  function openReports(){renderIfChanged();navigate('reports');el('planningReportSelect')?.focus();}
+  function renderIfChanged(){if(typeof project==='undefined'||!project)return;if(renderedProject!==project||lastSource!==sourceStamp()){state.preview=null;state.critical=null;state.leveled=null;state.settings=null;render();}}
+  function contextBar(versions){
+    if(!versions.length)return '<p>Нет принятого графика. Создайте или примите версию в разделе «График».</p><button type="button" class="btn" data-planning-go="schedule">Открыть график</button>';
+    return `<div class="planning-context"><label>Общая выбранная версия<select data-planning-version>${versions.map(v=>`<option value="${esc(v.id)}" ${v.id===state.right?'selected':''}>${esc(label(v))}</option>`).join('')}</select></label><label>Выбранная работа<select data-planning-task>${versionTasks(state.right).map(t=>`<option value="${esc(t.id)}" ${t.id===state.task?'selected':''}>${esc(t.name)}</option>`).join('')}</select></label><label>Начало периода<input type="date" data-planning-period="from" value="${esc(state.from)}"></label><label>Конец периода<input type="date" data-planning-period="to" value="${esc(state.to)}"></label><span data-planning-calculation-status>${state.preview?'Показан предварительный расчёт':'Сроки сохранённой версии'}${state.organizations.length?' · фильтр организаций: '+state.organizations.length:''}</span><button type="button" class="btn" data-planning-go="schedule">Редактировать график</button><button type="button" class="btn" data-planning-go="gantt">Показать на Ганте</button></div>`;
+  }
+  function prepareSurfaces(versions){
+    for(const [tab,title] of Object.entries(destinations)){
+      const panel=el('tab-'+tab);if(!panel)continue;
+      let target=el('planningSurface-'+tab);
+      if(!target){
+        // Front-based screens remain accessible; they are not schedule-version screens.
+        if(['gantt','matrix','planfact'].includes(tab)){
+          const legacy=document.createElement('details');legacy.id='planningLegacy-'+tab;legacy.className='card planning-legacy';
+          const summary=document.createElement('summary');summary.textContent=title+' по фронтам — отдельное представление';legacy.appendChild(summary);
+          for(const child of Array.from(panel.children))if(!child.classList.contains('liv-page-head'))legacy.appendChild(child);
+          panel.appendChild(legacy);
+        }
+        target=document.createElement('section');target.id='planningSurface-'+tab;target.className='card planning-tools planning-surface';target.dataset.planningSurface=tab;panel.insertBefore(target,el('planningLegacy-'+tab)||panel.querySelector(':scope > .card'));bindSurface(target);
+      }
+      const legacy=el('planningLegacy-'+tab);if(legacy&&legacy.dataset.empty!==String(!versions.length)){legacy.open=!versions.length;legacy.dataset.empty=String(!versions.length);}
+      target.innerHTML=(tab==='settings'?'<h2>Календари и проверка сохранения</h2>':contextBar(versions))+'<div data-planning-content></div>';
+    }
+  }
+  function routeParts(){
+    for(const node of Array.from(el('planningTools')?.querySelectorAll('[data-planning-destination]')||[])){
+      const target=el('planningSurface-'+node.dataset.planningDestination)?.querySelector('[data-planning-content]');if(!target)continue;
+      for(const old of Array.from(target.children))if(old.id===node.id)old.remove();
+      target.appendChild(node);
+    }
+  }
+  function resourceSummary(tasks){
+    const results=state.preview||new Map(tasks.map(t=>[t.id,{...dates(t),remainingStart:dates(t).start}]));let load=[],error='';
+    try{load=P.resourceLoad(tasks,results,state.leveled?.inputs||selectedInput,settings().capacities);}catch(e){error=e.message;}
+    return `<h2>Плановая потребность выбранного графика</h2><p>Общие назначения людей и техники по версии графика. Фактическая численность из отчётов подрядчиков показана в журнале ресурсов ниже. Полная сеть работ учитывается независимо от фильтра организаций.</p><button type="button" class="btn" data-planning-go="gantt">Диаграмма загрузки и выравнивание на Ганте</button>${error?'<p class="planning-late">'+esc(error)+'</p>':''}<div class="table-wrap planning-load"><table><thead><tr><th>Дата</th><th>Группа</th><th>Потребность</th><th>Доступно</th><th>Перегрузка</th></tr></thead><tbody>${load.slice(0,500).map(r=>`<tr><td>${esc(r.date)}</td><td>${esc(r.pool)}</td><td>${fmt(r.used)}</td><td>${fmt(r.capacity)}</td><td>${fmt(r.overload)}</td></tr>`).join('')||'<tr><td colspan="5">Нет рассчитанных назначений ресурсов.</td></tr>'}</tbody></table></div>${load.length>500?'<p>Первые 500 строк. Для анализа периода и группы откройте диаграмму на Ганте.</p>':''}<div id="planningCapacityHost"></div>`;
+  }
+  function reportEntry(){
+    const archive=(project.reportSnapshots||[]).filter(r=>r.dataSnapshot?.fronts&&!r.dataSnapshot?.schema);
+    return '<h2>Отчёты проекта</h2><p>Формы по выбранной версии графика и отдельные снимки по фронтам используют разные основания. Тип источника указан явно.</p><button type="button" class="btn" data-planning-action="capture-fronts">Зафиксировать снимок по фронтам</button>'+archive.map(r=>`<details><summary>${esc(r.title)} · ${esc(r.reportDate)} · снимок по фронтам</summary><p>Зафиксированные значения на дату выпуска; текущие исправления их не изменяют.</p><div class="table-wrap"><table><thead><tr><th>Объект / работа</th><th>Подрядчик</th><th>Ед.</th><th>Объём</th><th>Факт накопительно</th><th>Прирост за период</th><th>Готовность, %</th></tr></thead><tbody>${r.dataSnapshot.fronts.map(f=>`<tr><td>${esc([f.building,f.block,f.floor,f.work].filter(v=>v!==''&&v!=null).join(' · '))}</td><td>${esc(f.organization)}</td><td>${esc(f.unit)}</td><td>${fmt(f.totalQty)}</td><td>${fmt(f.doneQty)}</td><td>${fmt(f.periodQty)}</td><td>${fmt(f.percent)}</td></tr>`).join('')}</tbody></table></div></details>`).join('');
   }
   function selectedInput(task){
     const front=(project.fronts||[]).find(f=>String(f.id)===String((state.drafts[task.id]||task.planning||{}).frontId||task.frontId));
@@ -60,12 +106,15 @@
   }
   function change(event){
     const id=event.target.id;
+    if(event.target.hasAttribute('data-planning-version')){readDraft();state.comparisonMode='versions';state.right=event.target.value;state.task='';state.preview=null;state.critical=null;state.leveled=null;render();return;}
+    if(event.target.dataset.planningPeriod){state[event.target.dataset.planningPeriod]=event.target.value;render();return;}
+    if(event.target.hasAttribute('data-planning-task')){state.task=event.target.value;render();return;}
     if(id==='planningComparisonMode'||['planningLeftDate','planningRightDate','planningLeftGroup','planningRightGroup'].includes(id)){
       readDraft();state[{planningComparisonMode:'comparisonMode',planningLeftDate:'leftDate',planningRightDate:'rightDate',planningLeftGroup:'leftGroup',planningRightGroup:'rightGroup'}[id]]=event.target.value;state.preview=null;state.task='';render();return;
     }
     if(id==='planningReportSelect'){state.reportId=event.target.value;render();return;}
     if(id.startsWith('quantity')||id.startsWith('periodPlan')||id.startsWith('planningKD')||id==='planningReportTitle'||id==='planningReportKind'||id==='planningReportTemplate'||id==='planningScenarioName'||id==='planningSavedScenario')return;
-    if(['planningRateSlider','planningResourcesSlider'].includes(id))return;
+    if(['planningRateSlider','planningResourcesSlider'].includes(id)){render();return;}
     if(id==='planningView'){const v=(settings().views||[]).find(v=>v.name===event.target.value);if(v){Object.assign(state,v.config);state.task='';state.preview=null;state.critical=null;state.leveled=null;render();}return;}
     if(id==='planningViewName')return;
     if(id==='planningScenario'){readDraft();storeScenario();state.scenario=Number(event.target.value);loadScenario();render();return;}
@@ -88,7 +137,10 @@
   async function click(event){
     const button=event.target.closest('button');if(!button||state.busy)return;state.busy=true;button.disabled=true;
     try{
-      if(button.dataset.openTask){readDraft();state.task=button.dataset.openTask;render();el('planningTask')?.scrollIntoView?.({block:'center'});return;}
+      if(button.dataset.planningGo){navigate(button.dataset.planningGo);return;}
+      if(button.dataset.planningAction==='capture-fronts'){if(!window.LIV_REPORT_SNAPSHOTS?.openCapture)throw Error('Модуль отчётов ещё загружается. Повторите через несколько секунд.');window.LIV_REPORT_SNAPSHOTS.openCapture();return;}
+      if(button.dataset.planningAction==='save-capacities'){readSettings();await P.persist(project,()=>{project.planningSettings=structuredCopy(state.settings);},()=>savePlanning());render();return;}
+      if(button.dataset.openTask){openTask(button.dataset.openTask);return;}
       if(button.dataset.quantityDecision){await decideQuantity(button.dataset.quantityDecision,button.dataset.approve==='yes');return;}
       if(button.id==='quantitySave')await saveQuantity();
       if(button.id==='periodPlanSave')await savePeriodPlan();
@@ -144,16 +196,18 @@
   function render(){
     if(typeof project==='undefined'||!project)return;
     const h=host();if(!h)return;
-    const openDetails=new Set(Array.from(h.querySelectorAll('details[open]')).map(d=>d.querySelector('summary')?.textContent));
+    if(renderedProject&&renderedProject!==project){state.drafts={};state.links={};state.preview=null;state.critical=null;state.leveled=null;state.settings=null;}
+    const openDetails=new Set(Array.from(document.querySelectorAll('[data-planning-surface] details[open]')).map(d=>d.querySelector('summary')?.textContent));
     const versions=(project.scheduleVersions||[]).filter(v=>['Принят','Архив'].includes(v.status));
-    if(!versions.length){h.innerHTML=manualForm()+'<p class="muted">Создайте график вручную или загрузите файл.</p>';return;}
+    if(!versions.length){prepareSurfaces(versions);h.innerHTML=manualForm()+'<p class="muted">Создайте график вручную или загрузите файл.</p>'+part('settings','planningStoragePart',storagePanel())+part('reports','planningReportsPart',reportEntry());routeParts();lastSource=sourceStamp();renderedProject=project;return;}
     if(!versions.some(v=>v.id===state.right))state.right=versions[0].id;
     if(!versions.some(v=>v.id===state.left))state.left=versions[1]?.id||state.right;
     const resolved=resolveComparison(versions);if(state.comparisonMode==='dates'){state.left=resolved.left?.id||'';state.right=resolved.right?.id||'';}
-    if(!resolved.right){h.innerHTML=manualForm()+comparisonControls(versions)+'<p class="planning-late">На выбранную дату нет сохранённой версии этой группы. Выберите другую дату; будущая версия не подставляется.</p>';return;}
+    if(!resolved.right){prepareSurfaces([]);h.innerHTML=manualForm()+comparisonControls(versions)+'<p class="planning-late">На выбранную дату нет сохранённой версии этой группы. Выберите другую дату; будущая версия не подставляется.</p>';lastSource=sourceStamp();renderedProject=project;return;}
     if(state.ganttVersion!==state.right){state.gantt={};state.ganttVersion=state.right;}
     const tasks=versionTasks(state.right);if(!tasks.some(t=>t.id===state.task))state.task=tasks[0]?.id||'';
     const selected=tasks.find(t=>t.id===state.task);
+    prepareSurfaces(versions);
     let input={},inputError='';if(selected){try{input=selectedInput(selected);}catch(e){input={...selected.planning,...state.drafts[selected.id]};inputError=e.message;}}
     const options=value=>versions.map(v=>'<option value="'+esc(v.id)+'" '+(v.id===value?'selected':'')+'>'+esc(label(v))+'</option>').join('');
     const comparisons=D.comparison(project,resolved.left,resolved.right,resolved.leftDate,resolved.rightDate);
@@ -189,18 +243,20 @@
       <label>Требуемое окончание / КД<input type="date" id="planningTarget" value="${esc(input.target||dates(selected||{},'contract').finish||'')}"></label>
       <label>Количество ресурсов с даты<textarea id="planningSteps" placeholder="2026-10-26 = 4">${esc((input.resourceSteps||[]).map(r=>r.date+' = '+r.resources).join('\n'))}</textarea></label>
       <label>Дополнительные ресурсы на каждый рабочий день<textarea id="planningAssignments" placeholder="Рабочие = 10">${esc((input.assignments||[]).map(r=>r.pool+' = '+r.quantity).join('\n'))}</textarea></label>
-      </div>${quantityPanel(tasks,selected,input)}${periodPlanPanel(selected)}${kdPanel(tasks,selected)}${scenarioPanel(selected,input)}${factPanel(input)}${calendarPanel()}${taskEditor(selected)}<p class="muted">Пример: сваи / установка или м³ / рабочий. Увеличение ресурса считается линейным только в этом сценарии. Технологические паузы задаются отдельными задачами и связями. Праздники и рабочие выходные задаются вручную в календаре. Выравнивание учитывает только явно назначенные общие группы ресурсов.</p>
+      </div>${part('planfact','planningQuantitiesPart',quantityPanel(tasks,selected,input)+periodPlanPanel(selected)+factPanel(input))}${kdPanel(tasks,selected)}${part('gantt','planningScenariosPart',scenarioPanel(selected,input))}${part('settings','planningCalendarPart',calendarPanel())}${taskEditor(selected)}<p class="muted">Пример: сваи / установка или м³ / рабочий. Увеличение ресурса считается линейным только в этом сценарии. Технологические паузы задаются отдельными задачами и связями. Праздники и рабочие выходные задаются вручную в календаре. Выравнивание учитывает только явно назначенные общие группы ресурсов.</p>
       ${inputError?'<p class="planning-late">'+esc(inputError)+'</p>':''}
-      <button class="btn primary" id="planningCalculate">Рассчитать прогноз и критический путь</button><button class="btn" id="planningLevel">Предпросмотр выравнивания ресурсов</button>
+      <section id="planningCalculationPart" data-planning-destination="gantt"><button class="btn primary" id="planningCalculate">Рассчитать прогноз и критический путь</button><button class="btn" id="planningLevel">Предпросмотр выравнивания ресурсов</button>
       ${state.preview?'<button class="btn" id="planningSave">Сохранить отдельную рабочую версию</button>':''}
       ${gantt(tasks)}${state.preview?'<details><summary>Расчётные сроки и резервы</summary><p>Резервы относятся к технологическим связям. «+» к исходному окончанию — календарные дни.</p>'+previewTable(tasks)+'</details>':''}
-      ${volumeTable(tasks)}${reportPanel(tasks)}${storagePanel()}
-      <h2>Шахматка выбранной версии</h2><p class="muted">Строки — место выполнения, столбцы — работы. Несколько записей в ячейке показаны отдельно. Приостановленные работы без заливки.</p>
-      ${matrixControls()}${matrix(tasks)}<button class="btn no-print" id="planningPrint">Печать / PDF</button>`;
+      </section>${part('planfact','planningAnalyticsPart',volumeTable(tasks))}${part('reports','planningReportsPart',reportEntry()+reportPanel(tasks))}${part('settings','planningStoragePart',storagePanel())}${part('resources','planningResourcePart',resourceSummary(tasks))}${part('milestones','planningMilestonePart','<h2>Прогноз КД по выбранному графику</h2>'+milestoneTable(D.milestoneForecast(project,tasks,state.preview))+'<button type="button" class="btn" data-planning-go="schedule">Настроить связи работ с КД</button>')}
+      <section id="planningMatrixPart" data-planning-destination="matrix"><h2>Шахматка выбранной версии</h2><p class="muted">Строки — место выполнения, столбцы — работы. Несколько записей в ячейке показаны отдельно. Приостановленные работы без заливки.</p>
+      ${matrixControls()}${matrix(tasks)}<button class="btn no-print" id="planningPrint">Печать / PDF</button></section>`;
     if(input.frontId&&input.useJournal!==false&&el('planningDone'))el('planningDone').disabled=true;
     window.LIV_DAILY_UI?.render();
-    if(window.LIV_GANTT&&ganttOptions)window.LIV_GANTT.mount(el('planningGantt'),ganttOptions,state.gantt,id=>{state.task=id;render();el('planningTask')?.scrollIntoView?.({block:'center'});});
-    for(const d of h.querySelectorAll('details'))if(openDetails.has(d.querySelector('summary')?.textContent))d.setAttribute('open','');
+    routeParts();
+    if(window.LIV_GANTT&&ganttOptions)window.LIV_GANTT.mount(el('planningGantt'),ganttOptions,state.gantt,openTask);
+    for(const d of document.querySelectorAll('[data-planning-surface] details'))if(openDetails.has(d.querySelector('summary')?.textContent))d.setAttribute('open','');
+    lastSource=sourceStamp();renderedProject=project;
   }
   const context=t=>[t.building,t.block,t.floor!==''&&t.floor!=null?'Этаж '+t.floor:'',t.capture,t.axis,t.zone,t.element,t.network,t.segment].filter(Boolean).join(' · ');
   function previewTable(tasks){return '<div data-calculation-preview class="table-wrap"><table><thead><tr><th>Работа</th><th>Остаток</th><th>Рабочих дней</th><th>Начало</th><th>Прогноз</th><th>К исходному окончанию</th><th>Позднее начало</th><th>Позднее окончание</th><th>Общий резерв, раб. дн.</th><th>Свободный резерв, раб. дн.</th></tr></thead><tbody>'+tasks.map(t=>{const r=state.preview.get(t.id),cp=state.critical?.results.get(t.id),delta=P.days(dates(t).finish,r.finish);return `<tr><td>${esc(t.name+' · '+context(t))}</td><td>${r.remaining??'—'}</td><td>${r.days}</td><td>${r.start}</td><td>${r.finish}</td><td>${delta===null?'—':(delta>0?'+':'')+delta+' дн.'}</td><td>${esc(cp?.lateStart||'—')}</td><td>${esc(cp?.lateFinish||'—')}</td><td class="${cp?.isCritical?'planning-late':''}">${cp?.totalFloat??'—'}${cp?.isCritical?' · Критическая':''}</td><td>${cp?.freeFloat??'—'}</td></tr>`;}).join('')+'</tbody></table></div>';}
@@ -232,7 +288,7 @@
     const candidate={...settings(),deadline:P.date(el('planningProjectDeadline')?.value),holidays:dates('planningHolidays'),workingDays:dates('planningWorkingDays'),capacities:Object.fromEntries(parseAssignments(el('planningCapacities')?.value).map(a=>[a.pool,a.quantity]))};
     if(candidate.holidays.some(d=>candidate.workingDays.includes(d)))throw Error('Одна дата указана и как рабочая, и как нерабочая.');state.settings=candidate;
   }
-  function calendarPanel(){const s=settings();return `<details><summary>Календарь проекта и доступные ресурсы</summary><p class="muted">Исключения применяются ко всем выбранным недельным календарям. Даты вводятся вручную; официальные праздники автоматически не загружаются. Для отдельных работ доступны свои исключения, недельный календарь и дата передачи фронта. Исключение работы имеет приоритет над общим календарём. Группы ресурсов должны включать подрядчика, если ресурсы разных организаций не взаимозаменяемы.</p><div class="planning-grid"><label>Требуемое окончание всего графика<input id="planningProjectDeadline" type="date" value="${esc(s.deadline||'')}"></label><label>Нерабочие даты<textarea id="planningHolidays" placeholder="04.11.2026">${esc((s.holidays||[]).join('\n'))}</textarea></label><label>Рабочие выходные<textarea id="planningWorkingDays">${esc((s.workingDays||[]).join('\n'))}</textarea></label><label>Доступно в день по группам<textarea id="planningCapacities" placeholder="Подрядчик / Буровые = 3\nРабочие = 25">${esc(Object.entries(s.capacities||{}).map(([k,v])=>k+' = '+v).join('\n'))}</textarea></label></div><button class="btn" id="planningSettingsSave">Сохранить календарь и лимиты</button></details>`;}
+  function calendarPanel(){const s=settings();return `<details><summary>Календарь проекта и доступные ресурсы</summary><p class="muted">Исключения применяются ко всем выбранным недельным календарям. Даты вводятся вручную; официальные праздники автоматически не загружаются. Для отдельных работ доступны свои исключения, недельный календарь и дата передачи фронта. Исключение работы имеет приоритет над общим календарём. Группы ресурсов должны включать подрядчика, если ресурсы разных организаций не взаимозаменяемы.</p><div class="planning-grid"><label>Требуемое окончание всего графика<input id="planningProjectDeadline" type="date" value="${esc(s.deadline||'')}"></label><label>Нерабочие даты<textarea id="planningHolidays" placeholder="04.11.2026">${esc((s.holidays||[]).join('\n'))}</textarea></label><label>Рабочие выходные<textarea id="planningWorkingDays">${esc((s.workingDays||[]).join('\n'))}</textarea></label>${part('resources','planningCapacitiesPart',`<h2>Доступность общих ресурсов</h2><label>Доступно в день по группам<textarea id="planningCapacities" placeholder="Подрядчик / Буровые = 3\nРабочие = 25">${esc(Object.entries(s.capacities||{}).map(([k,v])=>k+' = '+v).join('\n'))}</textarea></label><button type="button" class="btn" data-planning-action="save-capacities">Сохранить лимиты ресурсов</button>`)}</div><button class="btn" id="planningSettingsSave">Сохранить календарь и лимиты</button></details>`;}
   function storeScenario(){
     state.scenarios[state.scenario]={drafts:structuredCopy(state.drafts),links:structuredCopy(state.links)};
   }
@@ -249,7 +305,11 @@
       el(rate?'planningRateValue':'planningResourcesValue').textContent=fmt(event.target.value);el('planningMode').value='productivity';
       readDraft();storeScenario();const task=versionTasks(state.right).find(t=>t.id===state.task);el('planningLive').innerHTML=scenarioResults(task,selectedInput(task));
       // Discard stale full-schedule preview and save action until recalculated.
-      el('planningSave')?.remove();for(const node of el('planningTools').querySelectorAll('[data-calculation-preview]'))node.remove();
+      el('planningSave')?.remove();for(const node of document.querySelectorAll('[data-planning-surface] [data-calculation-preview]'))node.remove();
+      const notice='Параметры изменены. Пересчитайте прогноз и критический путь на вкладке «Гант».';
+      for(const node of document.querySelectorAll('[data-planning-calculation-status]'))node.textContent=notice;
+      if(el('planningGantt'))el('planningGantt').innerHTML='<p role="status">'+notice+'</p>';
+      for(const id of ['planningResourcePart','planningMilestonePart','dailyBoardPart']){const node=el(id);if(!node)continue;for(const t of node.querySelectorAll('.table-wrap,.planning-kpis'))t.classList.add('hidden');if(!node.querySelector('[data-stale-calculation]')){const p=document.createElement('p');p.dataset.staleCalculation='';p.setAttribute('role','status');p.textContent=notice;node.prepend(p);}}
     }catch(e){el('planningLive').textContent=e.message;}
   }
   function scenarioResults(task,input){
@@ -417,7 +477,7 @@
   function kdPanel(tasks,selected){
     if(!selected)return '';
     const key=D.quantityKey(selected),links=settings().milestoneLinks||[],rows=D.milestoneForecast(project,tasks,state.preview);
-    return `<details><summary>Связь работ с ключевыми датами</summary><p class="muted">КД определяется наиболее поздним окончанием связанных работ. При сохранении рабочего прогноза обновляется рабочая дата КД; договорная сохраняется.</p><label>КД, для которых нужна выбранная работа (несколько — с Ctrl)<select id="planningKDTargets" multiple size="5">${(project.milestones||[]).filter(m=>m.active!==false).map(m=>`<option value="${esc(m.id)}" ${links.some(l=>l.key===key&&l.milestoneId===m.id)||selected.milestoneId===m.id?'selected':''}>${esc([m.contractNo,m.title,m.contractDate].filter(Boolean).join(' · '))}</option>`).join('')}</select></label><button id="planningKDLinkSave" class="btn">Сохранить связи выбранной работы</button>${milestoneTable(rows)}</details>`;
+    return `<details><summary>Связь работ с ключевыми датами</summary><p class="muted">КД определяется наиболее поздним окончанием связанных работ. При сохранении рабочего прогноза обновляется рабочая дата КД; договорная сохраняется.</p><label>КД, для которых нужна выбранная работа (несколько — с Ctrl)<select id="planningKDTargets" multiple size="5">${(project.milestones||[]).filter(m=>m.active!==false).map(m=>`<option value="${esc(m.id)}" ${links.some(l=>l.key===key&&l.milestoneId===m.id)||selected.milestoneId===m.id?'selected':''}>${esc([m.contractNo,m.title,m.contractDate].filter(Boolean).join(' · '))}</option>`).join('')}</select></label><button id="planningKDLinkSave" class="btn">Сохранить связи выбранной работы</button></details>`;
   }
   function milestoneTable(rows){return `<div class="table-wrap"><table><thead><tr><th>КД</th><th>Договорный срок</th><th>Начало связанных работ</th><th>Прогноз окончания</th><th>Отклонение</th><th>Определяющие работы</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.title)}</td><td>${esc(r.contractDate||'—')}</td><td>${esc(r.start||'—')}</td><td>${esc(r.finish||'—')}</td><td class="${r.delta>0?'planning-late':''}">${signed(r.delta)}</td><td>${esc(r.notice||r.determining.join(', '))}</td></tr>`).join('')||'<tr><td colspan="6">Связанных КД пока нет.</td></tr>'}</tbody></table></div>`;}
   async function saveKDLinks(){assertEdit();readDraft();const key=D.quantityKey(selectedTask()),ids=Array.from(el('planningKDTargets').options).filter(o=>o.selected).map(o=>o.value),s=structuredCopy(settings());s.milestoneLinks=[...(s.milestoneLinks||[]).filter(l=>l.key!==key),...ids.map(milestoneId=>({key,milestoneId}))];await P.persist(project,()=>{project.planningSettings=s;},()=>savePlanning());state.settings=s;render();}
@@ -458,6 +518,8 @@
   }
 
   window.LIV_PLANNING_UI={render};
-  window.LIV_PLANNING_UI.context=()=>({project,state,tasks:versionTasks(state.right),leftTasks:versionTasks(state.left),dates,taskStats,filtered,selectedInput,dependenciesFor,savePlanning,settings,esc,fmt,context,render});
+  window.LIV_PLANNING_UI.openReports=openReports;
+  window.LIV_PLANNING_UI.onTab=renderIfChanged;
+  window.LIV_PLANNING_UI.context=()=>({routeParts,openTask,project,state,tasks:versionTasks(state.right),leftTasks:versionTasks(state.left),dates,taskStats,filtered,selectedInput,dependenciesFor,savePlanning,settings,esc,fmt,context,render});
   document.addEventListener('DOMContentLoaded',render,{once:true});
 })();

@@ -406,7 +406,7 @@
     button.type = 'button';
     button.className = 'btn';
     button.textContent = 'Зафиксировать отчёт';
-    button.addEventListener('click',openCapture);
+    button.addEventListener('click',()=>{if(window.LIV_PLANNING_UI?.openReports)window.LIV_PLANNING_UI.openReports();else openCapture();});
     pdfButton.parentNode.insertBefore(button,pdfButton);
     return true;
   }
@@ -421,7 +421,8 @@
   window.LIV_REPORT_SNAPSHOTS = {
     version: VERSION,
     capture,
-    buildSnapshot
+    buildSnapshot,
+    openCapture
   };
 
   if (document.readyState === 'loading') {

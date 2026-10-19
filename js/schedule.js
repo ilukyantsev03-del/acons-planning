@@ -329,12 +329,7 @@
               <input id="scheduleSearch" placeholder="Задача, объект, подрядчик, участок">
             </div>
             <div class="field compact-field">
-              <label>Представление</label>
-              <select id="scheduleViewMode">
-                <option value="classic">Классический</option>
-                <option value="matrix">Шахматка</option>
-                <option value="all">Таблица и шахматка</option>
-              </select>
+              <button id="scheduleOpenMatrix" class="btn" type="button">Открыть шахматку</button>
             </div>
           </div>
         </section>
@@ -390,8 +385,7 @@
         { id: 'linear', label: 'Линейный' }
       ],
       filters: [
-        { id: 'scheduleSearch', selector: '#scheduleSearch', label: 'Поиск' },
-        { id: 'scheduleViewMode', selector: '#scheduleViewMode', label: 'Представление' }
+        { id: 'scheduleSearch', selector: '#scheduleSearch', label: 'Поиск' }
       ],
       actions: [
         { id: 'upload', selector: '.schedule-hero-actions .btn.primary', label: 'Загрузить график' },
@@ -466,11 +460,8 @@
       search.addEventListener('input', renderSchedule);
     }
 
-    const view = document.getElementById('scheduleViewMode');
-    if (view && !view.dataset.bound) {
-      view.dataset.bound = '1';
-      view.addEventListener('change', renderSchedule);
-    }
+    const view = document.getElementById('scheduleOpenMatrix');
+    if(view&&!view.dataset.bound){view.dataset.bound='1';view.addEventListener('click',()=>{if(typeof switchTab==='function')switchTab('matrix');});}
   }
 
   async function handleFile(event) {
@@ -1371,10 +1362,7 @@
       `;
     }).join('');
 
-    const viewMode=document.getElementById('scheduleViewMode')?.value||'classic';
-    table.classList.toggle('hidden',viewMode==='matrix');
-    const matrix=document.querySelector('#planningTools .planning-matrix');
-    if(matrix)matrix.classList.toggle('hidden',viewMode==='classic');
+    table.classList.remove('hidden');
     if (window.LIV_VIEW_BUILDER && typeof window.livApplyViewConstructor === 'function') {
       window.livApplyViewConstructor();
     }

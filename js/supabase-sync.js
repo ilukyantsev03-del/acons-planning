@@ -274,7 +274,7 @@
     ['liv-key-date-import', 'js/key-date-import.js?v=20261014-5'],
     ['liv-key-date-import-guard', 'js/key-date-import-guard.js?v=20261013-2'],
     ['liv-numbered-elements-v2', 'js/numbered-elements-v2.js?v=20261018-2'],
-    ['liv-report-snapshots', 'js/report-snapshots.js?v=20261018-2'],
+    ['liv-report-snapshots', 'js/report-snapshots.js?v=20261019-2'],
     ['liv-preflight', 'js/preflight.js?v=20261014-5']
   ];
 

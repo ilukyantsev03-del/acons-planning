@@ -7670,6 +7670,7 @@ function livPanelMeta(
       'План / факт',
       'Сравнение плановых и фактических объёмов'
     ],
+    reports: ['Отчёты','Формы по версиям графиков и зафиксированные снимки'],
     resources: [
       'Ресурсы',
       'Люди, техника, динамика и план / факт ресурсов'
@@ -8006,6 +8007,7 @@ function switchTab(
 
     renderSettings();
   }
+  window.LIV_PLANNING_UI?.onTab(name);
 }
 
 
@@ -8179,6 +8181,7 @@ function renderAll() {
 
 
   markTotalRows();
+  window.LIV_PLANNING_UI?.onTab();
 }
 
 
