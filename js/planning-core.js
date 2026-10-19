@@ -268,7 +268,7 @@
     }
     result=recalculate(tasks,deps,wrapped);
     const load=resourceLoad(tasks,result,wrapped,capacities);if(load.some(r=>r.overload>0))warnings.push('Фиксированный факт содержит перегрузку ресурсов.');
-    return {results:result,inputs:wrapped,load,warnings,changes:tasks.filter(t=>before.get(t.id).start!==result.get(t.id).start||before.get(t.id).finish!==result.get(t.id).finish).map(t=>({id:t.id,before:before.get(t.id),after:result.get(t.id)}))};
+    return {before,results:result,inputs:wrapped,load,warnings,changes:tasks.filter(t=>before.get(t.id).start!==result.get(t.id).start||before.get(t.id).finish!==result.get(t.id).finish).map(t=>({id:t.id,before:before.get(t.id),after:result.get(t.id)}))};
   }
   function readiness(rows,method='weighted'){
     const valid=rows.filter(r=>number(r.current)!==null&&number(r.previous)!==null);

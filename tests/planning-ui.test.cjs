@@ -10,7 +10,7 @@ function setup(){
     ArrayBuffer,Uint8Array,
     crypto:require('node:crypto').webcrypto,Date,console,setTimeout:()=>1,alert:m=>messages.push(m),confirm:()=>true,saveProject:async()=>{}};
   c.window.saveProject=c.saveProject;c.window.LIV_ACCESS={canEdit:true};vm.createContext(c);
-  for(const file of ['planning-core','fact-series','planning-domain','planning-daily','schedule','planning-ui','planning-daily-ui']){
+  for(const file of ['planning-core','fact-series','planning-domain','planning-daily','planning-gantt','schedule','planning-ui','planning-daily-ui']){
     let source=fs.readFileSync(path.join(__dirname,'../js/'+file+'.js'),'utf8');
     if(file==='schedule')source=source.replace('  window.renderSchedule = renderSchedule;', '  window.SCHEDULE_TEST={state,prepareRows,importSchedule,promoteTestImport,handleFile};\n  window.renderSchedule = renderSchedule;');
     if(file==='planning-ui')source=source.replace('  window.LIV_PLANNING_UI={render};','  window.UI_TEST={state,selectedInput,dependenciesFor,readDraft,saveScenario,volumeTable,createManual,editManualTask,saveManualFact,saveQuantity,savePeriodPlan,saveKDLinks,savePlanningReport,saveNamedScenario,loadNamedScenario,verifyStorage};\n  window.LIV_PLANNING_UI={render};');
@@ -23,6 +23,22 @@ function setup(){
   return {c,el,set,change,messages,Event};
 }
 function stage(e){const a=e.c.window.SCHEDULE_TEST;Object.assign(a.state,{fileName:'Договор.xlsx',sheetName:'Кровля',headerRow:0,mapping:{name:0,building:1,workingStart:2,workingFinish:3,quantity:4,unit:5},dataRows:[['Кровля','ДЭС','15.10.2026','20.10.2026',100,'м²']]});e.set('scheduleGroup','Кровля / договор');e.set('scheduleRole','contractor');e.set('scheduleEffective','2026-10-15');return a;}
+test('Гант без расчёта: масштаб, поиск и выбор работы не меняют данные', {skip:!domPath},async()=>{
+ const e=setup(),a=stage(e);a.state.dataRows.push(['Стены','ДЭС','21.10.2026','25.10.2026',100,'м²']);await a.importSchedule();await a.promoteTestImport();
+ const source=JSON.stringify(e.c.project);assert.ok(e.el('planningGantt').querySelector('svg'));assert.equal(e.c.window.UI_TEST.state.preview,null);
+ const change=(key,value)=>{const field=e.el('planningGantt').querySelector('[data-gantt-control="'+key+'"]');field.value=value;field.dispatchEvent(new e.Event('change',{bubbles:true}));};
+ change('scale','week');assert.match(e.el('planningGantt').textContent,/Сохранённая версия/);
+ const q=e.el('planningGantt').querySelector('[data-gantt-control="search"]');q.value='Стены';q.dispatchEvent(new e.Event('input',{bubbles:true}));assert.equal(e.el('planningGantt').querySelectorAll('.gantt-task-button').length,1);
+ e.el('planningGantt').querySelector('.gantt-task-button').dispatchEvent(new e.Event('click',{bubbles:true}));assert.equal(e.c.window.UI_TEST.state.task,e.c.project.tasks[1].id);assert.equal(e.c.window.UI_TEST.state.gantt.search,'Стены');assert.equal(JSON.stringify(e.c.project),source);
+});
+test('Гант после выравнивания: два расчёта, полный ресурс, КД и сброс режима', {skip:!domPath},async()=>{
+ const e=setup(),a=stage(e);a.state.dataRows.push(['Стены','ДЭС','15.10.2026','20.10.2026',100,'м²']);await a.importSchedule();await a.promoteTestImport();
+ const tasks=e.c.project.tasks;for(const t of tasks)e.c.window.UI_TEST.state.drafts[t.id]={...e.c.window.UI_TEST.selectedInput(t),pool:'Буровые',resources:2};
+ e.c.project.milestones=[{id:'M',title:'КД — завершение стен',contractDate:'2026-10-20'}];tasks[1].milestoneId='M';e.c.window.LIV_PLANNING_UI.render();e.change('planningCapacities','Буровые = 2');
+ e.el('planningLevel').dispatchEvent(new e.Event('click',{bubbles:true}));const state=e.c.window.UI_TEST.state,html=e.el('planningGantt').innerHTML;assert.ok(state.leveled.before);assert.match(html,/Из-за выравнивания/);assert.match(html,/gantt-moved/);assert.equal(e.el('planningGantt').querySelectorAll('.gantt-resource-row').length,2);
+ const saved=state.preview;const filter=e.el('planningGantt').querySelector('[data-gantt-control="moved"]');filter.checked=true;filter.dispatchEvent(new e.Event('change',{bubbles:true}));assert.equal(state.preview,saved);assert.equal(e.el('planningGantt').querySelectorAll('.gantt-task-button').length,1);
+ e.el('planningCalculate').dispatchEvent(new e.Event('click',{bubbles:true}));assert.equal(state.leveled,null);assert.equal(e.el('planningGantt').querySelectorAll('.gantt-resource-row').length,1);assert.equal(e.el('planningGantt').querySelectorAll('.gantt-task-button').length,2);
+});
 test('Интерфейс: импорт → принятие → сравнение → прогноз → отдельная версия', {skip:!domPath},async()=>{
   const e=setup(),a=stage(e);await a.importSchedule();assert.equal(e.c.project.tasks.length,0);assert.equal(e.c.project.scheduleStaging.length,1);await a.promoteTestImport();
   assert.equal(e.c.project.tasks.length,1);assert.ok(e.el('planningTask'));const original=e.c.project.tasks[0],contract=e.c.project.taskDates.find(d=>d.type==='contract');

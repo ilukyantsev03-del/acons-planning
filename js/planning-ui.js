@@ -3,7 +3,8 @@
   const P=window.LIV_PLANNING,D=window.LIV_PLANNING_DOMAIN;
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const el=id=>document.getElementById(id);
-  const state={left:'',right:'',task:'',drafts:{},links:{},preview:null,critical:null,leveled:null,scenario:0,scenarios:{},settings:null,comparisonMode:'versions',leftDate:'',rightDate:'',leftGroup:'',rightGroup:'',reportId:'',storageMessage:'',settingsProject:null,matrixRow:'place',matrixCol:'name',matrixMetric:'progress',organization:'',organizations:[],method:'average',from:new Date().toISOString().slice(0,7)+'-01',to:new Date().toISOString().slice(0,10)};
+  let ganttOptions=null;
+  const state={gantt:{},left:'',right:'',task:'',drafts:{},links:{},preview:null,critical:null,leveled:null,scenario:0,scenarios:{},settings:null,comparisonMode:'versions',leftDate:'',rightDate:'',leftGroup:'',rightGroup:'',reportId:'',storageMessage:'',settingsProject:null,matrixRow:'place',matrixCol:'name',matrixMetric:'progress',organization:'',organizations:[],method:'average',from:new Date().toISOString().slice(0,7)+'-01',to:new Date().toISOString().slice(0,10)};
   const versionTasks=id=>(project.tasks||[]).filter(t=>(t.versionId||t.sourceImportId)===id&&t.active!==false);
   const dates=(task,type='working')=>(project.taskDates||[]).filter(d=>d.taskId===task.id&&d.type===type).slice(-1)[0]||{};
   const label=v=>[v.name||v.fileName,v.role==='customer'?'Заказчик':v.role==='contractor'?'Договор подрядчика':'Рабочий',v.effectiveDate||v.createdAt?.slice(0,10),v.isCurrent===false?'Архив':''].filter(Boolean).join(' · ');
@@ -106,7 +107,7 @@
       if(button.id==='planningSettingsSave'){readDraft();readSettings();await P.persist(project,()=>{project.planningSettings=structuredCopy(state.settings);},()=>savePlanning());render();}
       if(button.id==='planningLevel'){readDraft();readSettings();const tasks=versionTasks(state.right),deps=dependenciesFor(tasks);state.leveled=P.levelResources(tasks,deps,selectedInput,state.settings.capacities);state.preview=state.leveled.results;state.critical=P.criticalPath(tasks,deps,state.leveled.inputs,settings().deadline);render();}
       if(button.id==='planningCalculate'){
-        readDraft();const tasks=versionTasks(state.right),ids=new Set(tasks.map(t=>t.id));
+        readDraft();state.leveled=null;const tasks=versionTasks(state.right),ids=new Set(tasks.map(t=>t.id));
         const dependencies=dependenciesFor(tasks);
         state.critical=P.criticalPath(tasks,dependencies,selectedInput,settings().deadline);state.preview=state.critical.results;render();
       }
@@ -150,6 +151,7 @@
     if(!versions.some(v=>v.id===state.left))state.left=versions[1]?.id||state.right;
     const resolved=resolveComparison(versions);if(state.comparisonMode==='dates'){state.left=resolved.left?.id||'';state.right=resolved.right?.id||'';}
     if(!resolved.right){h.innerHTML=manualForm()+comparisonControls(versions)+'<p class="planning-late">На выбранную дату нет сохранённой версии этой группы. Выберите другую дату; будущая версия не подставляется.</p>';return;}
+    if(state.ganttVersion!==state.right){state.gantt={};state.ganttVersion=state.right;}
     const tasks=versionTasks(state.right);if(!tasks.some(t=>t.id===state.task))state.task=tasks[0]?.id||'';
     const selected=tasks.find(t=>t.id===state.task);
     let input={},inputError='';if(selected){try{input=selectedInput(selected);}catch(e){input={...selected.planning,...state.drafts[selected.id]};inputError=e.message;}}
@@ -191,12 +193,13 @@
       ${inputError?'<p class="planning-late">'+esc(inputError)+'</p>':''}
       <button class="btn primary" id="planningCalculate">Рассчитать прогноз и критический путь</button><button class="btn" id="planningLevel">Предпросмотр выравнивания ресурсов</button>
       ${state.preview?'<button class="btn" id="planningSave">Сохранить отдельную рабочую версию</button>':''}
-      ${state.preview?'<p data-calculation-preview class="muted">Начало и окончание — ранние сроки. Общий резерв — допустимый сдвиг до окончания графика или заданного срока; свободный — без переноса последующих работ. Связи задаются между конкретными работами. Резервы после выравнивания рассчитаны по технологическим связям; изменение ресурсов требует нового выравнивания.</p>'+previewTable(tasks)+gantt(tasks)+resourcePanel(tasks):''}
+      ${gantt(tasks)}${state.preview?'<details><summary>Расчётные сроки и резервы</summary><p>Резервы относятся к технологическим связям. «+» к исходному окончанию — календарные дни.</p>'+previewTable(tasks)+'</details>':''}
       ${volumeTable(tasks)}${reportPanel(tasks)}${storagePanel()}
       <h2>Шахматка выбранной версии</h2><p class="muted">Строки — место выполнения, столбцы — работы. Несколько записей в ячейке показаны отдельно. Приостановленные работы без заливки.</p>
       ${matrixControls()}${matrix(tasks)}<button class="btn no-print" id="planningPrint">Печать / PDF</button>`;
     if(input.frontId&&input.useJournal!==false&&el('planningDone'))el('planningDone').disabled=true;
     window.LIV_DAILY_UI?.render();
+    if(window.LIV_GANTT&&ganttOptions)window.LIV_GANTT.mount(el('planningGantt'),ganttOptions,state.gantt,id=>{state.task=id;render();el('planningTask')?.scrollIntoView?.({block:'center'});});
     for(const d of h.querySelectorAll('details'))if(openDetails.has(d.querySelector('summary')?.textContent))d.setAttribute('open','');
   }
   const context=t=>[t.building,t.block,t.floor!==''&&t.floor!=null?'Этаж '+t.floor:'',t.capture,t.axis,t.zone,t.element,t.network,t.segment].filter(Boolean).join(' · ');
@@ -330,14 +333,15 @@
   function matrixControls(){const fields=[['place','Полное место'],['building','Здание'],['block','Блок'],['floor','Этаж'],['capture','Захватка'],['name','Работа'],['organization','Организация']];const select=(id,label,value,options)=>`<label>${label}<select id="${id}">${options.map(([v,l])=>`<option value="${v}" ${value===v?'selected':''}>${l}</option>`).join('')}</select></label>`;return `<div class="planning-grid">${select('planningMatrixRow','Строки',state.matrixRow,fields)}${select('planningMatrixCol','Столбцы',state.matrixCol,fields)}${select('planningMatrixMetric','В ячейке',state.matrixMetric,[['progress','Готовность'],['forecast','Прогнозное окончание'],['delta','Отклонение окончания'],['volume','Факт / общий объём'],['gain','Прирост от выполнения'],['scopeEffect','Влияние изменения объёма']])}</div><div class="planning-grid"><label>Сохранённое представление<select id="planningView"><option value="">Выберите</option>${(settings().views||[]).map(v=>`<option value="${esc(v.name)}">${esc(v.name)}</option>`).join('')}</select></label><label>Название представления<input id="planningViewName" placeholder="Еженедельный отчёт"></label></div><button id="planningViewSave" class="btn">Сохранить представление</button>`;}
   async function saveView(){assertEdit();const name=el('planningViewName').value.trim();if(!name)throw Error('Укажите название представления.');const config=Object.fromEntries(['matrixRow','matrixCol','matrixMetric','organization','organizations','method','from','to','left','right','comparisonMode','leftDate','rightDate','leftGroup','rightGroup'].map(k=>[k,state[k]])),s=structuredCopy(settings());s.views=[...(s.views||[]).filter(v=>v.name!==name),{name,config}];await P.persist(project,()=>{project.planningSettings=s;},()=>savePlanning());state.settings=s;render();}
   function gantt(tasks){
-    const ds=tasks.flatMap(t=>[state.preview.get(t.id),dates(t)]),a=ds.map(d=>d.start).filter(Boolean).sort()[0],b=ds.map(d=>d.finish).filter(Boolean).sort().at(-1),span=Math.max(1,P.days(a,b)+1);
-    const bar=(d,kind,label)=>!d?.start||!d?.finish?'':`<div class="planning-bar ${kind}" style="margin-left:${Math.max(0,P.days(a,d.start)/span*100)}%;width:${Math.max(.5,(P.days(d.start,d.finish)+1)/span*100)}%" title="${esc(label+': '+d.start+' — '+d.finish)}"></div>`;
-    return `<section data-calculation-preview><h2>Гант: исходный график, прогноз и критический путь</h2><p>${a} — ${b}. Серый — исходный, синий — прогноз, красный — критические работы. Полосы показывают начало и окончание включительно.</p><div class="table-wrap"><table class="planning-gantt"><thead><tr><th>Работа</th><th>Начало</th><th>Окончание</th><th>Временная шкала</th></tr></thead><tbody>${filtered(tasks).map(t=>{const r=state.preview.get(t.id);return `<tr><td>${esc(t.name)}</td><td>${r.start}</td><td>${r.finish}</td><td class="planning-track">${bar(dates(t),'planning-base','Исходный')}${bar(r,state.critical?.results.get(t.id)?.isCritical?'planning-critical':'','Прогноз')}</td></tr>`;}).join('')}</tbody></table></div></section>`;
-  }
-  function resourcePanel(tasks){
-    const load=P.resourceLoad(tasks,state.preview,state.leveled?.inputs||selectedInput,settings().capacities);
-    const warnings=state.leveled?.warnings||[];
-    return `<section data-calculation-preview><h2>Люди и техника: загрузка по дням</h2><p>Выравнивание — последовательное назначение по приоритетам, с сохранением связей. Это допустимый вариант, минимальная длительность проекта не гарантируется. Перенесено работ: ${state.leveled?.changes.length||0}.</p>${warnings.map(w=>'<p class="planning-late">'+esc(w)+'</p>').join('')}${!load.length?'<p>Назначьте работам общие группы ресурсов и их доступное количество.</p>':`<div class="table-wrap planning-load"><table><thead><tr><th>Дата</th><th>Группа</th><th>Требуется</th><th>Доступно</th><th>Перегрузка</th><th>Загрузка</th></tr></thead><tbody>${load.map(r=>`<tr class="${r.overload>0?'planning-late':''}"><td>${r.date}</td><td>${esc(r.pool)}</td><td>${fmt(r.used)}</td><td>${fmt(r.capacity)}</td><td>${fmt(r.overload)}</td><td><meter min="0" max="${Math.max(r.used,r.capacity||1)}" value="${r.used}"></meter></td></tr>`).join('')}</tbody></table></div>`}</section>`;
+    if(!window.LIV_GANTT)return '<p>Модуль Ганта не загружен. Обновите страницу.</p>';
+    const base=new Map(tasks.map(t=>[t.id,{...dates(t),remainingStart:dates(t).start}])),after=state.preview||base,leveled=!!(state.preview&&state.leveled),before=leveled?state.leveled.before:null;
+    let beforeLoad=[],afterLoad=[],resourceError='';
+    // Calculate the complete resource network even when the task list is filtered.
+    try{afterLoad=P.resourceLoad(tasks,after,leveled?state.leveled.inputs:selectedInput,settings().capacities);if(before)beforeLoad=P.resourceLoad(tasks,before,selectedInput,settings().capacities);}catch(e){resourceError=e.message;}
+    ganttOptions={tasks:filtered(tasks),base,before,after,leveled,calculated:!!state.preview,selected:state.task,critical:state.preview?state.critical?.results:null,dependencies:dependenciesFor(tasks),beforeLoad,afterLoad,resourceError,capacities:settings().capacities,holidays:settings().holidays,workingDays:settings().workingDays,asOf:state.to,versionLabel:label(project.scheduleVersions.find(v=>v.id===state.right)||{}),changes:leveled?state.leveled.changes:[],warnings:leveled?state.leveled.warnings:[],kdBefore:before?D.milestoneForecast(project,tasks,before):[],kdAfter:leveled?D.milestoneForecast(project,tasks,after):[]};
+    // Transfer names for all changes without letting the display filter hide their impact.
+    ganttOptions.allTasks=tasks;
+    return '<section id="planningGantt" class="planning-gantt-workbench"></section>';
   }
   function taskStats(t){
     const input=state.drafts[t.id]||t.planning||{},frontId=input.frontId||t.frontId,work={...t,volumeKey:D.quantityKey(t),frontId},q=(project.taskQuantities||[]).find(q=>q.taskId===t.id),unit=q?.unit||input.unit||t.unit||'',d=dates(t),period=D.periodProgress(project,work,state.from||state.to,state.to),now=period.now,before=period.before,total=now.total;
