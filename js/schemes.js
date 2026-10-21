@@ -40,24 +40,30 @@
     }
   }
 
-  function derivedProgress(status, frontId, groupId='', elementId='') {
+  function reportAsOf(){try{return window.LIV_PLANNING_UI?.context?.().state.to||new Date().toISOString().slice(0,10);}catch{return new Date().toISOString().slice(0,10);}}
+  function derivedProgress(status, frontId, groupId='', elementId='',asOf=new Date().toISOString().slice(0,10)) {
     const current = p();
     const elements=(current?.numberedElements||[]).filter(item=>item.active!==false);
-    const completed=item=>DONE.has(item.status)||item.status==='Завершено';
+    const completed=item=>(DONE.has(item.status)||item.status==='Завершено')&&(!(item.factDate||item.completedAt)||String(item.factDate||item.completedAt).slice(0,10)<=asOf);
+    const historic=asOf<new Date().toISOString().slice(0,10);
     if(elementId){
       const element=elements.find(item=>String(item.id)===String(elementId));
-      return element?(completed(element)?100:0):null;
+      return element?historic&&!(element.factDate||element.completedAt)?null:(completed(element)?100:0):null;
     }
     if(groupId){
       const group=(current?.numberedElementGroups||[]).find(item=>String(item.id)===String(groupId));
       const total=Number(group?.totalQty||0);
       if(!(total>0))return null;
+      if(historic&&elements.some(item=>String(item.groupId)===String(groupId)&&!(item.factDate||item.completedAt)))return null;
       const done=elements.filter(item=>String(item.groupId)===String(groupId)&&completed(item)).length;
       return Math.min(100,Math.round(done/total*100));
     }
     const front = (current?.fronts || []).find(x => String(x.id) === String(frontId || ''));
-    const total = Number(front?.totalQty || 0);
-    const done = Number(front?.doneQty || 0);
+    const dated=front&&window.LIV_PLANNING_DOMAIN?.frontView(current,front,asOf);
+    const canonical=front&&window.LIV_FACT_SERIES?.series(window.LIV_FACT_SERIES.primaryRows(current,new Set([String(front.id)])),asOf);
+    if(historic&&!canonical?.hasFacts)return null;
+    const total = Number(dated?.totalQty??front?.totalQty??0);
+    const done = canonical?.hasFacts?canonical.actual:Number(front?.doneQty || 0);
     if (front && total > 0 && Number.isFinite(done)) {
       return Math.max(0, Math.min(100, Math.round(done / total * 100)));
     }
@@ -108,7 +114,7 @@
     const tab=document.createElement('button'); tab.className='tab'; tab.dataset.tab='schemes'; tab.textContent='Схемы'; nav.insertBefore(tab,nav.querySelector('[data-tab="import"]'));
     const panel=document.createElement('section'); panel.id='tab-schemes'; panel.className='panel hidden'; panel.innerHTML=`
       <section class="sch-head"><div><h1>Схемы</h1><p>PDF, изображения и визуальные обозначения</p></div><div class="sch-group no-print"><button id="schUpload" class="btn primary sch-write">+ Загрузить схему</button><input id="schFile" type="file" accept="application/pdf,image/png,image/jpeg,.pdf,.png,.jpg,.jpeg" hidden><button id="schDownload" class="btn" disabled>Скачать исходник</button><button id="schDelete" class="btn danger-lite sch-write" disabled>Удалить схему</button></div></section>
-      <section class="sch-stats"><div class="sch-stat"><span>Отметок</span><strong id="schTotal">0</strong></div><div class="sch-stat"><span>В работе</span><strong id="schWork">0</strong></div><div class="sch-stat"><span>Выполнено</span><strong id="schDone">0</strong></div><div class="sch-stat"><span>Средняя готовность</span><strong id="schProgress">0%</strong></div></section>
+      <section class="sch-stats"><div class="sch-stat"><span>Отметок</span><strong id="schTotal">0</strong></div><div class="sch-stat"><span>В работе</span><strong id="schWork">0</strong></div><div class="sch-stat"><span>Статус отметок: выполнено</span><strong id="schDone">0</strong></div><div class="sch-stat"><span>Средняя по связям</span><strong id="schProgress">0%</strong></div></section>
       <section class="sch-layout"><aside class="card sch-side no-print"><h2>Загруженные схемы <span id="schCount" class="badge">0</span></h2><input id="schSearch" class="sch-search" type="search" placeholder="Поиск по схемам..."><div id="schList" class="sch-list"></div></aside>
       <section class="card sch-view"><div class="sch-toolbar no-print"><div class="sch-group"><button id="schPrev" class="btn" disabled>‹</button><span id="schPage" class="sch-page">Страница —</span><button id="schNext" class="btn" disabled>›</button><button id="schMinus" class="btn" disabled>−</button><button id="schFit" class="btn" disabled>По ширине</button><button id="schPlus" class="btn" disabled>+</button></div><div class="sch-group"><select id="schFilter" class="sch-filter"><option value="all">Все статусы</option>${STATUSES.map(x=>`<option>${x}</option>`).join('')}</select><select id="schTool" class="sch-filter sch-write" aria-label="Форма отметки"><option value="area">Прямоугольник</option><option value="line">Линия</option><option value="point">Точка</option><option value="circle">Круг</option></select><button id="schDraw" class="btn primary sch-write" disabled>Отметить участок</button></div></div>
       <div class="sch-toolbar sch-tools no-print sch-write"><div class="sch-group"><label>Обозначение <input id="schDesignation" class="sch-filter" maxlength="120" placeholder="Например: монтаж выполнен"></label><select id="schSymbols" class="sch-filter" aria-label="Использовать обозначение"><option value="">Из легенды…</option></select><button id="schUndo" class="btn" disabled>Отменить</button><button id="schRedo" class="btn" disabled>Повторить</button></div><div class="sch-group"><label>Цвет <select id="schColorMode" class="sch-filter"><option value="custom">Свой</option><option value="status">По статусу</option></select><input id="schColor" type="color" value="#2563eb" aria-label="Цвет линии"></label><label>Толщина <input id="schWidth" class="sch-filter" type="number" min="1" max="20" value="3"> пкс</label><label>Заливка <select id="schFill" class="sch-filter"><option value="0">Нет</option><option value="0.15">15%</option><option value="0.3">30%</option><option value="0.5">50%</option><option value="1">Сплошная</option></select></label></div><div class="sch-group"><button id="schDetails" class="btn" disabled>Данные отметки</button><button id="schRemoveMark" class="btn danger-lite" disabled>Удалить отметку</button><button id="schSaveDrawings" class="btn primary" disabled>Сохранить рисунки</button></div></div><div id="schHint" class="sch-hint" role="status" aria-live="polite">Выбери форму и рисуй. Карточка открывается отдельно — кнопкой «Данные отметки».</div>
@@ -165,8 +171,9 @@
 
   function stats() {
     const rows=state.schemeId?marks(state.schemeId):[];
-    const measurable=rows.filter(x=>x.progressPercent!==null&&x.progressPercent!==undefined&&x.progressPercent!=='');
-    const avg=measurable.length?Math.round(measurable.reduce((sum,x)=>sum+Number(x.progressPercent||0),0)/measurable.length):null;
+    const subjects=new Map();for(const x of rows){const key=x.numberedElementId?'element:'+x.numberedElementId:x.elementGroupId?'group:'+x.elementGroupId:x.frontId?'front:'+x.frontId:'';if(key)subjects.set(key,derivedProgress(x.status,x.frontId,x.elementGroupId,x.numberedElementId,reportAsOf()));}
+    const measurable=[...subjects.values()].filter(v=>v!==null);const avg=measurable.length?Math.round(measurable.reduce((sum,v)=>sum+v,0)/measurable.length):null;
+    $s('schProgress').title='На '+reportAsOf()+'. Среднее по уникальным связанным участкам; не общий процент объёмов. Без истории на дату значение не определяется.';
     $s('schTotal').textContent=rows.length;
     $s('schWork').textContent=rows.filter(x=>x.status==='В работе').length;
     $s('schDone').textContent=rows.filter(x=>DONE.has(x.status)).length;
@@ -174,7 +181,7 @@
   }
 
   function render() {
-    if(!ensure())return; document.querySelectorAll('.sch-write').forEach(x=>x.classList.toggle('hidden',!canWrite())); renderList(); stats(); toolbar(); if(state.schemeId&&!scheme(state.schemeId))clear();
+    if(!ensure())return; document.querySelectorAll('.sch-write').forEach(x=>x.classList.toggle('hidden',!canWrite())); renderList(); stats(); toolbar();if(state.pdf)renderMarks(); if(state.schemeId&&!scheme(state.schemeId))clear();
   }
 
   function toolbar() {
@@ -279,7 +286,7 @@
     visibleMarks().filter(x=>state.filter==='all'||x.status===state.filter).forEach(x=>{
       const b=document.createElement('button');b.type='button';b.dataset.markId=x.id;
       b.className=`sch-mark ${markClass(x.status)}${state.selected===x.id?' selected':''}`;
-      paintShape(b,x);b.title=([x.designation,x.title].filter(Boolean).join(' · ')||x.status||'Отметка')+(state.dirty.has(String(x.id))?' · не сохранено':'');
+      paintShape(b,x);b.title=([x.designation,x.title].filter(Boolean).join(' · ')||x.status||'Отметка')+' · готовность на '+reportAsOf()+': '+(derivedProgress(x.status,x.frontId,x.elementGroupId,x.numberedElementId,reportAsOf())??'нет данных')+'%'+(state.dirty.has(String(x.id))?' · не сохранено':'');
       if(x.title)b.innerHTML+=`<span>${html(x.title)}</span>`;
       b.onpointerdown=e=>e.stopPropagation();
       b.onclick=e=>{e.stopPropagation();if(state.draw||state.saving)return;state.selected=x.id;over.querySelectorAll('.sch-mark').forEach(n=>n.classList.toggle('selected',n.dataset.markId===x.id));toolbar();};
@@ -392,7 +399,7 @@
   function openMark(id=null,geometry=null) {
     if(!canWrite())return;
     const current=p(),existing=id?mark(id):null,x=existing||geometry||{};
-    openModal(existing?'Отметка выполнения':'Новая отметка на схеме',`<div class="sch-note">Данные и связи отметки. Цвет, толщину и заливку можно менять на панели схемы без открытия этой карточки.</div><div class="form-grid"><div class="field"><label>Участок</label><input id="smTitle" value="${html(x.title||'')}"></div><div class="field"><label>Статус</label><select id="smStatus">${STATUSES.map(s=>`<option ${s===(x.status||'Не начато')?'selected':''}>${s}</option>`).join('')}</select></div><div class="field"><label>Вид работ</label><select id="smWork">${options(current.works,x.workId)}</select></div><div class="field"><label>Организация</label><select id="smOrg">${options(current.organizations,x.organizationId)}</select></div><div class="field"><label>Связанный фронт</label><select id="smFront">${frontOptions(x.frontId)}</select></div><div class="field"><label>Группа номерных элементов</label><select id="smGroup">${options(current.numberedElementGroups,x.elementGroupId)}</select></div><div class="field"><label>Номерной элемент</label><select id="smElement">${elementOptions(x.numberedElementId)}</select></div></div><div class="sch-note">Процент вручную не вводится. Готовность рассчитывается по выбранному номерному элементу, группе с заданным общим количеством либо измеряемому фронту.</div><div class="field"><label>Комментарий</label><textarea id="smComment">${html(x.comment||'')}</textarea></div><div class="liv-editor-footer">${existing?'<button id="smDelete" class="btn danger-lite">Удалить отметку</button>':''}<button id="smCancel" class="btn">Отмена</button><button id="smSave" class="btn primary">Сохранить</button></div>`);
+    openModal(existing?'Отметка выполнения':'Новая отметка на схеме',`<div class="sch-note">Данные и связи отметки. Цвет, толщину и заливку можно менять на панели схемы без открытия этой карточки.</div><div class="form-grid"><div class="field"><label>Участок</label><input id="smTitle" value="${html(x.title||'')}"></div><div class="field"><label>Статус</label><select id="smStatus">${STATUSES.map(s=>`<option ${s===(x.status||'Не начато')?'selected':''}>${s}</option>`).join('')}</select></div><div class="field"><label>Вид работ</label><select id="smWork">${options(current.works,x.workId)}</select></div><div class="field"><label>Организация</label><select id="smOrg">${options(current.organizations,x.organizationId)}</select></div><div class="field"><label>Связанный фронт</label><select id="smFront">${frontOptions(x.frontId)}</select></div><div class="field"><label>Группа номерных элементов</label><select id="smGroup">${options(current.numberedElementGroups,x.elementGroupId)}</select></div><div class="field"><label>Номерной элемент</label><select id="smElement">${elementOptions(x.numberedElementId)}</select></div></div><div class="sch-note">Рисование и статус отметки не создают выполненный объём. Процент вручную не вводится. Готовность рассчитывается по выбранному номерному элементу, группе с заданным общим количеством либо измеряемому фронту.</div><div class="field"><label>Комментарий</label><textarea id="smComment">${html(x.comment||'')}</textarea></div><div class="liv-editor-footer">${existing?'<button id="smDelete" class="btn danger-lite">Удалить отметку</button>':''}<button id="smCancel" class="btn">Отмена</button><button id="smSave" class="btn primary">Сохранить</button></div>`);
     $s('smCancel').onclick=closeModal;
     $s('smSave').onclick=()=>saveMark(existing,x);
     if($s('smDelete'))$s('smDelete').onclick=()=>deleteMark(existing);
@@ -400,13 +407,16 @@
 
   async function saveMark(existing,g) {
     const current=p(),t=now();if(!current)return;
+    const selectedElement=(current.numberedElements||[]).find(e=>e.id===$s('smElement').value),selectedGroup=(current.numberedElementGroups||[]).find(g=>g.id===$s('smGroup').value);
+    const frontIds=[$s('smFront').value,selectedElement?.frontId,selectedGroup?.frontId].filter(Boolean);
+    if(new Set(frontIds).size>1||($s('smGroup').value&&selectedElement?.groupId&&selectedElement.groupId!==$s('smGroup').value)){alert('Фронт, группа и элемент относятся к разным участкам. Уточните связи отметки.');return;}
     const previous=existing?{...existing}:null;
     let synced=false;
     const button=$s('smSave');if(button.disabled)return;button.disabled=true;
     let x=existing;
     if(!x){x={id:makeId('SMK'),schemeId:g.schemeId,pageNo:g.pageNo,x:g.x,y:g.y,width:g.width,height:g.height,markType:g.markType||'area',lineReverse:!!g.lineReverse,active:true,createdAt:t};current.schemeMarks.push(x);}
     const status=$s('smStatus').value;
-    const frontId=$s('smFront').value;
+    const frontId=$s('smFront').value||selectedElement?.frontId||selectedGroup?.frontId||'';
     const elementGroupId=$s('smGroup').value;
     const numberedElementId=$s('smElement').value;
     const progressPercent=derivedProgress(status,frontId,elementGroupId,numberedElementId);

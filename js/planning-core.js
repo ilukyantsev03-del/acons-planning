@@ -167,13 +167,14 @@
     let count=0;for(let d=from;d<=to;d=next(d))if(workday(d,calendar))count++;return count;
   }
   function reverse(input,deadline){
+    if(number(input.total)===null||number(input.done)===null)throw Error('Для потребности нужны общий объём и подтверждённый факт.');
     deadline=date(deadline);const start=startDay(input.availableFrom&&input.availableFrom>input.start?input.availableFrom:input.start,input.calendar),remaining=Math.max(0,(number(input.total)||0)-(number(input.done)||0));
     if(!deadline||deadline<start)throw Error('Требуемое окончание раньше начала.');
     const count=workingCount(start,deadline,input.calendar);
     if(!count)throw Error('В периоде нет рабочих дней.');
-    let resourceDays=0;for(let d=start;d<=deadline;d=next(d))if(workday(d,input.calendar))resourceDays+=resourceAt(input,d);
-    const rate=number(input.rate);
-    return {days:count,requiredPace:remaining/count,requiredRate:resourceDays?remaining/resourceDays:null,requiredResources:rate>0?Math.ceil(remaining/(count*rate)):null};
+    let resourceDays=0;for(let d=start;d<=deadline;d=next(d))if(workday(d,input.calendar))resourceDays+=resourceAt(input.mode==='actual'?{...input,resources:input.physicalResources,resourceSteps:input.physicalResourceSteps||[]}:input,d);
+    const rate=number(input.mode==='actual'?input.productivityRate:input.rate);
+    return {days:count,requiredPace:remaining/count,requiredRate:resourceDays?remaining/resourceDays:null,requiredResources:remaining===0?0:rate>0?Math.ceil(remaining/(count*rate)):null};
   }
   // Backward pass in date space: each candidate is tested with the same calendar,
   // lag and variable-resource duration as the forward pass. No calendar-day slack approximation.
@@ -225,7 +226,7 @@
   }
   function assignments(input,day){
     const rows=(input.assignments||[]).map(a=>({pool:text(a.pool),quantity:number(a.quantity)}));
-    if(input.pool)rows.push({pool:text(input.pool),quantity:resourceAt(input,day)});
+    if(input.pool){if(input.mode==='actual'&&number(input.physicalResources)===null)throw Error('Для загрузки укажите фактическое назначение физических ресурсов, а не общий темп.');const physical=input.mode==='actual'?{...input,resources:input.physicalResources,resourceSteps:input.physicalResourceSteps||[]}:input;rows.push({pool:text(input.pool),quantity:resourceAt(physical,day)});}
     const totals=new Map();for(const a of rows){if(!a.pool||a.quantity===null||a.quantity<0)throw Error('Проверьте назначение ресурсов.');totals.set(a.pool,(totals.get(a.pool)||0)+a.quantity);}
     return [...totals].map(([pool,quantity])=>({pool,quantity}));
   }

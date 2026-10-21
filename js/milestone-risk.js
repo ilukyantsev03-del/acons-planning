@@ -80,6 +80,7 @@
   }
 
   function isWorkday(date, calendar) {
+    if(window.LIV_PLANNING&&window.LIV_DAILY)return window.LIV_PLANNING.workday(iso(date),window.LIV_DAILY.calendar(currentProject()||{},calendar));
     const day = date.getDay();
     if (calendar === '5x2') return day !== 0 && day !== 6;
     if (calendar === '6x1') return day !== 0;
@@ -240,13 +241,14 @@
     const elements = linkedElements(item, current);
     const target = targetFor(item, fronts, elements, current);
     // Schedule milestones (delivery, acceptance, approvals) need no invented physical quantity.
-    if(item.scheduleTaskId && (item.riskMethod==='schedule'||target.quantity==null)){
+    const linkedSchedule=window.LIV_CHAIN?.milestoneView(current,item,asOf);
+    if((linkedSchedule||item.scheduleTaskId) && (item.riskMethod==='schedule'||target.quantity==null)){
       const task=(current.tasks||[]).find(t=>t.id===item.scheduleTaskId&&t.active!==false);
-      const version=(current.scheduleVersions||[]).find(v=>v.id===(task?.versionId||task?.sourceImportId));
+      const version=linkedSchedule?.version||(current.scheduleVersions||[]).find(v=>v.id===(task?.versionId||task?.sourceImportId));
       const planned=(current.taskDates||[]).filter(d=>d.taskId===task?.id&&d.type==='working').slice(-1)[0];
-      const targetDate=item.contractDate||'',forecast=planned?.finish||'';
+      const targetDate=item.contractDate||'',forecast=linkedSchedule?.finish||planned?.finish||'';
       const completed=Boolean(item.factDate&&item.factDate<=asOf)||isCompleted(item.status);
-      const applicable=task&&forecast&&(!version?.effectiveDate||version.effectiveDate<=asOf);
+      const applicable=(linkedSchedule||task)&&forecast&&(!version?.effectiveDate||version.effectiveDate<=asOf);
       let level='gray',reason='Нет связанной версии графика на отчётную дату.';
       if(completed){level='green';reason='Выполнение КД подтверждено.';}
       else if(applicable&&targetDate){
@@ -268,12 +270,14 @@
     const daysLeft = targetDate ? workdays(asOf, targetDate, calendar) : null;
     const remaining = target.quantity == null ? null : Math.max(0, target.quantity - actual);
     const windowDays = Math.max(1, Math.min(90, Math.round(num(item.riskWindowDays) || 7)));
-    const recentRate = averageRate(series.daily, asOf, windowDays, calendar);
-    const longRate = averageRate(series.daily, asOf, 28, calendar);
+    let recentRate = averageRate(series.daily, asOf, windowDays, calendar),longRate = averageRate(series.daily, asOf, 28, calendar);
+    const primary=(current.workMetrics||[]).find(m=>m.frontId===fronts[0]?.id&&m.isPrimary&&m.active!==false);
+    if(!useElements&&fronts.length===1&&(!item.metricId||item.metricId===primary?.id)&&!(item.riskDetails?.metricIds||[]).length&&window.LIV_CHAIN){const cal=window.LIV_DAILY.calendar(current,calendar),work={frontId:fronts[0].id};recentRate=window.LIV_CHAIN.pace(current,work,asOf,cal,windowDays).rate??0;longRate=window.LIV_CHAIN.pace(current,work,asOf,cal,28).rate??0;}
     const requiredRate = remaining == null || !daysLeft ? 0 : remaining / Math.max(1, daysLeft);
     const projectedQty = target.quantity == null || daysLeft == null ? null : actual + recentRate * Math.max(0, daysLeft);
     const gapQty = target.quantity == null || projectedQty == null ? null : Math.max(0, target.quantity - projectedQty);
-    const completed = Boolean(item.factDate) || isCompleted(item.status) || remaining === 0;
+    const completed = Boolean(item.factDate&&item.factDate<=asOf) || isCompleted(item.status);
+    const physicalComplete=remaining===0;
     const projectedFinishDate = remaining == null || remaining <= 0
       ? asOf
       : recentRate > 0
@@ -282,6 +286,7 @@
 
     let level = 'gray';
     if (completed) level = 'green';
+    else if(physicalComplete)level=targetDate&&targetDate<asOf?'red':'yellow';
     else if (!targetDate || target.quantity == null) level = 'gray';
     else if (!daysLeft) level = 'red';
     else if (recentRate <= 0) level = daysLeft <= 14 ? 'red' : 'orange';
@@ -291,7 +296,8 @@
     }
 
     let reason = 'Нет данных для расчёта.';
-    if (completed) reason = 'Цель выполнена.';
+    if (completed) reason = 'Выполнение КД подтверждено.';
+    else if(physicalComplete)reason='Целевой объём выполнен; выполнение и освидетельствование КД требуют подтверждения.';
     else if (!targetDate) reason = 'Не задана целевая дата.';
     else if (target.quantity == null) reason = 'Не задан или не распознан целевой объём.';
     else if (!daysLeft) reason = 'Срок наступил, целевой объём не достигнут.';
@@ -301,7 +307,9 @@
     else if (recentRate < requiredRate * 1.15) reason = 'Срок достижим, но запас производительности минимален.';
     else reason = 'Текущий темп обеспечивает выполнение в срок.';
 
+    if(!completed&&linkedSchedule?.finish&&targetDate&&linkedSchedule.finish>targetDate){level='red';reason+=' Связанный рабочий график завершает КД '+linkedSchedule.finish+', позже договора.';}
     return {
+      linkedScheduleFinish:linkedSchedule?.finish||'',
       milestoneId: item.id,
       reportDate: asOf,
       targetDate,
@@ -398,7 +406,7 @@
         <div class="milestone-risk-detail"><span>Требуемый темп</span><strong>${round(risk.requiredRate,2)} ${escapeHtml(risk.targetUnit)}/дн.</strong></div>
         <div class="milestone-risk-detail"><span>Прогноз к сроку</span><strong>${risk.projectedQty == null ? '—' : round(risk.projectedQty,1) + ' ' + escapeHtml(risk.targetUnit)}</strong></div>
         <div class="milestone-risk-detail"><span>Недобор</span><strong>${risk.gapQty == null ? '—' : round(risk.gapQty,1) + ' ' + escapeHtml(risk.targetUnit)}</strong></div>
-        <div class="milestone-risk-detail"><span>Прогноз завершения</span><strong>${formatDate(risk.projectedFinishDate)}</strong></div>
+        ${risk.linkedScheduleFinish?'<div class="milestone-risk-detail"><span>По рабочему графику</span><strong>'+formatDate(risk.linkedScheduleFinish)+'</strong></div>':''}<div class="milestone-risk-detail"><span>Прогноз завершения</span><strong>${formatDate(risk.projectedFinishDate)}</strong></div>
       </div>
       <div class="milestone-risk-note"><b>Основание</b><br>Целевая дата: ${formatDate(risk.targetDate)} · календарь ${escapeHtml(risk.calendarId)}.<br>Связано фронтов: ${risk.linkedFrontCount}; номерных элементов: ${risk.linkedElementCount}. Источник факта: ${escapeHtml(risk.sourceMode)}.</div>
     `);

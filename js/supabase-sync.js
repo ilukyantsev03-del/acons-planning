@@ -256,7 +256,7 @@
   if (document.querySelector('script[data-liv-schemes]')) return;
 
   const script = document.createElement('script');
-  script.src = 'js/schemes.js?v=20261015-2';
+  script.src = 'js/schemes.js?v=20261021-1';
   script.async = true;
   script.dataset.livSchemes = '1';
   script.onerror = () => {
@@ -269,7 +269,7 @@
   const modules = [
     ['liv-normalized-sync', 'js/normalized-sync.js?v=20261018-2'],
     ['liv-source-mappings', 'js/source-mappings.js?v=20261013-5'],
-    ['liv-milestone-risk', 'js/milestone-risk.js?v=20261016-1'],
+    ['liv-milestone-risk', 'js/milestone-risk.js?v=20261021-1'],
     ['liv-milestone-risk-groups', 'js/milestone-risk-groups.js?v=20261013-2'],
     ['liv-key-date-import', 'js/key-date-import.js?v=20261014-5'],
     ['liv-key-date-import-guard', 'js/key-date-import-guard.js?v=20261013-2'],

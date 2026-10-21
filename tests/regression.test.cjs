@@ -108,7 +108,7 @@ test('КД: все листы сохраняются при изменении �
 });
 
 function schemes(extra) {
-  const env = moduleContext('js/schemes.js', 'state,saveMark,loadPdf,pdfjs,syncScheme,syncMark,derivedProgress', extra);
+  const env = moduleContext('js/schemes.js', 'state,saveMark,loadPdf,pdfjs,syncScheme,syncMark,derivedProgress,stats', extra);
   env.window.LIV_ACCESS = { role:'planner' };
   env.window.LIV_NORMALIZED_SYNC = { projectId: () => 'project-1', serverId: () => null };
   return env;
@@ -471,4 +471,18 @@ test('КД по графику: перенос рабочей даты пока�
 test('КД по графику: процент задачи не подменяет подтверждение выполнения КД',()=>{
  const e=moduleContext('js/milestone-risk.js','compute');e.context.project.tasks=[{id:'T',progressPercent:100}];e.context.project.taskDates=[{taskId:'T',type:'working',finish:'2026-10-18'}];
  const r=e.api.compute({id:'M',scheduleTaskId:'T',contractDate:'2026-10-20'},{asOf:'2026-10-16'});assert.equal(r.riskLevel,'yellow');assert.match(r.reason,/требует подтверждения/);
+});
+test('Схема читает канонический факт вместо устаревшего итога фронта; будущее исключено',()=>{
+ const e=schemes();e.window.LIV_FACT_SERIES=factModel();e.context.project.fronts=[{id:'F',totalQty:100,doneQty:999}];e.context.project.progressFacts=[{id:'now',frontId:'F',factDate:'2026-10-01',factType:'cumulative_snapshot',cumulativeQty:40},{id:'future',frontId:'F',factDate:'2099-01-01',quantity:50}];assert.equal(e.api.derivedProgress('Выполнено','F'),40);assert.equal(e.context.project.fronts[0].doneQty,999);
+});
+test('Схема на отчётную дату: повторные отметки не увеличивают вес фронта и не меняют записи',()=>{
+ const e=schemes();e.window.LIV_FACT_SERIES=factModel();e.window.LIV_PLANNING_UI={context:()=>({state:{to:'2026-10-21'}})};e.context.project.fronts=[{id:'F',totalQty:100},{id:'G',totalQty:100}];e.context.project.progressFacts=[{id:'f',frontId:'F',factDate:'2026-10-20',factType:'cumulative_snapshot',cumulativeQty:40},{id:'g',frontId:'G',factDate:'2026-10-20',factType:'cumulative_snapshot',cumulativeQty:100}];e.context.project.schemeMarks=[{id:'a',schemeId:'S',frontId:'F',status:'В работе',progressPercent:5},{id:'b',schemeId:'S',frontId:'F',status:'В работе',progressPercent:5},{id:'c',schemeId:'S',frontId:'G',status:'Выполнено',progressPercent:5}];e.api.state.schemeId='S';const before=JSON.stringify(e.context.project);e.api.stats();assert.equal(e.element('schProgress').textContent,'70%');assert.equal(JSON.stringify(e.context.project),before);assert.equal(e.api.derivedProgress('В работе','F','','','2026-10-19'),null);
+});
+test('Схема блокирует противоречивые связи до записи и создания отметки',async()=>{
+ const notices=[],e=schemes({alert:m=>notices.push(m)});e.context.project.numberedElements=[{id:'N',frontId:'F2',groupId:'G2'}];e.element('smFront').value='F1';e.element('smElement').value='N';e.element('smGroup').value='';const before=e.context.project.schemeMarks.length;await e.api.saveMark(null,{schemeId:'S',pageNo:1});assert.equal(e.context.project.schemeMarks.length,before);assert.ok(notices.some(m=>String(m).includes('разным участкам')));
+});
+test('КД: объём выполнен, но освидетельствование не подтверждено; сохранённый прогноз связан',()=>{
+ const e=moduleContext('js/milestone-risk.js','compute');e.window.LIV_FACT_SERIES=factModel();e.context.project.fronts=[{id:'F',totalQty:100}];e.context.project.progressFacts=[{id:'x',frontId:'F',factDate:'2026-10-19',factType:'cumulative_snapshot',cumulativeQty:100}];
+ const r=e.api.compute({id:'M',frontId:'F',targetQty:100,contractDate:'2026-10-28'},{asOf:'2026-10-21'});assert.equal(r.riskLevel,'yellow');assert.match(r.reason,/требуют подтверждения/);
+ e.window.LIV_CHAIN={milestoneView:()=>({finish:'2026-10-29',version:{effectiveDate:'2026-10-20'}})};const linked=e.api.compute({id:'M',riskMethod:'schedule',contractDate:'2026-10-28'},{asOf:'2026-10-21'});assert.equal(linked.projectedFinishDate,'2026-10-29');assert.equal(linked.riskLevel,'red');
 });

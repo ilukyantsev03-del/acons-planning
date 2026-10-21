@@ -78,7 +78,8 @@
     const bar=(r,index,kind,t,label)=>{
       if(!valid(r)||r.finish<a.from||r.start>a.to)return '';
       const x=a.x(r.start),end=a.x(r.finish,true),y=headerHeight+index*rowHeight;
-      const title=esc(t.name+' · '+label+': '+full(r.start)+' — '+full(r.finish));
+      const f=options.facts?.get(t.id),fact=f?' · факт '+(f.actual??'нет данных')+' / '+(f.total??'нет объёма')+' '+(f.volume?.unit||'')+'; остаток '+(f.remaining??'нет данных'):'';
+      const title=esc(t.name+' · '+label+': '+full(r.start)+' — '+full(r.finish)+fact);
       const shape=t.isMilestone?`<path d="M ${x+5} ${y+24} l 9 10 l -9 10 l -9 -10 Z"/>`:`<rect x="${x}" y="${y+(kind==='base'?9:kind==='before'?21:27)}" width="${Math.max(2,end-x)}" height="${kind==='base'?5:kind==='before'?6:16}" rx="3"/>`;
       return `<g class="gantt-bar gantt-${kind}${options.critical?.get(t.id)?.isCritical&&kind==='after'?' gantt-critical':''}${kind==='after'&&m.moved.has(t.id)?' gantt-moved':''}" data-gantt-task="${esc(t.id)}" tabindex="0" role="button" aria-label="${title}"><title>${title}</title>${shape}</g>`;
     };
@@ -106,7 +107,7 @@
     const m=build(options,ui);if(m.empty)return '<p>Для Ганта нужны корректные даты работ.</p>';
     const a=m.axis,control=(key,label,value,type='checkbox')=>`<label>${type==='checkbox'?`<input type="checkbox" data-gantt-control="${key}" ${value?'checked':''}>${label}`:`${label}<input type="${type}" data-gantt-control="${key}" value="${esc(value)}">`}</label>`;
     const label=options.leveled?'После выравнивания':options.calculated?'Прогноз':'Сохранённая версия';
-    const names=m.rows.map(t=>{const r=options.after.get(t.id),c=m.moved.get(t.id),delta=c?P.days(c.before.finish,c.after.finish):null;return `<div class="gantt-name-row ${options.selected===t.id?'gantt-selected':''}"><button type="button" class="gantt-task-button" data-gantt-task="${esc(t.id)}" title="Открыть работу: ${esc(t.name)}">${esc(t.name)}</button><small>${esc(m.context(t))}</small><small>${full(r?.start)} — ${full(r?.finish)}${c?' · окончание '+signed(delta)+' кал. дн.':''}${options.critical?.get(t.id)?.isCritical?' · критическая':''}</small></div>`;}).join('');
+    const names=m.rows.map(t=>{const r=options.after.get(t.id),c=m.moved.get(t.id),delta=c?P.days(c.before.finish,c.after.finish):null;return `<div class="gantt-name-row ${options.selected===t.id?'gantt-selected':''}"><button type="button" class="gantt-task-button" data-gantt-task="${esc(t.id)}" title="Открыть работу: ${esc(t.name)}">${esc(t.name)}</button><small>${esc(m.context(t))}${options.facts?.has(t.id)?' · факт '+esc(options.facts.get(t.id).actual??'—')+' / '+esc(options.facts.get(t.id).total??'—')+' '+esc(options.facts.get(t.id).volume?.unit||''):''}</small><small>${full(r?.start)} — ${full(r?.finish)}${c?' · окончание '+signed(delta)+' кал. дн.':''}${options.critical?.get(t.id)?.isCritical?' · критическая':''}</small></div>`;}).join('');
     const capacities=options.capacities||{},capacity=Object.hasOwn(capacities,m.pool)?P.number(capacities[m.pool]):null;
     const charts=!m.pool?'<p class="gantt-no-load">Для загрузки назначьте работам общие группы ресурсов. Отсутствие назначений не означает нулевую потребность.</p>':(options.leveled&&ui.compare!==false?resourceChart(options.beforeLoad||[],m.pool,a,capacity,'До выравнивания'):'')+resourceChart(options.afterLoad||[],m.pool,a,capacity,options.leveled?'После выравнивания':'Плановая загрузка');
     const changed=(options.changes||[]).map(c=>({c,t:(options.allTasks||options.tasks).find(t=>t.id===c.id)}));
