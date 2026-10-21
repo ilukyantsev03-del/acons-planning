@@ -136,6 +136,10 @@ function livMainTabTitle(tab) {
     demolition: 'Демонтаж',
     import: 'Импорт',
     history: 'История изменений',
+    volumes: 'Объёмы',
+    schedule: 'График',
+    schemes: 'Схемы',
+    reports: 'Отчёты',
     settings: 'Настройки'
   };
 
@@ -497,6 +501,7 @@ function livVBApplyGroup(
 
       element.style.order =
         String(index);
+      if(item.auto)element.parentElement?.classList.add('liv-auto-order');
 
       /*
         Если кнопка почему-то потеряла текст,
@@ -545,6 +550,10 @@ function livVBRepairNavigationLabels() {
     demolition: 'Демонтаж',
     import: 'Импорт',
     history: 'История',
+    volumes: 'Объёмы',
+    schedule: 'График',
+    schemes: 'Схемы',
+    reports: 'Отчёты',
     settings: 'Настройки'
   };
 
@@ -646,9 +655,10 @@ function livVBApplyTables(schema) {
       return;
     }
 
+    if(tableSchema.auto)livVBApplyAutoColumns(table,tableSchema,config);
     const card =
       table.closest(
-        '.card'
+        tableSchema.auto?'[data-planning-destination],details,.wb-list':'.card'
       );
 
     const title =
@@ -666,7 +676,7 @@ function livVBApplyTables(schema) {
         'tfoot'
       );
 
-    if (title) {
+    if (title && !tableSchema.auto) {
       title.textContent =
         config.title ||
         tableSchema.title ||
@@ -694,37 +704,49 @@ function livVBApplyTables(schema) {
   });
 }
 
+/* Discover live screens as well as registered native tables. IDs survive rerenders. */
+function livVBDiscoverSchema(base) {
+  const panel=livCurrentPanel();if(!panel)return base;
+  const panels=[panel];if(livActiveMainTab()==='resources'){const extra=document.getElementById('planningSurface-resources');if(extra&&!panel.contains(extra))panels.push(extra);}
+  const schema={...base,blocks:livVBResolveItems(base.blocks).slice(),tables:livVBResolveItems(base.tables).slice()};
+  const hash=text=>{let n=2166136261;for(const ch of text)n=Math.imul(n^ch.charCodeAt(0),16777619);return (n>>>0).toString(36);};
+  const nodeId=(node,prefix,index)=>{if(!node.id)node.id=prefix+'-'+hash(livCurrentViewKey()+'|'+(node.closest('[id]')?.id||'')+'|'+index+'|'+(node.querySelector('h2,h3,summary')?.textContent||''));return node.id;};
+  const blocks=panels.flatMap(p=>[...p.children]).filter(n=>n.matches('.card,details,section')&&!n.matches('.liv-page-head'));
+  for(const content of panels.flatMap(p=>[...p.querySelectorAll('[data-planning-content]')]))blocks.push(...[...content.children].filter(n=>n.matches('section')));
+  blocks.forEach((node,index)=>{const id=nodeId(node,'liv-block',index);if(schema.blocks.some(x=>livVBFindElement(x)===node))return;schema.blocks.push({id:'auto:'+id,title:node.querySelector('h2,h3,summary')?.textContent?.trim()||'Блок '+(index+1),selector:'#'+id,auto:true});});
+  const counts=new Map();
+  for(const table of panels.flatMap(p=>[...p.querySelectorAll('table')])){
+    if(schema.tables.some(x=>{const node=x.selector?document.querySelector(x.selector):null;return (node?.matches('table')?node:node?.closest('table'))===table;}))continue;
+    const header=table.querySelector('thead tr');if(!header||[...header.children].some(c=>Number(c.getAttribute('colspan')||c.colSpan||1)>1||Number(c.getAttribute('rowspan')||c.rowSpan||1)>1))continue;
+    const anchor=table.closest('[data-planning-destination],.wb-workspace,[id]')?.id||panel.id;
+    const key=anchor+'|'+[...header.children].map(c=>c.dataset.vbOriginalTitle||c.textContent.trim()).join('|'),index=counts.get(key)||0;counts.set(key,index+1);
+    if(!table.id)table.id='liv-table-'+hash(key+'|'+index);
+    const columns=[...header.children].map((cell,i)=>{if(!cell.dataset.vbColumn){cell.dataset.vbColumn='col-'+i;cell.dataset.vbOriginalTitle=cell.textContent.trim();}return {id:cell.dataset.vbColumn,title:cell.dataset.vbOriginalTitle||'Столбец '+(i+1)};});
+    const section=table.closest('[data-planning-destination],.wb-list,.wb-detail,details,.card');
+    schema.tables.push({id:'auto:'+table.id,title:section?.querySelector('h2,h3,summary')?.textContent?.trim()||columns[0]?.title||'Таблица',selector:'#'+table.id,columns,auto:true,showTitle:false});
+  }
+  return schema;
+}
 function livGetCurrentSchema() {
-  return (
-    livGetRegisteredViewSchema(
-      livCurrentViewKey()
-    ) ||
-    {
-      title:
-        livReportTitle(),
-
-      modes:
-        [],
-
-      filters:
-        [],
-
-      actions:
-        [],
-
-      kpis:
-        [],
-
-      blocks:
-        [],
-
-      charts:
-        [],
-
-      tables:
-        []
+  return livVBDiscoverSchema(livGetRegisteredViewSchema(livCurrentViewKey()) || {title:livReportTitle(),modes:[],filters:[],actions:[],kpis:[],blocks:[],charts:[],tables:[]});
+}
+function livVBApplyAutoColumns(table,schema,config){
+  const columns=livVBResolveTableColumns(schema),ordered=livVBOrdered(columns,config.columnOrder),hidden=new Set(config.hiddenColumns);
+  // Expand merged body cells into their logical columns before reordering totals.
+  for(const row of table.querySelectorAll('tr')){
+    let cells=[...row.children];if(cells.some(c=>Number(c.getAttribute('rowspan')||c.rowSpan||1)>1)||cells.length===1&&Number(cells[0].getAttribute('colspan')||cells[0].colSpan||1)>1)continue;
+    if(cells.some(c=>Number(c.getAttribute('colspan')||c.colSpan||1)>1)){
+      const expanded=[];for(const cell of cells){const span=Number(cell.getAttribute('colspan')||cell.colSpan||1);cell.setAttribute('colspan','1');expanded.push(cell);for(let n=1;n<span;n++){const blank=document.createElement(cell.tagName.toLowerCase());row.insertBefore(blank,cell.nextSibling);expanded.push(blank);}}
+      cells=expanded;
     }
-  );
+    if(cells.length!==columns.length)continue;
+    cells.forEach((cell,index)=>{if(!cell.dataset.vbColumn)cell.dataset.vbColumn='col-'+index;});
+    const map=new Map(cells.map(c=>[c.dataset.vbColumn,c]));
+    for(const col of ordered){const cell=map.get(col.id);if(!cell)continue;cell.classList.toggle('liv-builder-hidden',hidden.has(col.id));
+      if(row.parentElement?.tagName==='THEAD'&&!cell.querySelector('input,select,button'))cell.textContent=config.columnTitles[col.id]||col.title;
+      row.appendChild(cell);
+    }
+  }
 }
 
 function livApplyViewConstructor() {

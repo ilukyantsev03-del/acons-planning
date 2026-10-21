@@ -712,6 +712,28 @@
   window.addEventListener('liv-normalized-sync-status',event=>{
     if(event.detail?.status==='ready')setTimeout(resyncServerLinks,50);
   });window.addEventListener('liv-auth-session',()=>setTimeout(render,0));let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(state.pdf&&!$s('tab-schemes')?.classList.contains('hidden'))renderPage();},250);});
-  window.LIV_SCHEMES={render,select,upload:openUpload,openMark};
+  // Independent read-only preview: never selects the editor or writes page metadata.
+  async function preview(host,id,{page:pageNo=1,frontId='',asOf=reportAsOf()}={}){
+    if(!host)return;const item=scheme(id),token=String(makeId('PREVIEW'));host.dataset.previewToken=token;
+    host.textContent='Загрузка схемы…';
+    try{
+      if(!item||item.active===false)throw Error('Схема не найдена.');
+      let doc=state.cache.get(item.id);
+      if(!doc){const client=window.LIV_SUPABASE;if(!client)throw Error('Нет подключения к хранилищу схем.');const r=await client.storage.from(BUCKET).download(item.storagePath);if(r.error)throw r.error;doc=(item.mimeType||'').startsWith('image/')?await imageDocument(r.data):await (await pdfjs()).getDocument({data:new Uint8Array(await r.data.arrayBuffer())}).promise;await rememberPdf(item.id,doc);}
+      if(host.dataset.previewToken!==token||!host.isConnected)return;
+      const page=await doc.getPage(Math.min(doc.numPages,Math.max(1,Number(pageNo)||1))),base=page.getViewport({scale:1}),width=Math.max(300,host.clientWidth||600),view=page.getViewport({scale:Math.min(1.5,width/base.width)});
+      const stage=document.createElement('div');stage.className='wb-scheme-stage';stage.style.width=view.width+'px';stage.style.height=view.height+'px';
+      const canvas=document.createElement('canvas');canvas.width=Math.ceil(view.width);canvas.height=Math.ceil(view.height);stage.appendChild(canvas);host.replaceChildren(stage);
+      await page.render({canvasContext:canvas.getContext('2d'),viewport:view}).promise;
+      if(host.dataset.previewToken!==token||!host.isConnected)return;
+      const related=new Set(window.LIV_CHAIN?.schemes(p(),{frontId}).map(m=>m.id)||[]);
+      for(const mark of (p()?.schemeMarks||[]).filter(m=>m.active!==false&&m.schemeId===id&&Number(m.pageNo||1)===Number(pageNo))){
+        const node=document.createElement('div');node.className='wb-scheme-mark';paintShape(node,mark);if(related.has(mark.id))node.classList.add('wb-scheme-related');
+        const percent=derivedProgress(mark.status,mark.frontId,mark.elementGroupId,mark.numberedElementId,asOf);node.title=[mark.designation,mark.title,percent===null?'Нет данных':percent+'%'].filter(Boolean).join(' · ');stage.appendChild(node);
+      }
+    }catch(error){if(host.dataset.previewToken===token)host.textContent='Не удалось открыть схему: '+(error.message||error);}
+  }
+  window.LIV_SCHEMES={render,select,upload:openUpload,openMark,preview};
+  if(typeof CustomEvent==='function')window.dispatchEvent?.(new CustomEvent('liv-schemes-ready'));
   document.readyState==='loading'?document.addEventListener('DOMContentLoaded',boot,{once:true}):boot();
 })();

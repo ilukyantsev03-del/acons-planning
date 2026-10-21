@@ -7670,6 +7670,7 @@ function livPanelMeta(
       'План / факт',
       'Сравнение плановых и фактических объёмов'
     ],
+    volumes: ['Объёмы','Действующие и договорные объёмы, изменения и история'],
     reports: ['Отчёты','Формы по версиям графиков и зафиксированные снимки'],
     resources: [
       'Ресурсы',
@@ -8008,6 +8009,8 @@ function switchTab(
     renderSettings();
   }
   window.LIV_PLANNING_UI?.onTab(name);
+  if(typeof livApplyViewConstructor==='function')livApplyViewConstructor();
+  if(typeof markTotalRows==='function')markTotalRows();
 }
 
 
@@ -8017,6 +8020,18 @@ function switchTab(
 
 
 function markTotalRows() {
+
+  for(const table of document.querySelectorAll('main table')){
+    const head=table.querySelector('thead tr');if(!head)continue;
+    const cells=[...head.children],rows=[...table.querySelectorAll('tbody tr')].filter(r=>r.children.length===cells.length).slice(0,30);
+    cells.forEach((th,index)=>{
+      const samples=rows.map(r=>r.children[index]).filter(c=>!c.querySelector('input,select,button')&&c.textContent.trim()&&!/^[—–-]$/.test(c.textContent.trim()));
+      const numeric=samples.length>0&&samples.every(c=>/^[+−-]?[\d\s\u00a0]+(?:[.,]\d+)?\s*(?:%|п\.п\.)?$/.test(c.textContent.trim()));
+      th.classList.toggle('liv-numeric-cell',numeric);for(const r of rows)r.children[index].classList.toggle('liv-numeric-cell',numeric);
+      const date=samples.length>0&&samples.every(c=>/^\d{4}-\d{2}-\d{2}$|^\d{2}\.\d{2}\.\d{4}$/.test(c.textContent.trim()));
+      th.classList.toggle('liv-date-cell',date);for(const r of rows)r.children[index].classList.toggle('liv-date-cell',date);
+    });
+  }
 
   document
     .querySelectorAll(
@@ -8032,7 +8047,7 @@ function markTotalRows() {
           )
             .some(
               cell =>
-                /^\s*итого(?:\s|$)/i
+                /^\s*(?:итого|всего)(?:\s|:|$)/i
                   .test(
                     String(
                       cell.textContent ||
@@ -8044,7 +8059,7 @@ function markTotalRows() {
 
         row.classList.toggle(
           'liv-total-row',
-          hasTotal
+          hasTotal || row.parentElement?.tagName==='TFOOT'
         );
       }
     );

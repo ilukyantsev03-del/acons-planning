@@ -148,6 +148,6 @@
     return {...result,productionGain:weight?productionGain/weight:null,scopeEffect:weight?scopeEffect/weight:null};
   }
   function csv(rows){return '\uFEFF'+rows.map(row=>row.map(v=>{let s=String(v??'');if(/^[=+@\-]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';}).join(';')).join('\r\n');}
-  function storageProjection(project){return Object.fromEntries(['planningEdits','scheduleMatches','quantityBaselines','quantityChanges','quantityPlans','workMetrics','numberedElements','planningSettings','scheduleVersions','tasks','taskDates','taskQuantities','dependencies','milestones','fronts','progressFacts','reportSnapshots'].map(k=>[k,project[k]||(k==='planningSettings'?{}:[])]));}
+  function storageProjection(project){return Object.fromEntries(['resources','viewBuilder','planningEdits','scheduleMatches','quantityBaselines','quantityChanges','quantityPlans','workMetrics','numberedElements','planningSettings','scheduleVersions','tasks','taskDates','taskQuantities','dependencies','milestones','fronts','progressFacts','reportSnapshots'].map(k=>[k,project[k]||(['planningSettings','viewBuilder'].includes(k)?{}:[])]));}
   window.LIV_PLANNING_DOMAIN={quantityKey,elementScope,reviewImportedVolumes,seed,frontView,refreshFront,resolveVersion,volumeAt,recordChange,decideProposal,factAt,stateAt,periodProgress,comparison,validatePlan,periodPlan,milestoneForecast,quantityMetadata,freezeReport,aggregateReadiness,csv,storageProjection};
 })();

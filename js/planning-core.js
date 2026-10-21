@@ -27,6 +27,7 @@
     const total=number(input.total),done=number(input.done)??0,rate=number(input.rate),resources=number(input.resources),manual=number(input.manual);
     const remaining=total===null?null:Math.max(0,total-done);
     if(done<0 || (total!==null && total<0))throw Error('Объём не может быть отрицательным.');
+    if(input.mode==='finish'){const start=startDay(input.availableFrom&&input.availableFrom>input.start?input.availableFrom:input.start,input.calendar),finish=date(input.manualFinish);if(!finish||finish<start)throw Error('Экспертное окончание должно быть не раньше доступного начала.');return {remaining,days:workingCount(start,finish,input.calendar),start,remainingStart:start,finish,capacity:null,curve:[]};}
     let count;
     if(input.mode==='manual') {if(manual===null||manual<0)throw Error('Укажите длительность не менее нуля.');count=Math.ceil(manual);}
     else {if(remaining===null)throw Error('Укажите общий объём.');if(remaining===0)count=0;else {if(!(rate>0)||!(resources>0)&&!((input.resourceSteps||[]).some(r=>number(r.resources)>0)))throw Error('Выработка и количество ресурсов должны быть больше нуля.');count=(input.resourceSteps||[]).length?0:Math.ceil(remaining/(rate*resources));}}
@@ -149,8 +150,8 @@
     return all?total*period/all:null;
   }
   async function persist(current,mutation,save){
-    const names=['planningEdits','scheduleMatches','workMetrics','numberedElements','quantityBaselines','quantityChanges','quantityPlans','reportSnapshots','fronts','progressFacts','factLog','history','planningSettings','tasks','taskDates','taskQuantities','dependencies','scheduleVersions','scheduleStaging','importHistory','contracts','milestones'];
-    const before=Object.fromEntries(names.map(k=>[k,JSON.parse(JSON.stringify(current[k]||(k==='planningSettings'?{}:[])))]));
+    const names=['resources','viewBuilder','planningEdits','scheduleMatches','workMetrics','numberedElements','quantityBaselines','quantityChanges','quantityPlans','reportSnapshots','fronts','progressFacts','factLog','history','planningSettings','tasks','taskDates','taskQuantities','dependencies','scheduleVersions','scheduleStaging','importHistory','contracts','milestones'];
+    const before=Object.fromEntries(names.map(k=>[k,JSON.parse(JSON.stringify(current[k]||(['planningSettings','viewBuilder'].includes(k)?{}:[])))]));
     try{mutation();await save();}catch(error){for(const k of names)current[k]=before[k];throw error;}
   }
 
@@ -193,7 +194,7 @@
       const successors=out.map(d=>({dep:d,result:latest(d.successorTaskId)}));
       if(input.fixed){const r={...e,lateStart:e.start,lateFinish:e.finish,totalFloat:null,isCritical:false,completed:true};late.set(id,r);visiting.delete(id);return r;}
       const feasible=start=>{
-        const r=duration({...input,start,actualStart:undefined});
+        let r;try{r=duration({...input,start,actualStart:undefined});}catch(error){if(input.mode==='finish')return false;throw error;}
         if(r.finish>end)return false;
         for(const {dep,result:s} of successors){
           if(s.completed)continue;

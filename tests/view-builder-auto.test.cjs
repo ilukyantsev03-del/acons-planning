@@ -1,0 +1,14 @@
+'use strict';
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+let domPath=process.env.LIV_DOM_TEST_MODULE;try{domPath=domPath||require.resolve('linkedom');}catch{}
+function setup(){const {parseHTML}=require(domPath),{document}=parseHTML('<html><body><button class="tab active" data-tab="planfact">План / факт</button><main><section id="tab-planfact"><section class="card" id="part"><h2>Объёмы</h2><table id="qty"><thead><tr><th>Работа</th><th>Ед.</th><th>Объём</th><th>Факт</th></tr></thead><tbody><tr><td>A</td><td>м³</td><td>100</td><td>40</td></tr><tr class="liv-total-row"><th colspan="2">Итого</th><td>100</td><td>40</td></tr></tbody></table></section></section></main></body></html>');const c={document,window:{},project:{},setTimeout:()=>0,console,esc:s=>s,clone:v=>JSON.parse(JSON.stringify(v))};vm.createContext(c);vm.runInContext(fs.readFileSync(__dirname+'/../js/view-builder.js','utf8'),c);return {c,document};}
+test('Конструктор обнаруживает раздел без ручной схемы; порядок, названия и скрытие колонок сохраняют соответствие итогов', {skip:!domPath},()=>{
+ const {c,document:d}=setup(),schema=c.livGetCurrentSchema();assert.equal(schema.blocks.length,1);assert.equal(schema.tables.length,1);const t=schema.tables[0];assert.equal(t.columns.length,4);
+ const settings=c.livViewSettings();settings.tables[t.id]={columnOrder:['col-0','col-3','col-2','col-1'],columnTitles:{'col-3':'Выполнено'},hiddenColumns:['col-1'],showHeader:true};
+ c.livApplyViewConstructor();const rows=d.querySelectorAll('#qty tr');assert.equal(rows[0].children[1].textContent,'Выполнено');assert.equal(rows[1].children[1].textContent,'40');assert.equal(rows[2].children[1].textContent,'40');assert.equal(rows[2].children[2].textContent,'100');assert.ok(rows[1].lastElementChild.classList.contains('liv-builder-hidden'));
+ const again=c.livGetCurrentSchema();assert.equal(again.tables[0].id,t.id);c.livApplyViewConstructor();assert.equal(rows[1].children[1].textContent,'40');assert.equal(d.querySelector('#part h2').textContent,'Объёмы');
+});
+test('Сохранённый вид восстанавливается в новой сессии, скрытый блок можно вернуть', {skip:!domPath},()=>{
+ const {c,document:d}=setup(),schema=c.livGetCurrentSchema();c.livViewSettings().hiddenBlocks=[schema.blocks[0].id];c.livApplyViewConstructor();assert.ok(d.querySelector('#part').classList.contains('liv-builder-hidden'));
+ const fresh=setup();fresh.c.project=JSON.parse(JSON.stringify(c.project));fresh.c.livApplyViewConstructor();assert.ok(fresh.document.querySelector('#part').classList.contains('liv-builder-hidden'));fresh.c.livViewSettings().hiddenBlocks=[];fresh.c.livApplyViewConstructor();assert.equal(fresh.document.querySelector('#part').classList.contains('liv-builder-hidden'),false);
+});

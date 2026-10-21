@@ -18,7 +18,7 @@
   function input(p,t,asOf,override={}){
     const saved={...t.planning,...override},frontId=saved.frontId||t.frontId||'',work={...t,frontId},front=(p.fronts||[]).find(f=>f.id===frontId),d=dates(p,t),cal=override.calendar?.holidays?override.calendar:E.calendar(p,saved.calendar||t.calendar),v=D.volumeAt(p,work,asOf),fact=D.factAt(p,work,asOf),q=(p.taskQuantities||[]).find(q=>q.taskId===t.id);
     const result={mode:'manual',resources:1,manual:t.isMilestone?0:P.date(d.start)&&P.date(d.finish)?P.workingCount(d.start,d.finish,cal):t.durationAccepted,total:v.total??q?.quantity??front?.totalQty??'',done:front?.doneQty??0,rate:'',start:d.start||d.finish,unit:v.unit||q?.unit||front?.unit||t.unit||'',...saved,calendar:cal,asOf,frontId};
-    if((p.quantityBaselines||[]).some(b=>b.key===D.quantityKey(work))&&v.total!==null)result.total=v.total;
+    if(saved.useVolumeLedger!==false&&(p.quantityBaselines||[]).some(b=>b.key===D.quantityKey(work))&&v.total!==null)result.total=v.total;
     const journal=result.useJournal!==false&&fact.hasFacts;
     if(journal)result.done=fact.actual;
     result.actualStart=dates(p,t,'actual').start||front?.factStart||saved.actualStart||'';
