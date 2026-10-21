@@ -5,7 +5,7 @@
   const el=id=>document.getElementById(id);
   let ganttOptions=null,lastSource='',renderedProject=null,lastChainRows=[];
   const state={chainOnlySelected:false,gantt:{},left:'',right:'',task:'',drafts:{},links:{},preview:null,critical:null,leveled:null,scenario:0,scenarios:{},settings:null,comparisonMode:'versions',leftDate:'',rightDate:'',leftGroup:'',rightGroup:'',reportId:'',storageMessage:'',settingsProject:null,matrixRow:'place',matrixCol:'name',matrixMetric:'progress',organization:'',organizations:[],method:'average',from:new Date().toISOString().slice(0,7)+'-01',to:new Date().toISOString().slice(0,10)};
-  const versionTasks=id=>(project.tasks||[]).filter(t=>(t.versionId||t.sourceImportId)===id&&t.active!==false);
+  const versionTasks=id=>(project?.tasks||[]).filter(t=>(t.versionId||t.sourceImportId)===id&&t.active!==false);
   const dates=(task,type='working')=>(project.taskDates||[]).filter(d=>d.taskId===task.id&&d.type===type).slice(-1)[0]||{};
   const label=v=>[v.name||v.fileName,v.role==='customer'?'Заказчик':v.role==='contractor'?'Договор подрядчика':'Рабочий',v.effectiveDate||v.createdAt?.slice(0,10),v.isCurrent===false?'Архив':''].filter(Boolean).join(' · ');
   function host(){
@@ -208,8 +208,8 @@
     },()=>savePlanning());state.right=id;state.task='';state.preview=null;renderSchedule();
   }
   function render(){
-    window.LIV_WORKBENCH?.capture();lastChainRows=[];
     if(typeof project==='undefined'||!project)return;
+    window.LIV_WORKBENCH?.capture();lastChainRows=[];
     const h=host();if(!h)return;
     if(renderedProject&&renderedProject!==project){state.drafts={};state.links={};state.preview=null;state.critical=null;state.leveled=null;state.settings=null;}
     const openDetails=new Set(Array.from(document.querySelectorAll('[data-planning-surface] details[open]')).map(d=>d.querySelector('summary')?.textContent));

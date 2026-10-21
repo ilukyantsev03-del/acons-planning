@@ -230,3 +230,10 @@ test('Конструктор вместе с рабочим местом: нов
  }
  for(const b of e.c.document.querySelectorAll('.tab'))b.classList.toggle('active',b.dataset.tab==='planfact');const root=e.el('planningWorkbench'),input=root.querySelector('[data-wb-field="workers"]');input.value='13';input.dispatchEvent(new e.Event('input',{bubbles:true}));e.c.window.LIV_PLANNING_UI.render();assert.equal(e.el('planningWorkbench').querySelector('[data-wb-field="workers"]').value,'13');assert.equal(e.c.document.querySelectorAll('#planningWorkbench').length,1);
 });
+test('Холодный запуск до загрузки проекта и смена проекта не переносят чужой незаписанный ввод', {skip:!domPath},async()=>{
+ const e=setup(),a=stage(e);e.c.project=null;assert.doesNotThrow(()=>e.c.window.LIV_PLANNING_UI.render());assert.doesNotThrow(()=>e.c.window.LIV_WORKBENCH.capture());
+ e.c.project={tasks:[],taskDates:[],taskQuantities:[],dependencies:[],scheduleVersions:[],scheduleStaging:[],fronts:[],progressFacts:[],factLog:[],workMetrics:[],importHistory:[]};e.c.window.LIV_PLANNING_UI.render();await a.importSchedule();await a.promoteTestImport();const n=e.el('planningWorkbench').querySelector('[data-wb-field="workers"]');n.value='99';n.dispatchEvent(new e.Event('input',{bubbles:true}));e.c.project=JSON.parse(JSON.stringify(e.c.project));e.c.window.LIV_PLANNING_UI.render();assert.equal(e.el('planningWorkbench').querySelector('[data-wb-field="workers"]').value,'');
+});
+test('Первое наполнение: одна работа через обычные поля без файла и вставки диапазона', {skip:!domPath},async()=>{
+ const e=setup();e.c.window.renderSchedule();e.set('manualName','Рабочий график');e.set('manualDate','2026-10-21');e.set('manualSingleName','Устройство кровли');e.set('manualSingleQty','100');e.set('manualSingleUnit','м²');e.set('manualSingleStart','2026-10-22');e.set('manualSingleFinish','2026-11-02');await e.c.window.UI_TEST.createManual();assert.equal(e.c.project.tasks.length,1);assert.equal(e.c.project.tasks[0].name,'Устройство кровли');assert.equal(e.c.project.taskQuantities[0].quantity,100);assert.ok(e.el('planningWorkbench'));
+});
