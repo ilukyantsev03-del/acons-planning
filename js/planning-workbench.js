@@ -146,5 +146,5 @@
   window.addEventListener?.('beforeunload',event=>{const c=ui();if(!c)return;capture();if(Object.values(c.s.forms).some(f=>['quantity','workers','itr','mechanizers','equipmentQty'].some(k=>String(f[k]??'').trim()!==''))){event.preventDefault();event.returnValue='';}});
   window.addEventListener?.('liv-schemes-ready',()=>{const c=ui(),t=c?.tasks.find(t=>t.id===c.state.task);if(t&&document.getElementById('wbScheme'))previewScheme(c,t,inputFor(c,t));});
   function onTab(tab){if(!['facts','forecast'].includes(tab))return;const c=ui();if(!c)return;capture();c.state.workbenchTab=tab;mount();}
-  window.LIV_WORKBENCH={onTab,observedProductivity,resourcePeriods,steps,analyse,prepareDaily,commitDaily,restore,capture,mount};
+  window.LIV_WORKBENCH={onTab,observedProductivity,resourcePeriods,steps,analyse,prepareDaily,commitDaily,restore,capture,mount,hasPendingInput:()=>{const c=ui();if(!c)return false;capture();return c.s.busy||Object.values(c.s.forms).some(f=>['quantity','workers','itr','mechanizers','equipmentQty'].some(k=>String(f[k]??'').trim()!==''));}};
 })();

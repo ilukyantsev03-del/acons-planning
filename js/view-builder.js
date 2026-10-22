@@ -1,7 +1,7 @@
 'use strict';
 
 /* =========================================================
-   LIV Planning — UNIVERSAL VIEW BUILDER
+   Planning — UNIVERSAL VIEW BUILDER
    Конструктор представлений + сохраненные виды + печать
    ========================================================= */
 
@@ -2008,7 +2008,7 @@ function livOpenViewBuilder() {
                 }
               >
 
-              Шапка отчета LIV Planning
+              Шапка отчета Planning
 
             </label>
 
@@ -2632,11 +2632,11 @@ function livBuildPrintDocument() {
                       <div>
 
                         <div class="liv-brand-name">
-                          LIV Planning
+                          Planning
                         </div>
 
                         <div class="liv-brand-subtitle">
-                          Планирование и производственная аналитика
+                          ${esc(window.LIV_PROJECTS?.name(project) || project.meta?.projectName || 'Планирование и производственная аналитика')}
                         </div>
 
                       </div>
@@ -2708,7 +2708,7 @@ function livBuildPrintDocument() {
                   <footer class="liv-report-footer">
 
                     <span>
-                      LIV Planning
+                      Planning
                     </span>
 
                     <span>
@@ -2907,7 +2907,7 @@ function livPrintCurrent() {
 
     if (!printWindow) {
       alert(
-        'Браузер заблокировал окно отчета. Разреши всплывающие окна для LIV Planning и повтори.'
+        'Браузер заблокировал окно отчета. Разреши всплывающие окна для Planning и повтори.'
       );
 
       return;

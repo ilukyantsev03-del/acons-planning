@@ -453,7 +453,7 @@
   }
 
   async function upload() {
-    const file=state.pending,current=p(),client=window.LIV_SUPABASE;if(!file||!current||!client)return alert('Нет подключения к серверу.');if(!window.LIV_NORMALIZED_SYNC?.projectId?.())return alert('Дождись подключения серверного проекта и повтори.');const b=$s('suSave');if(b.disabled)return;b.disabled=true;b.textContent='Загрузка...';const id=makeId('SCH'),kind=fileKind(file),path=`schemes/${safeName(id)}/source.${kind.ext}`,t=now();try{const u=await client.storage.from(BUCKET).upload(path,file,{contentType:kind.mime,upsert:false});if(u.error)throw u.error;const x={id,name:$s('suName').value.trim()||file.name,fileName:file.name,storagePath:path,mimeType:kind.mime,fileSize:file.size,pageCount:0,buildingId:$s('suBuilding').value,matrixId:$s('suMatrix').value,revision:$s('suRevision').value.trim(),status:'Загружена',active:true,createdAt:t,updatedAt:t};try{await syncScheme(x);}catch(error){current.schemes=current.schemes.filter(y=>y.id!==x.id);await client.storage.from(BUCKET).remove([path]);throw error;}current.schemes.push(x);await saveProject();state.pending=null;closeModal();render();await select(x.id);if(state.pdf&&canWrite()){state.draw=true;toolbar();}}catch(error){alert('Не удалось загрузить схему: '+(error.message||error));b.disabled=false;b.textContent='Загрузить';}
+    const file=state.pending,current=p(),client=window.LIV_SUPABASE;if(!file||!current||!client)return alert('Нет подключения к серверу.');if(!window.LIV_NORMALIZED_SYNC?.projectId?.())return alert('Дождись подключения серверного проекта и повтори.');const b=$s('suSave');if(b.disabled)return;b.disabled=true;b.textContent='Загрузка...';const id=makeId('SCH'),kind=fileKind(file),path=`schemes/${window.LIV_PROJECTS?.activeId()==='LIV-MAIN'?'':safeName(window.LIV_PROJECTS?.activeId()||'')+'/'}${safeName(id)}/source.${kind.ext}`,t=now();try{const u=await client.storage.from(BUCKET).upload(path,file,{contentType:kind.mime,upsert:false});if(u.error)throw u.error;const x={id,name:$s('suName').value.trim()||file.name,fileName:file.name,storagePath:path,mimeType:kind.mime,fileSize:file.size,pageCount:0,buildingId:$s('suBuilding').value,matrixId:$s('suMatrix').value,revision:$s('suRevision').value.trim(),status:'Загружена',active:true,createdAt:t,updatedAt:t};try{await syncScheme(x);}catch(error){current.schemes=current.schemes.filter(y=>y.id!==x.id);await client.storage.from(BUCKET).remove([path]);throw error;}current.schemes.push(x);await saveProject();state.pending=null;closeModal();render();await select(x.id);if(state.pdf&&canWrite()){state.draw=true;toolbar();}}catch(error){alert('Не удалось загрузить схему: '+(error.message||error));b.disabled=false;b.textContent='Загрузить';}
   }
 
   const userId=()=>window.LIV_REMOTE_SYNC?.userId?.()||null;
@@ -476,7 +476,7 @@
       const existing=await client
         .from(table)
         .select('id,row_version')
-        .eq('external_id',x.id)
+        .eq('external_id',window.LIV_PROJECTS?.externalId(x.id)||x.id)
         .maybeSingle();
       if(existing.error)throw existing.error;
 
@@ -535,7 +535,7 @@
       const existing=await client
         .from(table)
         .select('id,row_version')
-        .eq('external_id',x.id)
+        .eq('external_id',window.LIV_PROJECTS?.externalId(x.id)||x.id)
         .maybeSingle();
       if(existing.error)throw existing.error;
       if(!existing.data?.id)return;
@@ -582,7 +582,7 @@
     if(!projectId)throw new Error('Дождись подключения серверного проекта и повтори.');
     const data={
       project_id:projectId,
-      external_id:x.id,
+      external_id:window.LIV_PROJECTS?.externalId(x.id)||x.id,
       name:x.name,
       file_name:x.fileName,
       storage_path:x.storagePath,
@@ -610,7 +610,7 @@
     const normalizer=window.LIV_NORMALIZED_SYNC;
     const data={
       project_id:normalizer?.projectId?.(),
-      external_id:x.id,
+      external_id:window.LIV_PROJECTS?.externalId(x.id)||x.id,
       scheme_id:item.serverId,
       page_no:Number(x.pageNo||1),
       x:clamp(x.x),
@@ -733,7 +733,7 @@
       }
     }catch(error){if(host.dataset.previewToken===token)host.textContent='Не удалось открыть схему: '+(error.message||error);}
   }
-  window.LIV_SCHEMES={render,select,upload:openUpload,openMark,preview};
+  window.LIV_SCHEMES={render,select,upload:openUpload,openMark,preview,prepareSwitch:async()=>{if((state.pending&&$s('suSave'))||state.dirty.size||state.saving||state.linksRunning||state.deleting.size||entityWrites.size)throw Error('Завершите загрузку и сохранение схемы перед сменой проекта.');}};
   if(typeof CustomEvent==='function')window.dispatchEvent?.(new CustomEvent('liv-schemes-ready'));
   document.readyState==='loading'?document.addEventListener('DOMContentLoaded',boot,{once:true}):boot();
 })();

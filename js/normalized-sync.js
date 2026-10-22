@@ -2,7 +2,9 @@
 
 (function () {
   const MODULE_VERSION = '2026.10.14.6';
-  const PROJECT_EXTERNAL_ID = 'LIV-MAIN';
+  const projectExternalId = () => window.LIV_PROJECTS?.activeId() || 'LIV-MAIN';
+  const scopedCopy = p => window.LIV_PROJECTS?.serverCopy(p) || p;
+  const isCurrent = p => !window.LIV_PROJECTS || window.LIV_PROJECTS.identity(p) === projectExternalId();
   const SAVE_DELAY = 1200;
   const PAGE_SIZE = 1000;
   const WRITE_CHUNK = 150;
@@ -402,11 +404,11 @@
     const result = await client()
       .from('projects')
       .select('id')
-      .eq('external_id', PROJECT_EXTERNAL_ID)
+      .eq('external_id', projectExternalId())
       .maybeSingle();
 
     if (result.error) throw result.error;
-    if (!result.data?.id) throw new Error('Не найден серверный проект LIV-MAIN.');
+    if (!result.data?.id) throw new Error('Не найден выбранный проект строительства.');
     state.projectId = result.data.id;
     loadHashes();
     loadServerVersions();
@@ -432,7 +434,7 @@
   }
 
   async function adoptNamedRows(table, items, projectScoped = false) {
-    if (!items.length) return;
+    if (!items.length || projectExternalId() !== 'LIV-MAIN') return;
     const rows = await fetchAll(
       table,
       'id,external_id,name',
@@ -621,8 +623,8 @@
     const organizations = current.organizations.filter(item => item?.id && item?.name);
 
     await adoptNamedRows('buildings', buildings, true);
-    await adoptNamedRows('works', works, false);
-    await adoptNamedRows('organizations', organizations, false);
+    await adoptNamedRows('works', works, true);
+    await adoptNamedRows('organizations', organizations, true);
 
     await upsertRows('buildings', buildings.map((item, index) => ({
       external_id: String(item.id),
@@ -634,6 +636,7 @@
     })), 'external_id');
 
     await upsertRows('works', works.map((item, index) => ({
+      project_id: state.projectId,
       external_id: String(item.id),
       name: text(item.name),
       section_name: text(item.section ?? item.sectionName) || null,
@@ -643,6 +646,7 @@
     })), 'external_id');
 
     await upsertRows('organizations', organizations.map(item => ({
+      project_id: state.projectId,
       external_id: String(item.id),
       name: text(item.name),
       short_name: text(item.shortName) || null,
@@ -651,8 +655,8 @@
     })), 'external_id');
 
     await refreshMap('buildings', 'building', true);
-    await refreshMap('works', 'work', false);
-    await refreshMap('organizations', 'organization', false);
+    await refreshMap('works', 'work', true);
+    await refreshMap('organizations', 'organization', true);
 
     const projectOrganizations = organizations
       .map(item => mapValue('organization', item.id))
@@ -760,8 +764,8 @@
 
     const checks = [
       ['buildings', current.buildings.filter(item => item.active !== false).length, true],
-      ['organizations', current.organizations.filter(item => item.active !== false).length, false],
-      ['works', current.works.filter(item => item.active !== false).length, false],
+      ['organizations', current.organizations.filter(item => item.active !== false).length, true],
+      ['works', current.works.filter(item => item.active !== false).length, true],
       ['contracts', current.contracts.filter(item => item.active !== false).length, true],
       ['structures', current.structures.filter(item => item.active !== false).length, true],
       ['fronts', current.fronts.filter(item => item.active !== false).length, true],
@@ -790,6 +794,8 @@
 
       if (projectScoped) {
         query = query.eq('project_id', state.projectId);
+      } else if (projectExternalId() !== 'LIV-MAIN') {
+        query = query.like('external_id', projectExternalId() + '::%');
       }
 
       const result = await query;
@@ -1245,7 +1251,7 @@
       if (front.totalQty == null && !front.unit) return;
       const work = current.works.find(item => String(item.id) === String(front.workId));
       result.push({
-        id: 'METRIC-' + front.id + '-PRIMARY',
+        id: window.LIV_PROJECTS?.externalId('METRIC-' + window.LIV_PROJECTS.localId(front.id) + '-PRIMARY') || 'METRIC-' + front.id + '-PRIMARY',
         frontId: front.id,
         code: 'primary',
         name: work?.name || 'Основной объём',
@@ -1316,7 +1322,7 @@
     current.factLog.forEach(item => {
       if (item?.id && canonicalFactIds.has(String(item.id))) return;
       if (!item?.frontId || !dateValue(item.date ?? item.factDate)) return;
-      const metricExternal = item.metricId || 'METRIC-' + item.frontId + '-PRIMARY';
+      const metricExternal = item.metricId || (window.LIV_PROJECTS?.externalId('METRIC-' + window.LIV_PROJECTS.localId(item.frontId) + '-PRIMARY') || 'METRIC-' + item.frontId + '-PRIMARY');
       const sourceFingerprint = text(item.importFingerprint) || 'legacy-fact:' + (item.id || hash(item));
       facts.push({
         project_id: state.projectId,
@@ -1362,7 +1368,7 @@
 
     if (current.tasks.length && !versions.length) {
       versions.push({
-        id: 'SVER-LEGACY',
+        id: window.LIV_PROJECTS?.externalId('SVER-LEGACY') || 'SVER-LEGACY',
         name: 'Рабочий график',
         status: 'Принят',
         createdAt: new Date().toISOString()
@@ -1785,7 +1791,8 @@
   }
 
   async function runSync(current, options = {}) {
-    if (!current || !client() || !canWrite()) return false;
+    if (!current || !client() || !canWrite() || !isCurrent(current)) return false;
+    current = scopedCopy(current);
     if (state.running) {
       state.queuedProject = current;
       return false;
@@ -1860,7 +1867,7 @@
   }
 
   function queue(current) {
-    if (!current || !canWrite()) return;
+    if (!current || !canWrite() || !isCurrent(current)) return;
     state.queuedProject = current;
     clearTimeout(state.timer);
     state.timer = setTimeout(() => {
@@ -1889,7 +1896,7 @@
 
     remote.flush = async current => {
       const snapshotResult = await originalFlush?.(current);
-      await flush(current);
+      if (snapshotResult && isCurrent(current)) await flush(current);
       return snapshotResult;
     };
 
@@ -1933,16 +1940,17 @@
     queue,
     flush,
     run: runSync,
-    syncResources: () => syncResourcesBackground(localProject()),
+    syncResources: () => syncResourcesBackground(scopedCopy(localProject())),
+    prepareSwitch: async () => { clearTimeout(state.timer); state.queuedProject=null; const end=Date.now()+30000; while(state.running || state.resourceRunning){if(Date.now()>end)throw Error('Синхронизация ещё выполняется. Повторите переключение после завершения.');await new Promise(r=>setTimeout(r,100));} },
     state: () => ({ ...state, maps: undefined, hashes: undefined }),
     projectId: () => state.projectId,
     ensureProjectId: resolveProjectId,
-    serverId: mapValue,
+    serverId: (map, id) => mapValue(map, window.LIV_PROJECTS?.externalId(id) || id),
     inferMilestoneTarget: targetFromTitle,
     verifyMigration:
       () =>
         verifyMigration(
-          localProject()
+          scopedCopy(localProject())
         )
   };
 

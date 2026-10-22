@@ -133,6 +133,7 @@
       .in('id', serverIds);
     if (result.error) throw result.error;
 
+    (result.data || []).forEach(row => {row.external_id = window.LIV_PROJECTS?.localId(row.external_id) || row.external_id;});
     const localIds = new Set((current[config.collection] || []).map(item => String(item.id)));
     return new Map(
       (result.data || [])

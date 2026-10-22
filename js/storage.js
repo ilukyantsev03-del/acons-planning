@@ -150,7 +150,7 @@ async function exportBackup() {
       nowIso(),
 
     source:
-      'LIV Planning',
+      'Planning',
 
     format:
       'liv-planning-backup',
@@ -196,7 +196,7 @@ function validateBackupPayload(
   ) {
 
     throw new Error(
-      'Файл не содержит корректный проект LIV Planning.'
+      'Файл не содержит корректный проект Planning.'
     );
   }
 
@@ -266,6 +266,7 @@ async function restoreProject(
     validateBackupPayload(
       parsed
     );
+    window.LIV_PROJECTS?.assertBackup(parsed);
 
 
     const data =
@@ -853,6 +854,7 @@ async function compareProjectFile(
     validateBackupPayload(
       parsed
     );
+    window.LIV_PROJECTS?.assertBackup(parsed);
 
 
     compareIncoming =

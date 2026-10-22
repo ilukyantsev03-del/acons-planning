@@ -5390,7 +5390,7 @@ async function fullResetProject() {
 
   const first =
     confirm(
-      'Полный сброс удалит рабочие данные И справочники LIV Planning.\n\n' +
+      'Полный сброс удалит рабочие данные И справочники Planning.\n\n' +
       'Перед сбросом будет создана защитная копия. Продолжить?'
     );
 
@@ -5476,7 +5476,7 @@ async function fullResetProject() {
 
 
   alert(
-    'LIV Planning сброшен. Защитная копия сохранена локально.'
+    'Planning сброшен. Защитная копия сохранена локально.'
   );
 }
 
@@ -9120,7 +9120,7 @@ async function init() {
 
 
   project =
-    localProject;
+    window.LIV_PROJECTS?.prepare(localProject) || localProject;
 
 
   validateLoadedProject();
@@ -9182,7 +9182,7 @@ async function init() {
 
 
   renderAll();
-
+  window.LIV_PROJECTS?.loadCatalog();
 
   async function applyRemoteState(
     remoteState
@@ -9195,10 +9195,12 @@ async function init() {
     }
 
 
+    window.LIV_PROJECTS?.assertCurrent(remoteState.project);
     project =
       await migrateIfNeeded(
         remoteState.project
       );
+    window.LIV_PROJECTS?.prepare(project);
 
 
     validateLoadedProject();
@@ -9375,13 +9377,13 @@ document.addEventListener(
         error => {
 
           console.error(
-            'LIV Planning startup error:',
+            'Planning startup error:',
             error
           );
 
 
           alert(
-            `Ошибка запуска LIV Planning:\n${
+            `Ошибка запуска Planning:\n${
               error?.message ||
               String(
                 error

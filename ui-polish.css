@@ -67,3 +67,21 @@
  @media(max-width:640px){.container{padding:16px 12px 32px}.topbar{padding:15px}.top-actions{gap:6px}.topbar .btn{font-size:11px;padding:7px 9px}.topbar h1{font-size:22px}.liv-page-head h1{font-size:24px}nav.tabs{gap:3px;margin-bottom:20px;padding-bottom:12px}.tab{font-size:12px;padding:7px 9px}.scope-reference-nav>div{left:0;right:auto}.card,.panel>.card{padding:16px;border-radius:10px}.planning-setup{padding:18px!important}.setup-heading{align-items:start;flex-direction:column;gap:14px}.setup-progress{width:100%;justify-content:space-between}.setup-route{grid-template-columns:1fr}.setup-step,.setup-step:nth-child(2),.setup-step:nth-child(3){border:0;border-bottom:1px solid #e3eaf2;border-radius:0;padding:18px}.setup-step:first-child{border-radius:10px 10px 0 0}.setup-step:last-child{border:0;border-radius:0 0 10px 10px}.setup-step-head{margin-bottom:16px}.setup-footer{display:block}.setup-footer>details{text-align:left;margin-top:12px}.setup-missing li{flex-direction:column;gap:4px}.setup-missing li>span{text-align:left}.planning-context{grid-template-columns:1fr!important}.planning-context label{min-width:0}.comparison-title{display:block}.comparison-selection.work-brief>.work-brief-values{grid-template-columns:repeat(2,minmax(0,1fr))}.comparison-metrics{flex-wrap:wrap;row-gap:6px}.grid2,.grid3{grid-template-columns:1fr}.workspace-config-grid{grid-template-columns:1fr}.scope-picker{min-width:0}.scope-options{min-width:220px;max-width:calc(100vw - 48px)}.workspace-toolbar{padding:13px}.workspace-toolbar label{width:100%}.workspace-toolbar .btn{flex:1}.planning-grid{grid-template-columns:1fr}}
  @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 }
+
+/* Construction hierarchy and comfortable controls. Diagram geometry is unchanged. */
+@media screen {
+ .topbar{display:flex;flex-wrap:wrap;align-items:center;gap:18px 24px;position:relative}
+ .topbar>div:first-child{flex:0 0 auto}.topbar .top-actions{flex:1 0 100%;display:flex;flex-wrap:wrap;gap:10px;padding-top:14px;border-top:1px solid #ffffff20}
+ .construction-project-bar{display:flex;flex:1;align-items:flex-end;gap:12px;flex-wrap:wrap;color:white}
+ .construction-project-bar>label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:#cad7e5;min-width:240px}
+ .construction-project-bar select{min-height:48px;padding:10px 38px 10px 14px;font-size:16px;color:#183149;border:1px solid #cbd7e4;border-radius:8px;background:white;max-width:min(480px,80vw)}
+ .btn,.topbar .btn,.setup-add .btn,.setup-step-content>.btn,.liv-editor-tabs .btn,.liv-editor-nav .btn{min-height:46px;padding:10px 16px;font-size:15px;border-radius:8px}
+ .tab,.resource-tab,.scope-reference-nav>summary{min-height:46px;padding:10px 14px;font-size:14px}
+ main input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=hidden]),main select{min-height:46px;font-size:14px}
+ .workspace-config-row>.btn,.icon-btn{min-width:44px;min-height:44px;padding:8px;font-size:15px}
+ .scope-picker summary,.setup-add>summary{min-height:44px;padding-top:10px;padding-bottom:10px}
+ .construction-project-context{font-size:13px;color:#61738a;border-bottom:1px solid #dce3eb;padding:0 0 14px;margin:0 0 18px}
+ .construction-project-context.project-save-error{color:#a5353b;background:#fff4f4;padding:14px;border:1px solid #edc8cd;border-radius:8px}
+ .construction-project-bar button:disabled{opacity:.6}
+ @media(max-width:640px){.construction-project-bar{flex-basis:100%}.construction-project-bar>label{width:100%;min-width:0}.construction-project-bar select{width:100%;max-width:100%}.topbar .btn{font-size:14px;min-height:46px}.topbar .top-actions{gap:8px}.top-actions .btn{flex:1 1 auto}}
+}

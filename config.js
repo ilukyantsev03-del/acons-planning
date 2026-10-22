@@ -26,7 +26,7 @@ window.ACONS_CONFIG = {
      ======================================================= */
 
   APP_NAME:
-    'LIV Planning',
+    'Planning',
 
   LOCALE:
     'ru-RU',

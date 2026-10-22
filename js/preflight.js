@@ -205,6 +205,7 @@
     for (const [table, items, column, scoped, getId] of specs) {
       const localRaw = items
         .map(getId)
+        .map(value => column==='external_id' ? (window.LIV_PROJECTS?.externalId(value) || value) : value)
         .map(value => String(value || ''))
         .filter(Boolean);
 

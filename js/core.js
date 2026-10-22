@@ -872,7 +872,7 @@ function normalizeStatus(
 
 function emptyProject() {
 
-  return {
+  const initial = {
 
     schemaVersion:
       SCHEMA_VERSION,
@@ -880,7 +880,7 @@ function emptyProject() {
     meta: {
 
       projectName:
-        'LIV Planning',
+        'Planning',
 
       createdAt:
         nowIso(),
@@ -1110,6 +1110,7 @@ function emptyProject() {
           })
         )
   };
+  return window.LIV_PROJECTS?.prepareEmpty(initial)||initial;
 }
 
 
@@ -1169,7 +1170,7 @@ async function openDb() {
         () => {
 
           alert(
-            'База LIV Planning открыта в другой вкладке. Закрой старые вкладки приложения и обнови страницу.'
+            'База Planning открыта в другой вкладке. Закрой старые вкладки приложения и обнови страницу.'
           );
         };
     }
@@ -1179,7 +1180,7 @@ async function openDb() {
 
 async function dbGetKey(
   key =
-    PROJECT_KEY
+    ((typeof window !== 'undefined' && window.LIV_PROJECTS?.storageKey()) || PROJECT_KEY)
 ) {
 
   return new Promise(
@@ -1223,7 +1224,7 @@ async function dbGetKey(
 async function dbPutKey(
   value,
   key =
-    PROJECT_KEY
+    ((typeof window !== 'undefined' && window.LIV_PROJECTS?.storageKey(value)) || PROJECT_KEY)
 ) {
 
   return new Promise(
@@ -1297,7 +1298,7 @@ function normalizeProject(
     ),
 
     projectName:
-      'LIV Planning'
+      source.meta?.constructionName || source.meta?.projectName || 'Planning'
   };
 
 
@@ -1592,8 +1593,8 @@ async function saveProject() {
     project.meta ||
     {};
 
-  project.meta.projectName =
-    'LIV Planning';
+  window.LIV_PROJECTS?.prepare(project);
+  project.meta.projectName = project.meta.constructionName || project.meta.projectName || 'Planning';
 
   project.meta.updatedAt =
     nowIso();

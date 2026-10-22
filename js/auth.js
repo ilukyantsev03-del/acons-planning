@@ -57,7 +57,7 @@
     overlay.id = 'livAuthOverlay';
     overlay.innerHTML =
       '<form id="livAuthForm" class="liv-auth-card" autocomplete="on">' +
-        '<h1>LIV Planning</h1>' +
+        '<h1>Planning</h1>' +
         '<p class="liv-auth-subtitle">Вход в систему</p>' +
         '<div class="liv-auth-field">' +
           '<label for="livAuthEmail">Email</label>' +
