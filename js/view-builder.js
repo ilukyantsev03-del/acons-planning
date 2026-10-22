@@ -136,6 +136,8 @@ function livMainTabTitle(tab) {
     demolition: 'Демонтаж',
     import: 'Импорт',
     history: 'История изменений',
+    facts: 'Факт',
+    forecast: 'Прогноз',
     volumes: 'Объёмы',
     schedule: 'График',
     schemes: 'Схемы',
@@ -550,6 +552,8 @@ function livVBRepairNavigationLabels() {
     demolition: 'Демонтаж',
     import: 'Импорт',
     history: 'История',
+    facts: 'Факт',
+    forecast: 'Прогноз',
     volumes: 'Объёмы',
     schedule: 'График',
     schemes: 'Схемы',
@@ -723,7 +727,7 @@ function livVBDiscoverSchema(base) {
     if(!table.id)table.id='liv-table-'+hash(key+'|'+index);
     const columns=[...header.children].map((cell,i)=>{if(!cell.dataset.vbColumn){cell.dataset.vbColumn='col-'+i;cell.dataset.vbOriginalTitle=cell.textContent.trim();}return {id:cell.dataset.vbColumn,title:cell.dataset.vbOriginalTitle||'Столбец '+(i+1)};});
     const section=table.closest('[data-planning-destination],.wb-list,.wb-detail,details,.card');
-    schema.tables.push({id:'auto:'+table.id,title:section?.querySelector('h2,h3,summary')?.textContent?.trim()||columns[0]?.title||'Таблица',selector:'#'+table.id,columns,auto:true,showTitle:false});
+    schema.tables.push({id:'auto:'+table.id+(table.dataset.vbViewKey?':'+table.dataset.vbViewKey:''),title:section?.querySelector('h2,h3,summary')?.textContent?.trim()||columns[0]?.title||'Таблица',selector:'#'+table.id,columns,auto:true,showTitle:false});
   }
   return schema;
 }

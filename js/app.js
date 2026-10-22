@@ -812,8 +812,7 @@ function renderMilestones() {
   const rows =
     [
       ...(
-        project.milestones ||
-        []
+        (project.milestones || []).filter(item=>{const c=window.LIV_CONTEXT?.active?.();return !c||window.LIV_CONTEXT.recordMatches(project,item,c.state);})
       )
     ]
       .sort(
@@ -7666,9 +7665,11 @@ function livPanelMeta(
       'Гант',
       'Сроки, последовательность и текущее состояние работ'
     ],
+    facts: ['Факт','Ежедневное выполнение, люди и техника'],
+    forecast: ['Прогноз','Потребность в ресурсах и достижимость сроков'],
     planfact: [
       'План / факт',
-      'Сравнение плановых и фактических объёмов'
+      'Сравнение работ: объёмы, люди и техника за выбранный период'
     ],
     volumes: ['Объёмы','Действующие и договорные объёмы, изменения и история'],
     reports: ['Отчёты','Формы по версиям графиков и зафиксированные снимки'],

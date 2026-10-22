@@ -22,6 +22,7 @@ const RESOURCE_JOURNAL_COLUMNS = [
   { id: 'work', title: 'Работа' },
   { id: 'front', title: 'Фронт' },
   { id: 'itr', title: 'ИТР', numeric: true },
+  { id: 'specialization', title: 'Специальность / бригада' },
   { id: 'workers', title: 'Рабочие', numeric: true },
   { id: 'mechanizers', title: 'Механизаторы', numeric: true },
   { id: 'equipmentType', title: 'Наименование техники' },
@@ -225,6 +226,7 @@ function resourceFiltered(
   return (
     project.resources || []
   ).filter(row => {
+    const scope=window.LIV_CONTEXT?.active?.();if(scope&&!window.LIV_CONTEXT.recordMatches(project,row,scope.state))return false;
     if (!resourceValidIsoDate(row.date)) {
       return false;
     }

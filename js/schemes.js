@@ -70,7 +70,7 @@
     return null;
   }
 
-  const schemes = () => (p()?.schemes||[]).filter(x=>x.active!==false).sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
+  const schemes = () => (p()?.schemes||[]).filter(x=>x.active!==false).filter(x=>{const c=window.LIV_CONTEXT?.active?.();if(!c)return true;const marks=(p()?.schemeMarks||[]).filter(m=>m.schemeId===x.id&&m.active!==false),fronts=marks.flatMap(m=>{const element=(p()?.numberedElements||[]).find(e=>e.id===m.numberedElementId),group=(p()?.numberedElementGroups||[]).find(g=>g.id===m.elementGroupId);return [m.frontId,element?.frontId,group?.frontId].filter(Boolean);});return window.LIV_CONTEXT.recordMatches(p(),{...x,frontIds:fronts},c.state);}).sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
   const scheme = id => (p()?.schemes||[]).find(x=>String(x.id)===String(id))||null;
   const mark = id => state.dirty.get(String(id)) || (p()?.schemeMarks||[]).find(x=>String(x.id)===String(id))||null;
   const marks = (schemeId,page=null) => (p()?.schemeMarks||[]).filter(x=>x.active!==false&&String(x.schemeId)===String(schemeId)&&(page===null||Number(x.pageNo||1)===Number(page)));
@@ -111,7 +111,7 @@
   function addUi() {
     if ($s('tab-schemes')) return;
     const nav=document.querySelector('.tabs'), main=document.querySelector('main.container'); if(!nav||!main)return;
-    const tab=document.createElement('button'); tab.className='tab'; tab.dataset.tab='schemes'; tab.textContent='Схемы'; nav.insertBefore(tab,nav.querySelector('[data-tab="import"]'));
+    const tab=document.createElement('button'); tab.className='tab'; tab.dataset.tab='schemes'; tab.textContent='Схемы'; nav.insertBefore(tab,nav.querySelector('.scope-reference-nav')||nav.querySelector(':scope > [data-tab="import"]')||null);
     const panel=document.createElement('section'); panel.id='tab-schemes'; panel.className='panel hidden'; panel.innerHTML=`
       <section class="sch-head"><div><h1>Схемы</h1><p>PDF, изображения и визуальные обозначения</p></div><div class="sch-group no-print"><button id="schUpload" class="btn primary sch-write">+ Загрузить схему</button><input id="schFile" type="file" accept="application/pdf,image/png,image/jpeg,.pdf,.png,.jpg,.jpeg" hidden><button id="schDownload" class="btn" disabled>Скачать исходник</button><button id="schDelete" class="btn danger-lite sch-write" disabled>Удалить схему</button></div></section>
       <section class="sch-stats"><div class="sch-stat"><span>Отметок</span><strong id="schTotal">0</strong></div><div class="sch-stat"><span>В работе</span><strong id="schWork">0</strong></div><div class="sch-stat"><span>Статус отметок: выполнено</span><strong id="schDone">0</strong></div><div class="sch-stat"><span>Средняя по связям</span><strong id="schProgress">0%</strong></div></section>
