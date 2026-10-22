@@ -125,6 +125,7 @@ function livCurrentPanel() {
 
 function livMainTabTitle(tab) {
   const titles = {
+    workspace: 'Мой экран',
     dashboard: 'Сводка проекта',
     matrix: 'Шахматка',
     gantt: 'График производства работ',
@@ -541,6 +542,7 @@ function livVBApplyGroup(
 
 function livVBRepairNavigationLabels() {
   const mainTitles = {
+    workspace: 'Мой экран',
     dashboard: 'Сводка',
     matrix: 'Шахматка',
     gantt: 'Гант',
@@ -710,7 +712,7 @@ function livVBApplyTables(schema) {
 
 /* Discover live screens as well as registered native tables. IDs survive rerenders. */
 function livVBDiscoverSchema(base) {
-  const panel=livCurrentPanel();if(!panel)return base;
+  const panel=livCurrentPanel();if(!panel||livActiveMainTab()==='workspace')return base;
   const panels=[panel];if(livActiveMainTab()==='resources'){const extra=document.getElementById('planningSurface-resources');if(extra&&!panel.contains(extra))panels.push(extra);}
   const schema={...base,blocks:livVBResolveItems(base.blocks).slice(),tables:livVBResolveItems(base.tables).slice()};
   const hash=text=>{let n=2166136261;for(const ch of text)n=Math.imul(n^ch.charCodeAt(0),16777619);return (n>>>0).toString(36);};
@@ -1645,6 +1647,7 @@ async function livVBSaveModalSettings() {
 }
 
 function livOpenViewBuilder() {
+  if(livActiveMainTab()==='workspace'&&window.LIV_WORKSPACE){window.LIV_WORKSPACE.openSettings();return;}
   const schema =
     livGetCurrentSchema();
 
@@ -2891,6 +2894,7 @@ function livBuildPrintDocument() {
 }
 
 function livPrintCurrent() {
+  if(livActiveMainTab()==='workspace'&&window.LIV_WORKSPACE){window.LIV_WORKSPACE.printCurrent();return;}
   let printWindow =
     null;
 

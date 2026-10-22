@@ -6,7 +6,7 @@
 
   <title>LIV Planning</title>
 
-  <link rel="stylesheet" href="style.css?v=20261022-2">
+  <link rel="stylesheet" href="style.css?v=20261022-3">
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
@@ -22,6 +22,7 @@
   </div>
 
   <div class="top-actions">
+    <a class="btn" href="docs/USER_GUIDE_RU.html" target="_blank" rel="noopener">Инструкция</a>
 
     <button
       id="backupBtn"
@@ -133,6 +134,7 @@
       Импорт
     </button>
 
+    <button class="tab" data-tab="workspace">Мой экран</button>
     <button class="tab" data-tab="facts">Факт</button>
     <button class="tab" data-tab="forecast">Прогноз</button>
     <button class="tab" data-tab="volumes">Объёмы</button>
@@ -2476,6 +2478,7 @@
 
   </section>
 
+<section id="tab-workspace" class="panel hidden"></section>
 <section id="tab-facts" class="panel hidden"></section>
 <section id="tab-forecast" class="panel hidden"></section>
 <section id="tab-volumes" class="panel hidden"></section>
@@ -2528,19 +2531,20 @@
 <script src="js/organizations.js?v=20261013-1"></script>
 <script src="js/import.js?v=20261016-1"></script>
 
-<script src="js/view-builder.js?v=20261022-1"></script>
+<script src="js/view-builder.js?v=20261022-3"></script>
 <script src="js/planning-core.js?v=20261022-2"></script>
 <script src="js/planning-domain.js?v=20261022-2"></script>
 <script src="js/planning-daily.js?v=20261021-2"></script>
 <script src="js/schedule.js?v=20261019-2"></script>
 <script src="js/planning-chain.js?v=20261021-2"></script>
 <script src="js/planning-gantt.js?v=20261021-1"></script>
-<script src="js/planning-context.js?v=20261022-2"></script>
+<script src="js/planning-context.js?v=20261022-3"></script>
 <script src="js/planning-comparison.js?v=20261022-2"></script>
 <script src="js/planning-workbench.js?v=20261022-1"></script>
-<script src="js/planning-ui.js?v=20261022-2"></script>
+<script src="js/planning-workspace.js?v=20261022-3"></script>
+<script src="js/planning-ui.js?v=20261022-3"></script>
 <script src="js/planning-daily-ui.js?v=20261021-2"></script>
-<script src="js/app.js?v=20261022-1"></script>
+<script src="js/app.js?v=20261022-3"></script>
 
 </body>
 </html>

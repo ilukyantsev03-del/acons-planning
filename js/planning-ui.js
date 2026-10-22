@@ -14,7 +14,7 @@
     h=document.createElement('section');h.id='planningTools';h.className='card planning-tools';h.dataset.planningSurface='schedule';panel.appendChild(h);
     bindSurface(h);return h;
   }
-  const destinations={facts:'Факт',forecast:'Прогноз',volumes:'Объёмы',gantt:'Гант',matrix:'Шахматка',planfact:'План / факт',resources:'Ресурсы',dashboard:'Сводка',milestones:'Ключевые даты',reports:'Отчёты',settings:'Настройки'};
+  const destinations={workspace:'Мой экран',facts:'Факт',forecast:'Прогноз',volumes:'Объёмы',gantt:'Гант',matrix:'Шахматка',planfact:'План / факт',resources:'Ресурсы',dashboard:'Сводка',milestones:'Ключевые даты',reports:'Отчёты',settings:'Настройки'};
   function bindSurface(node){node.addEventListener('input',liveInput);node.addEventListener('change',event=>{try{change(event);}catch(e){alert(e.message);}});node.addEventListener('click',click);}
   function part(destination,id,html){return `<section id="${id}" data-planning-destination="${destination}">${html}</section>`;}
   function sourceStamp(){return JSON.stringify(['buildings','organizations','contracts','structures','workMetrics','planLog','scheduleVersions','tasks','taskDates','taskQuantities','dependencies','fronts','progressFacts','factLog','milestones','planningSettings','quantityBaselines','quantityChanges','quantityPlans','reportSnapshots','schemes','schemeMarks','resourcePlans','resources','numberedElements','numberedElementGroups'].map(k=>project[k]));}
