@@ -3,7 +3,7 @@
 /* =========================================================
    LIV Planning — ГРАФИК
    Тестовый импорт графиков Excel / CSV
-   Единая модель задач без разрушения старых fronts
+   Загрузить или создать график без разрушения старых fronts
    ========================================================= */
 
 (function () {
@@ -268,7 +268,7 @@
         <section class="card schedule-hero no-print">
           <div>
             <div class="schedule-kicker">ГРАФИК ПРОЕКТА</div>
-            <h2>Единая модель задач</h2>
+            <h2>Загрузить или создать график</h2>
             <p class="muted schedule-lead">Загрузите Excel или CSV, проверьте сопоставление колонок и импортируйте задачи. Исходный файл не заменяет данные LIV.</p>
           </div>
           <div class="schedule-hero-actions">
@@ -276,15 +276,15 @@
               Загрузить график
               <input id="scheduleFileInput" type="file" accept=".xlsx,.xls,.csv" hidden>
             </label>
-            <button id="schedulePromoteBtn" class="btn" type="button">Принять как рабочий график</button>
-            <button id="scheduleClearTestBtn" class="btn danger-lite" type="button">Удалить тестовый импорт</button>
+            <button id="schedulePromoteBtn" class="btn" type="button">Принять версию графика</button>
+            <button id="scheduleClearTestBtn" class="btn danger-lite" type="button">Отменить подготовленную загрузку</button>
           </div>
         </section>
 
         <section id="scheduleImportCard" class="card hidden no-print">
           <div class="schedule-import-head">
             <div>
-              <h2>Проверка импорта</h2>
+              <h2>1. Файл и лист</h2>
               <div id="scheduleFileMeta" class="muted"></div>
             </div>
             <div class="schedule-import-controls">
@@ -304,7 +304,7 @@
             </div>
           </div>
           <div class="schedule-mapping">
-            <label>Группа графика (одинаковая для всех его версий)<input id="scheduleGroup" placeholder="Например: Кровля / договор Ренессанс"></label>
+            <label>Название графика (то же для следующих редакций)<input id="scheduleGroup" placeholder="Например: Кровля / договор Ренессанс"></label>
             <label>Назначение<select id="scheduleRole"><option value="working">Внутренний рабочий</option><option value="contractor">Договор подрядчика</option><option value="customer">График Заказчика</option></select></label>
             <label>Организация<select id="scheduleOrganization"><option value="">Не выбрана</option></select></label>
             <label>Номер договора<input id="scheduleContractNo" placeholder="Точный номер договора"></label>
@@ -317,7 +317,7 @@
           <div id="scheduleMapping" class="schedule-mapping"></div>
           <div id="schedulePreview" class="table-wrap schedule-preview"></div>
           <div class="editor-actions">
-            <button id="scheduleImportBtn" class="btn primary" type="button">Загрузить в тестовый контур</button>
+            <button id="scheduleImportBtn" class="btn primary" type="button">Подготовить версию для проверки</button>
             <span id="scheduleImportHint" class="muted"></span>
           </div>
         </section>
@@ -345,7 +345,7 @@
         <section class="card table-wrap">
           <div id="scheduleEmpty" class="schedule-empty">
             <b>График пока не загружен.</b>
-            <span>Для теста загрузите Excel/CSV. Перед записью LIV покажет найденные поля и первые строки.</span>
+            <span>Загрузите Excel или CSV. Сначала проверьте столбцы и строки, затем примите версию.</span>
           </div>
           <table id="scheduleTable" class="hidden">
             <thead>
@@ -389,8 +389,8 @@
       ],
       actions: [
         { id: 'upload', selector: '.schedule-hero-actions .btn.primary', label: 'Загрузить график' },
-        { id: 'promote', selector: '#schedulePromoteBtn', label: 'Принять как рабочий график' },
-        { id: 'clear', selector: '#scheduleClearTestBtn', label: 'Удалить тестовый импорт' }
+        { id: 'promote', selector: '#schedulePromoteBtn', label: 'Принять версию графика' },
+        { id: 'clear', selector: '#scheduleClearTestBtn', label: 'Отменить подготовленную загрузку' }
       ],
       kpis: [
         { id: 'total', selector: '#scheduleTotal', label: 'Задач' },
@@ -521,7 +521,7 @@
     host.innerHTML = `
       <div class="schedule-map-title">
         <b>Найденные поля</b>
-        <span class="muted">Можно поправить сопоставление перед импортом.</span>
+        <span class="muted">Проверьте, из каких столбцов брать данные. Остальные поля раскрываются ниже.</span>
       </div>
       <div class="schedule-map-grid">
         ${Object.entries(FIELD_DEFS).map(([field,def]) => {
@@ -576,6 +576,7 @@
     host.innerHTML='<table><thead><tr><th>Строка</th><th>Тип</th><th>Здание</th><th>Работа</th><th>Элемент</th><th>Захватка</th><th>Начало</th><th>Окончание</th></tr></thead><tbody>'+prepared.rows.map(r=>'<tr><td>'+r.sourceRow+'</td><td>'+(r.isMilestone?'КД':'Работа')+'</td><td>'+esc(r.building||'Не определено')+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.element)+'</td><td>'+esc(r.capture)+'</td><td>'+esc(r.start||'—')+'</td><td>'+esc(r.finish||'—')+'</td></tr>').join('')+'</tbody></table>'+
       (prepared.errors.length?'<p class="planning-late">'+prepared.errors.map(esc).join('<br>')+'</p>':'')+
       (prepared.warnings.length?'<p class="muted">'+prepared.warnings.map(esc).join('<br>')+'</p>':'');
+    window.LIV_WORKFLOW?.schedule?.();
     if(hint)hint.textContent=state.mapping.name==null?'Нужно выбрать колонку «Задача».':'Распознано: '+prepared.rows.length+' строк. Ошибок: '+prepared.errors.length+'.';
   }
 
@@ -1182,13 +1183,13 @@
     if(state.mapping.name==null){alert('Выберите колонку «Задача».');return;}
     const group=text(document.getElementById('scheduleGroup')?.value),role=document.getElementById('scheduleRole')?.value||'working';
     const effectiveDate=isoDate(document.getElementById('scheduleEffective')?.value),calendar=document.getElementById('scheduleCalendar')?.value||'7x0';
-    if(!group||!effectiveDate){alert('Укажите группу графика и дату версии.');return;}
+    if(!group||!effectiveDate){alert('Укажите название графика и дату версии.');return;}
     const registerMilestones=Boolean(document.getElementById('scheduleRegisterKD')?.checked),organizationId=document.getElementById('scheduleOrganization')?.value||'',contractNo=text(document.getElementById('scheduleContractNo')?.value);
     if(registerMilestones&&(role==='working'||!organizationId||!contractNo)){alert('Для регистрации договорных КД выберите договорный график, организацию и номер договора.');return;}
     const prepared=prepareRows({milestoneFallback:document.getElementById('scheduleMilestoneFallback')?.checked});
     if(prepared.errors.length){alert(prepared.errors.join('\n'));return;}
     if(!prepared.rows.length){alert('Нет строк с работами и датами.');return;}
-    if(prepared.warnings.length&&!confirm(prepared.warnings.join('\n')+'\nПродолжить тестовую загрузку?'))return;
+    if(prepared.warnings.length&&!confirm(prepared.warnings.join('\n')+'\nПодготовить эту версию для проверки?'))return;
     const importId=uid('SIMP'),createdAt=new Date().toISOString(),scheduleKey=[role,key(group),organizationId,key(contractNo)].join('|');
     const staged=prepared.rows.map(r=>{
       const taskId=uid('TASK');
@@ -1218,21 +1219,21 @@
     const sourceCounts=new Map();for(const {task} of staged)sourceCounts.set(task.sourceTaskId,(sourceCounts.get(task.sourceTaskId)||0)+1);
     for(const {task} of staged)if(sourceCounts.get(task.sourceTaskId)>1){task.originalSourceTaskId=task.sourceTaskId;task.sourceTaskId='row:'+task.sourceRow+':'+task.sourceTaskId;}
     for(const item of staged)item.dependencies=dependencies.filter(d=>d.predecessorTaskId===item.task.id||d.successorTaskId===item.task.id);
-    if(project.scheduleStaging.length&&!confirm('Заменить предыдущую тестовую загрузку? Рабочие версии сохраняются.'))return;
+    if(project.scheduleStaging.length&&!confirm('Заменить предыдущую подготовленную загрузку? Принятые версии сохраняются.'))return;
     project.scheduleVersions.filter(v=>v.status==='Тест').forEach(v=>{v.status='Удален';});
     project.scheduleStaging=staged;
     project.scheduleVersions.unshift({id:importId,name:group,versionNo:Math.max(0,...project.scheduleVersions.filter(v=>(v.name||v.fileName)===group).map(v=>Number(v.versionNo)||0),project.scheduleVersions.filter(v=>(v.name||v.fileName)===group).length)+1,fileName:state.fileName,sheetName:state.sheetName,sourceType:state.sourceType,
       scheduleKey,role,effectiveDate,calendar,organizationId,contractNo,registerMilestones,createdAt,status:'Тест',rowsCreated:staged.length,dependencyCount:dependencies.length});
     if(typeof saveProject==='function')await saveProject();
-    renderSchedule();alert('В тестовом контуре: '+staged.length+' задач, '+staged.filter(x=>x.task.isMilestone).length+' КД. Проверьте таблицу перед принятием.');
+    renderSchedule();alert('Подготовлено работ для проверки: '+staged.length+'; ключевых дат: '+staged.filter(x=>x.task.isMilestone).length+' КД. Проверьте таблицу перед принятием.');
   }
 
   async function promoteTestImport() {
     if(window.LIV_ACCESS?.canEdit===false){alert('Нет права изменять график.');return;}
-    if(!ensureCollections()||!project.scheduleStaging.length){alert('Сначала загрузите график в тестовый контур.');return;}
+    if(!ensureCollections()||!project.scheduleStaging.length){alert('Сначала подготовьте версию для проверки.');return;}
     const id=project.scheduleStaging[0].task.sourceImportId;
     const version=project.scheduleVersions.find(v=>v.id===id);
-    if(!confirm('Принять версию? Предыдущая версия этой группы останется в истории. Другие графики не изменятся.'+(version?.registerMilestones?'\nКД этого договора будут созданы или обновлены в журнале. Изменённые договорные сроки сохранятся в истории.':'\nКД останутся вехами графика; договорный журнал не изменяется.')))return;
+    if(!confirm('Принять версию? Предыдущая редакция этого графика останется в истории. Другие графики не изменятся.'+(version?.registerMilestones?'\nКД этого договора будут созданы или обновлены в журнале. Изменённые договорные сроки сохранятся в истории.':'\nКД останутся вехами графика; договорный журнал не изменяется.')))return;
     try {
       await window.LIV_PLANNING.persist(project,()=>{
         window.LIV_PLANNING.accept(project,id);
@@ -1249,10 +1250,10 @@
     if (!ensureCollections()) return;
     const staged = Array.isArray(project.scheduleStaging) ? project.scheduleStaging : [];
     if (!staged.length) {
-      alert('Тестовых загрузок графика нет.');
+      alert('Нет подготовленной версии для отмены.');
       return;
     }
-    if (!confirm('Удалить текущую тестовую загрузку графика?\n\nРабочие задачи не будут затронуты.')) return;
+    if (!confirm('Отменить подготовленную загрузку графика?\n\nРабочие задачи не будут затронуты.')) return;
 
     project.scheduleStaging = [];
     const current = (project.scheduleVersions || []).find(v => v.status === 'Тест');
@@ -1299,6 +1300,7 @@
     ensureCollections();
     if(window.LIV_PLANNING_UI)window.LIV_PLANNING_UI.render();
 
+    window.LIV_WORKFLOW?.schedule?.();
     const search = key(document.getElementById('scheduleSearch')?.value || '');
     const stagedTasks = (project.scheduleStaging || [])
       .map(item => ({ ...item.task, testOnly: true }))
@@ -1330,13 +1332,13 @@
     document.getElementById('scheduleInWork').textContent = all.filter(t => t.status === 'В работе').length;
     document.getElementById('scheduleDone').textContent = all.filter(t => t.status === 'Завершено' || t.progressPercent >= 100).length;
     document.getElementById('scheduleWithDates').textContent = all.filter(t => !!dateFor(t.id,'working')).length;
-    document.getElementById('scheduleImported').textContent = stagedCount ? stagedCount+' тест' : imported.length;
+    document.getElementById('scheduleImported').textContent = stagedCount ? stagedCount+' на проверке' : imported.length;
 
     if (!tasks.length) {
       table.classList.add('hidden');
       empty.classList.remove('hidden');
       empty.querySelector('b').textContent = all.length ? 'По фильтру задач нет.' : 'График пока не загружен.';
-      empty.querySelector('span').textContent = all.length ? 'Измените строку поиска.' : 'Для теста загрузите Excel/CSV. Перед записью LIV покажет найденные поля и первые строки.';
+      empty.querySelector('span').textContent = all.length ? 'Измените строку поиска.' : 'Загрузите Excel или CSV. Сначала проверьте столбцы и строки, затем примите версию.';
       return;
     }
 
@@ -1349,7 +1351,7 @@
       return `
         <tr>
           <td>${index+1}</td>
-          <td><b>${esc(task.name)}</b>${task.testOnly ? '<div class="schedule-test-badge">ТЕСТ</div>' : ''}${task.sourceSheet ? '<div class="muted schedule-source">'+esc(task.sourceSheet)+'</div>' : ''}</td>
+          <td><b>${esc(task.name)}</b>${task.testOnly ? '<div class="schedule-test-badge">НА ПРОВЕРКЕ</div>' : ''}${task.sourceSheet ? '<div class="muted schedule-source">'+esc(task.sourceSheet)+'</div>' : ''}</td>
           <td>${esc(contextText(task) || '—')}</td>
           <td>${esc(task.organizationName || '—')}</td>
           <td><span class="schedule-status">${esc(task.status || 'Не начато')}</span></td>

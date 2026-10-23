@@ -335,7 +335,7 @@
 
     const badge = ensureStatusBadge();
     if (badge) {
-      badge.textContent = message || status;
+      badge.textContent = status === 'error' ? 'Справочники: нужна проверка' : (message || status);
       badge.style.background = status === 'error'
         ? '#fff3f3'
         : status === 'syncing'

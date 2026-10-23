@@ -31,7 +31,7 @@ test('Факт → прогноз → Гант → физические ресу
 });
 test('Разделы: каждый блок расположен в профильной вкладке в единственном экземпляре', {skip:!domPath},async()=>{
  const e=setup(),a=stage(e);await a.importSchedule();await a.promoteTestImport();
- for(const [id,tab] of Object.entries({planningGantt:'gantt',planningCalculate:'gantt',planningRateSlider:'gantt',planningMatrixRow:'matrix',planningFrom:'planfact',quantitySave:'volumes',dailyActionSave:'dashboard',planningReportSave:'reports',planningVerifyStorage:'settings',dailyServerProbe:'settings',planningCapacities:'resources',planningHolidays:'settings',planningMilestonePart:'milestones',dailyPrepare:'schedule',planningTask:'schedule'})){
+ for(const [id,tab] of Object.entries({planningGantt:'gantt',planningCalculate:'gantt',planningRateSlider:'forecast',planningMatrixRow:'matrix',planningFrom:'planfact',quantitySave:'volumes',dailyActionSave:'dashboard',planningReportSave:'reports',planningVerifyStorage:'settings',dailyServerProbe:'settings',planningCapacities:'resources',planningHolidays:'settings',planningMilestonePart:'milestones',dailyPrepare:'schedule',planningTask:'schedule'})){
   assert.equal(e.el(id)?.closest('.panel')?.id,'tab-'+tab,id);assert.equal(e.c.document.querySelectorAll('#'+id).length,1,id);
  }
  assert.equal(e.el('planningTools').querySelectorAll('[data-planning-destination]').length,0);for(const tab of ['matrix','gantt','planfact'])assert.ok(e.el('planningLegacy-'+tab).querySelector('[data-legacy-fixture]'));

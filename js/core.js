@@ -1606,9 +1606,13 @@ async function saveProject() {
     SCHEMA_VERSION;
 
 
-  await dbPutKey(
-    project
-  );
+  try {
+    await dbPutKey(project);
+    window.LIV_WORKFLOW?.localSaved?.(project);
+  } catch (error) {
+    window.LIV_WORKFLOW?.localFailed?.(project,error);
+    throw error;
+  }
 
 
   if (

@@ -9122,6 +9122,7 @@ async function init() {
 
   project =
     window.LIV_PROJECTS?.prepare(localProject) || localProject;
+  if(raw)window.LIV_WORKFLOW?.deviceLoaded?.(project);
 
 
   validateLoadedProject();

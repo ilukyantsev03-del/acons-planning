@@ -17,7 +17,7 @@
     if(id===LEGACY){const old=await sb().from('liv_settings').select('value,updated_at,updated_by').eq('key','project_snapshot').maybeSingle();if(old.error)throw old.error;if(old.data?.value?.project){if(identity(old.data.value.project)!==id)throw Error('Исходная база имеет другой идентификатор проекта.');return {...old.data,project:old.data.value.project};}}
     return null;
   }
-  async function writeSnapshot(p){
+  async function writeSnapshot(p,ticket=window.LIV_WORKFLOW?.ticket?.(p)){
     if(!sb()||!p||!userId||!canWrite()||applyingRemote)return false;
     const id=identity(p),serialized=JSON.stringify(p);
     if(chains.has(id)&&pendingDocuments.get(id)===serialized)return chains.get(id);
@@ -25,20 +25,21 @@
     const previous=chains.get(id)||Promise.resolve();
     const pending=previous.catch(()=>{}).then(async()=>{
       try{
+        window.LIV_WORKFLOW?.serverSaving?.(payload,ticket);
         const row=await projectRow(payload);
-        if(acknowledged.get(id)===serialized){const check=await sb().from(TABLE).select('revision').eq('project_id',row.id).maybeSingle();if(check.error)throw check.error;if(Number(check.data?.revision)!==revisions.get(id))throw Error('На сервере появилась новая версия. Сохраните резервную копию и перезагрузите страницу перед продолжением.');if(id===window.LIV_PROJECTS.activeId()){window.LIV_PROJECT_SAVE_ERROR='';window.LIV_PROJECTS.mount?.();}return true;}
+        if(acknowledged.get(id)===serialized){const check=await sb().from(TABLE).select('revision').eq('project_id',row.id).maybeSingle();if(check.error)throw check.error;if(Number(check.data?.revision)!==revisions.get(id))throw Error('На сервере появилась новая версия. Сохраните резервную копию и перезагрузите страницу перед продолжением.');if(id===window.LIV_PROJECTS.activeId()){window.LIV_PROJECT_SAVE_ERROR='';window.LIV_PROJECTS.mount?.();}window.LIV_WORKFLOW?.serverSaved?.(payload,ticket);return true;}
         if(!revisions.has(id)){const existing=await sb().from(TABLE).select('revision').eq('project_id',row.id).maybeSingle();if(existing.error)throw existing.error;if(existing.data)throw Error('Проект уже существует на сервере. Откройте его перед сохранением.');revisions.set(id,0);}
         const revision=revisions.get(id);
         // Dedicated invoker RPC keeps RLS and compare-and-swap, with a bounded 30s budget.
         const result=await sb().rpc('save_construction_snapshot',{p_project_id:row.id,p_document:payload,p_expected_revision:revision});
         if(result.error)throw result.error;
         if(!result.data?.length)throw Error('На сервере появилась новая версия. Сохраните резервную копию и перезагрузите страницу перед продолжением.');
-        acknowledged.set(id,serialized);revisions.set(id,Number(result.data[0].revision));if(id===window.LIV_PROJECTS.activeId()){window.LIV_PROJECT_SAVE_ERROR='';window.LIV_PROJECTS.mount?.();}return true;
-      }catch(error){console.error('Planning: сохранение проекта',error);window.dispatchEvent(new CustomEvent('liv-project-save-error',{detail:{message:saveErrorMessage(error)}}));return false;}
+        acknowledged.set(id,serialized);revisions.set(id,Number(result.data[0].revision));if(id===window.LIV_PROJECTS.activeId()){window.LIV_PROJECT_SAVE_ERROR='';window.LIV_PROJECTS.mount?.();}window.LIV_WORKFLOW?.serverSaved?.(payload,ticket);return true;
+      }catch(error){window.LIV_WORKFLOW?.serverFailed?.(payload,ticket,error);console.error('Planning: сохранение проекта',error);window.dispatchEvent(new CustomEvent('liv-project-save-error',{detail:{message:saveErrorMessage(error)}}));return false;}
     });chains.set(id,pending);pendingDocuments.set(id,serialized);pending.finally(()=>{if(chains.get(id)===pending){chains.delete(id);pendingDocuments.delete(id);}});return pending;
   }
   function saveErrorMessage(error){
-    if(error?.code==='57014'||/statement timeout/i.test(error?.message||''))return 'Сервер не успел сохранить проект. Не закрывайте страницу. Скачайте резервную копию кнопкой «Сохранить проект» и повторите сохранение или переход после обновления приложения.';
+    if(error?.code==='57014'||/statement timeout/i.test(error?.message||''))return 'Сервер не успел сохранить проект. Не закрывайте страницу. Скачайте резервную копию кнопкой «Скачать резервную копию» и повторите сохранение или переход после обновления приложения.';
     if(error?.code==='PT409')return 'На сервере появилась новая версия. Сохраните резервную копию и перезагрузите страницу перед продолжением.';
     return error?.message||'Не удалось подтвердить сохранение проекта на сервере.';
   }
@@ -46,11 +47,11 @@
     ready=false;const session=await waitForSession();if(!session?.user)return {project:localProject,online:false,role:''};userId=session.user.id;
     const profile=await sb().from('app_users').select('id,role,active').eq('id',userId).maybeSingle();if(profile.error)throw profile.error;if(!profile.data?.active)throw Error('Учётная запись не активна.');role=profile.data.role||'';
     const snapshot=await readSnapshot(localProject);ready=true;
-    if(snapshot?.project)return {project:snapshot.project,online:true,role,remoteUpdatedAt:snapshot.updated_at||''};
+    if(snapshot?.project){window.LIV_WORKFLOW?.serverLoaded?.(snapshot.project);return {project:snapshot.project,online:true,role,remoteUpdatedAt:snapshot.updated_at||''};}
     if(canWrite()&&localProject&&!await writeSnapshot(localProject))throw Error('Первое сохранение проекта не выполнено.');
     return {project:localProject,online:true,role,firstUpload:canWrite()};
   }
-  function queueSave(p){if(!p||!canWrite()||applyingRemote)return;clearTimeout(saveTimer);const captured=JSON.parse(JSON.stringify(p));saveTimer=setTimeout(()=>{saveTimer=null;writeSnapshot(captured);},500);}
+  function queueSave(p){if(!p||!canWrite()||applyingRemote)return;clearTimeout(saveTimer);const captured=JSON.parse(JSON.stringify(p)),ticket=window.LIV_WORKFLOW?.ticket?.(p);window.LIV_WORKFLOW?.serverQueued?.(p,ticket);saveTimer=setTimeout(()=>{saveTimer=null;writeSnapshot(captured,ticket);},500);}
   async function flush(p){clearTimeout(saveTimer);saveTimer=null;return writeSnapshot(p);}
   function subscribe(){if(!sb()||channel||!activeServerId||!ready)return;channel=sb().channel('planning-project-'+activeServerId).on('postgres_changes',{event:'*',schema:'public',table:TABLE,filter:'project_id=eq.'+activeServerId},payload=>{
     const row=payload.new||{};if(!row.project||identity(row.project)!==window.LIV_PROJECTS.activeId())return;
@@ -80,7 +81,7 @@
 
 (function loadLivDataModules() {
   const modules = [
-    ['liv-normalized-sync', 'js/normalized-sync.js?v=20261022-5'],
+    ['liv-normalized-sync', 'js/normalized-sync.js?v=20261023-4'],
     ['liv-source-mappings', 'js/source-mappings.js?v=20261022-5'],
     ['liv-milestone-risk', 'js/milestone-risk.js?v=20261021-1'],
     ['liv-milestone-risk-groups', 'js/milestone-risk-groups.js?v=20261013-2'],

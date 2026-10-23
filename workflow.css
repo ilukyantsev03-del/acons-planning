@@ -1,0 +1,35 @@
+@media screen {
+ .topbar>.workflow-save-status{order:2;flex:1 1 100%;min-width:0;color:#e2edf6;font-size:14px;border:1px solid #ffffff28;border-radius:8px;padding:8px 12px;background:#ffffff08}
+ .topbar .top-actions{order:3}.construction-project-bar{order:1}
+ .workflow-save-status>summary{cursor:pointer;font-weight:500;min-height:30px;display:flex;align-items:center;gap:9px;list-style:none}
+ .workflow-save-status>summary:before{content:'';width:9px;height:9px;flex:none;border-radius:50%;background:#c5d0dd}
+ .workflow-save-status[data-phase=server]>summary:before{background:#71d8b1}.workflow-save-status[data-phase=saving]>summary:before,.workflow-save-status[data-phase=queued]>summary:before,.workflow-save-status[data-phase=warning]>summary:before{background:#ffd17e}
+ .workflow-save-status[data-phase=error]>summary:before,.workflow-save-status[data-phase=localError]>summary:before{background:#ff969e}
+ .workflow-save-explanation{max-width:900px;padding:8px 18px;font-size:13px;color:#d1dce8}.workflow-save-explanation p{margin:6px 0;overflow-wrap:anywhere}
+ .workflow-intro{padding:12px 14px;background:#f0f5f9;border-radius:8px;color:#4a647d;margin:0 0 18px;line-height:1.6}
+ .workflow-wide{grid-column:1/-1}.workflow-extra,.workflow-import-extra{margin:18px 0;border:1px solid #dfe7ef;border-radius:9px;background:#fbfcfe;padding:12px 16px}
+ .workflow-extra>summary,.workflow-import-extra>summary{min-height:44px;display:flex;align-items:center;cursor:pointer;list-style:revert;font-weight:600;color:#35516b}
+ .workflow-extra[open]>summary,.workflow-import-extra[open]>summary{margin-bottom:14px}.workflow-primary-fields{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+ .workflow-import-route{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));list-style:none;counter-reset:step;gap:10px;padding:0;margin:0 0 24px}
+ .workflow-import-route li{counter-increment:step;display:flex;align-items:center;gap:10px;padding:12px;background:#f1f5f9;border-radius:8px;color:#34506b;font-weight:600}
+ .workflow-import-route li:before{content:counter(step);flex:none;display:grid;place-items:center;width:28px;height:28px;background:#244a65;color:white;border-radius:50%}
+ #scheduleImportCard>.schedule-import-head h2{font-size:19px}#scheduleImportCard>h3{margin-top:26px}.workflow-review{border-left:3px solid #346c86!important}
+ .workflow-review .btn{white-space:normal}.workflow-result-details .wb-mini{margin:12px 0}
+ #livNormalizedSyncBadge{max-width:100%;white-space:normal!important;text-align:left}
+ @media(max-width:760px){.workflow-import-route{grid-template-columns:repeat(2,minmax(0,1fr));font-size:13px}.workflow-import-route li{padding:10px;gap:7px}.workflow-primary-fields{grid-template-columns:minmax(0,1fr)}.workflow-save-status>summary{font-size:13px;min-height:36px}.topbar>.workflow-save-status{order:2}.topbar .top-actions{order:3}.workflow-save-explanation{padding:6px}.wb-mode-facts .wb-detail{order:-1}.workflow-extra,.workflow-import-extra{padding:10px 12px}}
+}
+@media screen {
+ #scheduleImportCard .schedule-mapping:not(#scheduleMapping){display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+ #scheduleImportCard .schedule-mapping>label{display:flex;flex-direction:column;gap:8px;min-width:0}
+ #scheduleImportCard .schedule-mapping>label input,#scheduleImportCard .schedule-mapping>label select{width:100%;min-width:0}
+ #scheduleImportCard .schedule-mapping>label:has(input[type=checkbox]){flex-direction:row;align-items:flex-start}
+ #scheduleImportCard .schedule-mapping>label input[type=checkbox]{width:18px;flex:none;margin-top:3px}
+ #scheduleImportCard .schedule-mapping>p{grid-column:1/-1}
+ #schedulePreview{max-height:55vh;overflow:auto}
+ @media(max-width:1000px){#scheduleImportCard .schedule-mapping:not(#scheduleMapping){grid-template-columns:repeat(2,minmax(0,1fr))}}
+ @media(max-width:760px){#scheduleImportCard .schedule-mapping:not(#scheduleMapping){grid-template-columns:minmax(0,1fr)}}
+}
+@media screen {
+ .workflow-extra>summary:after,.workflow-import-extra>summary:after,.workflow-save-status>summary:after{content:'⌄';margin-left:auto;padding-left:12px;font-size:18px;flex:none}
+ .workflow-extra[open]>summary:after,.workflow-import-extra[open]>summary:after,.workflow-save-status[open]>summary:after{content:'⌃'}
+}
