@@ -1,0 +1,128 @@
+/* Screen layout only: keep report pagination and diagram coordinates intact. */
+@media screen {
+  :root { --page-gutter: clamp(12px, 1.8vw, 40px); }
+  .container { width: 100%; max-width: none; padding: 24px var(--page-gutter) 48px; }
+  .topbar { padding: 18px var(--page-gutter); flex-direction: row; align-items: center; }
+  .topbar, .top-actions, .construction-project-bar, .container, .panel,
+  .card, .planning-tools, [data-planning-content], .grid2 > *, .grid3 > *,
+  .wb-layout > *, .catalog-two-columns > *, .sch-layout > *, .resource-chart-grid > * {
+    min-width: 0;
+  }
+  .construction-project-bar { justify-content: flex-end; }
+  .construction-project-bar > label { flex: 1 1 260px; max-width: 480px; min-width: 0; }
+  .construction-project-bar select { width: 100%; max-width: 100%; }
+  .topbar .top-actions { flex: 1 1 100%; min-width: 0; }
+  .top-actions > * { max-width: 100%; }
+  .responsive-toggle, .responsive-ready .responsive-toggle { display: none; }
+  nav.tabs { overflow: visible; flex-wrap: wrap; }
+  .table-wrap, .responsive-table-scroll, .gantt-scroll, .planning-load, .daily-grid {
+    width: 100%; min-width: 0; max-width: 100%; overflow: auto;
+    overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch;
+  }
+  .responsive-table-scroll { margin: 12px 0; }
+  .responsive-table-scroll:focus-visible, .table-wrap:focus-visible {
+    outline: 3px solid #91b6cf; outline-offset: 2px;
+  }
+  .toolbar, .editor-actions, .section-toolbar, .section-toolbar-actions,
+  .liv-section-toolbar, .liv-filter-bar, .resource-toolbar, .settings-toolbar,
+  .catalog-toolbar, .wb-shortcuts, .work-brief-actions { flex-wrap: wrap; min-width: 0; }
+  .planning-grid > *, .form-grid > *, .resource-filter-grid > *, .workspace-toolbar > *,
+  .mapping-grid > *, .import-grid > * { min-width: 0; max-width: 100%; }
+  .scope-options { max-width: min(380px, calc(100vw - 48px)); }
+  .planning-tools details details { box-shadow: none; }
+  .catalog-schedule-details { order: 100; }
+  .liv-page-head, .settings-card-head, .catalog-heading { flex-wrap: wrap; }
+  .construction-project-context, .catalog-message, .notice, .muted,
+  .liv-page-head p, .card p { overflow-wrap: anywhere; }
+  /* Bounded scrolling belongs to the data surface, never the whole page. */
+  .planning-matrix, .gantt-scroll { max-height: min(740px, 72vh); max-height: min(740px, 72dvh); }
+  .modal-card { max-width: 100%; max-height: 94vh; max-height: 94dvh; }
+  #modalBody .form-grid > *, .liv-editor-body > * { min-width: 0; }
+  @media (min-width: 1920px) {
+    .container { padding-top: 28px; }
+    .planning-matrix, .gantt-scroll { max-height: 76vh; max-height: 76dvh; }
+  }
+  @media (max-width: 1100px) {
+    .construction-project-bar { justify-content: flex-start; }
+    .planning-context { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    .resource-chart-grid, .wb-layout, .wb-mode-facts .wb-layout { grid-template-columns: minmax(0, 1fr); }
+    .comparison-source { max-width: 100%; }
+  }
+  @media (max-width: 760px) {
+    .container { padding-top: 14px; }
+    .topbar { gap: 12px; padding-top: 14px; padding-bottom: 14px; }
+    .topbar > div:first-child { flex: 1; }
+    .topbar h1 { font-size: 24px; }
+    .construction-project-bar { flex-basis: 100%; gap: 8px; }
+    .construction-project-bar > label { flex-basis: 100%; max-width: none; }
+    .construction-project-bar > .btn { flex: 1; }
+    .responsive-ready .responsive-toggle { display: inline-flex; min-height: 46px; }
+    .responsive-ready .responsive-actions-toggle { order: 0; }
+    .responsive-ready .construction-project-bar { order: 1; }
+    .responsive-ready .topbar .top-actions { order: 2; }
+    .responsive-ready .top-actions[data-responsive-open="false"],
+    .responsive-ready nav.tabs[data-responsive-open="false"] { display: none; }
+    .responsive-ready .top-actions[data-responsive-open="true"] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .responsive-ready .top-actions > * { width: auto; min-width: 0; white-space: normal; text-align: center; }
+    .responsive-nav-toggle { width: 100%; justify-content: space-between; margin-bottom: 12px; background: #fff; }
+    nav.tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    nav.tabs > .tab { width: 100%; white-space: normal; text-align: left; justify-content: flex-start; }
+    .scope-reference-nav { grid-column: 1 / -1; width: 100%; margin: 0; }
+    .scope-reference-nav > div { position: static; min-width: 0; width: 100%; margin-top: 8px; box-shadow: none; }
+    .scope-reference-nav > summary { white-space: normal; }
+    .card, .panel > .card, .panel > .grid2 > .card, .resource-view > .card { padding: 16px; }
+    .card .card { padding: 12px; }
+    .grid2, .grid3, .form-grid, .planning-grid, .catalog-two-columns,
+    .workspace-config-grid, .import-grid, .mapping-grid { grid-template-columns: minmax(0, 1fr); }
+    .planning-context { grid-template-columns: minmax(0, 1fr) !important; padding: 12px; }
+    .scope-bar { gap: 8px; }
+    .planning-tools .scope-picker, .scope-picker { flex: 1 1 140px; min-width: 0; }
+    .scope-picker .scope-options { min-width: 0; width: min(290px, calc(100vw - 48px)); }
+    .scope-picker:nth-of-type(even) .scope-options { left: auto; right: 0; }
+    .scope-bar > .btn { flex: 1 1 100%; }
+    main input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=hidden]),
+    main select, main textarea, .modal input, .modal select, .modal textarea {
+      font-size: 16px; /* Prevent focus zoom on iOS without disabling user zoom. */
+    }
+    .btn, .topbar .btn, .tab, .resource-tab, .scope-picker summary,
+    main summary, .sch-toolbar .btn { min-height: 46px; }
+    .planning-tools .btn { margin: 4px 4px 4px 0; }
+    .catalog-kind-tabs { gap: 8px; }
+    .catalog-kind-tabs .btn { min-width: 0; flex: 1 1 130px; }
+    .catalog-editor, .workspace-toolbar, .planning-gantt-workbench { padding: 12px; }
+    .daily-toolbar label, .workspace-toolbar label, .gantt-toolbar label { max-width: 100%; }
+    .daily-toolbar > label, .gantt-toolbar > label { flex: 1 1 145px; min-width: 0; }
+    .gantt-toolbar input, .gantt-toolbar select { min-width: 0; max-width: 100%; }
+    .planning-kpis > span, .wb-kpis > span, .comparison-summary > span,
+    .workspace-kpis > div { min-width: 0; flex: 1 1 140px; }
+    .stats, .stats-2, .stats-3, .stats-5, .sch-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .stat, .liv-metrics .stat { padding: 12px; }
+    .liv-page-head { display: block; margin-bottom: 16px; }
+    .liv-page-head h1 { font-size: 24px; }
+    #livAuthOverlay { padding: 12px; overflow-y: auto; }
+    #livAuthOverlay .liv-auth-card { padding: 22px; max-height: calc(100dvh - 24px); overflow: auto; }
+    #livAuthOverlay input { font-size: 16px; }
+    .top-actions .liv-auth-user { grid-column: 1 / -1; flex-wrap: wrap; margin-left: 0; }
+    .top-actions .liv-auth-name { max-width: 100%; overflow-wrap: anywhere; }
+    .top-actions .liv-auth-logout { min-height: 46px; }
+    .modal { padding: 8px; }
+    .modal-card { border-radius: 10px; max-height: calc(100dvh - 16px); }
+    .modal-head { padding: 12px; gap: 10px; }
+    .modal-head h2 { overflow-wrap: anywhere; }
+    #modalBody { padding: 12px; }
+    #modalBody .editor-actions { bottom: -12px; margin: 12px -12px -12px; padding: 12px; flex-wrap: wrap; }
+    #modalBody .editor-actions > .btn { flex: 1 1 130px; }
+    /* Smaller frozen label leaves the calendar visible; SVG geometry stays unchanged. */
+    .gantt-scroll .gantt-fixed { width: 150px; }
+    .gantt-scroll .gantt-name-header { padding: 8px; font-size: 12px; line-height: 18px; }
+    .sch-layout { grid-template-columns: minmax(0, 1fr) !important; }
+    .sch-layout .sch-side { position: static; }
+    .sch-scroll { min-height: 260px !important; max-height: 65dvh !important; padding: 8px !important; }
+    .sch-empty { min-height: 240px !important; }
+  }
+  @media (max-width: 380px) {
+    .card, .panel > .card { padding: 12px; }
+    .topbar .top-actions[data-responsive-open="true"] { grid-template-columns: minmax(0, 1fr); }
+    .stats, .stats-2, .stats-3, .stats-5 { grid-template-columns: minmax(0, 1fr); }
+  }
+}
