@@ -207,6 +207,7 @@ function validateBackupPayload(
     'milestones',
     'buildings',
     'works',
+    'workKinds',
     'organizations'
   ];
 
@@ -626,8 +627,13 @@ const COMPARE_COLLECTIONS = [
   ],
 
   [
-    'works',
+    'workKinds',
     'Виды работ'
+  ],
+
+  [
+    'works',
+    'Наименования работ'
   ],
 
   [

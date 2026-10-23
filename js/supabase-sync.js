@@ -47,7 +47,7 @@
     const row=payload.new||{};if(!row.project||identity(row.project)!==window.LIV_PROJECTS.activeId())return;
     if(String(row.updated_by||'')===String(userId)||Number(row.revision)<=Number(revisions.get(identity(row.project))||0))return;
     // Never acknowledge another revision before local unsaved changes have been resolved.
-    if(saveTimer||chains.get(identity(row.project))){window.dispatchEvent(new CustomEvent('liv-project-save-error',{detail:{message:'Проект обновлён в другом окне. Сохраните резервную копию и перезагрузите страницу.'}}));return;}
+    if(saveTimer||chains.get(identity(row.project))||window.LIV_WORK_CATALOG_UI?.hasPendingInput?.()){window.dispatchEvent(new CustomEvent('liv-project-save-error',{detail:{message:'Проект обновлён в другом окне. Сохраните резервную копию и перезагрузите страницу.'}}));return;}
     revisions.set(identity(row.project),Number(row.revision));window.dispatchEvent(new CustomEvent('liv-remote-project',{detail:{project:row.project,updatedAt:row.updated_at||''}}));
   }).subscribe();}
   async function reconnect(p){clearTimeout(saveTimer);if(channel&&sb())await sb().removeChannel(channel);channel=null;ready=false;role='';userId='';revisions.clear();const state=await bootstrap(p);subscribe();return state;}

@@ -925,6 +925,8 @@ function emptyProject() {
     organizations:
       [],
 
+    workKinds: [],
+
     works:
       DEFAULT_WORKS
         .map(
@@ -1306,6 +1308,7 @@ function normalizeProject(
     'buildings',
     'organizations',
     'works',
+    'workKinds',
     'structures',
     'fronts',
     'matrices',

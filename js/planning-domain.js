@@ -69,7 +69,7 @@
     const changes=(project.quantityChanges||[]).filter(c=>c.status==='approved'&&c.effectiveDate<=asOf&&c.elementIds?.includes(element.id)).sort((a,b)=>a.effectiveDate.localeCompare(b.effectiveDate)||(a.sequence||0)-(b.sequence||0));const last=changes.at(-1);return {excluded:last?.kind==='exclude',effectiveDate:last?.effectiveDate||'',document:last?.document||''};
   }
   function frontView(project,front,asOf=today()){ 
-    const t=(project.tasks||[]).find(t=>t.frontId===front.id&&(project.quantityBaselines||[]).some(b=>b.key===quantityKey(t)));
+    const t=(project.tasks||[]).find(t=>t.frontId===front.id&&(project.quantityBaselines||[]).some(b=>b.key===quantityKey(t)))||((project.quantityBaselines||[]).some(b=>b.key==='front:'+front.id)?{id:front.id,frontId:front.id}:null);
     if(!t)return front;
     const state=stateAt(project,t,asOf);return {...front,totalQty:state.total??front.totalQty,doneQty:state.actual??front.doneQty,scopeExcluded:state.total===0,scopeOverrun:state.overrun,quantityAsOf:asOf};
   }
@@ -148,6 +148,6 @@
     return {...result,productionGain:weight?productionGain/weight:null,scopeEffect:weight?scopeEffect/weight:null};
   }
   function csv(rows){return '\uFEFF'+rows.map(row=>row.map(v=>{let s=String(v??'');if(/^[=+@\-]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';}).join(';')).join('\r\n');}
-  function storageProjection(project){return Object.fromEntries(['buildings','organizations','contracts','resources','viewBuilder','planningEdits','scheduleMatches','quantityBaselines','quantityChanges','quantityPlans','workMetrics','numberedElements','planningSettings','scheduleVersions','tasks','taskDates','taskQuantities','dependencies','milestones','fronts','progressFacts','reportSnapshots'].map(k=>[k,project[k]||(['planningSettings','viewBuilder'].includes(k)?{}:[])]));}
+  function storageProjection(project){return Object.fromEntries(['workKinds','works','structures','buildings','organizations','contracts','resources','viewBuilder','planningEdits','scheduleMatches','quantityBaselines','quantityChanges','quantityPlans','workMetrics','numberedElements','planningSettings','scheduleVersions','tasks','taskDates','taskQuantities','dependencies','milestones','fronts','progressFacts','reportSnapshots'].map(k=>[k,project[k]||(['planningSettings','viewBuilder'].includes(k)?{}:[])]));}
   window.LIV_PLANNING_DOMAIN={quantityKey,elementScope,reviewImportedVolumes,seed,frontView,refreshFront,resolveVersion,volumeAt,recordChange,decideProposal,factAt,stateAt,periodProgress,comparison,validatePlan,periodPlan,milestoneForecast,quantityMetadata,freezeReport,aggregateReadiness,csv,storageProjection};
 })();

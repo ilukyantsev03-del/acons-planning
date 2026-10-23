@@ -4,7 +4,7 @@
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const el=id=>document.getElementById(id);
   let ganttOptions=null,lastSource='',renderedProject=null,lastChainRows=[];
-  const state={buildings:[],contracts:[],comparisonMetric:'volumes',comparisonAggregation:'average',comparisonGrain:'month',comparisonRole:'workers',workbenchTab:'facts',chainOnlySelected:false,gantt:{},left:'',right:'',task:'',drafts:{},links:{},preview:null,critical:null,leveled:null,scenario:0,scenarios:{},settings:null,comparisonMode:'versions',leftDate:'',rightDate:'',leftGroup:'',rightGroup:'',reportId:'',storageMessage:'',settingsProject:null,matrixRow:'place',matrixCol:'name',matrixMetric:'progress',organization:'',organizations:[],method:'average',from:new Date().toISOString().slice(0,7)+'-01',to:new Date().toISOString().slice(0,10)};
+  const state={buildings:[],contracts:[],workKinds:[],workIds:[],comparisonMetric:'volumes',comparisonAggregation:'average',comparisonGrain:'month',comparisonRole:'workers',workbenchTab:'facts',chainOnlySelected:false,gantt:{},left:'',right:'',task:'',drafts:{},links:{},preview:null,critical:null,leveled:null,scenario:0,scenarios:{},settings:null,comparisonMode:'versions',leftDate:'',rightDate:'',leftGroup:'',rightGroup:'',reportId:'',storageMessage:'',settingsProject:null,matrixRow:'place',matrixCol:'name',matrixMetric:'progress',organization:'',organizations:[],method:'average',from:new Date().toISOString().slice(0,7)+'-01',to:new Date().toISOString().slice(0,10)};
   const versionTasks=id=>(project?.tasks||[]).filter(t=>(t.versionId||t.sourceImportId)===id&&t.active!==false);
   const dates=(task,type='working')=>(project.taskDates||[]).filter(d=>d.taskId===task.id&&d.type===type).slice(-1)[0]||{};
   const label=v=>[v.name||v.fileName,v.role==='customer'?'Заказчик':v.role==='contractor'?'Договор подрядчика':'Рабочий',v.effectiveDate||v.createdAt?.slice(0,10),v.isCurrent===false?'Архив':''].filter(Boolean).join(' · ');
@@ -17,7 +17,7 @@
   const destinations={workspace:'Мой экран',facts:'Факт',forecast:'Прогноз',volumes:'Объёмы',gantt:'Гант',matrix:'Шахматка',planfact:'План / факт',resources:'Ресурсы',dashboard:'Сводка',milestones:'Ключевые даты',reports:'Отчёты',settings:'Настройки'};
   function bindSurface(node){node.addEventListener('input',liveInput);node.addEventListener('change',event=>{try{change(event);}catch(e){alert(e.message);}});node.addEventListener('click',click);}
   function part(destination,id,html){return `<section id="${id}" data-planning-destination="${destination}">${html}</section>`;}
-  function sourceStamp(){return JSON.stringify(['buildings','organizations','contracts','structures','workMetrics','planLog','scheduleVersions','tasks','taskDates','taskQuantities','dependencies','fronts','progressFacts','factLog','milestones','planningSettings','quantityBaselines','quantityChanges','quantityPlans','reportSnapshots','schemes','schemeMarks','resourcePlans','resources','numberedElements','numberedElementGroups'].map(k=>project[k]));}
+  function sourceStamp(){return JSON.stringify(['works','workKinds','buildings','organizations','contracts','structures','workMetrics','planLog','scheduleVersions','tasks','taskDates','taskQuantities','dependencies','fronts','progressFacts','factLog','milestones','planningSettings','quantityBaselines','quantityChanges','quantityPlans','reportSnapshots','schemes','schemeMarks','resourcePlans','resources','numberedElements','numberedElementGroups'].map(k=>project[k]));}
   function navigate(tab){if(typeof switchTab==='function')switchTab(tab);else{for(const panel of document.querySelectorAll('main > .panel'))panel.classList.toggle('hidden',panel.id!=='tab-'+tab);for(const b of document.querySelectorAll('.tab[data-tab]'))b.classList.toggle('active',b.dataset.tab===tab);}}
   function openTask(id){if(!versionTasks(state.right).some(t=>t.id===id))return;state.task=id;render();navigate('schedule');el('planningTask')?.scrollIntoView?.({block:'center'});}
   function openRelated(tab,id=state.task){window.LIV_WORKBENCH?.capture();if(versionTasks(state.right).some(t=>t.id===id))state.task=id;if(['facts','forecast'].includes(tab))state.workbenchTab=tab;render();navigate(tab);window.LIV_WORKBENCH?.onTab?.(tab);}
@@ -42,7 +42,7 @@
         target=document.createElement('section');target.id='planningSurface-'+tab;target.className='card planning-tools planning-surface';target.dataset.planningSurface=tab;panel.insertBefore(target,el('planningLegacy-'+tab)||panel.querySelector(':scope > .card'));bindSurface(target);
       }
       const legacy=el('planningLegacy-'+tab);if(legacy&&legacy.dataset.empty!==String(!versions.length)){legacy.open=tab==='planfact'?false:!versions.length;legacy.dataset.empty=String(!versions.length);}
-      target.innerHTML=(tab==='settings'?'<h2>Календари и проверка сохранения</h2>':contextBar(versions))+'<div data-planning-content></div>';
+      target.innerHTML=(tab==='volumes'?(window.LIV_CONTEXT?.bar?.({project,state,esc},{contractors:false})||''):tab==='settings'?'<h2>Календари и проверка сохранения</h2>':contextBar(versions))+'<div data-planning-content></div>';
     }
   }
   function routeParts(){
@@ -210,9 +210,9 @@
   }
   function render(){
     if(typeof project==='undefined'||!project)return;
-    window.LIV_WORKBENCH?.capture();lastChainRows=[];
+    window.LIV_WORKBENCH?.capture();window.LIV_WORK_CATALOG_UI?.capture();lastChainRows=[];
     const h=host();if(!h)return;
-    if(renderedProject&&renderedProject!==project){state.right='';state.left='';state.task='';state.setup={};state.buildings=[];state.organizations=[];state.organization='';state.contracts=[];state.drafts={};state.links={};state.preview=null;state.critical=null;state.leveled=null;state.settings=null;}
+    if(renderedProject&&renderedProject!==project){state.right='';state.left='';state.task='';state.setup={};state.workKinds=[];state.workIds=[];state.buildings=[];state.organizations=[];state.organization='';state.contracts=[];state.drafts={};state.links={};state.preview=null;state.critical=null;state.leveled=null;state.settings=null;}
     const openDetails=new Set(Array.from(document.querySelectorAll('[data-planning-surface] details[open]')).map(d=>d.querySelector('summary')?.textContent));
     const versions=(project.scheduleVersions||[]).filter(v=>['Принят','Архив'].includes(v.status));
     if(!versions.length){prepareSurfaces(versions);h.innerHTML=manualForm()+'<p class="muted">Создайте график вручную или загрузите файл.</p>'+part('settings','planningStoragePart',storagePanel())+part('reports','planningReportsPart',reportEntry())+part('planfact','planningAnalyticsPart','');routeParts();window.LIV_WORKBENCH?.mount();window.LIV_COMPARISON?.mount();window.LIV_CONTEXT?.install();lastSource=sourceStamp();renderedProject=project;return;}
@@ -289,7 +289,7 @@
     return analytics(tasks);
   }
   function matrix(tasks){
-    tasks=filtered(tasks).filter(t=>!(Number(t.floor)<0)&&!t.isSummary&&!t.isMilestone);
+    tasks=filtered(tasks).filter(t=>!t.isSummary&&!t.isMilestone);
     const value=(t,f)=>f==='place'?context(t):f==='organization'?t.organizationName||'Без организации':f==='floor'?(t.floor==null||t.floor===''?'Без этажа':'Этаж '+t.floor):t[f]||'Не указано';
     const cols=[...new Set(tasks.map(t=>value(t,state.matrixCol)))],rows=[...new Set(tasks.map(t=>value(t,state.matrixRow)))];
     return '<div class="table-wrap planning-matrix"><table><thead><tr><th>Место / работа</th>'+cols.map(c=>'<th>'+esc(c)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr><th>'+esc(r)+'</th>'+cols.map(c=>'<td>'+tasks.filter(t=>value(t,state.matrixRow)===r&&value(t,state.matrixCol)===c).map(t=>{
@@ -521,7 +521,7 @@
   }
   function reportMatrixCells(tasks){
     const value=(t,f)=>f==='place'?context(t):f==='organization'?t.organizationName||'Без организации':f==='floor'?(t.floor==null||t.floor===''?'Без этажа':'Этаж '+t.floor):t[f]||'Не указано';
-    return filtered(tasks).filter(t=>!t.isMilestone&&!t.isSummary&&!(Number(t.floor)<0)).map(t=>{const s=taskStats(t),d=state.preview?.get(t.id)||dates(t),base=dates(t,'contract').finish||dates(t).finish,label=state.matrixMetric==='forecast'?d.finish||'—':state.matrixMetric==='delta'?signed(P.days(base,d.finish)):state.matrixMetric==='volume'?fmt(s.cumulative)+' / '+fmt(s.total)+' '+s.unit:state.matrixMetric==='gain'?fmt(s.productionGain)+' п.п.':state.matrixMetric==='scopeEffect'?fmt(s.scopeEffect)+' п.п.':fmt(s.current??t.progressPercent)+'%';return {row:value(t,state.matrixRow),column:value(t,state.matrixCol),label,start:d.start,finish:d.finish,status:s.total===0?'Исключено из объёма':t.status||'Не начато'};});
+    return filtered(tasks).filter(t=>!t.isMilestone&&!t.isSummary).map(t=>{const s=taskStats(t),d=state.preview?.get(t.id)||dates(t),base=dates(t,'contract').finish||dates(t).finish,label=state.matrixMetric==='forecast'?d.finish||'—':state.matrixMetric==='delta'?signed(P.days(base,d.finish)):state.matrixMetric==='volume'?fmt(s.cumulative)+' / '+fmt(s.total)+' '+s.unit:state.matrixMetric==='gain'?fmt(s.productionGain)+' п.п.':state.matrixMetric==='scopeEffect'?fmt(s.scopeEffect)+' п.п.':fmt(s.current??t.progressPercent)+'%';return {row:value(t,state.matrixRow),column:value(t,state.matrixCol),label,start:d.start,finish:d.finish,status:s.total===0?'Исключено из объёма':t.status||'Не начато'};});
   }
   function savedMatrix(matrix){if(!matrix?.cells?.length)return '<p>Нет данных для шахматки.</p>';const rows=[...new Set(matrix.cells.map(c=>c.row))],cols=[...new Set(matrix.cells.map(c=>c.column))];return '<div class="table-wrap"><table><thead><tr><th>Место / работа</th>'+cols.map(c=>'<th>'+esc(c)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(row=>'<tr><th>'+esc(row)+'</th>'+cols.map(col=>'<td>'+matrix.cells.filter(c=>c.row===row&&c.column===col).map(c=>'<b>'+esc(c.label)+'</b><small>'+esc(c.status)+'</small><small>'+esc(c.start||'—')+' — '+esc(c.finish||'—')+'</small>').join('<hr>')+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';}
   function renderReport(report){

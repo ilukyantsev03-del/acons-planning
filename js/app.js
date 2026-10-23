@@ -9038,6 +9038,7 @@ function validateLoadedProject() {
     'buildings',
     'organizations',
     'works',
+    'workKinds',
     'structures',
     'fronts',
     'matrices',
