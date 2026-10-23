@@ -2,7 +2,7 @@
 (function () {
   const LEGACY='LIV-MAIN', TABLE='construction_project_snapshots', WRITERS=new Set(['admin','planner']);
   let saveTimer=null,channel=null,role='',userId='',applyingRemote=false,ready=false,activeServerId='';
-  const revisions=new Map(), chains=new Map();
+  const revisions=new Map(), chains=new Map(), acknowledged=new Map(), pendingDocuments=new Map();
   const sb=()=>window.LIV_SUPABASE||null, canWrite=()=>ready&&WRITERS.has(role);
   const identity=p=>window.LIV_PROJECTS?.identity(p)||LEGACY;
   async function waitForSession(){if(!sb())return null;for(let i=0;i<20;i++){const r=await sb().auth.getSession();if(r.data?.session?.user)return r.data.session;await new Promise(r=>setTimeout(r,150));}return null;}
@@ -13,25 +13,34 @@
     if(r.error)throw r.error;
     revisions.set(id,Number(r.data?.revision||0));
     if(id===window.LIV_PROJECTS.activeId())activeServerId=row.id;
-    if(r.data?.project){if(identity(r.data.project)!==id)throw Error('Сервер вернул данные другого проекта.');return r.data;}
+    if(r.data?.project){if(identity(r.data.project)!==id)throw Error('Сервер вернул данные другого проекта.');acknowledged.set(id,JSON.stringify(r.data.project));return r.data;}
     if(id===LEGACY){const old=await sb().from('liv_settings').select('value,updated_at,updated_by').eq('key','project_snapshot').maybeSingle();if(old.error)throw old.error;if(old.data?.value?.project){if(identity(old.data.value.project)!==id)throw Error('Исходная база имеет другой идентификатор проекта.');return {...old.data,project:old.data.value.project};}}
     return null;
   }
   async function writeSnapshot(p){
     if(!sb()||!p||!userId||!canWrite()||applyingRemote)return false;
-    const id=identity(p),payload=JSON.parse(JSON.stringify(p));
+    const id=identity(p),serialized=JSON.stringify(p);
+    if(chains.has(id)&&pendingDocuments.get(id)===serialized)return chains.get(id);
+    const payload=JSON.parse(serialized);
     const previous=chains.get(id)||Promise.resolve();
     const pending=previous.catch(()=>{}).then(async()=>{
       try{
         const row=await projectRow(payload);
+        if(acknowledged.get(id)===serialized){const check=await sb().from(TABLE).select('revision').eq('project_id',row.id).maybeSingle();if(check.error)throw check.error;if(Number(check.data?.revision)!==revisions.get(id))throw Error('На сервере появилась новая версия. Сохраните резервную копию и перезагрузите страницу перед продолжением.');if(id===window.LIV_PROJECTS.activeId()){window.LIV_PROJECT_SAVE_ERROR='';window.LIV_PROJECTS.mount?.();}return true;}
         if(!revisions.has(id)){const existing=await sb().from(TABLE).select('revision').eq('project_id',row.id).maybeSingle();if(existing.error)throw existing.error;if(existing.data)throw Error('Проект уже существует на сервере. Откройте его перед сохранением.');revisions.set(id,0);}
-        const revision=revisions.get(id),record={project_id:row.id,project:payload,revision:revision+1,updated_by:userId,updated_at:new Date().toISOString()};
-        const result=revision?await sb().from(TABLE).update(record).eq('project_id',row.id).eq('revision',revision).select('revision'):await sb().from(TABLE).insert(record).select('revision');
+        const revision=revisions.get(id);
+        // Dedicated invoker RPC keeps RLS and compare-and-swap, with a bounded 30s budget.
+        const result=await sb().rpc('save_construction_snapshot',{p_project_id:row.id,p_document:payload,p_expected_revision:revision});
         if(result.error)throw result.error;
         if(!result.data?.length)throw Error('На сервере появилась новая версия. Сохраните резервную копию и перезагрузите страницу перед продолжением.');
-        revisions.set(id,Number(result.data[0].revision));if(id===window.LIV_PROJECTS.activeId()){window.LIV_PROJECT_SAVE_ERROR='';window.LIV_PROJECTS.mount?.();}return true;
-      }catch(error){console.error('Planning: сохранение проекта',error);window.dispatchEvent(new CustomEvent('liv-project-save-error',{detail:{message:error.message}}));return false;}
-    });chains.set(id,pending);pending.finally(()=>{if(chains.get(id)===pending)chains.delete(id);});return pending;
+        acknowledged.set(id,serialized);revisions.set(id,Number(result.data[0].revision));if(id===window.LIV_PROJECTS.activeId()){window.LIV_PROJECT_SAVE_ERROR='';window.LIV_PROJECTS.mount?.();}return true;
+      }catch(error){console.error('Planning: сохранение проекта',error);window.dispatchEvent(new CustomEvent('liv-project-save-error',{detail:{message:saveErrorMessage(error)}}));return false;}
+    });chains.set(id,pending);pendingDocuments.set(id,serialized);pending.finally(()=>{if(chains.get(id)===pending){chains.delete(id);pendingDocuments.delete(id);}});return pending;
+  }
+  function saveErrorMessage(error){
+    if(error?.code==='57014'||/statement timeout/i.test(error?.message||''))return 'Сервер не успел сохранить проект. Не закрывайте страницу. Скачайте резервную копию кнопкой «Сохранить проект» и повторите сохранение или переход после обновления приложения.';
+    if(error?.code==='PT409')return 'На сервере появилась новая версия. Сохраните резервную копию и перезагрузите страницу перед продолжением.';
+    return error?.message||'Не удалось подтвердить сохранение проекта на сервере.';
   }
   async function bootstrap(localProject){
     ready=false;const session=await waitForSession();if(!session?.user)return {project:localProject,online:false,role:''};userId=session.user.id;
@@ -50,8 +59,8 @@
     if(saveTimer||chains.get(identity(row.project))||window.LIV_WORK_CATALOG_UI?.hasPendingInput?.()){window.dispatchEvent(new CustomEvent('liv-project-save-error',{detail:{message:'Проект обновлён в другом окне. Сохраните резервную копию и перезагрузите страницу.'}}));return;}
     revisions.set(identity(row.project),Number(row.revision));window.dispatchEvent(new CustomEvent('liv-remote-project',{detail:{project:row.project,updatedAt:row.updated_at||''}}));
   }).subscribe();}
-  async function reconnect(p){clearTimeout(saveTimer);if(channel&&sb())await sb().removeChannel(channel);channel=null;ready=false;role='';userId='';revisions.clear();const state=await bootstrap(p);subscribe();return state;}
-  function disconnect(){clearTimeout(saveTimer);ready=false;role='';userId='';if(channel&&sb())sb().removeChannel(channel).catch(()=>{});channel=null;}
+  async function reconnect(p){clearTimeout(saveTimer);if(channel&&sb())await sb().removeChannel(channel);channel=null;ready=false;role='';userId='';revisions.clear();acknowledged.clear();const state=await bootstrap(p);subscribe();return state;}
+  function disconnect(){clearTimeout(saveTimer);acknowledged.clear();ready=false;role='';userId='';if(channel&&sb())sb().removeChannel(channel).catch(()=>{});channel=null;}
   window.LIV_REMOTE_SYNC={bootstrap,reconnect,disconnect,queueSave,flush,subscribe,beginRemoteApply:()=>{applyingRemote=true;},endRemoteApply:()=>{applyingRemote=false;},canWrite,role:()=>role,userId:()=>userId};
   window.addEventListener('liv-project-save-error',event=>{window.LIV_PROJECT_SAVE_ERROR=event.detail.message;const host=document.getElementById('constructionProjectContext');if(host){host.textContent=event.detail.message;host.setAttribute('role','alert');host.classList.add('project-save-error');}});
 })();
