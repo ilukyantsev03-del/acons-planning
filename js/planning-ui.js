@@ -212,7 +212,7 @@
     if(typeof project==='undefined'||!project)return;
     window.LIV_WORKBENCH?.capture();window.LIV_WORK_CATALOG_UI?.capture();lastChainRows=[];
     const h=host();if(!h)return;
-    if(renderedProject&&renderedProject!==project){state.right='';state.left='';state.task='';state.setup={};state.workKinds=[];state.workIds=[];state.buildings=[];state.organizations=[];state.organization='';state.contracts=[];state.drafts={};state.links={};state.preview=null;state.critical=null;state.leveled=null;state.settings=null;}
+    if(renderedProject&&renderedProject!==project){state.showTotals=undefined;state.right='';state.left='';state.task='';state.setup={};state.workKinds=[];state.workIds=[];state.buildings=[];state.organizations=[];state.organization='';state.contracts=[];state.drafts={};state.links={};state.preview=null;state.critical=null;state.leveled=null;state.settings=null;}
     const openDetails=new Set(Array.from(document.querySelectorAll('[data-planning-surface] details[open]')).map(d=>d.querySelector('summary')?.textContent));
     const versions=(project.scheduleVersions||[]).filter(v=>['Принят','Архив'].includes(v.status));
     if(!versions.length){prepareSurfaces(versions);h.innerHTML=manualForm()+'<p class="muted">Создайте график вручную или загрузите файл.</p>'+part('settings','planningStoragePart',storagePanel())+part('reports','planningReportsPart',reportEntry())+part('planfact','planningAnalyticsPart','');routeParts();window.LIV_WORKBENCH?.mount();window.LIV_COMPARISON?.mount();window.LIV_CONTEXT?.install();lastSource=sourceStamp();renderedProject=project;return;}

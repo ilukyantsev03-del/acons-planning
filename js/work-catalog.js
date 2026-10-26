@@ -23,7 +23,7 @@
   }
   function matches(p,t,state){const r=resolve(p,t);return (!(state.workKinds||[]).length||(state.workKinds||[]).includes(r.workKindId||'__unassigned'))&&(!(state.workIds||[]).length||(state.workIds||[]).includes(r.workId||'__unassigned'));}
   function taskForFront(p,front){const s=by(p.structures,front.structureId)||{},b=by(p.buildings,front.buildingId||s.buildingId),w=by(p.works,front.workId);return {...s,...front,id:front.id,frontId:front.id,buildingId:b?.id||front.buildingId||s.buildingId||'',building:b?.name||front.building||'',elevation:s.elevation||s.customData?.elevation||'',name:w?.name||front.name||front.id,unit:front.unit||w?.unit||''};}
-  function placeKey(v){return [v.buildingId,v.block,v.floor,v.capture,v.axis,v.side,v.zone,v.roomNo,v.roomName,v.equipmentName,v.elevation||v.customData?.elevation].map(norm).join('|');}
+  function placeKey(v){if(window.LIV_CATALOG_IMPORT)return window.LIV_CATALOG_IMPORT.placeKey(v.buildingId,v)+'|'+norm(v.equipmentName);return [v.buildingId,v.block,v.floor,v.capture,v.axis,v.side,v.zone,v.roomNo,v.roomName,v.equipmentName,v.elevation||v.customData?.elevation,v.element||v.customData?.element].map(norm).join('|');}
   function rowKey(p,front){const t=taskForFront(p,front);return placeKey(t)+'|'+front.workId+'|'+norm(unit(front.unit));}
   function existingFront(p,input){return (p.fronts||[]).find(f=>f.active!==false&&rowKey(p,f)===placeKey(input)+'|'+input.workId+'|'+norm(unit(input.unit)));}
   function addVolume(p,input){const building=by(p.buildings,input.buildingId),work=by(p.works,input.workId),qty=P.number(input.quantity),date=P.date(input.effectiveDate),unitValue=unit(input.unit||work?.unit);

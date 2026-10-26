@@ -5116,6 +5116,7 @@ function resourcePrintTable(
   `;
 
   const foot =
+    window.LIV_CONTEXT?.active?.()?.state.showTotals!==false &&
     config.showFooter &&
     footerValues
       ? `
@@ -6495,6 +6496,7 @@ function switchResourceView(view) {
 }
 
 function renderResourceCurrentView() {
+  window.LIV_CONTEXT?.applyTotals?.();
   registerResourceBuilderSchemas();
 
   if (

@@ -2229,10 +2229,12 @@ function initSelects() {
    ========================================================= */
 
 
+function frontInSharedScope(front){const c=window.LIV_CONTEXT?.active?.();return !c||window.LIV_CONTEXT.recordMatches(project,{...front,frontId:front.id},c.state);}
+
 function renderDashboard() {
 
   const fronts =
-    activeFronts()
+    activeFronts().filter(frontInSharedScope)
       .map(
         hydrateFront
       );
@@ -2916,7 +2918,7 @@ function matrixFiltered() {
       : null;
 
 
-  return activeFronts()
+  return activeFronts().filter(front=>{const c=window.LIV_CONTEXT?.active?.();return !c||window.LIV_CONTEXT.recordMatches(project,{...front,frontId:front.id},c.state);})
     .map(
       hydrateFront
     )
@@ -4698,7 +4700,7 @@ function renderGantt() {
 
 
   const items =
-    activeFronts()
+    activeFronts().filter(frontInSharedScope)
       .map(
         hydrateFront
       )
@@ -4880,7 +4882,7 @@ function pfFrontIds() {
 
   return new Set(
 
-    activeFronts()
+    activeFronts().filter(frontInSharedScope)
       .filter(
         front => {
 

@@ -107,6 +107,7 @@
     registerMilestones(project,v,project.tasks.filter(t=>t.versionId===versionId));
     window.LIV_PLANNING_DOMAIN?.reviewImportedVolumes(project,v,project.tasks.filter(t=>t.versionId===versionId));
     v.status='Принят';v.isCurrent=true;v.acceptedAt=new Date().toISOString();project.scheduleStaging=[];
+    window.LIV_CATALOG_IMPORT?.finalizeSchedule(project,project.tasks.filter(t=>t.versionId===versionId));
   }
   function recalculate(tasks,dependencies,inputs) {
     const byId=new Map(tasks.map(t=>[t.id,t])),results=new Map(),visiting=new Set();
@@ -150,7 +151,7 @@
     return all?total*period/all:null;
   }
   async function persist(current,mutation,save){
-    const names=['workKinds','works','structures','buildings','organizations','resources','viewBuilder','planningEdits','scheduleMatches','workMetrics','numberedElements','quantityBaselines','quantityChanges','quantityPlans','reportSnapshots','fronts','progressFacts','factLog','history','planningSettings','tasks','taskDates','taskQuantities','dependencies','scheduleVersions','scheduleStaging','importHistory','contracts','milestones'];
+    const names=['sourceMappings','importProfiles','workKinds','works','structures','buildings','organizations','resources','viewBuilder','planningEdits','scheduleMatches','workMetrics','numberedElements','quantityBaselines','quantityChanges','quantityPlans','reportSnapshots','fronts','progressFacts','factLog','history','planningSettings','tasks','taskDates','taskQuantities','dependencies','scheduleVersions','scheduleStaging','importHistory','contracts','milestones'];
     const before=Object.fromEntries(names.map(k=>[k,JSON.parse(JSON.stringify(current[k]||(['planningSettings','viewBuilder'].includes(k)?{}:[])))]));
     try{mutation();await save();}catch(error){for(const k of names)current[k]=before[k];throw error;}
   }

@@ -22,6 +22,7 @@
   };
 
   const FIELD_DEFS = {
+    workKind:{label:'Вид работ (категория)',aliases:['категория работ','раздел работ']},
     element: {label:'Элемент / конструкция', aliases:['наименование элемента','конструкция','элемент']},
     name: {
       label: 'Задача',
@@ -307,6 +308,9 @@
             <label>Название графика (то же для следующих редакций)<input id="scheduleGroup" placeholder="Например: Кровля / договор Ренессанс"></label>
             <label>Назначение<select id="scheduleRole"><option value="working">Внутренний рабочий</option><option value="contractor">Договор подрядчика</option><option value="customer">График Заказчика</option></select></label>
             <label>Организация<select id="scheduleOrganization"><option value="">Не выбрана</option></select></label>
+            <label>Новый подрядчик, если нет в списке<input id="scheduleNewOrganization" placeholder="Либо выберите существующего выше"></label>
+            <label>Объект для строк без здания<input id="scheduleDefaultBuilding" placeholder="Например: Многоуровневый паркинг"></label>
+            <label>Вид работ для строк без категории<input id="scheduleDefaultWorkKind" placeholder="Например: Кровля"></label>
             <label>Номер договора<input id="scheduleContractNo" placeholder="Точный номер договора"></label>
             <label><input id="scheduleRegisterKD" type="checkbox"> При принятии зарегистрировать КД в договорном журнале</label>
             <label>Дата версии<input id="scheduleEffective" type="date"></label>
@@ -472,6 +476,7 @@
     state.sheetMappings={};
     state.workbook = XLSX.read(buffer, { type: 'array', cellDates: false, cellNF: true });
     state.fileName = file.name;
+    for(const key of ['scheduleNewOrganization','scheduleDefaultBuilding','scheduleDefaultWorkKind'])if(document.getElementById(key))document.getElementById(key).value='';
     state.sheetName = state.workbook.SheetNames[0] || '';
 
     const select = document.getElementById('scheduleSheetSelect');
@@ -591,6 +596,7 @@
 
   function taskContext(row) {
     return {
+      workKind: text(value(row,'workKind'))||text(document.getElementById?.('scheduleDefaultWorkKind')?.value),
       building: text(value(row,'building')),
       block: text(value(row,'block')),
       floor: text(value(row,'floor')),
@@ -1153,7 +1159,7 @@
       }
       if(isMilestone){start=finish;if(!finish)errors.push('Строка '+sourceRow+': у КД отсутствует срок.');}
       if(start&&finish&&finish<start)errors.push('Строка '+sourceRow+': окончание раньше начала.');
-      const ctx=taskContext(row);if(!ctx.building)ctx.building=section;
+      const ctx=taskContext(row);if(!ctx.building)ctx.building=section||text(document.getElementById?.('scheduleDefaultBuilding')?.value);
       if(!start&&!finish&&!isMilestone){warnings.push('Строка '+sourceRow+': нет дат, строка пропущена.');return;}
       let progress=0;const raw=value(row,'progress');
       if(text(raw)) {progress=num(text(raw).replace('%',''));if(!text(raw).includes('%')&&progress>0&&progress<1)progress*=100;
@@ -1185,16 +1191,18 @@
     const effectiveDate=isoDate(document.getElementById('scheduleEffective')?.value),calendar=document.getElementById('scheduleCalendar')?.value||'7x0';
     if(!group||!effectiveDate){alert('Укажите название графика и дату версии.');return;}
     const registerMilestones=Boolean(document.getElementById('scheduleRegisterKD')?.checked),organizationId=document.getElementById('scheduleOrganization')?.value||'',contractNo=text(document.getElementById('scheduleContractNo')?.value);
-    if(registerMilestones&&(role==='working'||!organizationId||!contractNo)){alert('Для регистрации договорных КД выберите договорный график, организацию и номер договора.');return;}
+    const organizationName=text(document.getElementById('scheduleNewOrganization')?.value);
+    if(organizationId&&organizationName){alert('Выберите существующего подрядчика или введите нового — оставьте один вариант.');return;}
+    if(registerMilestones&&(role==='working'||(!organizationId&&!organizationName)||!contractNo)){alert('Для регистрации договорных КД выберите договорный график, организацию и номер договора.');return;}
     const prepared=prepareRows({milestoneFallback:document.getElementById('scheduleMilestoneFallback')?.checked});
     if(prepared.errors.length){alert(prepared.errors.join('\n'));return;}
     if(!prepared.rows.length){alert('Нет строк с работами и датами.');return;}
     if(prepared.warnings.length&&!confirm(prepared.warnings.join('\n')+'\nПодготовить эту версию для проверки?'))return;
-    const importId=uid('SIMP'),createdAt=new Date().toISOString(),scheduleKey=[role,key(group),organizationId,key(contractNo)].join('|');
+    const importId=uid('SIMP'),createdAt=new Date().toISOString(),scheduleKey=[role,key(group),organizationId||key(organizationName),key(contractNo)].join('|');
     const staged=prepared.rows.map(r=>{
       const taskId=uid('TASK');
       const task={...r,id:taskId,raw:undefined,versionId:importId,sourceImportId:importId,sourceFile:state.fileName,sourceSheet:state.sheetName,
-        scheduleKey,role,effectiveDate,calendar,organizationId,active:true,testOnly:true,createdAt,updatedAt:createdAt,progressPercent:r.progress,durationAccepted:r.duration,
+        scheduleKey,role,effectiveDate,calendar,organizationId,organizationName:r.organizationName||organizationName,active:true,testOnly:true,createdAt,updatedAt:createdAt,progressPercent:r.progress,durationAccepted:r.duration,
         sourceTaskId:r.sourceTaskId||String(r.sourceRow),logicalId:scheduleTaskIdentity(r),isMilestone:r.isMilestone};
       const dates=[makeDate(taskId,'working',r.start,r.finish,'test-import'),
         makeDate(taskId,'baseline',value(r.raw,'baselineStart'),value(r.raw,'baselineFinish'),'test-import'),
@@ -1223,19 +1231,36 @@
     project.scheduleVersions.filter(v=>v.status==='Тест').forEach(v=>{v.status='Удален';});
     project.scheduleStaging=staged;
     project.scheduleVersions.unshift({id:importId,name:group,versionNo:Math.max(0,...project.scheduleVersions.filter(v=>(v.name||v.fileName)===group).map(v=>Number(v.versionNo)||0),project.scheduleVersions.filter(v=>(v.name||v.fileName)===group).length)+1,fileName:state.fileName,sheetName:state.sheetName,sourceType:state.sourceType,
-      scheduleKey,role,effectiveDate,calendar,organizationId,contractNo,registerMilestones,createdAt,status:'Тест',rowsCreated:staged.length,dependencyCount:dependencies.length});
+      scheduleKey,role,effectiveDate,calendar,organizationId,organizationName,contractNo,registerMilestones,createdAt,status:'Тест',rowsCreated:staged.length,dependencyCount:dependencies.length});
     if(typeof saveProject==='function')await saveProject();
     renderSchedule();alert('Подготовлено работ для проверки: '+staged.length+'; ключевых дат: '+staged.filter(x=>x.task.isMilestone).length+' КД. Проверьте таблицу перед принятием.');
   }
 
-  async function promoteTestImport() {
+  let promoting=false;
+  async function promoteTestImport(){if(promoting)return;promoting=true;try{await promoteTestImportRows();}finally{promoting=false;}}
+  async function promoteTestImportRows() {
     if(window.LIV_ACCESS?.canEdit===false){alert('Нет права изменять график.');return;}
     if(!ensureCollections()||!project.scheduleStaging.length){alert('Сначала подготовьте версию для проверки.');return;}
     const id=project.scheduleStaging[0].task.sourceImportId;
     const version=project.scheduleVersions.find(v=>v.id===id);
+    let catalogReview;
+    if(window.LIV_CATALOG_IMPORT){
+      const org=(project.organizations||[]).find(o=>o.id===version?.organizationId);
+      const records=project.scheduleStaging.map(({task})=>({building:task.building,organization:task.organizationName||org?.name||version.organizationName||'',work:task.isSummary||task.isMilestone?'':task.name,workKind:task.workKind||'',unit:task.unit||'',requiresUnit:!task.isSummary&&!task.isMilestone&&task.quantity!==null&&task.quantity!==undefined}));
+      const reviewed=await window.LIV_CATALOG_IMPORT.review(project,records,{title:'Принятие графика: здания, подрядчики и работы'});
+      if(!reviewed)return;
+      catalogReview=reviewed;
+    }
     if(!confirm('Принять версию? Предыдущая редакция этого графика останется в истории. Другие графики не изменятся.'+(version?.registerMilestones?'\nКД этого договора будут созданы или обновлены в журнале. Изменённые договорные сроки сохранятся в истории.':'\nКД останутся вехами графика; договорный журнал не изменяется.')))return;
     try {
       await window.LIV_PLANNING.persist(project,()=>{
+        if(catalogReview)window.LIV_CATALOG_IMPORT.apply(project,catalogReview.plan,catalogReview.decisions);
+        if(catalogReview&&version.organizationName&&!version.organizationId){
+          version.organizationId=window.LIV_CATALOG_IMPORT.match(project,'organization',version.organizationName).item?.id||'';
+          version.scheduleKey=[version.role,key(version.name),version.organizationId,key(version.contractNo)].join('|');
+          for(const item of project.scheduleStaging){item.task.scheduleKey=version.scheduleKey;item.task.organizationId=version.organizationId;}
+        }
+        window.LIV_CATALOG_IMPORT?.attachSchedule(project,project.scheduleStaging,version);
         window.LIV_PLANNING.accept(project,id);
         const v=project.scheduleVersions.find(x=>x.id===id);
         project.importHistory=project.importHistory||[];
@@ -1301,13 +1326,15 @@
     if(window.LIV_PLANNING_UI)window.LIV_PLANNING_UI.render();
 
     window.LIV_WORKFLOW?.schedule?.();
+    const scope=window.LIV_CONTEXT?.active?.();
+    const inScope=t=>!scope||window.LIV_CONTEXT.matches(project,t,scope.state);
     const search = key(document.getElementById('scheduleSearch')?.value || '');
     const stagedTasks = (project.scheduleStaging || [])
       .map(item => ({ ...item.task, testOnly: true }))
-      .filter(t => t.active !== false);
+      .filter(t => t.active !== false&&inScope(t));
 
     let tasks = [
-      ...window.LIV_PLANNING.currentTasks(project),
+      ...window.LIV_PLANNING.currentTasks(project).filter(inScope),
       ...stagedTasks
     ];
 
@@ -1323,7 +1350,7 @@
     const empty = document.getElementById('scheduleEmpty');
     if (!tbody || !table || !empty) return;
 
-    const official = window.LIV_PLANNING.currentTasks(project);
+    const official = window.LIV_PLANNING.currentTasks(project).filter(inScope);
     const all = [...official, ...stagedTasks];
     const imported = official.filter(t => t.sourceImportId);
     const stagedCount = stagedTasks.length;
@@ -1351,7 +1378,7 @@
       return `
         <tr>
           <td>${index+1}</td>
-          <td><b>${esc(task.name)}</b>${task.testOnly ? '<div class="schedule-test-badge">НА ПРОВЕРКЕ</div>' : ''}${task.sourceSheet ? '<div class="muted schedule-source">'+esc(task.sourceSheet)+'</div>' : ''}</td>
+          <td><b>${esc(task.name)}</b>${task.linkWarning?'<div class="planning-late">'+esc(task.linkWarning)+'</div>':''}${task.testOnly ? '<div class="schedule-test-badge">НА ПРОВЕРКЕ</div>' : ''}${task.sourceSheet ? '<div class="muted schedule-source">'+esc(task.sourceSheet)+'</div>' : ''}</td>
           <td>${esc(contextText(task) || '—')}</td>
           <td>${esc(task.organizationName || '—')}</td>
           <td><span class="schedule-status">${esc(task.status || 'Не начато')}</span></td>

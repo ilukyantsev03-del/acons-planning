@@ -14,6 +14,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="catalog-import.css?v=20261026-1">
 </head>
 
 <body>
@@ -25,7 +26,7 @@
   </div>
 
   <div class="top-actions">
-    <a class="btn" href="docs/USER_GUIDE_RU.html?v=20261023-4" target="_blank" rel="noopener">Инструкция</a>
+    <a class="btn" href="docs/USER_GUIDE_RU.html?v=20261026-1" target="_blank" rel="noopener">Инструкция</a>
 
     <button
       id="backupBtn"
@@ -2137,12 +2138,25 @@
             checked
           >
 
-          Наследовать пустые группирующие ячейки сверху
+          Наследовать пустые группирующие ячейки сверху (в ресурсах — только организацию)
 
         </label>
 
       </div>
 
+
+      <details class="catalog-import-defaults">
+        <summary>Общие значения для загрузки и сохранённая настройка</summary>
+        <p>Заполняют только пустые ячейки. Рахиль — общий проект; Паркинг — здание / сооружение. Людей без объекта не распределяем автоматически.</p>
+        <div class="import-grid">
+          <label>Здание / сооружение<input id="importDefault-building" placeholder="Например: Многоуровневый паркинг"></label>
+          <label>Подрядчик<input id="importDefault-organization" placeholder="Если один для всего листа"></label>
+          <label>Вид работ<input id="importDefault-workKind" placeholder="Например: Монолит"></label>
+          <label>Единица объёма<input id="importDefault-unit" placeholder="м³, м², шт."></label>
+        </div>
+        <label class="check-line"><input id="importResourcesTotal" type="checkbox">Строки ресурсов без объекта — общий итог подрядчика, уже включающий распределённых людей</label><p class="muted">Без галочки это отдельная нераспределённая группа. Обозначение «(Паркинг)» в имени подрядчика переносится в объект; направления «кладка» и «сети» автоматически не объединяются.</p>
+        <button type="button" class="btn" id="restoreImportProfileBtn">Применить сохранённую настройку листа</button>
+      </details>
 
       <div class="editor-actions left-actions">
 
@@ -2528,30 +2542,32 @@
 <script src="js/fact-series.js?v=20261016-1"></script>
 <script src="js/supabase-sync.js?v=20261023-4"></script>
 
-<script src="js/core.js?v=20261023-4"></script>
-<script src="js/construction-projects.js?v=20261023-1"></script>
+<script src="js/core.js?v=20261026-1"></script>
+<script src="js/construction-projects.js?v=20261026-1"></script>
 <script src="js/storage.js?v=20261023-1"></script>
 <script src="js/filters.js?v=20261008-8"></script>
-<script src="js/resources.js?v=20261022-1"></script>
+<script src="js/resources.js?v=20261026-1"></script>
 <script src="js/organizations.js?v=20261013-1"></script>
-<script src="js/import.js?v=20261016-1"></script>
+<script src="js/catalog-import.js?v=20261026-1"></script>
+<script src="js/construction-facts.js?v=20261026-1"></script>
+<script src="js/import.js?v=20261026-1"></script>
 
 <script src="js/view-builder.js?v=20261022-5"></script>
-<script src="js/planning-core.js?v=20261023-1"></script>
+<script src="js/planning-core.js?v=20261026-1"></script>
 <script src="js/planning-domain.js?v=20261023-1"></script>
-<script src="js/work-catalog.js?v=20261023-1"></script>
+<script src="js/work-catalog.js?v=20261026-1"></script>
 <script src="js/work-catalog-ui.js?v=20261023-1"></script>
 <script src="js/planning-daily.js?v=20261021-2"></script>
-<script src="js/schedule.js?v=20261023-4"></script>
+<script src="js/schedule.js?v=20261026-1"></script>
 <script src="js/planning-chain.js?v=20261021-2"></script>
 <script src="js/planning-gantt.js?v=20261021-1"></script>
-<script src="js/planning-context.js?v=20261023-1"></script>
-<script src="js/planning-comparison.js?v=20261023-1"></script>
-<script src="js/planning-workbench.js?v=20261022-5"></script>
-<script src="js/planning-workspace.js?v=20261023-1"></script>
-<script src="js/planning-ui.js?v=20261023-4"></script>
+<script src="js/planning-context.js?v=20261026-1"></script>
+<script src="js/planning-comparison.js?v=20261026-1"></script>
+<script src="js/planning-workbench.js?v=20261026-1"></script>
+<script src="js/planning-workspace.js?v=20261026-1"></script>
+<script src="js/planning-ui.js?v=20261026-1"></script>
 <script src="js/planning-daily-ui.js?v=20261021-2"></script>
-<script src="js/app.js?v=20261023-4"></script>
+<script src="js/app.js?v=20261026-1"></script>
 
 <script src="js/responsive-layout.js?v=20261023-2"></script>
 

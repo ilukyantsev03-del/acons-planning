@@ -27,7 +27,7 @@
     const hasFact=String(data.quantity??'').trim()!=='',hasPeople=['workers','itr','mechanizers','equipmentQty'].some(k=>String(data[k]??'').trim()!=='');
     if(!hasFact&&!hasPeople)throw Error('Введите факт и/или численность.');
     const primary=F.primaryRows(p,new Set([String(front.id)])).filter(r=>r.active!==false&&(r.factDate||r.date)===data.date);
-    const facts=(p.progressFacts||[]).filter(r=>r.active!==false&&r.frontId===front.id&&r.factDate===data.date);
+    const facts=(p.progressFacts||[]).filter(r=>r.active!==false&&r.frontId===front.id&&r.factDate===data.date&&!['status','event'].includes(r.factType));
     if(hasFact&&(primary.length>1||facts.length>1||primary.length&&!facts.length))throw Error('На эту дату несколько записей или старый журнал. Исправьте конкретную запись в журнале факта.');
     if(hasFact&&facts.length&&!data.replaceFact)throw Error('На эту дату уже есть факт. Включите «Исправить существующую запись» после проверки.');
     const quantity=num(data.quantity);if(hasFact&&(quantity===null||quantity<0))throw Error('Объём должен быть неотрицательным числом.');

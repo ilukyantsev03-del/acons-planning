@@ -2,7 +2,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 let domPath=process.env.LIV_DOM_TEST_MODULE;
 if(!domPath){try{domPath=require.resolve('linkedom');}catch{}}
-function setup(){
+function setup(catalog=false){
   const {parseHTML}=require(domPath),{document,Event}=parseHTML('<html><body><nav class="tabs">'+['dashboard','workspace','gantt','matrix','planfact','resources','milestones','reports','volumes','facts','forecast','settings'].map(t=>'<button class="tab" data-tab="'+t+'">'+t+'</button>').join('')+'</nav><main class="container">'+['dashboard','workspace','gantt','matrix','planfact','resources','milestones','reports','volumes','facts','forecast','settings'].map(t=>'<section id="tab-'+t+'" class="panel hidden"><section class="card" data-legacy-fixture="'+t+'">Данные по фронтам</section></section>').join('')+'</main></body></html>');
   const selectPrototype=Object.getPrototypeOf(document.createElement('select'));
   Object.defineProperty(selectPrototype,'value',{configurable:true,get(){return (this.querySelector('option[selected]')||this.querySelector('option'))?.value||'';},set(v){for(const o of Array.from(this.options))o.removeAttribute('selected');const o=Array.from(this.options).find(o=>o.value===v);if(o)o.setAttribute('selected','');}});
@@ -10,12 +10,14 @@ function setup(){
     ArrayBuffer,Uint8Array,
     crypto:require('node:crypto').webcrypto,Date,console,setTimeout:()=>1,alert:m=>messages.push(m),confirm:()=>true,saveProject:async()=>{}};
   c.window.saveProject=c.saveProject;c.window.LIV_ACCESS={canEdit:true};vm.createContext(c);
-  for(const file of ['planning-core','fact-series','planning-domain','work-catalog','work-catalog-ui','planning-daily','planning-chain','planning-gantt','planning-context','planning-comparison','planning-workbench','planning-workspace','schedule','planning-ui','planning-daily-ui']){
+  for(const file of ['planning-core','fact-series','planning-domain','work-catalog','catalog-import','construction-facts','work-catalog-ui','planning-daily','planning-chain','planning-gantt','planning-context','planning-comparison','planning-workbench','planning-workspace','schedule','planning-ui','planning-daily-ui']){
+    if(['catalog-import','construction-facts'].includes(file)&&!catalog)continue;
     let source=fs.readFileSync(path.join(__dirname,'../js/'+file+'.js'),'utf8');
     if(file==='schedule')source=source.replace('  window.renderSchedule = renderSchedule;', '  window.SCHEDULE_TEST={state,prepareRows,importSchedule,promoteTestImport,handleFile};\n  window.renderSchedule = renderSchedule;');
     if(file==='planning-ui')source=source.replace('  window.LIV_PLANNING_UI={render};','  window.UI_TEST={state,selectedInput,dependenciesFor,readDraft,saveScenario,volumeTable,createManual,editManualTask,saveManualFact,saveQuantity,savePeriodPlan,saveKDLinks,savePlanningReport,saveNamedScenario,loadNamedScenario,verifyStorage};\n  window.LIV_PLANNING_UI={render};');
     vm.runInContext(source,c,{filename:file});
   }
+  if(catalog){const C=c.window.LIV_CATALOG_IMPORT;C.review=async(p,records)=>{const plan=C.prepare(p,records);return {plan,decisions:C.defaultDecisions(plan)};};}
   c.renderSchedule=c.window.renderSchedule;
   const el=id=>document.getElementById(id);
   function set(id,value){const e=el(id);e.value=value;}
@@ -275,3 +277,18 @@ test('Ведомость: ошибка сохранения откатывает
  const e=setup();e.c.project.buildings=[{id:'B',name:'Корпус'}];e.c.window.LIV_PLANNING_UI.render();const a=catalogActions(e);a.field('workKind','WK-MASONRY','change');a.field('workName','Кладка');a.field('workUnit','м³');e.c.saveProject=async()=>{throw Error('Нет места');};await a.click('save-work');assert.equal(e.c.project.works.length,0);assert.match(a.root().textContent,/Нет места/);e.c.saveProject=async()=>{};await a.click('save-work');const w=e.c.project.works[0];e.c.window.LIV_WORK_CATALOG.addVolume(e.c.project,{buildingId:'B',workId:w.id,quantity:145.13,unit:'м³',effectiveDate:'2026-10-01'});const c=e.c.window.LIV_PLANNING_UI.context(),rows=e.c.window.LIV_WORK_CATALOG.model(e.c.project,{from:'2026-10-01',to:'2026-10-23'}),html=e.c.window.LIV_WORK_CATALOG_UI.table(c,{columns:['total'],page:0},rows,{all:true,actions:false});assert.match(html,/Итого Кладка/);assert.match(html,/<td class="liv-numeric-cell">145,13<\/td>/);assert.equal((html.match(/145,13/g)||[]).length,2);
 });
 test('Вид работ: подземные этажи остаются в рабочей таблице и отчёте по фронтам', {skip:!domPath},()=>{const e=setup();e.c.project.buildings=[{id:'B',name:'Корпус'}];const C=e.c.window.LIV_WORK_CATALOG,w=C.saveWork(e.c.project,{name:'Кладка',unit:'м³',workKindId:'WK-MASONRY'});C.addVolume(e.c.project,{buildingId:'B',workId:w.id,block:'Блок 1',floor:'-1',quantity:100,unit:'м³',effectiveDate:'2026-10-01'});e.c.window.LIV_PLANNING_UI.render();const c=e.c.window.LIV_PLANNING_UI.context();c.state.workKinds=['WK-MASONRY'];const rows=e.c.window.LIV_WORKSPACE.model(c,{source:'fronts'});assert.equal(rows.length,1);assert.equal(rows[0].t.floor,'-1');assert.equal(rows[0].t.block,'Блок 1');assert.equal(rows[0].values.Объем,100);});
+
+test('Сквозное принятие графика и общий отбор Паркинга; галочка итогов действует на рабочую таблицу',{skip:!domPath},async()=>{
+ const e=setup(true),a=stage(e);a.state.dataRows=[['Кровля','Паркинг','15.10.2026','20.10.2026',100,'м²'],['Кровля','Главный корпус','15.10.2026','20.10.2026',200,'м²']];
+ await a.importSchedule();assert.equal((e.c.project.buildings||[]).length,0);await a.promoteTestImport();assert.equal(e.c.project.buildings.length,2);assert.equal(e.c.project.works.length,1);assert.equal(e.c.project.fronts.length,2);assert.ok(e.c.project.tasks.every(t=>t.frontId));assert.equal(e.c.project.fronts[0].totalQty,100);
+ const parking=e.c.project.buildings.find(b=>b.name==='Многоуровневый паркинг');
+ const pick=e.c.document.querySelector('[data-scope-filter="buildings"][value="'+parking.id+'"]');assert.ok(pick);pick.checked=true;pick.dispatchEvent(new e.Event('change',{bubbles:true}));
+ const c=e.c.window.LIV_PLANNING_UI.context(),W=e.c.window.LIV_WORKSPACE,rows=W.model(c,W.defaults());assert.equal(rows.length,1);assert.equal(rows[0].values.building,'Многоуровневый паркинг');assert.equal(W.totalRows(c,rows)[0].values.Объем,100);assert.ok(e.el('planningSurface-workspace').querySelector('tfoot'));
+ const toggle=e.c.document.querySelector('[data-scope-totals]');toggle.checked=false;toggle.dispatchEvent(new e.Event('change',{bubbles:true}));assert.equal(c.state.showTotals,false);assert.equal(e.el('planningSurface-workspace').querySelector('tfoot'),null);assert.equal(e.c.document.body.classList.contains('scope-hide-totals'),true);
+});
+test('График подрядчика: новый подрядчик и общий объект создаются при принятии, редакция сохраняет группу',{skip:!domPath},async()=>{
+ const e=setup(true),a=stage(e);e.set('scheduleNewOrganization','КСБ');e.set('scheduleDefaultBuilding','Паркинг');a.state.dataRows[0][1]='';
+ await a.importSchedule();assert.equal((e.c.project.organizations||[]).length,0);await a.promoteTestImport();assert.equal(e.c.project.organizations.length,1);assert.equal(e.c.project.buildings[0].name,'Многоуровневый паркинг');assert.equal(e.c.project.tasks[0].organizationId,e.c.project.organizations[0].id);const key=e.c.project.scheduleVersions[0].scheduleKey;
+ await a.importSchedule();await a.promoteTestImport();assert.equal(e.c.project.organizations.length,1);assert.equal(e.c.project.scheduleVersions[0].scheduleKey,key);assert.equal(e.c.project.scheduleVersions.filter(v=>v.isCurrent).length,1);
+});
+test('Факт показывает статусную запись без выдуманного объёма и фильтрует журнал по объекту',{skip:!domPath},async()=>{const e=setup(true),a=stage(e);await a.importSchedule();await a.promoteTestImport();const f=e.c.project.fronts[0],w=e.c.project.works[0];e.c.window.LIV_CONSTRUCTION_FACTS.observation(e.c.project,{data:{work:w.name,status:'В работе'},front:f,date:'2026-10-20',source:{file:'Учебный.csv',sheet:'Факт',row:2}});e.c.window.LIV_PLANNING_UI.render();const journal=e.el('constructionFactJournal');assert.ok(journal);assert.match(journal.textContent,/В работе/);assert.match(journal.textContent,/Учебный.csv/);assert.equal(e.c.project.progressFacts[0].quantity,null);const state=e.c.window.LIV_PLANNING_UI.context().state;state.buildings=['ДРУГОЙ'];e.c.window.LIV_PLANNING_UI.render();assert.match(e.el('constructionFactJournal').textContent,/Строк: 0/);});

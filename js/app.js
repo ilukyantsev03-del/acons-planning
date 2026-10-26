@@ -2451,6 +2451,7 @@ function renderElements() {
 
           element.active !==
             false &&
+          (!window.LIV_CONTEXT?.active?.()||window.LIV_CONTEXT.recordMatches(project,element,window.LIV_CONTEXT.active().state))&&
 
           (
             buildingId ===
@@ -6383,7 +6384,7 @@ function renderCustomSection(
 
 
   const fronts =
-    activeFronts();
+    activeFronts().filter(frontInSharedScope);
 
 
   panel.innerHTML = `
@@ -6624,7 +6625,7 @@ function exportCustomSectionExcel(
 
 
   const rows =
-    activeFronts()
+    activeFronts().filter(frontInSharedScope)
       .map(
         front => {
 
@@ -6920,7 +6921,7 @@ function exportCurrentViewExcel() {
   } else {
 
     rows =
-      activeFronts()
+      activeFronts().filter(frontInSharedScope)
         .map(
           front => ({
 
@@ -8822,6 +8823,10 @@ function bindUi() {
     analyzeImport
   );
 
+
+  bindClick('restoreImportProfileBtn',restoreImportProfile);
+  bindChange('importResourcesTotal',()=>{importRows=[];$('commitImportBtn').disabled=true;});
+  for(const key of ['building','organization','workKind','unit'])bindChange('importDefault-'+key,()=>{importRows=[];$('commitImportBtn').disabled=true;});
 
   bindClick(
     'commitImportBtn',
