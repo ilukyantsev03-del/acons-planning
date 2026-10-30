@@ -27,3 +27,13 @@ test('Большой график: страницы, поиск, скрытые 
  let m=G.build(opts);assert.equal(m.rows.length,100);assert.equal(m.pages,3);assert.equal(m.hiddenLinks,1);m=G.build(opts,{search:'нужная'});assert.equal(m.rows[0].id,'204');assert.equal(r.size,205);assert.equal(G.build(opts,{page:99}).rows.length,5);assert.equal(G.build(opts,{critical:true}).rows.length,1);
  assert.match(G.render(opts,{search:'нет такого'}),/Нет работ/);assert.equal(G.build({...opts,calculated:false},{critical:true,moved:true}).total,205);
 });
+test('Две версии: единая шкала, добавленные и отсутствующие строки, ручные соответствия и отсутствие изменения источника',()=>{
+ const {G}=api(),old={id:'old',name:'Старая работа',building:'Паркинг'},now={id:'now',name:'Новая работа',building:'Паркинг'},before={start:'2026-10-01',finish:'2026-10-10'},after={start:'2026-10-04',finish:'2026-10-17'},rows=[{old,now,before,after,delta:7,status:'Соответствие подтверждено'},{old:{id:'removed',name:'Отсутствующая'},before,after:{},status:'Отсутствует'},{now:{id:'added',name:'Добавленная'},before:{},after,status:'Добавлено'}],options={tasks:[now],base:new Map([['now',after]]),after:new Map([['now',after]]),comparisons:rows,leftLabel:'Первая <версия>',rightLabel:'Вторая'},source=JSON.stringify(rows);
+ const v=G.versionView(options),m=G.build(v);assert.equal(m.total,3);assert.equal(m.axis.from,'2026-10-01');assert.equal(m.axis.to,'2026-10-17');assert.equal(v.base.size,2);assert.equal(v.after.size,2);assert.equal(v.changes.length,1);assert.equal(v.tasks[1].openId,'');assert.equal(v.tasks[0].openId,'now');
+ const h=G.render(options,{view:'versions'});assert.match(h,/Первая &lt;версия&gt;/);assert.match(h,/Отсутствующая/);assert.match(h,/Добавленная/);assert.match(h,/\+7 кал. дн./);assert.match(h,/data-gantt-task="now"/);assert.equal(JSON.stringify(rows),source);assert.equal(options.base.size,1);
+});
+test('Только изменения: неизменённое подтверждённое соответствие скрыто, неоднозначность и объём остаются',()=>{
+ const {G}=api(),d={start:'2026-10-01',finish:'2026-10-03'},t={id:'a',name:'Работа',progressPercent:0},r={old:t,now:{...t,id:'b'},before:d,after:d,delta:0,status:'Соответствие подтверждено'},options={comparisons:[r,{...r,scheduleVolumeDelta:10},{...r,status:'Требует сопоставления'}]};
+ assert.equal(G.build(G.versionView(options),{changed:true}).total,2);assert.equal(G.versionView(options).changes.length,0);
+ assert.match(G.render({tasks:[],base:new Map(),after:new Map(),comparisons:[]},{view:'versions'}),/data-gantt-action="working"/);
+});
