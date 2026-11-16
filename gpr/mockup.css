@@ -15,3 +15,11 @@
 
 /* Clip routes to the measured calendar columns; SVG and bars share one origin. */
 .mock-link-clip{position:absolute;overflow:hidden;pointer-events:none;z-index:5}.mock-link-clip .mock-link-layer{left:0;top:0;overflow:hidden}
+
+/* Distinguish project, main sections and nested groups. */
+.mock-table .summary.root td{background-color:#34404c;border-top:2px solid #8195ac;border-bottom:2px solid #8195ac}
+.mock-table .summary.root .mock-name{box-shadow:inset 5px 0 #9bb3ce}
+.mock-table .summary[data-depth="1"] td{background-color:#35332e;border-top:5px solid var(--surface);border-bottom:1px solid #746b58}
+.mock-table .summary[data-depth="1"] .mock-name{box-shadow:inset 5px 0 #b79459}
+.mock-table .summary[data-depth="2"] td{background-color:#2b3038;border-top:1px solid #58616e;border-bottom:1px solid #454c57}
+.mock-table .summary[data-depth="2"] .mock-name{box-shadow:inset 3px 0 #748296}
