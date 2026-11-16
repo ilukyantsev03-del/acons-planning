@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ГПР · Графики работ</title>
+
+
+
+
+
+<link rel="stylesheet" href="style.css?v=20261116-1">
+</head>
+<body>
+<div class="banner" id="banner"></div>
+<div class="top">
+  <div class="accessbar"><label>График <select id="scheduleSelect" aria-label="График"><option>Загрузка…</option></select></label><span id="accessStatus" role="status">Подключение…</span><span id="saveStatus" role="status"></span><span class="spacer"></span><button class="btn" id="reloadSchedule">Обновить</button><button class="btn" id="loginButton">Войти для редактирования</button><button class="btn" id="logoutButton" hidden>Выйти</button></div><div class="titlebar">
+    <h1 id="ttl">График фасадных работ</h1>
+    <span class="today">сегодня <input type="date" id="statusDate" title="Дата, на которую считаются отставания"></span>
+    <span class="today">срок сдачи <input type="date" id="deadline" title="Плановый срок окончания всех работ — от него считается критический путь проекта"></span>
+    <span class="spacer"></span>
+    <button class="btn" id="bAdd" hidden>+ Работа</button>
+    <button class="btn" id="bStages" hidden>Порядок этапов</button>
+    <button class="btn" id="bRates">Выработки</button>
+    <button class="btn" id="bBase" hidden title="Сохранить текущие сроки как базовый план">Зафиксировать базовый план</button>
+    <button class="btn" id="bCsv">Таблица CSV</button><button class="btn dark" id="bDl" hidden>Скачать график</button>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <button class="btn mobonly" id="bCtl" aria-expanded="false">Фильтры и вид</button>
+  <div id="ctl"><div class="controls">
+    <span class="lbl">Группировать</span>
+    <div class="seg" id="segGroup">
+      <button data-v="stage" class="on">Этап</button><button data-v="type">Вид работ</button><button data-v="contractor">Подрядчик</button><button data-v="none">Списком</button>
+    </div>
+    <select id="fCrit" aria-label="Критический путь">
+      <option value="off">Критический путь: скрыт</option><option value="project">Критический путь проекта</option><option value="stage">Критический путь по этапам</option>
+    </select>
+    <select id="fSort" aria-label="Порядок работ"><option value="gpr">Порядок как в ГПР</option><option value="date">По дате начала</option></select>
+    <select id="fCat" aria-label="Категория">
+      <option value="">Все работы</option><option value="facade">Только фасад</option><option value="glass">Только светопрозрачные</option><option value="prep">Леса и подготовка</option><option value="other">Смежные работы и вехи</option>
+    </select>
+    <select id="fStage" aria-label="Этап"></select>
+    <select id="fType" aria-label="Вид работ"></select>
+    <select id="fCon" aria-label="Подрядчик"></select>
+    <input class="inp" id="fSearch" placeholder="Поиск по работам" aria-label="Поиск">
+    <div class="seg" id="segZoom">
+      <button data-v="week">Недели</button><button data-v="month" class="on">Месяцы</button><button data-v="year">Год</button>
+    </div>
+    <button class="btn" id="bToday">К сегодня</button>
+    <button class="btn" id="bLinks" aria-pressed="false">Показать связи</button>
+    <button class="btn" id="bCollapse">Свернуть все</button>
+    <button class="btn" id="bReset">Сбросить фильтры</button>
+  </div>
+  <div class="legend">
+    <span><i class="lg-fac"></i>Фасад</span><span><i class="lg-gla"></i>Светопрозрачные</span><span><i class="lg-pre"></i>Леса и подготовка</span><span><i class="lg-oth"></i>Смежные работы</span><span><i class="lg-ms"></i>Веха</span><span><i class="lg-crit"></i>Критический путь</span><span><i class="lg-dl"></i>Срок сдачи</span>
+    <span><i class="lg-over"></i>Срок прошёл, не закрыто</span><span><i class="lg-late"></i>Отстаёт от плана</span>
+    <span><i class="lg-today"></i>Сегодня</span><span>Тёмная часть полосы — выполнено</span><span><i class="lg-bl"></i>Базовый план</span>
+    <span title="Полоса под шкалой дат: один вид работ идёт одновременно на нескольких захватках">Один вид работ: <i class="lg-l2" style="margin-left:5px"></i>в 2 местах</span><span><i class="lg-l3"></i>в 3 и больше</span>
+  </div></div>
+</div>
+<div class="gwrap" id="gwrap"><div class="empty" id="loading">Загружаю график…</div></div>
+
+<dialog id="loginDialog"><form id="loginForm"><h2>Вход владельца</h2><p>Просмотр и фильтры доступны без входа.</p><label>Email<input id="loginEmail" type="email" autocomplete="username" required></label><label>Пароль<input id="loginPassword" type="password" autocomplete="current-password" required></label><p id="loginError" role="alert"></p><div class="g2"><button class="btn" type="button" id="loginCancel">Отмена</button><button class="btn dark" type="submit" id="loginSubmit">Войти</button></div></form></dialog><aside class="drawer" id="drawer" aria-label="Карточка работы"></aside>
+<div class="modal-bg" id="modalBg"><div class="modal" id="modal"></div></div>
+<div class="tip" id="tip"></div>
+<div class="toast" id="toast"></div>
+
+<script type="application/json" id="fileData">{"tasks": [], "stages": [], "settings": {}, "baseline": {"items": {}}}</script>
+
+<script src="vendor/supabase-2.49.1.js"></script><script src="config.js?v=20261116-1"></script><script src="store.js?v=20261116-1"></script><script src="app.js?v=20261116-1"></script></body>
+</html>
