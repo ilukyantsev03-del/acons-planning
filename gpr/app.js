@@ -236,12 +236,12 @@ function render(){
     if(lv>0)ld+=`<div class="lseg" style="left:${i*px}px;width:${(j-i)*px}px;background:var(--l${lv})" title="${fmt(T0+i)}–${fmt(T0+j-1)}: ${esc(who[i])}"></div>`;i=j}
   // body
   let body='',y=0; rowY={}; visibleIds=[];
-  const RH=46, GH=30;
+  const RH=48, GH=44;
   for(const g of gs){
     if(g.label!==null){
       const closed=ui.collapsed.has(g.key);
       const done=g.items.filter(t=>t._m.complete).length;
-      body+=`<div class="row grp${closed?' closed':''}" data-g="${esc(g.key)}"><div class="lab"><span class="caret">▾</span><div class="t"><div class="n" title="${esc(g.label)}${g.note?'\nПримечание: '+esc(g.note):''}">${esc(g.label)} <span class="cnt">${g.items.length} работ, выполнено ${done}${g.note?', есть примечание':''}</span></div></div><span class="cr"></span><span class="cr"></span><span class="cd">${g.s!=null?fmt(g.s):''}</span><span class="cd">${g.f!=null?fmt(g.f):''}</span><span class="cn">${g.s!=null?g.f-g.s+1:''}</span><span class="p"></span></div><div class="trk" style="width:${W}px">${g.s!=null?`<div class="gbar" style="left:${X(g.s)}px;width:${(g.f-g.s+1)*px}px"></div>`:''}</div></div>`;
+      body+=`<div class="row grp${ui.group==='stage'?' stage-group':''}${closed?' closed':''}" data-g="${esc(g.key)}"><div class="lab"><span class="caret">▾</span><div class="t"><div class="n" title="${esc(g.label)}${g.note?'\nПримечание: '+esc(g.note):''}">${esc(g.label)} <span class="cnt">${g.items.length} работ, выполнено ${done}${g.note?', есть примечание':''}</span></div></div><span class="cr"></span><span class="cr"></span><span class="cd">${g.s!=null?fmt(g.s):''}</span><span class="cd">${g.f!=null?fmt(g.f):''}</span><span class="cn">${g.s!=null?g.f-g.s+1:''}</span><span class="p"></span></div><div class="trk" style="width:${W}px">${g.s!=null?`<div class="gbar" style="left:${X(g.s)}px;width:${(g.f-g.s+1)*px}px"></div>`:''}</div></div>`;
       y+=GH; if(closed) continue;
     }
     for(const t of g.items){
@@ -282,7 +282,7 @@ function render(){
 }
 function drawLinks(){
   const svg=$('links'); if(!svg) return;
-  let out='<defs><marker id="ar" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L6,3L0,6z" fill="currentColor" stroke="none"/></marker></defs>';
+  let out='<defs><marker id="ar" viewBox="0 0 6 6" refX="6" refY="3" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto"><path d="M0,0L6,3L0,6z" class="arrowhead" fill="context-stroke" stroke="none"/></marker></defs>';
   const vis=new Set(visibleIds);
   for(const id of visibleIds){
     const t=tasks[id], r=S[id]; if(!r) continue;
@@ -292,11 +292,11 @@ function drawLinks(){
       const cr=ui.crit!=='off'&&isCrit(t)&&tasks[p.id]&&isCrit(tasks[p.id]);
       if(!ui.links&&!hl&&!cr) continue;
       const pr=S[p.id]; if(!pr) continue;
-      const fromX=(p.type==='НН'||p.type==='НО')?X(pr.s):X(pr.f+1), toX=(p.type==='ОО'||p.type==='НО')?X(r.f+1):X(r.s);
-      const y1=rowY[p.id], y2=rowY[id];
-      const midX=Math.max(fromX+6, Math.min(toX-6, fromX+6));
-      const d=(p.type==='ОО'||p.type==='НО')?`M${fromX},${y1} H${Math.max(fromX,toX)+8} V${y2} H${toX}`:`M${fromX},${y1} H${midX} V${y2} H${toX}`;
-      out+=`<path class="${hl?'hl':cr?'cr':''}" style="color:${hl?'var(--glaB)':cr?'var(--critB)':'var(--muted)'}" d="${d}" marker-end="url(#ar)"/>`;
+      const box=(task,result)=>({start:X(result.s),end:X(result.f+1),y:rowY[task.id],milestone:!!task.ms,startDay:result.s,finishDay:result.f,dayWidth:px});
+      const link=window.GPR_LINKS.route(box(tasks[p.id],pr),box(t,r),p.type,+p.lag||0);
+      const source=link.reversed?t:tasks[p.id], target=link.reversed?tasks[p.id]:t;
+      const title=`${source.name} → ${target.name} · ${link.type}${p.lag?' · лаг '+p.lag+' дн.':''}${link.reversed?' · обратная запись, показано по ходу событий':''}`;
+      out+=`<path class="dependency ${hl?'hl':cr?'cr':''}" data-from="${esc(source.id)}" data-to="${esc(target.id)}" data-type="${link.type}" data-reversed="${link.reversed}" d="${link.d}" marker-end="url(#ar)"><title>${esc(title)}</title></path>`;
     }
   }
   svg.innerHTML=out;
