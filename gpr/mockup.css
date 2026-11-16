@@ -30,3 +30,11 @@
 
 .private-locked .mock-top .mock-toolbar,.private-locked .mock-top .kpis,.private-locked .mock-top .mock-legend,.private-locked #print,.private-locked #export{display:none!important}
 .private-locked #workspace .m-empty{max-width:680px;margin:50px auto;padding:32px;background:var(--surface2);border:1px solid var(--line);border-radius:12px;font-size:17px;line-height:1.6}
+
+/* Work categories tint rows; summary grouping and status accents stay distinct. */
+.finishing-profile .mock-table tbody tr.row-finishing>td{background-color:#2b2822}
+.finishing-profile .mock-table tbody tr.row-engineering>td{background-color:#202b37}
+.finishing-profile .row-engineering .mock-bar{background:var(--gla);border-color:var(--glaB)}
+.finishing-profile .row-engineering .mock-bar .done{background:var(--glaD)}
+.category-finishing{background:var(--fac)}.category-engineering{background:var(--gla)}
+@media print{.print-table .row-finishing .print-name{background:#fff3dd!important}.print-table .row-engineering .print-name{background:#e7f0fb!important}.print-table .row-engineering .print-work{background:linear-gradient(to bottom,transparent 15%,#9bb5d4 15%,#9bb5d4 55%,transparent 55%)!important}}
