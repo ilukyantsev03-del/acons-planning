@@ -27,3 +27,6 @@
 .mock-table th.timeline{position:sticky;top:0;z-index:25;background-color:var(--surface2)}
 
 .mock-top [hidden]{display:none!important}.finishing-filters select{max-width:260px}.finishing-cut{min-width:1500px}.finishing-cut th:first-child{width:330px}.finishing-cut th{width:140px}.finishing-profile .mock-name small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mock-table .summary[data-depth="3"] td{background-color:#252a31;border-top:1px solid #454d58}
+
+.private-locked .mock-top .mock-toolbar,.private-locked .mock-top .kpis,.private-locked .mock-top .mock-legend,.private-locked #print,.private-locked #export{display:none!important}
+.private-locked #workspace .m-empty{max-width:680px;margin:50px auto;padding:32px;background:var(--surface2);border:1px solid var(--line);border-radius:12px;font-size:17px;line-height:1.6}
