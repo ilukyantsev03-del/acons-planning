@@ -18,3 +18,7 @@
 @media print{.report-actions{display:none!important}.report-page{width:100%;margin:0;padding:0;box-shadow:none}}
 
 .report-table .report-dates{font-size:8pt;white-space:nowrap}.report-dates span{display:block;line-height:1.45}.report-base-dates{color:#526175}.report-calendar-wrap{position:relative}.report-arrows{position:absolute;top:0;pointer-events:none;overflow:hidden;z-index:4}.report-arrows svg{display:block;overflow:hidden}.report-arrows path{fill:none;stroke:#38526e;stroke-width:1.15}.report-arrows .arrow-fill{fill:#38526e;stroke:none}.report-table .report-link-note{font-size:7pt;color:#38526e;white-space:normal;line-height:1.2}.report-cut-table th{text-align:center}.report-cut-table th:first-child{text-align:left}.report-cut-table td{font-variant-numeric:tabular-nums;font-size:8.5pt}.report-late{color:#b52e25}.report-early{color:#277743}.report-cut .report-meta{font-size:9pt}.report-deps{display:none!important}
+
+.report-dates .report-current-dates{background:#e8f2fe;color:#173d69;border-left:0.6mm solid #4c83b8;padding-left:1mm;font-weight:650}.report-dates .report-base-dates{background:#f0f2f5;color:#596677;border-left:0.6mm solid #a4adba;padding-left:1mm;margin-top:0.6mm}.report-cut-table thead tr:first-child th:nth-child(3){background:#e8ecf2!important}.report-cut-table thead tr:first-child th:nth-child(4){background:#dceafb!important}
+
+.report-gridline{position:absolute;top:0;bottom:0;width:0.2mm;background:#dbe2eb!important;pointer-events:none}

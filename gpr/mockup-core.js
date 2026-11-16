@@ -1,7 +1,7 @@
 'use strict';
 (function(root){
 const MIN=60000,DAY=86400000,copy=v=>JSON.parse(JSON.stringify(v));
-const time=s=>typeof s==='number'?s:Date.parse(s.length===10?s+'T00:00:00Z':s.replace(/Z$/,'')+'Z');
+const time=s=>typeof s==='number'?s:Date.parse(s.length===10?s+'T00:00:00Z':/(?:Z|[+-]\d{2}:\d{2})$/i.test(s)?s:s+'Z');
 const stamp=n=>new Date(n).toISOString().slice(0,19),date=n=>new Date(time(n)).toISOString().slice(0,10);
 function intervals(day,cal){const d=date(day),ex=(cal.exceptions||[]).find(x=>d>=x.from&&d<=x.to);return ex?(ex.working?ex.hours:[]):cal.days[String(new Date(time(d)).getUTCDay()||7)]||[];}
 function bounds(day,cal){const base=time(date(day));return intervals(day,cal).map(([a,b])=>{const hm=s=>{const [h,m]=s.split(':').map(Number);return(h*60+m)*MIN;};return[base+hm(a),base+hm(b)];});}
