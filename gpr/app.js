@@ -54,8 +54,8 @@ function compute(){
     const facts=t.facts||{}; let fsum=0; for(const k in facts) fsum+=+facts[k]||0;
     const done=(+t.open||0)+fsum;
     const vol=+t.vol||0;
-    const pct=vol?Math.min(1,done/vol):(t.closed?1:Math.max(0,Math.min(1,(+t.openingPercent||0)/100)));
-    const complete=vol?done>=vol-1e-9:!!t.closed;
+    const manual=t.progressMode==='percent',pct=manual?Math.max(0,Math.min(1,(+t.manualPercent||0)/100)):vol?Math.min(1,done/vol):(t.closed?1:Math.max(0,Math.min(1,(+t.openingPercent||0)/100)));
+    const complete=manual?pct>=1:vol?done>=vol-1e-9:!!t.closed;
     let plan=null, st='nodate';
     if(r){
       plan=vol?vol*Math.max(0,Math.min(1,(TODAY-r.s+1)/t.dur)):null;
@@ -66,7 +66,7 @@ function compute(){
       else st='run';
     } else if(complete) st='done';
     const b=baseline.items&&baseline.items[id];
-    t._m={done,fsum,vol,pct,complete,plan,st,bs:b?dn(b[0]):null,bf:b?dn(b[1]):null};
+    t._m={done,fsum,vol,manual,pct,complete,plan,st,bs:b?dn(b[0]):null,bf:b?dn(b[1]):null};
   }
   cpm();
 }
@@ -188,7 +188,7 @@ function groups(list){
     if(!map.has(k)) map.set(k,{key:k,label:l,o,items:[],note:ui.group==='stage'?gn:''});
     map.get(k).items.push(t);
   }
-  const gs=[...map.values()];
+  const gs=[...map.values()];for(const g of gs)g.percent=g.items.reduce((sum,t)=>sum+t._m.pct*100,0)/(g.items.length||1);
   gs.forEach(g=>{sortTasks(g.items);const ss=g.items.map(t=>S[t.id]).filter(Boolean);g.s=ss.length?Math.min(...ss.map(r=>r.s)):null;g.f=ss.length?Math.max(...ss.map(r=>r.f)):null});
   gs.sort((a,b)=>ui.group==='stage'?a.o-b.o:ui.group==='contractor'?(a.o-b.o||a.label.localeCompare(b.label,'ru')):((a.s??1e9)-(b.s??1e9)));
   return gs;
@@ -243,13 +243,13 @@ function render(){
     if(g.label!==null){
       const closed=ui.collapsed.has(g.key);
       const done=g.items.filter(t=>t._m.complete).length;
-      body+=`<div class="row grp${ui.group==='stage'?' stage-group':''}${closed?' closed':''}" data-g="${esc(g.key)}"><div class="lab"><span class="caret">▾</span><div class="t"><div class="n" title="${esc(g.label)}${g.note?'\nПримечание: '+esc(g.note):''}">${esc(g.label)} <span class="cnt">${g.items.length} работ, выполнено ${done}${g.note?', есть примечание':''}</span></div></div><span class="cr"></span><span class="cr"></span><span class="cd">${g.s!=null?fmt(g.s):''}</span><span class="cd">${g.f!=null?fmt(g.f):''}</span><span class="cn">${g.s!=null?g.f-g.s+1:''}</span><span class="p"></span></div><div class="trk" style="width:${W}px">${g.s!=null?`<div class="gbar" style="left:${X(g.s)}px;width:${(g.f-g.s+1)*px}px"></div>`:''}</div></div>`;
+      body+=`<div class="row grp${ui.group==='stage'?' stage-group':''}${closed?' closed':''}" data-g="${esc(g.key)}"><div class="lab"><span class="caret">▾</span><div class="t"><div class="n" title="${esc(g.label)}${g.note?'\nПримечание: '+esc(g.note):''}">${esc(g.label)} <span class="cnt">${g.items.length} работ, выполнено ${done}${g.note?', есть примечание':''}</span></div></div><span class="cr"></span><span class="cr"></span><span class="cd">${g.s!=null?fmt(g.s):''}</span><span class="cd">${g.f!=null?fmt(g.f):''}</span><span class="cn">${g.s!=null?g.f-g.s+1:''}</span><span class="p" title="Средняя готовность работ группы">${nf(g.percent,1)}%</span></div><div class="trk" style="width:${W}px">${g.s!=null?`<div class="gbar" style="left:${X(g.s)}px;width:${(g.f-g.s+1)*px}px"></div>`:''}</div></div>`;
       y+=GH; if(closed) continue;
     }
     for(const t of g.items){
       const r=S[t.id], m=t._m;
       rowY[t.id]=y+RH/2; visibleIds.push(t.id);
-      const pc=m.vol||t.closed!=null?Math.round(m.pct*100)+'%':'';
+      const pc=Math.round(m.pct*100)+'%';
       let tr='';
       const crit=ui.crit!=='off'&&isCrit(t), dim=ui.crit!=='off'&&!crit;
       if(r&&t.ms){
@@ -259,7 +259,7 @@ function render(){
         tr+=`<div class="${cls}" data-id="${t.id}" style="left:${X(r.s)}px;width:${Math.max(t.dur*px,3)}px"><div class="dn" style="width:${m.pct*100}%"></div><div class="rz"></div></div>`;
       } else tr+=`<div class="nodate" style="left:${X(TODAY)+8}px">сроки не заданы</div>`;
       if(m.bs!=null) tr+=`<div class="bl" style="left:${X(m.bs)}px;width:${(m.bf-m.bs+1)*px}px"></div>`;
-      body+=`<div class="row${ui.sel===t.id?' sel':''}" data-id="${t.id}"><div class="lab"><div class="t"><div class="n" title="${esc(t.name)}">${esc(t.name)}</div><div class="s">${esc(subtitle(t))}</div></div>${crit&&FL[t.id]<0?`<span class="fl" title="Отрицательный резерв: не успевает к сроку">${FL[t.id]}</span>`:''}<span class="cr calc" title="${esc(rateUnit(t))}">${rateCalc(t)!=null?nf(rateCalc(t),1):'—'}<small class="rate-unit">${!t.ms&&t.vol?esc(rateUnit(t)):''}</small></span><span class="cr">${t.vol?(canWrite?`<input class="ratein${t.rateExp>0?' set':''}" type="number" step="any" min="0" data-id="${t.id}" value="${t.rateExp??''}" placeholder="${rateFact(t)!=null?nf(rateFact(t),1):''}" aria-label="Заданная выработка" title="${rateFact(t)!=null?'По факту сейчас: '+nf(rateFact(t),1)+' '+esc(rateUnit(t))+'. ':''}Введите свою выработку, ${esc(rateUnit(t))}">`:(t.rateExp>0?nf(t.rateExp,1):(rateFact(t)!=null?nf(rateFact(t),1):''))):''}</span><span class="cd">${r?fmt(r.s):'—'}</span><span class="cd">${r?fmt(r.f):'—'}</span><span class="cn">${canWrite&&!t.stretch&&!t.ms?`<input class="durin" type="number" min="1" data-id="${t.id}" value="${t.dur??''}" aria-label="Длительность, дней" title="Длительность, календарных дней — измените и нажмите Enter">`:(r?(r.f-r.s+1):'—')}</span><span class="p ${pctClass(t)}">${pc}</span></div><div class="trk" style="width:${W}px">${tr}</div></div>`;
+      body+=`<div class="row${ui.sel===t.id?' sel':''}" data-id="${t.id}"><div class="lab"><div class="t"><div class="n" title="${esc(t.name)}">${esc(t.name)}</div><div class="s">${esc(subtitle(t))}</div></div>${crit&&FL[t.id]<0?`<span class="fl" title="Отрицательный резерв: не успевает к сроку">${FL[t.id]}</span>`:''}<span class="cr calc" title="${esc(rateUnit(t))}">${rateCalc(t)!=null?nf(rateCalc(t),1):'—'}<small class="rate-unit">${!t.ms&&t.vol?esc(rateUnit(t)):''}</small></span><span class="cr">${t.vol?(canWrite?`<input class="ratein${t.rateExp>0?' set':''}" type="number" step="any" min="0" data-id="${t.id}" value="${t.rateExp??''}" placeholder="${rateFact(t)!=null?nf(rateFact(t),1):''}" aria-label="Заданная выработка" title="${rateFact(t)!=null?'По факту сейчас: '+nf(rateFact(t),1)+' '+esc(rateUnit(t))+'. ':''}Введите свою выработку, ${esc(rateUnit(t))}">`:(t.rateExp>0?nf(t.rateExp,1):(rateFact(t)!=null?nf(rateFact(t),1):''))):''}</span><span class="cd">${r?fmt(r.s):'—'}</span><span class="cd">${r?fmt(r.f):'—'}</span><span class="cn">${canWrite&&!t.stretch&&!t.ms?`<input class="durin" type="number" min="1" data-id="${t.id}" value="${t.dur??''}" aria-label="Длительность, дней" title="Длительность, календарных дней — измените и нажмите Enter">`:(r?(r.f-r.s+1):'—')}</span><span class="p ${pctClass(t)}">${canWrite?`<input class="percentin" type="number" min="0" max="100" step="0.1" data-id="${t.id}" value="${Number((m.pct*100).toFixed(1))}" aria-label="Готовность, %">`:pc}</span></div><div class="trk" style="width:${W}px">${tr}</div></div>`;
       y+=RH;
     }
   }
@@ -310,7 +310,7 @@ function showTip(e,id){
   const t=tasks[id],r=S[id],m=t._m;
   const stl={done:'выполнено',over:'срок прошёл, не закрыто',late:'отстаёт от плана',run:'идёт',future:'не начато',nodate:'без сроков'}[m.st];
   tip.innerHTML=`<b>#${t.num} ${esc(t.name)}</b><br>${esc(stageOf(t)?.short||'')}${t.contractor?', '+esc(t.contractor):''}<br>${r?fmt(r.s)+' – '+fmt(r.f)+', '+(r.f-r.s+1)+' дн.':'сроки не заданы'}<br>`+
-   (m.vol?`Выполнено ${nf(m.done)} из ${nf(m.vol)} ${esc(t.unit)} (${Math.round(m.pct*100)}%)<br>План на ${fmt(TODAY)}: ${nf(m.plan)}<br>`:'')+
+   (m.manual?`Готовность задана вручную: ${nf(m.pct*100)}%<br>`:'')+(m.vol?`Учтённый объём: выполнено ${nf(m.done)} из ${nf(m.vol)} ${esc(t.unit)} (${Math.round(m.pct*100)}%)<br>План на ${fmt(TODAY)}: ${nf(m.plan)}<br>`:'')+
    (m.bf!=null&&r?`Сдвиг к базовому плану: ${r.f-m.bf>0?'+':''}${r.f-m.bf} дн.<br>`:'')+(FL[id]!=null?`Резерв времени: ${FL[id]} дн.${FL[id]<=0?' — критическая':''}<br>`:'')+`Статус: ${stl}`+(t.note?`<br><i>${esc(t.note.slice(0,160))}</i>`:'');
   tip.style.display='block'; moveTip(e);
 }
@@ -327,17 +327,18 @@ gw.addEventListener('click',e=>{
   const lab=e.target.closest('.row[data-id] .lab');
   if(lab){openDrawer(lab.parentElement.dataset.id)}
 });
+gw.addEventListener('change',async e=>{const input=e.target.closest('.percentin');if(!input||!canWrite)return;if(dirty){toast('Сначала сохраните или закройте карточку.');render();return;}const t=tasks[input.dataset.id],n=+input.value;if(!t||input.value===''||!Number.isFinite(n)||n<0||n>100){toast('Процент — число от 0 до 100.');render();return;}const next=clone(t);next.progressMode='percent';next.manualPercent=n;if(!next.vol)next.closed=n>=100;await saveTask(next,'Готовность и проценты групп обновлены');});
 gw.addEventListener('mouseover',e=>{const b=e.target.closest('.bar,.ms');if(b&&!drag)showTip(e,b.dataset.id)});
 gw.addEventListener('mousemove',e=>{if(tip.style.display==='block')moveTip(e)});
 gw.addEventListener('mouseout',e=>{if(e.target.closest('.bar,.ms'))hideTip()});
 gw.addEventListener('change',e=>{
   const inp=e.target.closest('.durin'); if(!inp||!canWrite) return;
-  const v=parseInt(inp.value), t=tasks[inp.dataset.id]; if(!t) return;
-  if(isNaN(v)||v<1){inp.value=t.dur??'';toast('Длительность — целое число дней, не меньше 1');return}
+  const v=Number(inp.value), t=tasks[inp.dataset.id]; if(!t) return;
+  if(!Number.isInteger(v)||v<1){inp.value=t.dur??'';toast('Длительность — целое число дней, не меньше 1');return}
   if(v===t.dur) return;
   const c=clone(t); c.dur=v; saveTask(c,`«${t.name.slice(0,40)}»: ${v} дн.`);
 });
-gw.addEventListener('keydown',e=>{if(e.target.classList&&(e.target.classList.contains('durin')||e.target.classList.contains('ratein'))&&e.key==='Enter')e.target.blur()});
+gw.addEventListener('keydown',e=>{if(e.target.classList&&(e.target.classList.contains('durin')||e.target.classList.contains('ratein')||e.target.classList.contains('percentin'))&&e.key==='Enter')e.target.blur()});
 gw.addEventListener('change',e=>{
   const inp=e.target.closest('.ratein'); if(!inp||!canWrite) return;
   const t=tasks[inp.dataset.id]; if(!t) return;
@@ -471,6 +472,7 @@ function renderDrawer(){
       <div class="f"><label>Объём</label><input id="dVol" type="number" step="any" value="${t.vol??''}"${dis}></div>
       <div class="f"><label>Выполнено ранее</label><input id="dOpen" type="number" step="any" value="${t.open||''}" title="Объём, сделанный до подённого учёта"${dis}></div>
     </div>
+    <div class="g2"><div class="f"><label>Готовность, %</label><input id="dPercent" type="number" min="0" max="100" step="0.1" value="${t.progressMode==='percent'?t.manualPercent??0:Math.round((tasks[t.id]?._m?.pct||0)*100)}"${dis}></div><div class="f"><label><input type="checkbox" id="dProgressByFacts" ${t.progressMode!=='percent'?'checked':''}${dis} style="width:auto"> Считать по факту объёма</label></div></div>
     ${!t.vol?`<div class="f"><label><input type="checkbox" id="dClosed"${t.closed?' checked':''}${dis} style="width:auto"> Работа закрыта (для работ без объёма)</label></div>`:''}
     ${t.vol&&!t.stretch&&!t.ms?`<div class="sect">Выработка</div>
     <div class="g2"><div class="f"><label>Единица расчёта</label><select id="dRateBasis"${dis}>${[['day','Общий темп за день'],['person','На человека за день'],['crew','На бригаду за день']].map(([v,l])=>`<option value="${v}" ${(t.rateBasis||'day')===v?'selected':''}>${l}</option>`).join('')}</select></div><div class="f"><label id="dResourceLabel">${t.rateBasis==='crew'?'Бригад':t.rateBasis==='person'?'Рабочих':'Количество ресурса'}</label><input id="dRateResources" type="number" min="1" step="1" value="${t.rateResources??''}" ${!t.rateBasis||t.rateBasis==='day'?'disabled':dis} placeholder="Укажите количество"></div></div><p class="rnote" id="dRateHelp">${esc(rateUnit(t))}. ${resourceFactor(t)?'Общий темп = заданная выработка × количество ресурса.':'Для расчёта укажите количество рабочих или бригад.'} Дни — календарные. Факт на человека требует отдельной истории численности.</p>
@@ -535,9 +537,9 @@ function readDraft(){
   t.unit=v('dUnit').trim();
   const vol=parseFloat(v('dVol')); t.vol=isNaN(vol)?null:vol;
   const op=parseFloat(v('dOpen')); t.open=isNaN(op)?0:op;
-  const du=parseInt(v('dDur')); t.dur=isNaN(du)||du<1?null:du;
+  const du=Number(v('dDur')); t.dur=!Number.isInteger(du)||du<1?null:du;
   t.cons=v('dCons')||null;
-  if($('dClosed')) t.closed=$('dClosed').checked;
+  if($('dClosed')) t.closed=$('dClosed').checked;if($('dPercent')){const n=Number(v('dPercent'));if(Number.isFinite(n)&&n>=0&&n<=100){t.manualPercent=n;t.progressMode=$('dProgressByFacts').checked?'volume':'percent';}}
   t.note=v('dNote');
   if($('dRateBasis')){t.rateBasis=$('dRateBasis').value;t.rateResources=Number($('dRateResources').value)||null;}
   if($('dRate')){const rv=parseFloat(($('dRate').value||'').replace(',','.')); t.rateExp=isNaN(rv)||rv<=0?null:rv}
@@ -551,6 +553,7 @@ function bindDrawer(){
   document.querySelectorAll('.succ a').forEach(a=>a.onclick=()=>{if(dirty&&!confirm('Изменения не сохранены. Перейти без сохранения?'))return;dirty=false;openDrawer(a.dataset.id)});
   if(!canWrite) return;
   $('drawer').querySelectorAll('.db input,.db select,.db textarea').forEach(el=>{if(el.id==='fDate'||el.id==='fVal')return;el.addEventListener('input',markDirty);el.addEventListener('change',markDirty)});
+  if($('dPercent'))$('dPercent').addEventListener('input',()=>{$('dProgressByFacts').checked=false;markDirty();});
   if($('dRateBasis')) $('dRateBasis').addEventListener('change',()=>{readDraft();draft.rateExp=null;dirty=true;renderDrawer();});
   if($('dRateApply')) $('dRateApply').onclick=()=>{
     readDraft(); if(!resourceFactor(draft)){toast('Укажите количество рабочих или бригад');return;} const rate=draft.rateExp||rateFact(draft);
@@ -737,11 +740,13 @@ async function refreshCut(){if(cutBusy)return;if(dirty){toast('Сначала с
 function renderFacadeCut(){if(cutState===false){$('gwrap').innerHTML='<div class="empty">На выбранную дату сохранённого состояния нет. Выберите текущую дату или более позднюю сохранённую редакцию.</div>';return;}const data=cutState||snapshot(),dates=cutState?cutSchedule(data):S,selected=new Set(filtered(false).map(t=>t.id));let rows=data.tasks.filter(t=>selected.has(t.id)||cutState&&!tasks[t.id]);const horizon=+$('lookAhead').value;if(horizon){const a=dn($('cutDate').value);rows=rows.filter(t=>dates[t.id]&&dates[t.id].s<=a+horizon-1&&dates[t.id].f>=a);}const delta=n=>n==null?'—':(n>0?'+':'')+n+' дн.';const cell=n=>`<td class="${n>0?'bad':n<0?'good':''}">${delta(n)}</td>`;const body=rows.map(t=>{const r=dates[t.id],b=baseline.items[t.id];return `<tr><td class="cut-name"><b>${esc(t.name)}</b><small>${esc(stages[t.stage]?.short||stages[t.stage]?.name||'')}${t.contractor?' · '+esc(t.contractor):''}</small></td><td>${!cutState&&canWrite&&!t.ms&&!t.stretch?`<input class="durin" type="number" min="1" data-id="${esc(t.id)}" value="${t.dur}" aria-label="Длительность, дней">`:r?r.f-r.s+1:'—'}</td><td>${b?fmt(dn(b[0])):'—'}</td><td>${b?fmt(dn(b[1])):'—'}</td><td>${r?fmt(r.s):'—'}</td><td>${r?fmt(r.f):'—'}</td>${cell(r&&b?r.s-dn(b[0]):null)}${cell(r&&b?r.f-dn(b[1]):null)}</tr>`;}).join('');$('gwrap').innerHTML=`<table class="facade-cut"><thead><tr><th>Работа / местоположение</th><th>Дней</th><th>Базовое начало</th><th>Базовое окончание</th><th>Текущее начало</th><th>Текущее окончание</th><th>Сдвиг начала</th><th>Сдвиг окончания</th></tr></thead><tbody>${body}</tbody></table>`;}
 $('cutDate').value=isoOf(TODAY);$('compact').onchange=()=>{document.body.classList.toggle('compact-rows',$('compact').checked);render();};document.body.classList.add('compact-rows');$('nameWidth').oninput=()=>{document.documentElement.style.setProperty('--name-width',$('nameWidth').value+'px');document.documentElement.style.setProperty('--lw',((+$('nameWidth').value||460)+362)+'px');render();};$('lookAhead').onchange=()=>{$('segGroup').querySelectorAll('button').forEach(b=>b.disabled=!!$('lookAhead').value);if($('lookAhead').value){ui.group='none';$('segGroup').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v==='none'));ui.zoom='week';$('segZoom').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v==='week'));}render();};$('includeOverdue').onchange=render;$('refreshCut').onclick=refreshCut;$('cutDate').onchange=refreshCut;
 $('facadeViews').querySelectorAll('button').forEach(b=>b.onclick=()=>{facadeView=b.dataset.view;$('facadeViews').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));if(facadeView==='cut')refreshCut();else render();});
-function facadePrintRows(){const data=cutState&&facadeView==='cut'?cutState:snapshot(),dates=cutState&&facadeView==='cut'?cutSchedule(data):S,by=new Map(data.tasks.map(t=>[t.id,t])),rows=[];for(const g of groups(filtered(false))){if(g.label!==null)rows.push({name:g.label,summary:true,start:g.s==null?null:isoOf(g.s),finish:g.f==null?null:isoOf(g.f),duration:g.s==null?'—':g.f-g.s+1});if($('printScope').value==='visible'&&ui.collapsed.has(g.key)&&facadeView!=='cut')continue;for(const liveTask of g.items){const t=by.get(liveTask.id);if(!t)continue;const r=dates[t.id],b=baseline.items[t.id];rows.push({id:t.id,preds:(t.preds||[]).map(p=>({...p,label:tasks[p.id]?.name||p.id})),name:t.name,context:[stages[t.stage]?.short,t.contractor].filter(Boolean).join(' · '),start:r?isoOf(r.s):null,finish:r?isoOf(r.f):null,baseStart:b?.[0],baseFinish:b?.[1],duration:r?r.f-r.s+1:'—',progress:t.vol?nf(Math.min(100,100*((+t.open||0)+Object.values(t.facts||{}).reduce((a,b)=>a+(+b||0),0))/t.vol))+'%':t.closed?'100%':'—',milestone:t.ms,category:t.cat==='glass'?'row-engineering':''});}}return rows;}
+function facadePrintRows(){const data=cutState&&facadeView==='cut'?cutState:snapshot(),dates=cutState&&facadeView==='cut'?cutSchedule(data):S,by=new Map(data.tasks.map(t=>[t.id,t])),rows=[];for(const g of groups(filtered(false))){if(g.label!==null)rows.push({name:g.label,summary:true,start:g.s==null?null:isoOf(g.s),finish:g.f==null?null:isoOf(g.f),duration:g.s==null?'—':g.f-g.s+1,progress:nf(g.percent,1)+'%'});if($('printScope').value==='visible'&&ui.collapsed.has(g.key)&&facadeView!=='cut')continue;for(const liveTask of g.items){const t=by.get(liveTask.id);if(!t)continue;const r=dates[t.id],b=baseline.items[t.id];rows.push({id:t.id,preds:(t.preds||[]).map(p=>({...p,label:tasks[p.id]?.name||p.id})),name:t.name,context:[stages[t.stage]?.short,t.contractor].filter(Boolean).join(' · '),start:r?isoOf(r.s):null,finish:r?isoOf(r.f):null,baseStart:b?.[0],baseFinish:b?.[1],duration:r?r.f-r.s+1:'—',progress:t.progressMode==='percent'?nf(t.manualPercent||0)+'%':t.vol?nf(Math.min(100,100*((+t.open||0)+Object.values(t.facts||{}).reduce((a,b)=>a+(+b||0),0))/t.vol))+'%':t.closed?'100%':'—',milestone:t.ms,category:t.cat==='glass'?'row-engineering':''});}}return rows;}
 function facadePrintOptions(){return{span:$('printScale').value==='fit'?dn($('printEnd').value)-dn($('printStart').value)+1:+$('printScale').value,mode:facadeView==='cut'?'cut':'gantt',showLinks:$('printLinks').checked,title:settings.title,date:fmt(dn($('cutDate').value)),baseline:baseline.date||'не задан',paper:$('paper').value,start:$('printStart').value,end:$('printEnd').value};}
 function estimatePrint(){try{const rows=facadePrintRows(),o=facadePrintOptions();$('printEstimate').textContent='Строк: '+rows.length+' · Листов: '+window.GPR_REPORT.plan(rows,o.start,o.end,o.paper,o.span,o.mode).length+'. Заголовки на каждом листе.';}catch(e){$('printEstimate').textContent=e.message;}}
 $('bPrint').onclick=()=>{$('printScaleLabel').hidden=facadeView==='cut';compute();if(facadeView==='cut'&&cutState===false){toast('Нет сохранённого состояния для печати.');return;}const selected=filtered(false).map(t=>S[t.id]).filter(Boolean);if(!selected.length){toast('Нет работ со сроками для печати.');return;}$('printStart').value=isoOf($('lookAhead').value?dn($('cutDate').value):Math.min(...selected.map(t=>t.s)));$('printEnd').value=isoOf($('lookAhead').value?dn($('cutDate').value)+ +$('lookAhead').value-1:Math.max(...selected.map(t=>t.f)));estimatePrint();$('printDialog').showModal();};for(const id of ['paper','printStart','printEnd','printScope','printScale'])$(id).onchange=estimatePrint;
 $('doPrint').onclick=async()=>{const button=$('doPrint');button.disabled=true;button.textContent='Подготовка…';try{await new Promise(resolve=>setTimeout(resolve,0));window.GPR_REPORT.preview(document,facadePrintRows(),facadePrintOptions());$('printDialog').close();}catch(e){toast(e.message);}finally{button.disabled=false;button.textContent='Открыть печать';}};window.addEventListener('afterprint',()=>window.GPR_REPORT.close(document));
+// ---------- optional Sunday allowance ----------
+$('bSundays').onclick=()=>{if(dirty){toast('Сначала сохраните или закройте карточку.');return;}compute();const list=filtered(false),plans=list.map(t=>({...window.GPR_FACADE_OPTIONS.proposal(t,S[t.id],t._m.complete),start:S[t.id]?.s,finish:S[t.id]?.f,task:t}));$('modal').className='modal sunday-modal';$('modal').innerHTML=`<div class="dh"><h2>Воскресенья в текущей выборке</h2><button class="x" id="sundayClose">✕</button></div><div class="db"><p>Расчёт по текущему интервалу каждой работы, включая начало и окончание. Можно добавить найденное количество воскресений к длительности. После применения связанные сроки пересчитаются. Повторно уже применённая прибавка не предлагается.</p><table class="sunday-table"><thead><tr><th></th><th>Работа</th><th>Сейчас, дн.</th><th>Воскресений</th><th>Предложение, дн.</th></tr></thead><tbody>${plans.map(p=>`<tr><td><input type="checkbox" data-sunday="${esc(p.id)}" ${canWrite&&p.eligible?'checked':'disabled'}></td><td>${esc(p.task.name)}${p.reason?`<small>${esc(p.reason)}</small>`:''}</td><td>${p.duration}</td><td>${p.count}</td><td>${p.eligible?p.proposed:'—'}</td></tr>`).join('')}</tbody></table></div><div class="df"><button class="btn" id="sundayCancel">Закрыть</button>${canWrite?'<button class="btn dark" id="sundayApply">Применить выбранные</button>':''}<span id="sundayStatus" role="status"></span></div>`;$('modalBg').style.display='flex';const close=()=>{$('modalBg').style.display='none';$('modal').className='modal';};$('sundayClose').onclick=$('sundayCancel').onclick=close;if(!canWrite)return;$('sundayApply').onclick=async()=>{const selected=[...document.querySelectorAll('[data-sunday]:checked')].map(x=>plans.find(p=>p.id===x.dataset.sunday)).filter(p=>p?.eligible);if(!selected.length){$('sundayStatus').textContent='Выберите работы';return;}const button=$('sundayApply');button.disabled=true;let saved=0;try{for(const p of selected){const current=tasks[p.id];if(!current||current.dur!==p.duration)throw Error('Длительность изменилась. Откройте расчёт заново.');const next=clone(current);next.dur=p.proposed;next.sundayAdjustment={baseDuration:p.duration,added:p.count,appliedDuration:p.proposed,sourceStart:isoOf(p.start),sourceFinish:isoOf(p.finish),at:new Date().toISOString()};await db.collection('tasks').doc(next.id).set(next);saved++;$('sundayStatus').textContent=`Сохранено ${saved} из ${selected.length}`;}close();toast(`Воскресенья добавлены: ${saved} работ`);}catch(e){$('sundayStatus').textContent=`Сохранено ${saved} из ${selected.length}. ${e.message}`;}finally{button.disabled=false;}};};
 // ---------- baseline ----------
 $('bBase').onclick=async()=>{
   if(!confirm('Сохранить текущие сроки всех работ как новый базовый план? Старый базовый план будет заменён.'))return;
@@ -782,7 +787,7 @@ function makeServerDb(){
 }
 db=makeServerDb();
 async function loadSchedule(id){
-  if(['mockup-block2','finishing-main','parking-main'].includes(id)){location.href='mockup.html?v=20261116-dates8&schedule='+encodeURIComponent(id);return;}
+  if(['mockup-block2','finishing-main','parking-main'].includes(id)){location.href='mockup.html?v=20261116-progress9&schedule='+encodeURIComponent(id);return;}
   if(loadingSchedule)return;
   if(store.writing)throw Error('Дождитесь завершения сохранения.');
   if(dirty&&!confirm('В карточке есть несохранённые изменения. Обновить график без них?')){$('scheduleSelect').value=store.scheduleId;return;}
