@@ -16,3 +16,5 @@
  .report-page .report-table .report-grid{min-width:0}.report-page h1{font-weight:700}.report-page .report-table td{font-size:11px}
 }
 @media print{.report-actions{display:none!important}.report-page{width:100%;margin:0;padding:0;box-shadow:none}}
+
+.report-table .report-dates{font-size:8pt;white-space:nowrap}.report-dates span{display:block;line-height:1.45}.report-base-dates{color:#526175}.report-calendar-wrap{position:relative}.report-arrows{position:absolute;top:0;pointer-events:none;overflow:hidden;z-index:4}.report-arrows svg{display:block;overflow:hidden}.report-arrows path{fill:none;stroke:#38526e;stroke-width:1.15}.report-arrows .arrow-fill{fill:#38526e;stroke:none}.report-table .report-link-note{font-size:7pt;color:#38526e;white-space:normal;line-height:1.2}.report-cut-table th{text-align:center}.report-cut-table th:first-child{text-align:left}.report-cut-table td{font-variant-numeric:tabular-nums;font-size:8.5pt}.report-late{color:#b52e25}.report-early{color:#277743}.report-cut .report-meta{font-size:9pt}.report-deps{display:none!important}
