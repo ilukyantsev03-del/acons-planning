@@ -1,0 +1,14 @@
+.theme-toggle{display:inline-flex;align-items:center;gap:7px;font-size:13px;white-space:nowrap;cursor:pointer;color:var(--ink)}
+.theme-toggle input{width:16px;height:16px;margin:0;accent-color:var(--glaB);cursor:pointer}
+:root[data-theme="light"]{--bg:#f0f3f7;--surface:#fff;--surface2:#f4f6f9;--ink:#1b2736;--muted:#5d6979;--line:#cbd3df;--line2:#dfe5ed;--grp:#e5ebf3;color-scheme:light}
+:root[data-theme="light"] .mock-table .summary.root td{background-color:#dce6f2;border-color:#8fa4be}
+:root[data-theme="light"] .mock-table .summary.root .mock-name{box-shadow:inset 5px 0 #58799f}
+:root[data-theme="light"] .mock-table .summary[data-depth="1"] td{background-color:#f0e8d8;border-top-color:var(--surface);border-bottom-color:#b2a081}
+:root[data-theme="light"] .mock-table .summary[data-depth="1"] .mock-name{box-shadow:inset 5px 0 #a98039}
+:root[data-theme="light"] .mock-table .summary[data-depth="2"] td{background-color:#eaf0f7;border-color:#b6c4d5}
+:root[data-theme="light"] .mock-table .summary[data-depth="2"] .mock-name{box-shadow:inset 3px 0 #7992b0}
+:root[data-theme="light"] .mock-table .summary[data-depth="3"] td{background-color:#f1f4f8;border-color:#cbd3df}
+:root[data-theme="light"] .finishing-profile .mock-table tbody tr.row-finishing>td{background-color:#fff6e6}
+:root[data-theme="light"] .finishing-profile .mock-table tbody tr.row-engineering>td{background-color:#edf4fd}
+:root[data-theme="light"] .bl,:root[data-theme="light"] .mock-base{opacity:.85}
+@media print{.theme-toggle{display:none!important}}

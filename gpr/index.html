@@ -3,18 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ГПР · Графики работ</title>
+<script src="theme.js?v=20261116-theme1"></script><title>ГПР · Графики работ</title>
 
 
 
 
 
 <link rel="stylesheet" href="style.css?v=20261116-2">
-</head>
+<link rel="stylesheet" href="theme.css?v=20261116-theme1"></head>
 <body>
 <div class="banner" id="banner"></div>
 <div class="top">
-  <div class="accessbar"><label>График <select id="scheduleSelect" aria-label="График"><option>Загрузка…</option></select></label><span id="accessStatus" role="status">Подключение…</span><span id="saveStatus" role="status"></span><span class="spacer"></span><button class="btn" id="reloadSchedule">Обновить</button><button class="btn" id="loginButton">Войти для редактирования</button><button class="btn" id="logoutButton" hidden>Выйти</button></div><div class="titlebar">
+  <div class="accessbar"><label>График <select id="scheduleSelect" aria-label="График"><option>Загрузка…</option></select></label><span id="accessStatus" role="status">Подключение…</span><span id="saveStatus" role="status"></span><label class="theme-toggle" for="themeLight"><input type="checkbox" id="themeLight">Светлый фон</label><span class="spacer"></span><button class="btn" id="reloadSchedule">Обновить</button><button class="btn" id="loginButton">Войти для редактирования</button><button class="btn" id="logoutButton" hidden>Выйти</button></div><div class="titlebar">
     <h1 id="ttl">График фасадных работ</h1>
     <span class="today">сегодня <input type="date" id="statusDate" title="Дата, на которую считаются отставания"></span>
     <span class="today">срок сдачи <input type="date" id="deadline" title="Плановый срок окончания всех работ — от него считается критический путь проекта"></span>
@@ -67,5 +67,5 @@
 
 <script type="application/json" id="fileData">{"tasks": [], "stages": [], "settings": {}, "baseline": {"items": {}}}</script>
 
-<script src="vendor/supabase-2.49.1.js"></script><script src="config.js?v=20261116-2"></script><script src="store.js?v=20261116-2"></script><script src="links.js?v=20261116-2"></script><script src="app.js?v=20261116-finishing1"></script></body>
+<script src="vendor/supabase-2.49.1.js"></script><script src="config.js?v=20261116-2"></script><script src="store.js?v=20261116-2"></script><script src="links.js?v=20261116-2"></script><script src="app.js?v=20261116-theme1"></script></body>
 </html>
