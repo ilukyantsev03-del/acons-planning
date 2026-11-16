@@ -25,3 +25,5 @@
 .mock-table .summary[data-depth="2"] .mock-name{box-shadow:inset 3px 0 #748296}
 
 .mock-table th.timeline{position:sticky;top:0;z-index:25;background-color:var(--surface2)}
+
+.mock-top [hidden]{display:none!important}.finishing-filters select{max-width:260px}.finishing-cut{min-width:1500px}.finishing-cut th:first-child{width:330px}.finishing-cut th{width:140px}.finishing-profile .mock-name small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mock-table .summary[data-depth="3"] td{background-color:#252a31;border-top:1px solid #454d58}
