@@ -23,3 +23,5 @@
 .mock-table .summary[data-depth="1"] .mock-name{box-shadow:inset 5px 0 #b79459}
 .mock-table .summary[data-depth="2"] td{background-color:#2b3038;border-top:1px solid #58616e;border-bottom:1px solid #454c57}
 .mock-table .summary[data-depth="2"] .mock-name{box-shadow:inset 3px 0 #748296}
+
+.mock-table th.timeline{position:sticky;top:0;z-index:25;background-color:var(--surface2)}
