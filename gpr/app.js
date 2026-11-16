@@ -18,7 +18,7 @@ let stages={}, tasks={}, settings={projectStart:'2026-09-20',title:'График
 let loaded={tasks:false,stages:false};
 let S={}; // schedule results
 const ui={group:'stage',zoom:'month',cat:'',stage:'',type:'',con:'',q:'',kpi:'',collapsed:new Set(),links:false,sel:null,crit:'off',sort:'gpr'};
-let FL={}, ORD=[];
+let FL={}, ORD=[];let facadeView='gantt',cutState=null,cutBusy=false;
 const PX={week:26,month:6.2,year:2.3};
 let T0=0,T1=0,px=6.2;
 
@@ -111,6 +111,7 @@ function filtered(ignoreKpi){
     if(ui.type&&t.type!==ui.type) return false;
     if(ui.con){ if(ui.con==='__none'){ if(t.contractor) return false } else if(t.contractor!==ui.con) return false }
     if(q&&!((t.name||'').toLowerCase().includes(q)||(t.contractor||'').toLowerCase().includes(q)||(stageOf(t)?.name||'').toLowerCase().includes(q)||('#'+t.num)===q)) return false;
+    const horizon=+$('lookAhead').value,r=S[t.id];if(horizon){const a=dn($('cutDate').value||isoOf(TODAY));if(!r||!((r.s<=a+horizon-1&&r.f>=a)||($('includeOverdue').checked&&!t._m.complete&&r.f<a)))return false;}
     if(!ignoreKpi&&ui.kpi&&!kpiTest(ui.kpi,t)) return false;
     return true;
   });
@@ -155,6 +156,7 @@ function renderFilters(){
 
 // ---------- gantt ----------
 function range(){
+  if($('lookAhead').value){T0=dn($('cutDate').value||isoOf(TODAY))-1;T1=T0+28;return;}
   let mn=dn(settings.projectStart||'2026-09-20'),mx=mn+200;
   for(const id in S){const r=S[id];if(!r)continue;mn=Math.min(mn,r.s);mx=Math.max(mx,r.f)}
   for(const id in tasks){const m=tasks[id]._m;if(m&&m.bf!=null)mx=Math.max(mx,m.bf)}
@@ -176,7 +178,7 @@ function sortTasks(arr){
   });
 }
 function groups(list){
-  if(ui.group==='none') return [{key:'',label:null,items:sortTasks(list)}];
+  if(ui.group==='none'||$('lookAhead').value) return [{key:'',label:null,items:sortTasks(list)}];
   const map=new Map();
   for(const t of list){
     let k,l,o;
@@ -193,7 +195,7 @@ function groups(list){
 }
 function pctClass(t){const st=t._m.st;return st==='done'?'ok':st==='over'?'bad':st==='late'?'warn':''}
 function subtitle(t){
-  const parts=['#'+t.num];
+  const parts=[];
   if(ui.group!=='stage') parts.push(stageOf(t)?.short||'');
   if(t.section) parts.push(t.section);
   if(ui.group!=='type') parts.push(t.type);
@@ -204,7 +206,7 @@ function subtitle(t){
 let rowY={}, visibleIds=[];
 function render(){
   if(!loaded.tasks||!loaded.stages) return;
-  compute(); renderKpis(); renderFilters();
+  compute(); renderKpis(); renderFilters();if(facadeView==='cut'){renderFacadeCut();return;}
   $('ttl').textContent=settings.title||'График фасадных работ';
   range(); px=PX[ui.zoom];
   const W=(T1-T0+1)*px;
@@ -236,7 +238,7 @@ function render(){
     if(lv>0)ld+=`<div class="lseg" style="left:${i*px}px;width:${(j-i)*px}px;background:var(--l${lv})" title="${fmt(T0+i)}–${fmt(T0+j-1)}: ${esc(who[i])}"></div>`;i=j}
   // body
   let body='',y=0; rowY={}; visibleIds=[];
-  const RH=48, GH=44;
+  const RH=$('compact').checked?38:48, GH=$('compact').checked?34:44;
   for(const g of gs){
     if(g.label!==null){
       const closed=ui.collapsed.has(g.key);
@@ -729,6 +731,17 @@ $('bRates').onclick=openRates;
 $('modalBg').addEventListener('click',e=>{if(e.target===$('modalBg'))$('modalBg').style.display='none'});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){if($('modalBg').style.display==='flex'){$('modalBg').style.display='none';$('modal').className='modal'}else if($('drawer').classList.contains('open'))closeDrawer()}});
 
+// ---------- shared working view and baseline cut ----------
+function cutSchedule(data){const by=Object.fromEntries(data.tasks.map(t=>[t.id,t])),out={},active=new Set,ps=dn(data.settings.projectStart||'2026-09-20');function visit(id){if(id in out)return out[id];const t=by[id];if(!t||active.has(id))return null;if((!t.ms&&!(t.dur>0)&&!t.stretch)||(t.ms&&!t.cons&&!t.preds?.length))return out[id]=null;active.add(id);let start=Math.max(ps,t.cons?dn(t.cons):ps),finish=null,dur=Math.max(1,+t.dur||1);for(const p of t.preds||[]){const r=visit(p.id);if(!r)continue;const lag=+p.lag||0;if(p.type==='НН')start=Math.max(start,r.s+lag);else if(p.type==='ОО'||p.type==='НО'){const n=(p.type==='ОО'?r.f:r.s)+lag;finish=finish===null?n:Math.max(finish,n);}else start=Math.max(start,r.f+(by[p.id]?.ms?0:1)+lag);}active.delete(id);if(t.stretch)return out[id]={s:start,f:Math.max(finish??start+dur-1,start)};start=finish!==null?Math.max(start,finish-dur+1):start;return out[id]={s:start,f:t.ms?start:start+dur-1};}data.tasks.forEach(t=>visit(t.id));return out;}
+async function refreshCut(){if(cutBusy)return;if(dirty){toast('Сначала сохраните или закройте карточку.');return;}cutBusy=true;const day=$('cutDate').value,now=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Moscow',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());try{if(!day)throw Error('Укажите дату среза.');cutState=day<now?await store.asOf(day):null;$('cutNotice').textContent=day<now?'Сохранённое состояние на '+day+' относительно действующего базового плана.':'Текущий график относительно базового плана'+(baseline.date?' от '+baseline.date:'')+'.';render();}catch(e){cutState=false;$('cutNotice').textContent=e.message;if(facadeView==='cut')$('gwrap').innerHTML='<div class="empty">'+esc(e.message)+'</div>';}finally{cutBusy=false;}}
+function renderFacadeCut(){if(cutState===false){$('gwrap').innerHTML='<div class="empty">На выбранную дату сохранённого состояния нет. Выберите текущую дату или более позднюю сохранённую редакцию.</div>';return;}const data=cutState||snapshot(),dates=cutState?cutSchedule(data):S,selected=new Set(filtered(false).map(t=>t.id));let rows=data.tasks.filter(t=>selected.has(t.id)||cutState&&!tasks[t.id]);const horizon=+$('lookAhead').value;if(horizon){const a=dn($('cutDate').value);rows=rows.filter(t=>dates[t.id]&&dates[t.id].s<=a+horizon-1&&dates[t.id].f>=a);}const delta=n=>n==null?'—':(n>0?'+':'')+n+' дн.';const cell=n=>`<td class="${n>0?'bad':n<0?'good':''}">${delta(n)}</td>`;const body=rows.map(t=>{const r=dates[t.id],b=baseline.items[t.id];return `<tr><td class="cut-name"><b>${esc(t.name)}</b><small>${esc(stages[t.stage]?.short||stages[t.stage]?.name||'')}${t.contractor?' · '+esc(t.contractor):''}</small></td><td>${!cutState&&canWrite&&!t.ms&&!t.stretch?`<input class="durin" type="number" min="1" data-id="${esc(t.id)}" value="${t.dur}" aria-label="Длительность, дней">`:r?r.f-r.s+1:'—'}</td><td>${b?fmt(dn(b[0])):'—'}</td><td>${b?fmt(dn(b[1])):'—'}</td><td>${r?fmt(r.s):'—'}</td><td>${r?fmt(r.f):'—'}</td>${cell(r&&b?r.s-dn(b[0]):null)}${cell(r&&b?r.f-dn(b[1]):null)}</tr>`;}).join('');$('gwrap').innerHTML=`<table class="facade-cut"><thead><tr><th>Работа / местоположение</th><th>Дней</th><th>Базовое начало</th><th>Базовое окончание</th><th>Текущее начало</th><th>Текущее окончание</th><th>Сдвиг начала</th><th>Сдвиг окончания</th></tr></thead><tbody>${body}</tbody></table>`;}
+$('cutDate').value=isoOf(TODAY);$('compact').onchange=()=>{document.body.classList.toggle('compact-rows',$('compact').checked);render();};document.body.classList.add('compact-rows');$('nameWidth').oninput=()=>{document.documentElement.style.setProperty('--name-width',$('nameWidth').value+'px');document.documentElement.style.setProperty('--lw',((+$('nameWidth').value||460)+362)+'px');render();};$('lookAhead').onchange=()=>{if($('lookAhead').value){ui.zoom='week';$('segZoom').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v==='week'));}render();};$('includeOverdue').onchange=render;$('refreshCut').onclick=refreshCut;$('cutDate').onchange=refreshCut;
+$('facadeViews').querySelectorAll('button').forEach(b=>b.onclick=()=>{facadeView=b.dataset.view;$('facadeViews').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));if(facadeView==='cut')refreshCut();else render();});
+function facadePrintRows(){const data=cutState&&facadeView==='cut'?cutState:snapshot(),dates=cutState&&facadeView==='cut'?cutSchedule(data):S,by=new Map(data.tasks.map(t=>[t.id,t])),rows=[];for(const g of groups(filtered(false))){if(g.label!==null)rows.push({name:g.label,summary:true,start:g.s==null?null:isoOf(g.s),finish:g.f==null?null:isoOf(g.f),duration:g.s==null?'—':g.f-g.s+1});if($('printScope').value==='visible'&&ui.collapsed.has(g.key)&&facadeView!=='cut')continue;for(const liveTask of g.items){const t=by.get(liveTask.id);if(!t)continue;const r=dates[t.id],b=baseline.items[t.id];rows.push({name:t.name,context:[stages[t.stage]?.short,t.contractor].filter(Boolean).join(' · '),start:r?isoOf(r.s):null,finish:r?isoOf(r.f):null,baseStart:b?.[0],baseFinish:b?.[1],duration:r?r.f-r.s+1:'—',progress:t.vol?nf(Math.min(100,100*((+t.open||0)+Object.values(t.facts||{}).reduce((a,b)=>a+(+b||0),0))/t.vol))+'%':t.closed?'100%':'—',milestone:t.ms,category:t.cat==='glass'?'row-engineering':''});}}return rows;}
+function facadePrintOptions(){return{title:settings.title,date:fmt(dn($('cutDate').value)),baseline:baseline.date||'не задан',paper:$('paper').value,start:$('printStart').value,end:$('printEnd').value};}
+function estimatePrint(){try{const rows=facadePrintRows(),o=facadePrintOptions();$('printEstimate').textContent=rows.length+' строк · '+window.GPR_REPORT.plan(rows,o.start,o.end,o.paper).length+' листов. Заголовки на каждом листе.';}catch(e){$('printEstimate').textContent=e.message;}}
+$('bPrint').onclick=()=>{compute();if(facadeView==='cut'&&cutState===false){toast('Нет сохранённого состояния для печати.');return;}const selected=filtered(false).map(t=>S[t.id]).filter(Boolean);if(!selected.length){toast('Нет работ со сроками для печати.');return;}$('printStart').value=isoOf($('lookAhead').value?dn($('cutDate').value):Math.min(...selected.map(t=>t.s)));$('printEnd').value=isoOf($('lookAhead').value?dn($('cutDate').value)+ +$('lookAhead').value-1:Math.max(...selected.map(t=>t.f)));estimatePrint();$('printDialog').showModal();};for(const id of ['paper','printStart','printEnd','printScope'])$(id).onchange=estimatePrint;
+$('doPrint').onclick=async()=>{const button=$('doPrint');button.disabled=true;button.textContent='Подготовка…';try{await new Promise(resolve=>setTimeout(resolve,0));window.GPR_REPORT.preview(document,facadePrintRows(),facadePrintOptions());$('printDialog').close();}catch(e){toast(e.message);}finally{button.disabled=false;button.textContent='Открыть печать';}};window.addEventListener('afterprint',()=>window.GPR_REPORT.close(document));
 // ---------- baseline ----------
 $('bBase').onclick=async()=>{
   if(!confirm('Сохранить текущие сроки всех работ как новый базовый план? Старый базовый план будет заменён.'))return;
@@ -754,9 +767,9 @@ const client=window.supabase.createClient(window.GPR_CONFIG.url,window.GPR_CONFI
 const store=new window.GPR_DATA.Store(client);
 let scheduleList=[],session=null,loadingSchedule=false,refreshingAuth=false;
 function updateAccess(){
-  canWrite=store.canEdit&&!loadingSchedule;
+  const changed=canWrite!==(store.canEdit&&!loadingSchedule);canWrite=store.canEdit&&!loadingSchedule;
   setEditUi();$('accessStatus').textContent=canWrite?'Владелец · редактирование':session?'Вы вошли · только просмотр':'Только просмотр · вход не требуется';
-  $('loginButton').hidden=!!session;$('logoutButton').hidden=!session;
+  $('loginButton').hidden=!!session;$('logoutButton').hidden=!session;if(changed&&loaded.tasks)render();
 }
 function applyConfirmed(){useData(store.snapshot());render();updateAccess();}
 function makeServerDb(){
@@ -769,14 +782,14 @@ function makeServerDb(){
 }
 db=makeServerDb();
 async function loadSchedule(id){
-  if(['mockup-block2','finishing-main'].includes(id)){location.href='mockup.html?v=20261116-theme1&schedule='+encodeURIComponent(id);return;}
+  if(['mockup-block2','finishing-main'].includes(id)){location.href='mockup.html?v=20261116-work2&schedule='+encodeURIComponent(id);return;}
   if(loadingSchedule)return;
   if(store.writing)throw Error('Дождитесь завершения сохранения.');
   if(dirty&&!confirm('В карточке есть несохранённые изменения. Обновить график без них?')){$('scheduleSelect').value=store.scheduleId;return;}
   loadingSchedule=true;canWrite=false;store.canEdit=false;setEditUi();$('scheduleSelect').disabled=true;$('reloadSchedule').disabled=true;$('saveStatus').textContent='Загрузка…';
   try{
     const data=await store.load(id);dirty=false;draft=null;ui.sel=null;ui.collapsed.clear();ui.stage='';ui.type='';ui.con='';$('drawer').classList.remove('open');
-    useData(data);render();const url=new URL(location.href);url.searchParams.set('schedule',id);history.replaceState(null,'',url);$('scheduleSelect').value=id;
+    cutState=null;useData(data);render();const url=new URL(location.href);url.searchParams.set('schedule',id);history.replaceState(null,'',url);$('scheduleSelect').value=id;
     $('saveStatus').textContent='Данные загружены';banner('');requestAnimationFrame(scrollToday);
   }catch(error){banner('График не загружен: '+(error.message||'ошибка соединения'));$('saveStatus').textContent='Ошибка загрузки';throw error;}
   finally{loadingSchedule=false;$('scheduleSelect').disabled=false;$('reloadSchedule').disabled=false;updateAccess();}

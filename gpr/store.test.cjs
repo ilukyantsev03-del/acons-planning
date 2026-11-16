@@ -15,3 +15,11 @@ test('A failed request does not become a local successful save',async()=>{const 
 test('New items and deletion stay scoped to the selected schedule',async()=>{const f=fake(),s=new Store(f.client);s.scheduleId='s';s.canEdit=true;await s.save('task','new',{name:'New'});assert.equal(f.records[0].schedule_id,'s');await s.remove('task','new');assert.equal(f.records.length,0);assert.equal(s.rows.size,0);});
 test('Missing predecessors and cycles are blocked',()=>{const t={id:'a',stage:'stage',preds:[]},p={tasks:[t],stages:[{id:'stage'}]};assert(validate(p));assert.throws(()=>validate({...p,tasks:[{...t,preds:[{id:'absent',type:'ОН',lag:0}]}]}),/отсутствующей/);assert.throws(()=>validate({...p,tasks:[{...t,preds:[{id:'a',type:'ОН',lag:0}]}]}),/замкнутый/);});
 test('The real schedule fixture loads without embedded data', {skip:!process.env.GPR_FIXTURE},async()=>{const rows=require(process.env.GPR_FIXTURE).map(r=>({...r,schedule_id:'facade-main'})),f=fake(rows,null),s=new Store(f.client),data=await s.load('facade-main');assert.equal(data.tasks.length,214);assert.equal(data.stages.length,11);assert.equal(s.canEdit,false);assert.equal(data.tasks.filter(t=>t.ms).length,13);assert(f.calls.every(c=>c.action==='select'));});
+
+test('historical facade cut replays updates and deletions from the saved origin',async()=>{
+ const state={tasks:[{id:'a',name:'До изменения',stage:'s',preds:[]}],stages:[{id:'s'}],settings:{title:'Origin'}};
+ const events=[{kind:'task',item_id:'a',action:'UPDATE',new_data:{...state.tasks[0],name:'После изменения'}},{kind:'task',item_id:'b',action:'INSERT',new_data:{id:'b',stage:'s',preds:[]}},{kind:'task',item_id:'b',action:'DELETE',new_data:null}];
+ const client={from(){const q={select(){return q},eq(){return q},gt(){return q},lte(){return q},order(){return q},range(){return Promise.resolve({data:events})}};return q}};
+ const s=new Store(client);s.scheduleId='facade';s.rows.set(s.key('meta','state-facade-origin'),{data:{at:'2026-11-16T12:00:00Z',state}});s.canEdit=true;
+ const cut=await s.asOf('2026-11-17');assert.equal(cut.tasks.length,1);assert.equal(cut.tasks[0].name,'После изменения');assert.equal(state.tasks[0].name,'До изменения');await assert.rejects(()=>s.asOf('2026-11-15'),/состояния нет/);s.canEdit=false;await assert.rejects(()=>s.asOf('2026-11-17'),/владельцу/);
+});

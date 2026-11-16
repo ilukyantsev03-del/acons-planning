@@ -18,6 +18,16 @@
       await this.permission();return result;
     }
     snapshot(){const result={tasks:[],stages:[],settings:{},baseline:{items:{}}};for(const r of this.rows.values()){if(r.kind==='task')result.tasks.push({...copy(r.data),id:r.id});if(r.kind==='stage')result.stages.push({...copy(r.data),id:r.id});if(r.kind==='meta'&&r.id==='settings')result.settings=copy(r.data);if(r.kind==='meta'&&r.id==='baseline')result.baseline=copy(r.data);}return result;}
+    async asOf(day){
+      const origin=this.rows.get(this.key('meta','state-facade-origin'))?.data;
+      if(!origin||day<origin.at.slice(0,10))throw Error('На эту дату сохранённого состояния нет.'+(origin?' История с '+origin.at.slice(0,10)+'.':''));
+      if(!this.canEdit)throw Error('Исторический срез фасадов доступен владельцу после входа. Текущий срез доступен всем.');
+      const end=new Date(day+'T23:59:59.999+03:00').toISOString(),events=[];
+      for(let off=0;;off+=500){const r=await this.client.from('gpr_history').select('id,kind,item_id,action,new_data,changed_at').eq('schedule_id',this.scheduleId).gt('changed_at',origin.at).lte('changed_at',end).order('changed_at').order('id').range(off,off+499);if(r.error)throw r.error;events.push(...r.data);if(r.data.length<500)break;}
+      const data=copy(origin.state),rows=new Map([...data.tasks.map(t=>['task/'+t.id,t]),...data.stages.map(t=>['stage/'+t.id,t]),['meta/settings',data.settings]]);
+      for(const e of events){const key=e.kind+'/'+e.item_id;if(e.action==='DELETE')rows.delete(key);else rows.set(key,copy(e.new_data));}
+      data.tasks=[...rows].filter(([k])=>k.startsWith('task/')).map(([,v])=>v);data.stages=[...rows].filter(([k])=>k.startsWith('stage/')).map(([,v])=>v);data.settings=rows.get('meta/settings')||data.settings;validate(data);return data;
+    }
     serialize(kind,id,operation){
       const scheduleId=this.scheduleId,key=this.key(kind,id),previous=this.chains.get(key)||Promise.resolve();
       this.writing++;

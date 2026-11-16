@@ -10,7 +10,7 @@
 
 
 <link rel="stylesheet" href="style.css?v=20261116-2">
-<link rel="stylesheet" href="theme.css?v=20261116-theme1"></head>
+<link rel="stylesheet" href="theme.css?v=20261116-theme1"><link rel="stylesheet" href="work.css?v=20261116-work2"><link rel="stylesheet" href="report.css?v=20261116-work2"></head>
 <body>
 <div class="banner" id="banner"></div>
 <div class="top">
@@ -23,9 +23,10 @@
     <button class="btn" id="bStages" hidden>Порядок этапов</button>
     <button class="btn" id="bRates">Выработки</button>
     <button class="btn" id="bBase" hidden title="Сохранить текущие сроки как базовый план">Зафиксировать базовый план</button>
-    <button class="btn" id="bCsv">Таблица CSV</button><button class="btn dark" id="bDl" hidden>Скачать график</button>
+    <button class="btn" id="bPrint">Печать / PDF</button><button class="btn" id="bCsv">Таблица CSV</button><button class="btn dark" id="bDl" hidden>Скачать график</button>
   </div>
-  <div class="kpis" id="kpis"></div>
+  <details class="extra-settings"><summary>Показатели графика</summary><div class="kpis" id="kpis"></div></details>
+<div class="controls work-controls"><div class="seg" id="facadeViews"><button data-view="gantt" class="on">График</button><button data-view="cut">Срез к базовому плану</button></div><label>Срез на <input type="date" id="cutDate"></label><button class="btn" id="refreshCut">Обновить срез</button><select id="lookAhead" aria-label="Горизонт работ"><option value="">Весь график</option><option value="7">Ближайшие 7 дней</option><option value="14">Ближайшие 14 дней</option></select><label><input type="checkbox" id="includeOverdue"> С просроченными</label><label><input type="checkbox" id="compact" checked> Компактно</label><label>Название <input type="range" id="nameWidth" min="360" max="720" step="20" value="460" aria-label="Ширина названия"></label></div><div id="cutNotice" role="status"></div>
   <button class="btn mobonly" id="bCtl" aria-expanded="false">Фильтры и вид</button>
   <div id="ctl"><div class="controls">
     <span class="lbl">Группировать</span>
@@ -65,7 +66,8 @@
 <div class="tip" id="tip"></div>
 <div class="toast" id="toast"></div>
 
+<div id="printRoot"></div><dialog id="printDialog"><form method="dialog"><h2>Печать графика</h2><p>Отдельная компоновка с повторением заголовков, сроками и базовым планом.</p><label>Формат <select id="paper"><option value="A3">А3 · альбомная</option><option value="A4">А4 · альбомная</option></select></label><label>Период с <input type="date" id="printStart"></label><label>по <input type="date" id="printEnd"></label><label>Строки <select id="printScope"><option value="visible">Текущий вид</option><option value="all">Все работы текущей выборки</option></select></label><p id="printEstimate" role="status"></p><button class="btn" value="cancel">Отмена</button> <button class="btn dark" id="doPrint" type="button">Открыть печать</button></form></dialog>
 <script type="application/json" id="fileData">{"tasks": [], "stages": [], "settings": {}, "baseline": {"items": {}}}</script>
 
-<script src="vendor/supabase-2.49.1.js"></script><script src="config.js?v=20261116-2"></script><script src="store.js?v=20261116-2"></script><script src="links.js?v=20261116-2"></script><script src="app.js?v=20261116-theme1"></script></body>
+<script src="vendor/supabase-2.49.1.js"></script><script src="config.js?v=20261116-2"></script><script src="store.js?v=20261116-work2"></script><script src="links.js?v=20261116-2"></script><script src="report.js?v=20261116-work2"></script><script src="app.js?v=20261116-work2"></script></body>
 </html>
