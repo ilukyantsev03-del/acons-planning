@@ -12,3 +12,6 @@
 .compare-table{min-width:1570px}.compare-table th:not(:first-child){width:130px}.compare-table th:nth-child(2),.compare-table th:nth-child(3){width:80px}
 
 .mock-bar{top:calc(50% - 9px)}.mock-diamond{top:calc(50% - 6.5px)}.summary .mock-bar{top:calc(50% - 3px)}
+
+/* Clip routes to the measured calendar columns; SVG and bars share one origin. */
+.mock-link-clip{position:absolute;overflow:hidden;pointer-events:none;z-index:5}.mock-link-clip .mock-link-layer{left:0;top:0;overflow:hidden}
