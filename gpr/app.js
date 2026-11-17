@@ -209,6 +209,7 @@ function subtitle(t){
 let rowY={}, visibleIds=[];
 function render(){
   if(!loaded.tasks||!loaded.stages) return;
+  document.documentElement.style.setProperty('--lw',((+$('nameWidth').value||460)+520+(window.GPR_WORKSPACE.quantity()?130:0))+'px');
   compute(); renderKpis(); renderFilters();if(window.GPR_WORKSPACE.facts()){range();window.GPR_WORKSPACE.calendar($('gwrap'),filtered(false).map(t=>({...t,context:subtitle(t),percentLabel:nf(t._m.pct*100)+'%'})),$('lookAhead').value?$('cutDate').value:isoOf(T0),$('lookAhead').value?isoOf(dn($('cutDate').value)+ +$('lookAhead').value-1):isoOf(T1),canWrite,saveCalendarFact);return;}if(facadeView==='cut'){renderFacadeCut();return;}
   $('ttl').textContent=settings.title||'График фасадных работ';
   range(); px=PX[ui.zoom];
