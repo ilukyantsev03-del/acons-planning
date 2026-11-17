@@ -24,3 +24,5 @@
 .report-gridline{position:absolute;top:0;bottom:0;width:0.2mm;background:#dbe2eb!important;pointer-events:none}
 .report-page.no-report-header>header,.report-page.no-report-header>.report-meta{display:none}.report-table td small{font-size:8pt;font-weight:650;color:#344c68;white-space:normal;overflow:visible;line-height:1.25}.report-table .report-link-note{font-size:6.5pt;font-weight:400}.report-table .report-name b{font-weight:650}.report-page{overflow:hidden}.report-page footer{clear:both}
 @media screen{.report-page{width:400mm;max-width:none}.report-page[data-paper=A4]{width:277mm;max-width:none}}
+/* Calendar cells remain visible in both timeline and daily-quantity printouts. */
+.report-table .report-grid{background-image:linear-gradient(to right,#b9c7d6 0.2mm,transparent 0.2mm)!important;border-bottom:0.25mm solid #b9c7d6}.report-fact-table td,.report-fact-table th{border:0.25mm solid #a9bacd;padding:1mm;overflow-wrap:anywhere}.report-fact-table td:not(:first-child),.report-fact-table th:not(:first-child){text-align:center}.report-fact-table .report-name{padding:1.3mm 2mm}.report-fact-table th{font-size:7pt}
