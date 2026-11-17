@@ -104,24 +104,25 @@ function wouldCycle(tid,pid){
 function stageOf(t){return stages[t.stage]}
 function stOrder(t){return stageOf(t)?.order??999}
 const W=window.GPR_WORKSPACE;
+const validFacadeDate=s=>/^\d{4}-\d{2}-\d{2}$/.test(s)&&+s.slice(0,4)>=1900&&+s.slice(0,4)<=2200;
 function facadePeriod(){
   const a=$('facadeRangeStart').value,b=$('facadeRangeEnd').value;
-  return a&&b&&a<=b?{start:dn(a),finish:dn(b)}:null;
+  return validFacadeDate(a)&&validFacadeDate(b)&&a<=b&&dn(b)-dn(a)<730?{start:dn(a),finish:dn(b)}:null;
 }
 function inFacadePeriod(r){
   const p=facadePeriod();
   return !$('facadePeriodOnly').checked||!p||!!r&&r.s<=p.finish&&r.f>=p.start;
 }
-function filtered(ignoreKpi){
+function filtered(ignoreKpi,dates=S){
   const q=ui.q.trim().toLowerCase();
   return Object.values(tasks).filter(t=>{
-    if(!W.accepts(t)||!inFacadePeriod(S[t.id]))return false;
+    if(!W.accepts(t)||!inFacadePeriod(dates[t.id]))return false;
     if(ui.cat&&t.cat!==ui.cat) return false;
     if(ui.stage&&t.stage!==ui.stage) return false;
     if(ui.type&&t.type!==ui.type) return false;
     if(ui.con){ if(ui.con==='__none'){ if(t.contractor) return false } else if(t.contractor!==ui.con) return false }
     if(q&&!((t.name||'').toLowerCase().includes(q)||(t.contractor||'').toLowerCase().includes(q)||(stageOf(t)?.name||'').toLowerCase().includes(q)||('#'+t.num)===q)) return false;
-    const horizon=+$('lookAhead').value,r=S[t.id];if(horizon){const a=dn($('cutDate').value||isoOf(TODAY));if(!r||!((r.s<=a+horizon-1&&r.f>=a)||($('includeOverdue').checked&&!t._m.complete&&r.f<a)))return false;}
+    const horizon=+$('lookAhead').value,r=dates[t.id];if(horizon){const a=dn($('cutDate').value||isoOf(TODAY));if(!r||!((r.s<=a+horizon-1&&r.f>=a)||($('includeOverdue').checked&&!t._m.complete&&r.f<a)))return false;}
     if(!ignoreKpi&&ui.kpi&&!kpiTest(ui.kpi,t)) return false;
     return true;
   });
@@ -190,7 +191,7 @@ function sortTasks(arr){
   });
 }
 function groups(list){
-  if(ui.group==='none'||$('lookAhead').value) return [{key:'',label:null,items:sortTasks(list)}];
+  if(ui.group==='none') return [{key:'',label:null,items:sortTasks(list)}];
   const map=new Map();
   for(const t of list){
     let k,l,o;
@@ -416,7 +417,7 @@ $('bCollapse').onclick=()=>{
   else { groups(filtered(false)).forEach(g=>{if(g.label!==null)ui.collapsed.add(g.key)}) }
   render();
 };
-$('bReset').onclick=()=>{Object.assign(ui,{cat:'',stage:'',type:'',con:'',q:'',kpi:''});$('fSearch').value='';$('facadeRangeStart').value='';$('facadeRangeEnd').value='';$('facadePeriodOnly').checked=false;render()};
+$('bReset').onclick=()=>{Object.assign(ui,{cat:'',stage:'',type:'',con:'',q:'',kpi:''});$('fSearch').value='';$('facadeRangeStart').value='';$('facadeRangeEnd').value='';$('facadePeriodOnly').checked=false;$('facadePeriodNotice').textContent='';render()};
 $('statusDate').value=isoOf(TODAY);
 $('statusDate').onchange=e=>{if(e.target.value){TODAY=dn(e.target.value);render();scrollToday()}};
 function scrollToday(){const target=X(TODAY)-gw.clientWidth*0.3;gw.scrollLeft=Math.max(0,target)}
@@ -750,14 +751,29 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){if($('modalBg').sty
 // ---------- shared working view and baseline cut ----------
 function cutSchedule(data){const by=Object.fromEntries(data.tasks.map(t=>[t.id,t])),out={},active=new Set,ps=dn(data.settings.projectStart||'2026-09-20');function visit(id){if(id in out)return out[id];const t=by[id];if(!t||active.has(id))return null;if((!t.ms&&!(t.dur>0)&&!t.stretch)||(t.ms&&!t.cons&&!t.preds?.length))return out[id]=null;active.add(id);let start=Math.max(ps,t.cons?dn(t.cons):ps),finish=null,dur=Math.max(1,+t.dur||1);for(const p of t.preds||[]){const r=visit(p.id);if(!r)continue;const lag=+p.lag||0;if(p.type==='НН')start=Math.max(start,r.s+lag);else if(p.type==='ОО'||p.type==='НО'){const n=(p.type==='ОО'?r.f:r.s)+lag;finish=finish===null?n:Math.max(finish,n);}else start=Math.max(start,r.f+(by[p.id]?.ms?0:1)+lag);}active.delete(id);if(t.stretch)return out[id]={s:start,f:Math.max(finish??start+dur-1,start)};start=finish!==null?Math.max(start,finish-dur+1):start;return out[id]={s:start,f:t.ms?start:start+dur-1};}data.tasks.forEach(t=>visit(t.id));return out;}
 async function refreshCut(){if(cutBusy)return;if(dirty){toast('Сначала сохраните или закройте карточку.');return;}cutBusy=true;const day=$('cutDate').value,now=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Moscow',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());try{if(!day)throw Error('Укажите дату среза.');cutState=day<now?await store.asOf(day):null;$('cutNotice').textContent=day<now?'Сохранённое состояние на '+day+' относительно действующего базового плана.':'Текущий график относительно базового плана'+(baseline.date?' от '+baseline.date:'')+'.';render();}catch(e){cutState=false;$('cutNotice').textContent=e.message;if(facadeView==='cut')$('gwrap').innerHTML='<div class="empty">'+esc(e.message)+'</div>';}finally{cutBusy=false;}}
-function renderFacadeCut(){if(cutState===false){$('gwrap').innerHTML='<div class="empty">На выбранную дату сохранённого состояния нет. Выберите текущую дату или более позднюю сохранённую редакцию.</div>';return;}const data=cutState||snapshot(),dates=cutState?cutSchedule(data):S,selected=new Set(filtered(false).map(t=>t.id));let rows=data.tasks.filter(t=>(selected.has(t.id)||cutState&&!tasks[t.id])&&inFacadePeriod(dates[t.id]));const horizon=+$('lookAhead').value;if(horizon){const a=dn($('cutDate').value);rows=rows.filter(t=>dates[t.id]&&dates[t.id].s<=a+horizon-1&&dates[t.id].f>=a);}const delta=n=>n==null?'—':(n>0?'+':'')+n+' дн.';const cell=n=>`<td class="${n>0?'bad':n<0?'good':''}">${delta(n)}</td>`;const body=rows.map(t=>{const r=dates[t.id],b=baseline.items[t.id];return `<tr><td class="cut-name"><b>${esc(t.name)}</b><small>${esc(stages[t.stage]?.short||stages[t.stage]?.name||'')}${t.contractor?' · '+esc(t.contractor):''}</small></td><td>${!cutState&&canWrite&&!t.ms&&!t.stretch?`<input class="durin" type="number" min="1" data-id="${esc(t.id)}" value="${t.dur}" aria-label="Длительность, дней">`:r?r.f-r.s+1:'—'}</td><td>${b?fmt(dn(b[0])):'—'}</td><td>${b?fmt(dn(b[1])):'—'}</td><td>${r?fmt(r.s):'—'}</td><td>${r?fmt(r.f):'—'}</td>${cell(r&&b?r.s-dn(b[0]):null)}${cell(r&&b?r.f-dn(b[1]):null)}</tr>`;}).join('');$('gwrap').innerHTML=`<table class="facade-cut"><thead><tr><th>Работа / местоположение</th><th>Дней</th><th>Базовое начало</th><th>Базовое окончание</th><th>Текущее начало</th><th>Текущее окончание</th><th>Сдвиг начала</th><th>Сдвиг окончания</th></tr></thead><tbody>${body}</tbody></table>`;}
-$('cutDate').value=isoOf(TODAY);$('compact').onchange=()=>{document.body.classList.toggle('compact-rows',$('compact').checked);render();};document.body.classList.add('compact-rows');$('nameWidth').oninput=()=>{document.documentElement.style.setProperty('--name-width',$('nameWidth').value+'px');document.documentElement.style.setProperty('--lw',((+$('nameWidth').value||460)+362)+'px');render();};$('lookAhead').onchange=()=>{$('facadeRangeStart').value='';$('facadeRangeEnd').value='';$('segGroup').querySelectorAll('button').forEach(b=>b.disabled=!!$('lookAhead').value);if($('lookAhead').value){ui.group='none';$('segGroup').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v==='none'));ui.zoom='week';$('segZoom').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v==='week'));}render();};for(const id of ['facadeRangeStart','facadeRangeEnd','facadePeriodOnly'])$(id).onchange=()=>{
-  const a=$('facadeRangeStart').value,b=$('facadeRangeEnd').value;
-  $('facadeRangeEnd').setCustomValidity(a&&b&&a>b?'Окончание периода должно быть не раньше начала.':'');
-  if(a&&b&&a>b){$('facadeRangeEnd').reportValidity();return;}
-  if(facadePeriod()){$('lookAhead').value='';$('segGroup').querySelectorAll('button').forEach(b=>b.disabled=false);}
-  render();gw.scrollLeft=0;
+function renderFacadeCut(){if(cutState===false){$('gwrap').innerHTML='<div class="empty">На выбранную дату сохранённого состояния нет. Выберите текущую дату или более позднюю сохранённую редакцию.</div>';return;}const data=cutState||snapshot(),dates=cutState?cutSchedule(data):S,selected=new Set(filtered(false,dates).map(t=>t.id));let rows=data.tasks.filter(t=>(selected.has(t.id)||cutState&&!tasks[t.id])&&inFacadePeriod(dates[t.id]));const horizon=+$('lookAhead').value;if(horizon){const a=dn($('cutDate').value);rows=rows.filter(t=>dates[t.id]&&dates[t.id].s<=a+horizon-1&&dates[t.id].f>=a);}const delta=n=>n==null?'—':(n>0?'+':'')+n+' дн.';const cell=n=>`<td class="${n>0?'bad':n<0?'good':''}">${delta(n)}</td>`;const body=rows.map(t=>{const r=dates[t.id],b=baseline.items[t.id];return `<tr><td class="cut-name"><b>${esc(t.name)}</b><small>${esc(stages[t.stage]?.short||stages[t.stage]?.name||'')}${t.contractor?' · '+esc(t.contractor):''}</small></td><td>${!cutState&&canWrite&&!t.ms&&!t.stretch?`<input class="durin" type="number" min="1" data-id="${esc(t.id)}" value="${t.dur}" aria-label="Длительность, дней">`:r?r.f-r.s+1:'—'}</td><td>${b?fmt(dn(b[0])):'—'}</td><td>${b?fmt(dn(b[1])):'—'}</td><td>${r?fmt(r.s):'—'}</td><td>${r?fmt(r.f):'—'}</td>${cell(r&&b?r.s-dn(b[0]):null)}${cell(r&&b?r.f-dn(b[1]):null)}</tr>`;}).join('');$('gwrap').innerHTML=`<table class="facade-cut"><thead><tr><th>Работа / местоположение</th><th>Дней</th><th>Базовое начало</th><th>Базовое окончание</th><th>Текущее начало</th><th>Текущее окончание</th><th>Сдвиг начала</th><th>Сдвиг окончания</th></tr></thead><tbody>${body}</tbody></table>`;}
+$('cutDate').value=isoOf(TODAY);$('compact').onchange=()=>{document.body.classList.toggle('compact-rows',$('compact').checked);render();};document.body.classList.add('compact-rows');$('nameWidth').oninput=()=>{document.documentElement.style.setProperty('--name-width',$('nameWidth').value+'px');document.documentElement.style.setProperty('--lw',((+$('nameWidth').value||460)+362)+'px');render();};function showFacadeGroups(){
+  if(ui.group==='none'){ui.group='stage';$('segGroup').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v==='stage'));}
+  ui.collapsed.clear();$('segGroup').querySelectorAll('button').forEach(b=>b.disabled=false);
+}
+$('lookAhead').onchange=()=>{
+  $('facadeRangeStart').value='';$('facadeRangeEnd').value='';$('facadePeriodNotice').textContent='';
+  if($('lookAhead').value){showFacadeGroups();ui.zoom='week';$('segZoom').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v==='week'));}
+  render();
 };
+let facadePeriodTimer;
+function applyFacadePeriod(){
+  const a=$('facadeRangeStart').value,b=$('facadeRangeEnd').value;
+  const ok=facadePeriod();
+  if((a||b)&&!ok){$('facadePeriodNotice').textContent=validFacadeDate(a)&&validFacadeDate(b)?'Укажите начало не позже окончания и период не более 730 дней.':'Введите обе даты полностью, включая четырёхзначный год.';return;}
+  $('facadePeriodNotice').textContent='';
+  if(ok){$('lookAhead').value='';showFacadeGroups();}
+  render();gw.scrollLeft=0;
+}
+for(const id of ['facadeRangeStart','facadeRangeEnd'])$(id).onchange=()=>{
+  clearTimeout(facadePeriodTimer);facadePeriodTimer=setTimeout(applyFacadePeriod,450);
+};
+$('facadePeriodOnly').onchange=applyFacadePeriod;
 $('includeOverdue').onchange=render;$('refreshCut').onclick=refreshCut;$('cutDate').onchange=refreshCut;
 $('facadeViews').querySelectorAll('button').forEach(b=>b.onclick=()=>{facadeView=b.dataset.view;$('facadeViews').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));if(facadeView==='cut')refreshCut();else render();});
 async function saveCalendarFact(id,day,raw){if(dirty)throw Error('Сначала сохраните карточку');const t=clone(tasks[id]);if(!t||!(t.vol>0))throw Error('Задайте общий объём и единицу в карточке работы');if(raw!==''&&(!Number.isFinite(+raw)||+raw<0))throw Error('Объём — число ≥ 0');window.GPR_WORKSPACE.putFact(t,day,raw,isoOf(TODAY),(tasks[id]._m?.pct||0)*100);if(day<=isoOf(TODAY))t.closed=window.GPR_WORKSPACE.done(t)>=t.vol;if(!await saveTask(t,'Дневной факт сохранён'))throw Error('Факт не сохранён. Проверьте сообщение об ошибке.');}
