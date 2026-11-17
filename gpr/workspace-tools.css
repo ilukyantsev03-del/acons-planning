@@ -5,3 +5,7 @@
 
 @media(max-width:760px){.row .lab,.quantity-columns .row .lab,.corner,.quantity-columns .corner{width:var(--lw);flex-basis:var(--lw)}}
 .facade-cut th:nth-child(2){width:96px}
+
+/* Keep column widths fixed when the calendar scale shrinks. */
+#workspace>.mock-table[style]{min-width:0}
+.gwrap>.ginner{min-width:0}
