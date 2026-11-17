@@ -22,3 +22,5 @@
 .report-dates .report-current-dates{background:#e8f2fe;color:#173d69;border-left:0.6mm solid #4c83b8;padding-left:1mm;font-weight:650}.report-dates .report-base-dates{background:#f0f2f5;color:#596677;border-left:0.6mm solid #a4adba;padding-left:1mm;margin-top:0.6mm}.report-cut-table thead tr:first-child th:nth-child(3){background:#e8ecf2!important}.report-cut-table thead tr:first-child th:nth-child(4){background:#dceafb!important}
 
 .report-gridline{position:absolute;top:0;bottom:0;width:0.2mm;background:#dbe2eb!important;pointer-events:none}
+.report-page.no-report-header>header,.report-page.no-report-header>.report-meta{display:none}.report-table td small{font-size:8pt;font-weight:650;color:#344c68;white-space:normal;overflow:visible;line-height:1.25}.report-table .report-link-note{font-size:6.5pt;font-weight:400}.report-table .report-name b{font-weight:650}.report-page{overflow:hidden}.report-page footer{clear:both}
+@media screen{.report-page{width:400mm;max-width:none}.report-page[data-paper=A4]{width:277mm;max-width:none}}
