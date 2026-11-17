@@ -236,7 +236,7 @@ function render(){
     d=end;
   }
   if(ui.zoom==='week'){
-    for(let d=T0;d<=T1;d++){const wd=dOf(d).getUTCDay();dh+=`<div class="dcell${wd===0||wd===6?' we':''}" style="left:${X(d)}px;width:${px}px">${dOf(d).getUTCDate()}</div>`}
+    for(let d=T0;d<=T1;d++){const wd=dOf(d).getUTCDay();dh+=`<div class="dcell${wd===0?' sunday-date':''}" style="left:${X(d)}px;width:${px}px">${dOf(d).getUTCDate()}</div>`}
   } else if(ui.zoom==='month'){
     for(let d=T0;d<=T1;d++){if(dOf(d).getUTCDay()===1)dh+=`<div class="dcell" style="left:${X(d)}px;width:${7*px}px;text-align:left;padding-left:3px">${dOf(d).getUTCDate()}</div>`}
   }
@@ -279,7 +279,7 @@ function render(){
   // overlays
   let ov='';
   for(let d=T0;d<=T1;){const dt=dOf(d);const end=Math.round(Date.UTC(dt.getUTCFullYear(),dt.getUTCMonth()+1,1)/DAY);ov+=`<div class="gridl m" style="left:${X(d)}px"></div>`;d=end}
-  if(ui.zoom==='week'){for(let d=T0;d<=T1;d++){const wd=dOf(d).getUTCDay();if(wd===6)ov+=`<div class="wkend" style="left:${X(d)}px;width:${2*px}px"></div>`}}
+  for(let d=T0;d<=T1;d++){if(dOf(d).getUTCDay()===0)ov+=`<div class="wkend sunday-band" style="left:${X(d)}px;width:${px}px"></div>`}
   if(TODAY>=T0&&TODAY<=T1) ov+=`<div class="tline" style="left:${X(TODAY)+px/2-1}px"></div>`;
   if(settings.deadline){const dd=dn(settings.deadline);if(dd>=T0&&dd<=T1) ov+=`<div class="dline" style="left:${X(dd+1)}px" title="Срок сдачи ${fmt(dd)}"></div>`}
   const gw=$('gwrap'); const sl=gw.scrollLeft, stp=gw.scrollTop;

@@ -29,3 +29,9 @@
 .report-table .report-name .report-zone{display:block;font-size:10pt;font-weight:750;line-height:1.25;color:#20364e;white-space:normal;overflow-wrap:anywhere;margin-top:0.6mm}.report-table .report-name .report-task-name{font-size:8pt;font-weight:500;color:#526175}.report-day{font-size:6.5pt;font-weight:650;overflow:hidden;white-space:nowrap}.report-day small{font-weight:400}
 
 .report-facts.no-calendar-grid .report-fact-table td:nth-child(n+4){border-left:0;border-right:0}
+
+.report-sunday-date,.report-sunday-date small{color:#c53030!important;font-weight:700}
+.report-sunday-date,.report-sunday-cell{background:#fff0f0!important}
+.report-sunday-band{position:absolute;top:0;bottom:0;background:#fff0f0;pointer-events:none;z-index:0}
+.report-gridline{z-index:1}
+.report-bar,.report-base,.report-ms{z-index:2}

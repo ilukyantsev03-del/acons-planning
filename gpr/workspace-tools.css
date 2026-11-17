@@ -9,3 +9,9 @@
 /* Keep column widths fixed when the calendar scale shrinks. */
 #workspace>.mock-table[style]{min-width:0}
 .gwrap>.ginner{min-width:0}
+
+/* Calendar Sundays: display only, independent of working calendars. */
+:root{--sunday-ink:#c53030;--sunday-bg:rgba(220,38,38,.075)}
+html[data-theme="dark"]{--sunday-ink:#ff8585;--sunday-bg:rgba(248,113,113,.11)}
+.sunday-date,.sunday-date small{color:var(--sunday-ink)!important;font-weight:700}
+.sunday-date,.sunday-band{background:var(--sunday-bg)!important}
