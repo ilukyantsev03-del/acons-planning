@@ -57,3 +57,5 @@
 
 .report-mockup .report-dates span{display:inline-block;white-space:nowrap;margin-top:0!important;margin-right:calc(1mm * var(--report-fit));vertical-align:middle}
 .report-mockup .report-dates{line-height:1.1}
+
+.report-mockup .report-progress,.report-mockup .report-shift{white-space:nowrap;font-variant-numeric:tabular-nums}.report-mockup .report-shift.report-late{font-weight:700}.report-mockup .report-progress{text-align:center}
