@@ -24,8 +24,9 @@ if(page.classList.contains('report-mockup')){
  const header=page.querySelector('header'),meta=page.querySelector('.report-meta'),footer=page.querySelector('footer');
  const used=[header,meta,footer].reduce((n,e)=>n+(e?e.getBoundingClientRect().height:0),0);
  const budget=(page.dataset.paper==='A4'?182:265)*unit-used-6*unit;
- let scale=1;
- for(let i=0;i<5;i++){const height=body.getBoundingClientRect().height;if(height<=budget+1)break;scale*=budget/Math.max(height,1);page.style.setProperty('--report-fit',String(scale));}
+ let low=0,high=1;
+ for(let i=0;i<9;i++){const mid=(low+high)/2;page.style.setProperty('--report-fit',String(mid));if(body.getBoundingClientRect().height<=budget)low=mid;else high=mid;}
+ const scale=low;page.style.setProperty('--report-fit',String(scale));
  page.dataset.textScale=Math.round(scale*100)+'%';continue;
 }
 const unit=page.getBoundingClientRect().width/(page.dataset.paper==='A4'?277:400);const budget=(page.dataset.paper==='A4'?137:210)+(page.classList.contains('no-report-header')?22:0);const h=body.getBoundingClientRect().height;let scale=Math.min(1,budget*unit/Math.max(h,1));body.style.zoom=String(scale);body.style.width='100%';page.dataset.textScale=Math.round(scale*100)+'%';}}
