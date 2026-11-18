@@ -35,3 +35,22 @@
 .report-sunday-band{position:absolute;top:0;bottom:0;background:#fff0f0;pointer-events:none;z-index:0}
 .report-gridline{z-index:1}
 .report-bar,.report-base,.report-ms{z-index:2}
+
+/* Compact mockup print: work titles first, full-width calendar and scalable row density. */
+.report-mockup{--report-fit:1;min-height:0!important}
+.report-mockup .report-table td,.report-mockup .report-table th{
+ height:calc(6mm * var(--report-fit));padding:calc(.7mm * var(--report-fit)) calc(1mm * var(--report-fit));
+ font-size:calc(8pt * var(--report-fit))!important;line-height:1.12;
+}
+.report-mockup .report-table .report-name .report-task-name{
+ font-size:calc(8.5pt * var(--report-fit));font-weight:700;color:#172638;line-height:1.12;
+}
+.report-mockup .report-table .report-name b{line-height:1.12}
+.report-mockup .report-table .report-dates{font-size:calc(7pt * var(--report-fit))!important;white-space:normal}
+.report-mockup .report-dates span{line-height:1.15;padding-left:calc(.7mm * var(--report-fit))}
+.report-mockup .report-dates .report-base-dates{margin-top:calc(.4mm * var(--report-fit))}
+.report-mockup .report-group td{height:calc(5mm * var(--report-fit));background:#e7edf5!important}
+.report-mockup .report-table .report-link-note{font-size:calc(6pt * var(--report-fit));line-height:1.1;margin-top:0}
+.report-mockup .report-table .report-grid{padding:0}
+.report-mockup .report-base{height:max(.2mm,calc(.7mm * var(--report-fit)))}
+@media screen{.report-mockup{min-height:0}}
