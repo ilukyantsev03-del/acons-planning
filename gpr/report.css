@@ -59,3 +59,40 @@
 .report-mockup .report-dates{line-height:1.1}
 
 .report-mockup .report-progress,.report-mockup .report-shift{white-space:nowrap;font-variant-numeric:tabular-nums}.report-mockup .report-shift.report-late{font-weight:700}.report-mockup .report-progress{text-align:center}
+
+/* Presentation finish, scoped exclusively to mockup printouts. */
+.report-mockup{
+ border:.25mm solid #8796a8;padding:3mm!important;box-sizing:border-box;
+ break-inside:avoid-page;min-height:0!important;
+}
+.report-mockup>header{padding-bottom:2mm;border-bottom:.35mm solid #344c65;align-items:center}
+.report-mockup .report-eyebrow{font-size:6pt;letter-spacing:1pt}
+.report-mockup h1{font-size:14pt;margin:1mm 0 0;line-height:1.12}
+.report-mockup .report-period{font-size:10pt}
+.report-mockup .report-period small{font-size:7pt;margin-top:1mm}
+.report-mockup .report-meta{font-size:7pt;padding:1.5mm 0}
+.report-mockup footer{font-size:6.5pt;margin-top:1.5mm;padding-top:1mm;border-top:.15mm solid #aab7c5}
+.report-mockup .report-table td,.report-mockup .report-table th{border:.12mm solid #d3dce6}
+.report-mockup .report-table .report-name .report-task-name{font-weight:400}
+.report-mockup .report-table .report-name b{font-weight:400}
+.report-mockup .report-table .report-group .report-name b{font-weight:600}
+.report-mockup .report-group td{border-top:.25mm solid #9cabbc;font-weight:600}
+.report-mockup .report-table .report-grid{border-bottom:.12mm solid #d3dce6}
+.report-mockup .report-gridline{border-left:.1mm solid #d7dfe9}
+.report-mockup .report-months{height:3.5mm}
+.report-mockup .report-months span{font-size:6pt;font-weight:600;height:3.5mm}
+.report-mockup .report-days{height:4.5mm}
+.report-mockup .report-day{
+ display:flex;flex-direction:column;align-items:center;justify-content:center;
+ height:4.5mm;padding:0;font-size:var(--mock-day-font,5pt);font-weight:400;
+ border-left:.1mm solid #d3dce6;line-height:1.05;font-variant-numeric:tabular-nums;
+}
+.report-mockup .report-day small{font-size:3.5pt;line-height:1.05}
+.report-mockup .report-day.report-sunday-date{font-weight:600}
+.report-mockup .report-arrows path{stroke-width:.8}
+.report-mockup .report-bar{border-width:.15mm}
+@media print{
+ .report-mockup{margin:0!important;min-height:0!important;box-shadow:none}
+ .report-mockup:last-child{break-after:auto!important;page-break-after:auto!important}
+ .report-mockup:empty{display:none!important}
+}
