@@ -11,7 +11,7 @@ function mockupColumns(o){
  cols.push(['calendar',100-cols.reduce((n,c)=>n+c[1],0)]);
  return cols.map(([key,width])=>`<col data-column="${key}" style="width:${width}%">`).join('');
 }
-function mockupHeaders(o){return `<th>Работа / группа</th>${o.showProgress!==false?'<th>Готово, %</th>':''}${o.showDuration!==false?'<th>Дней</th>':''}<th class="report-current-heading">Текущие сроки</th>${o.showBaseline!==false?'<th class="report-base-heading">Базовый план</th>':''}${o.showShift!==false?'<th>Сдвиг, дн.</th>':''}`;}
+function mockupHeaders(o){return `<th><span class="report-column-title">Работа / группа</span></th>${o.showProgress!==false?'<th><span class="report-column-title">Готово, %</span></th>':''}${o.showDuration!==false?'<th><span class="report-column-title">Дней</span></th>':''}<th class="report-current-heading"><span class="report-column-title">Текущие сроки</span></th>${o.showBaseline!==false?'<th class="report-base-heading"><span class="report-column-title">Базовый план</span></th>':''}${o.showShift!==false?'<th><span class="report-column-title">Сдвиг, дн.</span></th>':''}`;}
 function mockupCells(t,o){
  const short=s=>s?fmt(day(s)).replace(/\d{4}$/,y=>y.slice(-2)):'—';
  const shift=t.finish&&t.baseFinish?(day(t.finish)-day(t.baseFinish))/DAY:null;

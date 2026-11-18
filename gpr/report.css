@@ -101,3 +101,14 @@
 .report-mockup .report-table .report-base-heading{background:#edf0f4!important}
 .report-mockup .report-current-column,.report-mockup .report-base-column{text-align:center}
 .report-mockup .report-dates span{border-left:0;padding-left:0;margin-right:0}
+
+/* Mockup PDF column headings are centered and protected from clipping. */
+.report-mockup .report-table thead th{
+ text-align:center!important;vertical-align:middle;overflow:visible;
+ white-space:normal;text-indent:0;position:relative;
+}
+.report-mockup .report-column-title{
+ display:block;position:relative;z-index:1;box-sizing:border-box;max-width:100%;
+ padding:0 .5mm;text-align:center;white-space:normal;overflow:visible;
+ overflow-wrap:normal;word-break:normal;line-height:1.15;
+}
