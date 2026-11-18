@@ -112,3 +112,6 @@
  padding:0 .5mm;text-align:center;white-space:normal;overflow:visible;
  overflow-wrap:normal;word-break:normal;line-height:1.15;
 }
+
+/* Center numeric duration and finish variance in mockup PDF. */
+.report-mockup .report-table td.report-duration,.report-mockup .report-table td.report-shift{text-align:center!important;vertical-align:middle}
