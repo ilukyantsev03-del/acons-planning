@@ -96,3 +96,8 @@
  .report-mockup:last-child{break-after:auto!important;page-break-after:auto!important}
  .report-mockup:empty{display:none!important}
 }
+
+.report-mockup .report-table .report-current-heading{background:#e3eefb!important}
+.report-mockup .report-table .report-base-heading{background:#edf0f4!important}
+.report-mockup .report-current-column,.report-mockup .report-base-column{text-align:center}
+.report-mockup .report-dates span{border-left:0;padding-left:0;margin-right:0}
