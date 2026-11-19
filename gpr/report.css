@@ -28,7 +28,7 @@
 .report-table .report-grid{background-image:none!important;border-bottom:0.25mm solid #b9c7d6}.report-fact-table td,.report-fact-table th{border:0.25mm solid #a9bacd;padding:1mm;overflow-wrap:anywhere}.report-fact-table td:not(:first-child),.report-fact-table th:not(:first-child){text-align:center}.report-fact-table .report-name{padding:1.3mm 2mm}.report-fact-table th{font-size:7pt}
 .report-table .report-name .report-zone{display:block;font-size:10pt;font-weight:750;line-height:1.25;color:#20364e;white-space:normal;overflow-wrap:anywhere;margin-top:0.6mm}.report-table .report-name .report-task-name{font-size:8pt;font-weight:500;color:#526175}.report-day{font-size:6.5pt;font-weight:650;overflow:hidden;white-space:nowrap}.report-day small{font-weight:400}
 
-.report-facts.no-calendar-grid .report-fact-table td:nth-child(n+4){border-left:0;border-right:0}
+
 
 .report-sunday-date,.report-sunday-date small{color:#c53030!important;font-weight:700}
 .report-sunday-date,.report-sunday-cell{background:#fff0f0!important}
@@ -115,3 +115,16 @@
 
 /* Center numeric duration and finish variance in mockup PDF. */
 .report-mockup .report-table td.report-duration,.report-mockup .report-table td.report-shift{text-align:center!important;vertical-align:middle}
+/* The presentation profile is now shared by all schedule printouts. */
+.report-mockup .report-table .report-name .report-zone{font-size:calc(7.2pt * var(--report-fit));font-weight:600;line-height:1.15;margin-top:calc(.4mm * var(--report-fit));color:#435a73}
+.report-mockup .report-table .report-name .report-task-name{font-weight:400}
+.report-mockup .report-table td.report-progress,.report-mockup .report-table td.report-quantity,.report-mockup .report-table td.report-duration,.report-mockup .report-table td.report-shift{text-align:center;vertical-align:middle}
+.report-mockup .report-table td.report-quantity{white-space:normal;font-variant-numeric:tabular-nums}
+.report-facts.no-calendar-grid .report-table .report-fact-day{border-left:0!important;border-right:0!important}
+.report-cut .report-dates{white-space:normal}
+.report-mockup .report-fact-table th.report-fact-day{font-size:5pt!important}
+@media print{
+ .report-mockup{break-after:page;page-break-after:always}
+ .report-mockup:last-child{break-after:auto!important;page-break-after:auto!important}
+ .report-mockup:empty{display:none!important}
+}
