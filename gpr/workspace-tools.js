@@ -27,6 +27,7 @@ function printControls(){
 }
 function configurePrint({mode='gantt',context=true,quantityAvailable=false,profile='' }={}){
  const d=document.getElementById('printDialog');
+ d.querySelector('h2').textContent=mode==='cut'?'Печать среза к базовому плану':mode==='facts'?'Печать факта по дням':'Печать календарной сетки';
  if(d.dataset.profile!==profile){document.getElementById('printZone').checked=context;d.dataset.profile=profile;}
  for(const id of ['printCurrent','printBaseline','printShift','printDuration'])document.getElementById(id).disabled=mode==='facts';
  document.getElementById('printQuantity').disabled=!quantityAvailable;
