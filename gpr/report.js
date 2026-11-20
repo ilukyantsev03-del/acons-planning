@@ -19,7 +19,7 @@ function calendarScale(start,end,o){
  const detail=o.calendarDetail&&o.calendarDetail!=='auto'?o.calendarDetail:dayWidth>=4?'day':dayWidth*7>=9?'week':'month';let days='',months='';
  for(let i=0;i<count;i++){const n=start+i*DAY,d=new Date(n),first=i===0||d.getUTCDate()===1,next=Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,1),monthDays=Math.min(count-i,(next-n)/DAY);
   if(first)months+=`<span style="left:${100*i/count}%;width:${100*monthDays/count}%">${esc(d.toLocaleDateString('ru-RU',{month:'short',year:'numeric',timeZone:'UTC'}))}</span>`;
-  if(detail==='day'||detail==='week'&&(i===0||d.getUTCDay()===1)||detail==='month'&&first){const span=detail==='day'?1:detail==='week'?Math.min(count-i,i===0?(8-(d.getUTCDay()||7)):7):monthDays,label=detail==='day'?d.getUTCDate():detail==='week'?String(d.getUTCDate()).padStart(2,'0')+'.'+String(d.getUTCMonth()+1).padStart(2,'0'):'01–'+new Date(next-DAY).getUTCDate();days+=`<span class="report-day${d.getUTCDay()===0?' report-sunday-date':''}" style="left:${100*i/count}%;width:${100*span/count}%">${label}${detail==='day'?`<small>${['вс','пн','вт','ср','чт','пт','сб'][d.getUTCDay()]}</small>`:''}</span>`;}
+  if(detail==='day'||detail==='week'&&(i===0||d.getUTCDay()===1)||detail==='month'&&first){const span=detail==='day'?1:detail==='week'?Math.min(count-i,i===0?(8-(d.getUTCDay()||7)):7):monthDays,label=detail==='day'?d.getUTCDate():detail==='week'?(span<3?String(d.getUTCDate()):String(d.getUTCDate()).padStart(2,'0')+'.'+String(d.getUTCMonth()+1).padStart(2,'0')):'01–'+new Date(next-DAY).getUTCDate();days+=`<span class="report-day${d.getUTCDay()===0?' report-sunday-date':''}" style="left:${100*i/count}%;width:${100*span/count}%">${label}${detail==='day'?`<small>${['вс','пн','вт','ср','чт','пт','сб'][d.getUTCDay()]}</small>`:''}</span>`;}
  }return {days,months,detail};
 }
 function html(pages,options){if(options.mode==='facts')return factsHtml(pages,options);if(options.mode==='cut')return cutHtml(pages,options);if(options.mode==='dynamics')return rootWindow().GPR_CUTS.reportHtml(pages,options);const {title,date,baseline='',paper='A3',context=''}=options;return pages.map((p,index)=>{const count=Math.round((p.end-p.start)/DAY)+1,{days,months,detail}=calendarScale(p.start,p.end,options);
@@ -38,7 +38,7 @@ function drawLinks(document){const root=document.getElementById('printRoot');if(
 function fitPages(document){const root=document.getElementById('printRoot');
  for(const page of root.querySelectorAll('.report-mockup')){
   const cell=page.querySelector('.report-day'),days=page.dataset.calendarDetail==='day'?1:7,fill=root.dataset.fillHeight==='1';page.classList.toggle('report-fill-height',fill);
-  if(cell){const width=cell.getBoundingClientRect().width;page.style.setProperty('--mock-day-font',Math.min(8,Math.max(3.5,width/(days===1?2:5)*.75))+'pt');}
+  if(cell){const width=Math.max(...[...page.querySelectorAll('.report-day')].map(e=>e.getBoundingClientRect().width));page.style.setProperty('--mock-day-font',Math.min(8,Math.max(3.5,width/(days===1?2:5)*.75))+'pt');}
  }
  if(root.dataset.fit!=='1')return;for(const page of root.querySelectorAll('.report-page')){const body=page.querySelector('.report-calendar-wrap,.report-cut-table');if(!body)continue;body.style.zoom='1';body.style.width='100%';
 if(page.classList.contains('report-mockup')){
