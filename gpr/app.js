@@ -241,9 +241,9 @@ function render(){
     d=end;
   }
   if(ui.zoom==='week'){
-    for(let d=T0;d<=T1;d++){const wd=dOf(d).getUTCDay();dh+=`<div class="dcell${wd===0?' sunday-date':''}" style="left:${X(d)}px;width:${px}px">${dOf(d).getUTCDate()}<small>${['вс','пн','вт','ср','чт','пт','сб'][wd]}</small></div>`}
+    for(let d=T0;d<=T1;d++){const wd=dOf(d).getUTCDay();dh+=`<div class="dcell${wd===0?' sunday-date':''}" style="left:${X(d)}px;width:${px}px">${dOf(d).getUTCDate()}<small>${['вс','пн','вт','ср','чт','пт','сб'][dOf(d).getUTCDay()]}</small></div>`}
   } else if(ui.zoom==='month'){
-    for(let d=T0;d<=T1;d++){if(dOf(d).getUTCDay()===1)dh+=`<div class="dcell" style="left:${X(d)}px;width:${7*px}px;text-align:left;padding-left:3px">${dOf(d).getUTCDate()}<small>${['вс','пн','вт','ср','чт','пт','сб'][wd]}</small></div>`}
+    for(let d=T0;d<=T1;d++){if(dOf(d).getUTCDay()===1)dh+=`<div class="dcell" style="left:${X(d)}px;width:${7*px}px;text-align:left;padding-left:3px">${dOf(d).getUTCDate()}<small>${['вс','пн','вт','ср','чт','пт','сб'][dOf(d).getUTCDay()]}</small></div>`}
   }
   // load strip
   const byType={};
