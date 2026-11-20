@@ -224,7 +224,7 @@ let rowY={}, visibleIds=[];
 function render(){
   if(!loaded.tasks||!loaded.stages) return;
   updateRateColumns();
-  compute(); renderKpis(); renderFilters();if(window.GPR_WORKSPACE.facts()){range();window.GPR_WORKSPACE.calendar($('gwrap'),filtered(false).map(t=>({...t,context:subtitle(t),percentLabel:nf(t._m.pct*100)+'%'})),$('lookAhead').value?$('cutDate').value:isoOf(T0),$('lookAhead').value?isoOf(dn($('cutDate').value)+ +$('lookAhead').value-1):isoOf(T1),canWrite,saveCalendarFact);return;}if(facadeView==='cut'){cuts.render();return;}
+  compute(); renderKpis(); renderFilters();if(facadeView==='cut'){cuts.render();return;}if(window.GPR_WORKSPACE.facts()){range();window.GPR_WORKSPACE.calendar($('gwrap'),filtered(false).map(t=>({...t,context:subtitle(t),percentLabel:nf(t._m.pct*100)+'%'})),$('lookAhead').value?$('cutDate').value:isoOf(T0),$('lookAhead').value?isoOf(dn($('cutDate').value)+ +$('lookAhead').value-1):isoOf(T1),canWrite,saveCalendarFact);return;}if(facadeView==='cut'){cuts.render();return;}
   $('ttl').textContent=settings.title||'График фасадных работ';
   range(); px=PX[ui.zoom];
   const W=(T1-T0+1)*px;
@@ -416,7 +416,7 @@ let qt;$('fSearch').oninput=e=>{clearTimeout(qt);qt=setTimeout(()=>{ui.q=e.targe
 $('bToday').onclick=scrollToday;
 $('bCtl').onclick=()=>{const c=$('ctl').classList.toggle('show');$('bCtl').setAttribute('aria-expanded',c)};
 $('bLinks').onclick=()=>{ui.links=!ui.links;render()};
-$('bCollapse').onclick=()=>{
+$('bCollapse').onclick=()=>{if(cuts.active){cuts.toggleGroups();return;}
   if(ui.collapsed.size) ui.collapsed.clear();
   else { groups(filtered(false)).forEach(g=>{if(g.label!==null)ui.collapsed.add(g.key)}) }
   render();
@@ -841,7 +841,7 @@ function makeServerDb(){
 }
 db=makeServerDb();
 async function loadSchedule(id){
-  if(['mockup-block2','finishing-main','parking-main','lifts-main'].includes(id)){location.href='mockup.html?v=20261116-progress9&schedule='+encodeURIComponent(id);return;}
+  const route=await window.GPR_CUTS.scheduleUrl(client,id);if(route.startsWith('mockup.html')){location.href=route;return;}
   if(loadingSchedule)return;
   if(store.writing)throw Error('Дождитесь завершения сохранения.');
   if(dirty&&!confirm('В карточке есть несохранённые изменения. Обновить график без них?')){$('scheduleSelect').value=store.scheduleId;return;}
