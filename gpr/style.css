@@ -260,3 +260,5 @@ svg.links .arrowhead{fill:context-stroke;stroke:none}
 /* Actual pace has its own optional column; hiding it preserves the name width. */
 .hide-actual-rate .fact-rate{display:none!important}
 .lab .fact-rate,.chead .fact-rate{flex:0 0 72px;width:72px}
+
+.lab .planned-rate,.chead .planned-rate{flex:0 0 100px;width:100px}.chead .planned-rate{white-space:normal;line-height:1.2}.planned-rate .ratein{width:86px}
