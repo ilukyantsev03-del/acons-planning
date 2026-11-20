@@ -6,6 +6,9 @@ const MONF=['январь','февраль','март','апрель','май','
 const dn=s=>Math.round(Date.UTC(+s.slice(0,4),+s.slice(5,7)-1,+s.slice(8,10))/DAY);
 const isoOf=n=>new Date(n*DAY).toISOString().slice(0,10);
 const dOf=n=>new Date(n*DAY);
+const dateNumber=s=>s?dn(s):null;
+const startOf=(t,r)=>t.finishOnly?null:r?.s;
+const finishOf=(t,r)=>t.finishOnly?dn(t.finishOnly):r?.f;
 const fmt=n=>{if(n==null)return '—';const d=dOf(n);return String(d.getUTCDate()).padStart(2,'0')+'.'+String(d.getUTCMonth()+1).padStart(2,'0')+'.'+String(d.getUTCFullYear()).slice(2)};
 const now=new Date();
 let TODAY=Math.round(Date.UTC(now.getFullYear(),now.getMonth(),now.getDate())/DAY);
@@ -30,7 +33,7 @@ function compute(){
   const vis=new Set();
   function calc(id){
     if(id in S) return S[id];
-    const t=tasks[id]; if(!t||(!t.ms&&!(t.dur>0)&&!t.stretch)||(t.ms&&!t.cons&&!(t.preds||[]).length)){S[id]=null;return null}
+    const t=tasks[id]; if(t?.finishOnly){const f=dn(t.finishOnly);S[id]={s:f,f};ORD.push(id);return S[id];} if(!t||(!t.ms&&!(t.dur>0)&&!t.stretch)||(t.ms&&!t.cons&&!(t.preds||[]).length)){S[id]=null;return null}
     if(vis.has(id)){cycles.add(id);return null}
     vis.add(id);
     let sr=Math.max(PS,t.cons?dn(t.cons):PS), fr=null; const d=Math.max(1,+t.dur||1);
@@ -58,7 +61,7 @@ function compute(){
     const complete=t.factProgressOpening&&isoOf(TODAY)<t.factProgressOpening.from?pct>=1:manual?pct>=1:vol?done>=vol-1e-9:!!t.closed;
     let plan=null, st='nodate';
     if(r){
-      plan=vol?vol*Math.max(0,Math.min(1,(TODAY-r.s+1)/t.dur)):null;
+      plan=vol&&t.dur>0?vol*Math.max(0,Math.min(1,(TODAY-r.s+1)/t.dur)):null;
       if(complete) st='done';
       else if(r.f<TODAY) st='over';
       else if(r.s>TODAY) st='future';
@@ -66,7 +69,7 @@ function compute(){
       else st='run';
     } else if(complete) st='done';
     const b=baseline.items&&baseline.items[id];
-    t._m={done,fsum,vol,manual,pct,complete,plan,st,bs:b?dn(b[0]):null,bf:b?dn(b[1]):null};
+    t._m={done,fsum,vol,manual,pct,complete,plan,st,bs:dateNumber(b?.[0]),bf:dateNumber(b?.[1])};
   }
   cpm();
 }
@@ -213,7 +216,7 @@ function subtitle(t){
   if(t.section) parts.push(t.section);
   if(ui.group!=='type') parts.push(t.type);
   if(ui.group!=='contractor'&&t.contractor) parts.push(t.contractor);
-  const r=S[t.id]; if(r&&innerWidth<=760) parts.push(fmt(r.s)+'–'+fmt(r.f));
+  const r=S[t.id]; if(r&&innerWidth<=760) parts.push(t.finishOnly?'Завершено '+fmt(r.f):fmt(r.s)+'–'+fmt(r.f));
   return parts.filter(Boolean).join(', ');
 }
 let rowY={}, visibleIds=[];
@@ -257,7 +260,7 @@ function render(){
     if(g.label!==null){
       const closed=ui.collapsed.has(g.key);
       const done=g.items.filter(t=>t._m.complete).length;
-      body+=`<div class="row grp${ui.group==='stage'?' stage-group':''}${closed?' closed':''}" data-g="${esc(g.key)}"><div class="lab"><span class="caret">▾</span><div class="t"><div class="n" title="${esc(g.label)}${g.note?'\nПримечание: '+esc(g.note):''}">${esc(g.label)} <span class="cnt">${g.items.length} работ, выполнено ${done}${g.note?', есть примечание':''}</span></div></div><span class="cr"></span><span class="cr"></span><span class="cd">${g.s!=null?fmt(g.s):''}</span><span class="cd">${g.f!=null?fmt(g.f):''}</span><span class="cn">${g.s!=null?g.f-g.s+1:''}</span><span class="p" title="Средняя готовность работ группы">${nf(g.percent,1)}%</span>${window.GPR_WORKSPACE.quantity()?'<span class="quantity-facade"></span>':''}</div><div class="trk" style="width:${W}px">${g.s!=null?`<div class="gbar" style="left:${X(g.s)}px;width:${(g.f-g.s+1)*px}px"></div>`:''}</div></div>`;
+      body+=`<div class="row grp${ui.group==='stage'?' stage-group':''}${closed?' closed':''}" data-g="${esc(g.key)}"><div class="lab"><span class="caret">▾</span><div class="t"><div class="n" title="${esc(g.label)}${g.note?'\nПримечание: '+esc(g.note):''}">${esc(g.label)} <span class="cnt">${g.items.length} работ, выполнено ${done}${g.note?', есть примечание':''}</span></div></div><span class="cr"></span><span class="cr"></span><span class="cr fact-rate"></span><span class="cd">${g.s!=null?fmt(g.s):''}</span><span class="cd">${g.f!=null?fmt(g.f):''}</span><span class="cn">${g.s!=null?g.f-g.s+1:''}</span><span class="p" title="Средняя готовность работ группы">${nf(g.percent,1)}%</span>${window.GPR_WORKSPACE.quantity()?'<span class="quantity-facade"></span>':''}</div><div class="trk" style="width:${W}px">${g.s!=null?`<div class="gbar" style="left:${X(g.s)}px;width:${(g.f-g.s+1)*px}px"></div>`:''}</div></div>`;
       y+=GH; if(closed) continue;
     }
     for(const t of g.items){
@@ -268,12 +271,12 @@ function render(){
       const crit=ui.crit!=='off'&&isCrit(t), dim=ui.crit!=='off'&&!crit;
       if(r&&t.ms){
         tr+=`<div class="ms${crit?' crit':''}${dim?' dim':''}" data-id="${t.id}" style="left:${X(r.s)+px/2-6.5}px" title="${esc(t.name)}"></div>`;
-      } else if(r){
+      } else if(r&&!t.finishOnly){
         const cls=['bar',crit?'crit':'',dim?'dim':'',t.cat==='glass'?'gla':t.cat==='prep'?'pre':t.cat==='other'?'oth':'',m.st==='over'?'over':'',m.st==='late'?'late':'',cycles.has(t.id)?'cyc':'',ui.sel===t.id?'sel':'',canWrite?'':'ro'].filter(Boolean).join(' ');
         tr+=`<div class="${cls}" data-id="${t.id}" style="left:${X(r.s)}px;width:${Math.max(t.dur*px,3)}px"><div class="dn" style="width:${m.pct*100}%"></div><div class="rz"></div></div>`;
-      } else tr+=`<div class="nodate" style="left:${X(TODAY)+8}px">сроки не заданы</div>`;
+      } else if(!t.finishOnly) tr+=`<div class="nodate" style="left:${X(TODAY)+8}px">сроки не заданы</div>`;
       if(m.bs!=null) tr+=`<div class="bl" style="left:${X(m.bs)}px;width:${(m.bf-m.bs+1)*px}px"></div>`;
-      body+=`<div class="row${ui.sel===t.id?' sel':''}" data-id="${t.id}"><div class="lab"><div class="t"><div class="n" title="${esc(t.name)}">${esc(t.name)}</div><div class="s">${esc(subtitle(t))}</div></div>${crit&&FL[t.id]<0?`<span class="fl" title="Отрицательный резерв: не успевает к сроку">${FL[t.id]}</span>`:''}<span class="cr calc" title="${esc(rateUnit(t))}">${rateCalc(t)!=null?nf(rateCalc(t),1):'—'}<small class="rate-unit">${!t.ms&&t.vol?esc(rateUnit(t)):''}</small></span><span class="cr">${t.vol?(canWrite?`<input class="ratein${t.rateExp>0?' set':''}" type="number" step="any" min="0" data-id="${t.id}" value="${t.rateExp??''}" placeholder="${rateFact(t)!=null?nf(rateFact(t),1):''}" aria-label="Заданная выработка" title="${rateFact(t)!=null?'По факту сейчас: '+nf(rateFact(t),1)+' '+esc(rateUnit(t))+'. ':''}Введите свою выработку, ${esc(rateUnit(t))}">`:(t.rateExp>0?nf(t.rateExp,1):(rateFact(t)!=null?nf(rateFact(t),1):''))):''}</span><span class="cd">${r?fmt(r.s):'—'}</span><span class="cd">${r?fmt(r.f):'—'}</span><span class="cn">${canWrite&&!t.stretch&&!t.ms?`<input class="durin" type="number" min="1" data-id="${t.id}" value="${t.dur??''}" aria-label="Длительность, дней" title="Длительность, календарных дней — измените и нажмите Enter">`:(r?(r.f-r.s+1):'—')}</span><span class="p ${pctClass(t)}">${canWrite?`<input class="percentin" type="number" min="0" max="100" step="0.1" data-id="${t.id}" value="${Number((m.pct*100).toFixed(1))}" aria-label="Готовность, %">`:pc}</span>${window.GPR_WORKSPACE.quantity()?`<span class="quantity-facade">${nf(m.done,1)} / ${t.vol??'—'} ${esc(t.unit)}</span>`:''}</div><div class="trk" style="width:${W}px">${tr}</div></div>`;
+      body+=`<div class="row${ui.sel===t.id?' sel':''}" data-id="${t.id}"><div class="lab"><div class="t"><div class="n" title="${esc(t.name)}">${esc(t.name)}</div><div class="s">${esc(subtitle(t))}</div></div>${crit&&FL[t.id]<0?`<span class="fl" title="Отрицательный резерв: не успевает к сроку">${FL[t.id]}</span>`:''}<span class="cr calc" title="${esc(rateUnit(t))}">${rateCalc(t)!=null?nf(rateCalc(t),1):'—'}<small class="rate-unit">${!t.ms&&t.vol?esc(rateUnit(t)):''}</small></span><span class="cr">${t.vol?(canWrite?`<input class="ratein${t.rateExp>0?' set':''}" type="number" step="any" min="0" data-id="${t.id}" value="${t.rateExp??''}" placeholder="" aria-label="Выработка подрядчика" title="${rateFact(t)!=null?'По факту сейчас: '+nf(rateFact(t),1)+' '+esc(rateUnit(t))+'. ':''}Введите свою выработку, ${esc(rateUnit(t))}">`:(t.rateExp>0?nf(t.rateExp,1):'—')):''}</span><span class="cr fact-rate" title="Средний темп по дневным записям, от первой записи до выбранной даты. Ранее выполненный объём не включён.">${rateFact(t)!=null?nf(rateFact(t),1):'—'}<small class="rate-unit">${!t.ms&&t.vol?esc(rateUnit(t)):''}</small></span><span class="cd">${fmt(startOf(t,r))}</span><span class="cd">${fmt(finishOf(t,r))}</span><span class="cn">${canWrite&&!t.stretch&&!t.ms&&!t.finishOnly?`<input class="durin" type="number" min="1" data-id="${t.id}" value="${t.dur??''}" aria-label="Длительность, дней" title="Длительность, календарных дней — измените и нажмите Enter">`:(r&&!t.finishOnly?(r.f-r.s+1):'—')}</span><span class="p ${pctClass(t)}">${canWrite?`<input class="percentin" type="number" min="0" max="100" step="0.1" data-id="${t.id}" value="${Number((m.pct*100).toFixed(1))}" aria-label="Готовность, %">`:pc}</span>${window.GPR_WORKSPACE.quantity()?`<span class="quantity-facade">${nf(m.done,1)} / ${t.vol??'—'} ${esc(t.unit)}</span>`:''}</div><div class="trk" style="width:${W}px">${tr}</div></div>`;
       y+=RH;
     }
   }
@@ -286,7 +289,7 @@ function render(){
   const gw=$('gwrap'); const sl=gw.scrollLeft, stp=gw.scrollTop;
   const empty=!list.length?`<div class="empty">${Object.keys(tasks).length?'Под фильтр не попала ни одна работа. Сбросьте фильтры, чтобы увидеть весь график.':'В графике пока нет работ.'+(canWrite?' Нажмите «+ Работа», чтобы добавить первую.':'')}</div>`:'';
   gw.innerHTML=`<div class="ginner" style="width:calc(var(--lw) + ${W}px)">
-    <div class="ghead"><div class="corner"><div class="chead"><span class="t">${list.length} работ</span><span class="cr" title="Выработка расчётная: объём ÷ длительность, ед. в день">Расчётная</span><span class="cr" title="Выработка фактическая / экспертная — введите своё значение, ед. в день">Заданная</span><span class="cd">Начало</span><span class="cd">Оконч.</span><span class="cn">Дн.</span><span class="p">%</span>${window.GPR_WORKSPACE.quantity()?'<span class="quantity-facade">Выполнено / объём</span>':''}</div></div><div class="scale" style="width:${W}px"><div class="mrow">${mh}</div>${dh?`<div class="drow">${dh}</div>`:''}<div class="load">${ld}</div>${TODAY>=T0&&TODAY<=T1?`<div class="tline" style="left:${X(TODAY)+px/2-1}px"></div>`:''}</div></div>
+    <div class="ghead"><div class="corner"><div class="chead"><span class="t">${list.length} работ</span><span class="cr" title="Выработка расчётная: объём ÷ длительность, ед. в день">Расчётная</span><span class="cr" title="Выработка подрядчика из файла, ед. в день">Подрядчик</span><span class="cr fact-rate" title="Выработка фактическая по дневным записям">Фактическая</span><span class="cd">Начало</span><span class="cd">Оконч.</span><span class="cn">Дн.</span><span class="p">%</span>${window.GPR_WORKSPACE.quantity()?'<span class="quantity-facade">Выполнено / объём</span>':''}</div></div><div class="scale" style="width:${W}px"><div class="mrow">${mh}</div>${dh?`<div class="drow">${dh}</div>`:''}<div class="load">${ld}</div>${TODAY>=T0&&TODAY<=T1?`<div class="tline" style="left:${X(TODAY)+px/2-1}px"></div>`:''}</div></div>
     <div class="gbody" id="gbody">${body}<div id="ovl" style="position:absolute;top:0;bottom:0;left:var(--lw);width:${W}px;pointer-events:none;z-index:1">${ov}</div><svg class="links" id="links" style="left:var(--lw)" width="${W}" height="${y}"></svg></div>${empty}</div>`;
   gw.scrollLeft=sl; gw.scrollTop=stp;
   drawLinks();
@@ -323,7 +326,7 @@ const tip=$('tip');
 function showTip(e,id){
   const t=tasks[id],r=S[id],m=t._m;
   const stl={done:'выполнено',over:'срок прошёл, не закрыто',late:'отстаёт от плана',run:'идёт',future:'не начато',nodate:'без сроков'}[m.st];
-  tip.innerHTML=`<b>#${t.num} ${esc(t.name)}</b><br>${esc(stageOf(t)?.short||'')}${t.contractor?', '+esc(t.contractor):''}<br>${r?fmt(r.s)+' – '+fmt(r.f)+', '+(r.f-r.s+1)+' дн.':'сроки не заданы'}<br>`+
+  tip.innerHTML=`<b>#${t.num} ${esc(t.name)}</b><br>${esc(stageOf(t)?.short||'')}${t.contractor?', '+esc(t.contractor):''}<br>${t.finishOnly?'Завершено '+fmt(dn(t.finishOnly)):r?fmt(r.s)+' – '+fmt(r.f)+', '+(r.f-r.s+1)+' дн.':'сроки не заданы'}<br>`+
    (m.manual?`Готовность задана вручную: ${nf(m.pct*100)}%<br>`:'')+(m.vol?`Учтённый объём: выполнено ${nf(m.done)} из ${nf(m.vol)} ${esc(t.unit)} (${Math.round(m.pct*100)}%)<br>План на ${fmt(TODAY)}: ${nf(m.plan)}<br>`:'')+
    (m.bf!=null&&r?`Сдвиг к базовому плану: ${r.f-m.bf>0?'+':''}${r.f-m.bf} дн.<br>`:'')+(FL[id]!=null?`Резерв времени: ${FL[id]} дн.${FL[id]<=0?' — критическая':''}<br>`:'')+`Статус: ${stl}`+(t.note?`<br><i>${esc(t.note.slice(0,160))}</i>`:'');
   tip.style.display='block'; moveTip(e);
@@ -493,14 +496,15 @@ function renderDrawer(){
     <div class="g3">
       <div class="f"><label>Расчётная, ${esc(rateUnit(t))}</label><input value="${rateCalc(t)!=null?nf(rateCalc(t),2):'—'}" disabled></div>
       <div class="f"><label>Темп по дневному журналу</label><input value="${rateFact(t)!=null?nf(rateFact(t),2):'—'}" disabled></div>
-      <div class="f"><label>Заданная, ${esc(rateUnit(t))}</label><input id="dRate" type="number" step="any" min="0" value="${t.rateExp??''}"${dis}></div>
+      <div class="f"><label>Подрядчик, ${esc(rateUnit(t))}</label><input id="dRate" type="number" step="any" min="0" value="${t.rateExp??''}"${dis}></div>
     </div>
     ${ro?'':`<button class="btn" id="dRateApply">Пересчитать длительность по выработке</button>`}`:''}
     <div class="sect">Сроки и связи</div>
     <div class="g2">
-      <div class="f"><label>Длительность, календ. дней</label><input id="dDur" type="number" min="1" value="${t.dur??''}"${dis}${t.stretch?' title="Для растягиваемой работы — длительность по умолчанию, если окончание не задано связью"':''}></div>
+      <div class="f"><label>Длительность, календ. дней</label><input id="dDur" type="number" min="1" value="${t.dur||''}"${dis}${t.stretch?' title="Для растягиваемой работы — длительность по умолчанию, если окончание не задано связью"':''}></div>
       <div class="f"><label>Начало не ранее</label><input id="dCons" type="date" value="${t.cons||''}"${dis}></div>
     </div>
+    ${t.finishOnly?`<div class="f"><label>Только дата завершения</label><input id="dFinishOnly" type="date" value="${esc(t.finishOnly)}"${dis}></div>`:''}
     <label class="chk"><input type="checkbox" id="dStretch"${t.stretch?' checked':''}${dis}><span>Растягивать по связям: начало задают связи ОН/НН, окончание — связи ОО/НО</span></label>
     <label class="chk"><input type="checkbox" id="dMs"${t.ms?' checked':''}${dis}><span>Веха (контрольное событие, ромб на графике)</span></label>
     <div class="f"><label>Предшественники. ОН — начать после окончания; НН — начать от начала; ОО — закончить от окончания; НО — закончить от начала. Лаг в днях, может быть отрицательным.</label></div>
@@ -535,7 +539,7 @@ function refreshDrawerStats(){
   const shift=r&&m.bf!=null?r.f-m.bf:null;
   const fl=FLd;
   el.innerHTML=`
-    <div><span>Начало</span>${r?fmt(r.s):'—'}</div><div><span>Окончание</span>${r?fmt(r.f)+' ('+(r.f-r.s+1)+' дн.)':'—'}</div>
+    <div><span>Начало</span>${fmt(startOf(draft,r))}</div><div><span>Окончание</span>${draft.finishOnly?fmt(dn(draft.finishOnly)):r?fmt(r.f)+' ('+(r.f-r.s+1)+' дн.)':'—'}</div>
     <div><span>Выполнено</span>${m.vol?nf(m.done)+' из '+nf(m.vol)+' ('+Math.round(m.pct*100)+'%)':(m.complete?'закрыто':'—')}</div>
     <div><span>План на ${fmt(TODAY)}</span>${m.plan!=null?nf(m.plan):'—'}</div>
     <div><span>Отклонение от плана</span><b class="${dev==null?'':dev<-0.5?'bad':'ok'}">${dev==null?'—':(dev>0?'+':'')+nf(dev)}</b></div>
@@ -552,7 +556,7 @@ function readDraft(){
   const vol=parseFloat(v('dVol')); t.vol=isNaN(vol)?null:vol;
   const op=parseFloat(v('dOpen')); t.open=isNaN(op)?0:op;
   const du=Number(v('dDur')); t.dur=!Number.isInteger(du)||du<1?null:du;
-  t.cons=v('dCons')||null;
+  t.cons=v('dCons')||null;if($('dFinishOnly')){if(t.cons){delete t.finishOnly;t.dur=t.dur||1;}else{t.finishOnly=v('dFinishOnly')||null;t.dur=0;}}
   if($('dClosed')) t.closed=$('dClosed').checked;if($('dPercent')){const n=Number(v('dPercent'));if(Number.isFinite(n)&&n>=0&&n<=100){t.manualPercent=n;t.progressMode=$('dProgressByFacts').checked?'volume':'percent';}}
   t.note=v('dNote');
   if($('dRateBasis')){t.rateBasis=$('dRateBasis').value;t.rateResources=Number($('dRateResources').value)||null;}
@@ -618,7 +622,7 @@ function bindDrawer(){
 // ---- выработки ----
 function rateUnit(t){const u=t.unit||'ед.';return u+({day:'/день',person:'/чел.-день',crew:'/бриг.-день'}[t.rateBasis||'day']||'/день')}
 function resourceFactor(t){return !t.rateBasis||t.rateBasis==='day'?1:(+t.rateResources>0?+t.rateResources:null)}
-function rateCalc(t){const v=+t.vol||0,r=S[t.id],d=r?r.f-r.s+1:(+t.dur||0),k=resourceFactor(t);return v&&d&&k?v/d/k:null}
+function rateCalc(t){if(t.finishOnly)return null;const v=+t.vol||0,r=S[t.id],d=r?r.f-r.s+1:(+t.dur||0),k=resourceFactor(t);return v&&d&&k?v/d/k:null}
 function rateFact(t){if(t.rateBasis&&t.rateBasis!=='day')return null;const rows=Object.entries(t.facts||{}).filter(([d,q])=>d<=isoOf(TODAY)&&Number.isFinite(+q)).sort();if(!rows.length)return null;const n=TODAY-dn(rows[0][0])+1;return n>0?rows.reduce((a,[,q])=>a+(+q),0)/n:null}
 function durFromRate(t,rate){rate=rate??t.rateExp;const v=+t.vol||0,k=resourceFactor(t);if(!(rate>0)||!v||!k||t.stretch||t.ms)return null;const m=t._m,r=S[t.id];if(m&&m.complete)return null;const pace=rate*k;if(r&&TODAY>r.s&&m&&m.done>0){const elapsed=TODAY-r.s;return Math.max(elapsed+1,elapsed+Math.ceil(Math.max(0,v-m.done)/pace))}return Math.max(1,Math.ceil(Math.max(0,v-(m?m.done:0))/pace))}
 function nextNum(){return Math.max(0,...Object.values(tasks).map(t=>t.num||0))+1}
@@ -749,10 +753,12 @@ $('modalBg').addEventListener('click',e=>{if(e.target===$('modalBg'))$('modalBg'
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){if($('modalBg').style.display==='flex'){$('modalBg').style.display='none';$('modal').className='modal'}else if($('drawer').classList.contains('open'))closeDrawer()}});
 
 // ---------- shared working view and baseline cut ----------
-function cutSchedule(data){const by=Object.fromEntries(data.tasks.map(t=>[t.id,t])),out={},active=new Set,ps=dn(data.settings.projectStart||'2026-09-20');function visit(id){if(id in out)return out[id];const t=by[id];if(!t||active.has(id))return null;if((!t.ms&&!(t.dur>0)&&!t.stretch)||(t.ms&&!t.cons&&!t.preds?.length))return out[id]=null;active.add(id);let start=Math.max(ps,t.cons?dn(t.cons):ps),finish=null,dur=Math.max(1,+t.dur||1);for(const p of t.preds||[]){const r=visit(p.id);if(!r)continue;const lag=+p.lag||0;if(p.type==='НН')start=Math.max(start,r.s+lag);else if(p.type==='ОО'||p.type==='НО'){const n=(p.type==='ОО'?r.f:r.s)+lag;finish=finish===null?n:Math.max(finish,n);}else start=Math.max(start,r.f+(by[p.id]?.ms?0:1)+lag);}active.delete(id);if(t.stretch)return out[id]={s:start,f:Math.max(finish??start+dur-1,start)};start=finish!==null?Math.max(start,finish-dur+1):start;return out[id]={s:start,f:t.ms?start:start+dur-1};}data.tasks.forEach(t=>visit(t.id));return out;}
+function cutSchedule(data){const by=Object.fromEntries(data.tasks.map(t=>[t.id,t])),out={},active=new Set,ps=dn(data.settings.projectStart||'2026-09-20');function visit(id){if(id in out)return out[id];const t=by[id];if(!t||active.has(id))return null;if(t.finishOnly){const f=dn(t.finishOnly);return out[id]={s:f,f};}if((!t.ms&&!(t.dur>0)&&!t.stretch)||(t.ms&&!t.cons&&!t.preds?.length))return out[id]=null;active.add(id);let start=Math.max(ps,t.cons?dn(t.cons):ps),finish=null,dur=Math.max(1,+t.dur||1);for(const p of t.preds||[]){const r=visit(p.id);if(!r)continue;const lag=+p.lag||0;if(p.type==='НН')start=Math.max(start,r.s+lag);else if(p.type==='ОО'||p.type==='НО'){const n=(p.type==='ОО'?r.f:r.s)+lag;finish=finish===null?n:Math.max(finish,n);}else start=Math.max(start,r.f+(by[p.id]?.ms?0:1)+lag);}active.delete(id);if(t.stretch)return out[id]={s:start,f:Math.max(finish??start+dur-1,start)};start=finish!==null?Math.max(start,finish-dur+1):start;return out[id]={s:start,f:t.ms?start:start+dur-1};}data.tasks.forEach(t=>visit(t.id));return out;}
 async function refreshCut(){if(cutBusy)return;if(dirty){toast('Сначала сохраните или закройте карточку.');return;}cutBusy=true;const day=$('cutDate').value,now=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Moscow',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());try{if(!day)throw Error('Укажите дату среза.');cutState=day<now?await store.asOf(day):null;$('cutNotice').textContent=day<now?'Сохранённое состояние на '+day+' относительно действующего базового плана.':'Текущий график относительно базового плана'+(baseline.date?' от '+baseline.date:'')+'.';render();}catch(e){cutState=false;$('cutNotice').textContent=e.message;if(facadeView==='cut')$('gwrap').innerHTML='<div class="empty">'+esc(e.message)+'</div>';}finally{cutBusy=false;}}
-function renderFacadeCut(){if(cutState===false){$('gwrap').innerHTML='<div class="empty">На выбранную дату сохранённого состояния нет. Выберите текущую дату или более позднюю сохранённую редакцию.</div>';return;}const data=cutState||snapshot(),dates=cutState?cutSchedule(data):S,selected=new Set(filtered(false,dates).map(t=>t.id));let rows=data.tasks.filter(t=>(selected.has(t.id)||cutState&&!tasks[t.id])&&inFacadePeriod(dates[t.id]));const horizon=+$('lookAhead').value;if(horizon){const a=dn($('cutDate').value);rows=rows.filter(t=>dates[t.id]&&dates[t.id].s<=a+horizon-1&&dates[t.id].f>=a);}const delta=n=>n==null?'—':(n>0?'+':'')+n+' дн.';const cell=n=>`<td class="${n>0?'bad':n<0?'good':''}">${delta(n)}</td>`;const body=rows.map(t=>{const r=dates[t.id],b=baseline.items[t.id];return `<tr><td class="cut-name"><b>${esc(t.name)}</b><small>${esc(stages[t.stage]?.short||stages[t.stage]?.name||'')}${t.contractor?' · '+esc(t.contractor):''}</small></td><td>${!cutState&&canWrite&&!t.ms&&!t.stretch?`<input class="durin" type="number" min="1" data-id="${esc(t.id)}" value="${t.dur}" aria-label="Длительность, дней">`:r?r.f-r.s+1:'—'}</td><td>${b?fmt(dn(b[0])):'—'}</td><td>${b?fmt(dn(b[1])):'—'}</td><td>${r?fmt(r.s):'—'}</td><td>${r?fmt(r.f):'—'}</td>${cell(r&&b?r.s-dn(b[0]):null)}${cell(r&&b?r.f-dn(b[1]):null)}</tr>`;}).join('');$('gwrap').innerHTML=`<table class="facade-cut"><thead><tr><th>Работа / местоположение</th><th>Дней</th><th>Базовое начало</th><th>Базовое окончание</th><th>Текущее начало</th><th>Текущее окончание</th><th>Сдвиг начала</th><th>Сдвиг окончания</th></tr></thead><tbody>${body}</tbody></table>`;}
-$('cutDate').value=isoOf(TODAY);$('compact').onchange=()=>{document.body.classList.toggle('compact-rows',$('compact').checked);render();};document.body.classList.add('compact-rows');$('nameWidth').oninput=()=>{document.documentElement.style.setProperty('--name-width',$('nameWidth').value+'px');document.documentElement.style.setProperty('--lw',((+$('nameWidth').value||460)+362)+'px');render();};function showFacadeGroups(){
+function renderFacadeCut(){if(cutState===false){$('gwrap').innerHTML='<div class="empty">На выбранную дату сохранённого состояния нет. Выберите текущую дату или более позднюю сохранённую редакцию.</div>';return;}const data=cutState||snapshot(),dates=cutState?cutSchedule(data):S,selected=new Set(filtered(false,dates).map(t=>t.id));let rows=data.tasks.filter(t=>(selected.has(t.id)||cutState&&!tasks[t.id])&&inFacadePeriod(dates[t.id]));const horizon=+$('lookAhead').value;if(horizon){const a=dn($('cutDate').value);rows=rows.filter(t=>dates[t.id]&&dates[t.id].s<=a+horizon-1&&dates[t.id].f>=a);}const delta=n=>n==null?'—':(n>0?'+':'')+n+' дн.';const cell=n=>`<td class="${n>0?'bad':n<0?'good':''}">${delta(n)}</td>`;const body=rows.map(t=>{const r=dates[t.id],b=baseline.items[t.id];return `<tr><td class="cut-name"><b>${esc(t.name)}</b><small>${esc(stages[t.stage]?.short||stages[t.stage]?.name||'')}${t.contractor?' · '+esc(t.contractor):''}</small></td><td>${!cutState&&canWrite&&!t.ms&&!t.stretch&&!t.finishOnly?`<input class="durin" type="number" min="1" data-id="${esc(t.id)}" value="${t.dur}" aria-label="Длительность, дней">`:r&&!t.finishOnly?r.f-r.s+1:'—'}</td><td>${b?fmt(dateNumber(b[0])):'—'}</td><td>${b?fmt(dateNumber(b[1])):'—'}</td><td>${fmt(startOf(t,r))}</td><td>${fmt(finishOf(t,r))}</td>${cell(r&&b&&b[0]&&!t.finishOnly?r.s-dn(b[0]):null)}${cell(r&&b&&b[1]?r.f-dn(b[1]):null)}</tr>`;}).join('');$('gwrap').innerHTML=`<table class="facade-cut"><thead><tr><th>Работа / местоположение</th><th>Дней</th><th>Базовое начало</th><th>Базовое окончание</th><th>Текущее начало</th><th>Текущее окончание</th><th>Сдвиг начала</th><th>Сдвиг окончания</th></tr></thead><tbody>${body}</tbody></table>`;}
+$('cutDate').value=isoOf(TODAY);$('compact').onchange=()=>{document.body.classList.toggle('compact-rows',$('compact').checked);render();};document.body.classList.add('compact-rows');$('nameWidth').oninput=()=>{document.documentElement.style.setProperty('--name-width',$('nameWidth').value+'px');updateRateColumns();render();};function updateRateColumns(){const on=$('showActualRate').checked;document.body.classList.toggle('hide-actual-rate',!on);document.documentElement.style.setProperty('--lw',((+$('nameWidth').value||460)+362+(on?80:0))+'px');}
+$('showActualRate').onchange=()=>{updateRateColumns();render();};updateRateColumns();
+function showFacadeGroups(){
   if(ui.group==='none'){ui.group='stage';$('segGroup').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v==='stage'));}
   ui.collapsed.clear();$('segGroup').querySelectorAll('button').forEach(b=>b.disabled=false);
 }
@@ -777,7 +783,7 @@ $('facadePeriodOnly').onchange=applyFacadePeriod;
 $('includeOverdue').onchange=render;$('refreshCut').onclick=refreshCut;$('cutDate').onchange=refreshCut;
 $('facadeViews').querySelectorAll('button').forEach(b=>b.onclick=()=>{facadeView=b.dataset.view;$('facadeViews').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));if(facadeView==='cut')refreshCut();else render();});
 async function saveCalendarFact(id,day,raw){if(dirty)throw Error('Сначала сохраните карточку');const t=clone(tasks[id]);if(!t||!(t.vol>0))throw Error('Задайте общий объём и единицу в карточке работы');if(raw!==''&&(!Number.isFinite(+raw)||+raw<0))throw Error('Объём — число ≥ 0');window.GPR_WORKSPACE.putFact(t,day,raw,isoOf(TODAY),(tasks[id]._m?.pct||0)*100);if(day<=isoOf(TODAY))t.closed=window.GPR_WORKSPACE.done(t)>=t.vol;if(!await saveTask(t,'Дневной факт сохранён'))throw Error('Факт не сохранён. Проверьте сообщение об ошибке.');}
-function facadePrintRows(){const data=cutState&&facadeView==='cut'?cutState:snapshot(),dates=cutState&&facadeView==='cut'?cutSchedule(data):S,by=new Map(data.tasks.map(t=>[t.id,t])),rows=[];for(const g of groups(filtered(false))){if(g.label!==null)rows.push({id:'print-group-'+g.key,name:g.label,summary:true,start:g.s==null?null:isoOf(g.s),finish:g.f==null?null:isoOf(g.f),duration:g.s==null?'—':g.f-g.s+1,progress:nf(g.percent,1)+'%'});if($('printScope').value==='visible'&&ui.collapsed.has(g.key)&&facadeView!=='cut')continue;for(const liveTask of g.items){const t=by.get(liveTask.id);if(!t)continue;const r=dates[t.id],b=baseline.items[t.id];rows.push({id:t.id,parent:g.label!==null?'print-group-'+g.key:null,facts:t.facts,unit:t.unit,quantity:window.GPR_WORKSPACE.done(t)+' / '+(t.vol??'—'),preds:(t.preds||[]).map(p=>({...p,label:tasks[p.id]?.name||p.id})),name:t.name,zone:stages[t.stage]?.short||stages[t.stage]?.name||'',context:[stages[t.stage]?.short,t.contractor].filter(Boolean).join(' · '),start:r?isoOf(r.s):null,finish:r?isoOf(r.f):null,baseStart:b?.[0],baseFinish:b?.[1],duration:r?r.f-r.s+1:'—',progress:t.factProgressOpening&&isoOf(TODAY)<t.factProgressOpening.from?nf(t.factProgressOpening.percent)+'%':t.progressMode==='percent'?nf(t.manualPercent||0)+'%':t.vol?nf(Math.min(100,100*((+t.open||0)+Object.entries(t.facts||{}).filter(([d])=>d<=isoOf(TODAY)).reduce((a,[,b])=>a+(+b||0),0))/t.vol))+'%':t.closed?'100%':'—',milestone:t.ms,category:t.cat==='glass'?'row-engineering':''});}}return window.GPR_REPORT.filterRows(rows,facadePrintOptions());}
+function facadePrintRows(){const data=cutState&&facadeView==='cut'?cutState:snapshot(),dates=cutState&&facadeView==='cut'?cutSchedule(data):S,by=new Map(data.tasks.map(t=>[t.id,t])),rows=[];for(const g of groups(filtered(false))){if(g.label!==null)rows.push({id:'print-group-'+g.key,name:g.label,summary:true,start:g.s==null?null:isoOf(g.s),finish:g.f==null?null:isoOf(g.f),duration:g.s==null?'—':g.f-g.s+1,progress:nf(g.percent,1)+'%'});if($('printScope').value==='visible'&&ui.collapsed.has(g.key)&&facadeView!=='cut')continue;for(const liveTask of g.items){const t=by.get(liveTask.id);if(!t)continue;const r=dates[t.id],b=baseline.items[t.id];rows.push({id:t.id,parent:g.label!==null?'print-group-'+g.key:null,facts:t.facts,unit:t.unit,quantity:window.GPR_WORKSPACE.done(t)+' / '+(t.vol??'—'),preds:(t.preds||[]).map(p=>({...p,label:tasks[p.id]?.name||p.id})),name:t.name,zone:stages[t.stage]?.short||stages[t.stage]?.name||'',context:[stages[t.stage]?.short,t.contractor].filter(Boolean).join(' · '),start:startOf(t,r)==null?null:isoOf(startOf(t,r)),finish:finishOf(t,r)==null?null:isoOf(finishOf(t,r)),baseStart:b?.[0],baseFinish:b?.[1],duration:t.finishOnly?'—':r?r.f-r.s+1:'—',progress:t.factProgressOpening&&isoOf(TODAY)<t.factProgressOpening.from?nf(t.factProgressOpening.percent)+'%':t.progressMode==='percent'?nf(t.manualPercent||0)+'%':t.vol?nf(Math.min(100,100*((+t.open||0)+Object.entries(t.facts||{}).filter(([d])=>d<=isoOf(TODAY)).reduce((a,[,b])=>a+(+b||0),0))/t.vol))+'%':t.closed?'100%':'—',milestone:t.ms,category:t.cat==='glass'?'row-engineering':''});}}return window.GPR_REPORT.filterRows(rows,facadePrintOptions());}
 function facadePrintOptions(){return{span:$('printScale').value==='fit'?dn($('printEnd').value)-dn($('printStart').value)+1:+$('printScale').value,mode:window.GPR_WORKSPACE.facts()?'facts':facadeView==='cut'?'cut':'gantt',showLinks:$('printLinks').checked,...window.GPR_WORKSPACE.printOptions(settings.title),date:fmt(dn($('cutDate').value)),baseline:baseline.date||'не задан',paper:$('paper').value,start:$('printStart').value,end:$('printEnd').value};}
 function estimatePrint(){try{const rows=facadePrintRows(),o=facadePrintOptions();$('printEstimate').textContent=window.GPR_WORKSPACE.pageEstimate(rows,o);}catch(e){$('printEstimate').textContent=e.message;}}
 window.GPR_WORKSPACE.mount(document.querySelector('.top'),render);window.GPR_WORKSPACE.printControls();
@@ -788,15 +794,15 @@ $('bSundays').onclick=()=>{if(dirty){toast('Сначала сохраните и
 // ---------- baseline ----------
 $('bBase').onclick=async()=>{
   if(!confirm('Сохранить текущие сроки всех работ как новый базовый план? Старый базовый план будет заменён.'))return;
-  const items={}; for(const id in S){if(S[id])items[id]=[isoOf(S[id].s),isoOf(S[id].f)]}
-  try{await db.doc('meta/baseline').set({date:isoOf(TODAY),items});toast('Базовый план зафиксирован на '+fmt(TODAY))}catch(e){handleWriteErr(e)}
+  const items={}; for(const id in S){if(S[id])items[id]=[startOf(tasks[id],S[id])==null?null:isoOf(startOf(tasks[id],S[id])),isoOf(finishOf(tasks[id],S[id]))]}
+  try{await db.doc('meta/baseline').set({date:isoOf(TODAY),items,links:Object.fromEntries(Object.values(tasks).map(t=>[t.id,clone(t.preds||[])]))});toast('Базовый план зафиксирован на '+fmt(TODAY))}catch(e){handleWriteErr(e)}
 };
 
 // ---------- export ----------
 function snapshot(){return {tasks:Object.values(tasks).map(clone),stages:Object.values(stages).map(clone),settings:clone(settings),baseline:clone(baseline)}}
 function downloadFile(name,text,type){const url=URL.createObjectURL(new Blob([text],{type}));const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 $('bDl').onclick=()=>downloadFile('LIV_фасады_'+isoOf(TODAY)+'.json',JSON.stringify({kind:'liv-facade-artifact-v1',reportDate:isoOf(TODAY),data:snapshot()},null,2),'application/json');
-$('bCsv').onclick=()=>{compute();const rows=[['ID','Этап','Работа','Ед. объёма','Объём','Выполнено','Выработка расчётная','Выработка заданная','Ед. выработки','Количество ресурса','Начало','Окончание','Предшественники','Примечание'],...filtered(true).map(t=>[t.num,stageOf(t)?.short,t.name,t.unit,t.vol,t._m.done,rateCalc(t),t.rateExp,rateUnit(t),t.rateResources,S[t.id]?isoOf(S[t.id].s):'',S[t.id]?isoOf(S[t.id].f):'',t.preds.map(p=>'#'+tasks[p.id]?.num+' '+p.type+(p.lag>=0?'+':'')+p.lag).join('; '),t.note])];const cell=v=>{let s=String(v??'');if(/^[=+@-]/.test(s)&&typeof v!=='number')s="'"+s;return '"'+s.replace(/"/g,'""')+'"'};downloadFile('LIV_фасады.csv','\ufeff'+rows.map(r=>r.map(cell).join(';')).join('\r\n'),'text/csv;charset=utf-8')};
+$('bCsv').onclick=()=>{compute();const rows=[['ID','Этап','Работа','Ед. объёма','Объём','Выполнено','Выработка расчётная','Выработка подрядчика','Выработка фактическая','Ед. выработки','Количество ресурса','Начало','Окончание','Предшественники','Примечание'],...filtered(true).map(t=>[t.num,stageOf(t)?.short,t.name,t.unit,t.vol,t._m.done,rateCalc(t),t.rateExp,rateFact(t),rateUnit(t),t.rateResources,startOf(t,S[t.id])==null?'':isoOf(startOf(t,S[t.id])),finishOf(t,S[t.id])==null?'':isoOf(finishOf(t,S[t.id])),t.preds.map(p=>'#'+tasks[p.id]?.num+' '+p.type+(p.lag>=0?'+':'')+p.lag).join('; '),t.note])];const cell=v=>{let s=String(v??'');if(/^[=+@-]/.test(s)&&typeof v!=='number')s="'"+s;return '"'+s.replace(/"/g,'""')+'"'};downloadFile('LIV_фасады.csv','\ufeff'+rows.map(r=>r.map(cell).join(';')).join('\r\n'),'text/csv;charset=utf-8')};
 // ---------- init ----------
 function setEditUi(){['bAdd','bStages','bBase'].forEach(id=>$(id).hidden=!canWrite);$('deadline').disabled=!canWrite;$('bDl').hidden=false;}
 function banner(m,...btns){const b=$('banner');b.textContent=m;for(const [label,fn] of btns){const x=document.createElement('button');x.textContent=label;x.onclick=fn;b.appendChild(x)}b.style.display=m?'block':'none'}

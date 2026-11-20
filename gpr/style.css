@@ -256,3 +256,7 @@ svg.links .arrowhead{fill:context-stroke;stroke:none}
 .percentin{width:48px;min-width:0;border:1px solid var(--line);background:var(--surface);border-radius:4px;padding:3px;font-size:12px}.sunday-modal{width:min(1000px,96vw)}.sunday-table{width:100%;border-collapse:collapse;font-size:13px}.sunday-table td,.sunday-table th{padding:7px;border-bottom:1px solid var(--line);text-align:left}.sunday-table small{display:block;color:var(--muted)}.sunday-table input[type=checkbox]{width:16px;min-height:16px}.sunday-modal .db{overflow:auto;max-height:65vh}
 
 .lab .p,.chead .p{width:58px;flex-basis:58px}
+
+/* Actual pace has its own optional column; hiding it preserves the name width. */
+.hide-actual-rate .fact-rate{display:none!important}
+.lab .fact-rate,.chead .fact-rate{flex:0 0 72px;width:72px}
