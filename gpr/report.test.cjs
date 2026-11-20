@@ -21,7 +21,7 @@ test('each daily calendar cell receives a day number through a two-month print i
 
 test('optional daily print boundaries cover every day and do not depend on background graphics',()=>{for(const count of [1,14,45,120]){const rows=[{name:'Работа',start:'2026-11-17',finish:'2026-11-30'}],end=new Date(Date.UTC(2026,10,17)+(count-1)*86400000).toISOString().slice(0,10),pages=R.plan(rows,'2026-11-17',end,'A3',count,'gantt',1);const visible=R.html(pages,{showGrid:true}),hidden=R.html(pages,{showGrid:false});assert.equal((visible.match(/class="report-gridline"/g)||[]).length,count-1);assert(!hidden.includes('class="report-gridline"'));assert.equal((visible.match(/class="report-bar"/g)||[]).length,(hidden.match(/class="report-bar"/g)||[]).length);}const css=require('fs').readFileSync(__dirname+'/report.css','utf8');assert(css.includes('border-left:0.2mm solid #b9c7d6'));assert(!css.includes('linear-gradient'));const pages=R.plan([{name:'Факт'}],'2026-11-17','2026-11-30','A3',14);assert(R.html(pages,{mode:'facts',showGrid:false}).includes('no-calendar-grid'));});
 
-test('compact mockup keeps work titles and groups without repeated section subtitles',()=>{const rows=[{id:'g',name:'Мебель Standard Twin',summary:true},{id:'a',parent:'g',name:'Производство мебельных изделий',context:'Поставка · Мебель Standard Twin',start:'2026-11-01',finish:'2026-11-30'}],pages=R.plan(rows,'2026-11-01','2026-11-30','A3',30,'gantt',1),html=R.html(pages,{title:'Мокап',compactWorkNames:true});assert(html.includes('report-mockup'));assert(html.includes('width:45%'));assert(html.includes('Мебель Standard Twin'));assert(html.includes('Производство мебельных изделий'));assert(!html.includes('class="report-zone"'));assert(html.includes('01.11.26'));assert(!html.includes('Т: '));});
+test('compact mockup keeps work titles and groups without repeated section subtitles',()=>{const rows=[{id:'g',name:'Мебель Standard Twin',summary:true},{id:'a',parent:'g',name:'Производство мебельных изделий',context:'Поставка · Мебель Standard Twin',start:'2026-11-01',finish:'2026-11-30'}],pages=R.plan(rows,'2026-11-01','2026-11-30','A3',30,'gantt',1),html=R.html(pages,{title:'Мокап',compactWorkNames:true});assert(html.includes('report-mockup'));assert(html.includes('width:39%'));assert(html.includes('Мебель Standard Twin'));assert(html.includes('Производство мебельных изделий'));assert(!html.includes('class="report-zone"'));assert(html.includes('01.11.26'));assert(!html.includes('Т: '));});
 
 test('shared print columns keep headers and cells aligned for all visibility combinations',()=>{
  const rows=[{id:'a',name:'Работа',context:'ГК · Блок 1 · Этаж 3',zone:'ГК · Блок 1 · Этаж 3',progress:'45%',duration:14,quantity:'7 / 10',unit:'м²',start:'2026-11-17',finish:'2026-11-30',baseStart:'2026-11-15',baseFinish:'2026-11-28'}];
@@ -39,4 +39,16 @@ test('names and zones can be selected without losing row identity',()=>{
  const pages=R.plan([{id:'a',name:'Стяжка',context:'ГК · Этаж 3',zone:'ГК · Этаж 3'}],'2026-11-17','2026-11-30','A3',14);
  const names=R.html(pages,{compactWorkNames:true,showTaskNames:true,showContext:false});assert(names.includes('class="report-task-name">Стяжка'));assert(!names.includes('class="report-zone"'));
  const zones=R.html(pages,{compactWorkNames:true,showTaskNames:false,showContext:true});assert(zones.includes('class="report-zone">ГК · Этаж 3'));assert(!zones.includes('class="report-task-name"'));
+});
+
+
+test('date layouts render either two complete intervals or four independently labelled dates',()=>{
+ const row={id:'a',name:'Монтаж',start:'2026-11-17',finish:'2026-12-20',baseStart:'2026-11-01',baseFinish:'2026-12-10'},pages=R.plan([row,{...row,id:'b',start:null,finish:null,baseStart:null,baseFinish:null}],'2026-11-01','2026-12-31','A3',61,'gantt',1);
+ for(const mode of ['gantt','cut'])for(const dateLayout of ['ranges','separate'])for(const showCurrent of [true,false])for(const showBaseline of [true,false]){
+  const html=R.html(pages,{mode,dateLayout,compactWorkNames:true,showCurrent,showBaseline}),head=html.match(/<thead>[\s\S]*?<\/thead>/)[0],body=html.match(/<tbody>([\s\S]*?)<\/tbody>/)[1],cols=(html.match(/<col[ >]/g)||[]).length,perPlan=dateLayout==='ranges'?1:2,dates=+showCurrent+ +showBaseline;
+  assert.equal((head.match(/<th[ >]/g)||[]).length,cols);assert.equal((body.match(/<td[ >]/g)||[]).length,cols*2);assert.equal((body.match(/report-date-(?:range|single)/g)||[]).length,dates*perPlan*2);
+  if(showCurrent)assert(html.includes(dateLayout==='ranges'?'17.11.26 — 20.12.26':'Текущее начало'));
+  if(showBaseline)assert(html.includes(dateLayout==='ranges'?'01.11.26 — 10.12.26':'Базовое окончание'));
+  assert(!/NaN|Invalid Date|Т: |Б: /.test(html));
+ }
 });
