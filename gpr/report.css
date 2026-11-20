@@ -133,3 +133,11 @@
 .report-table tr.lift-group>td{background-color:#f2ead8!important;border-top:0.35mm solid #bba87d;border-bottom:0.2mm solid #c7b995}
 .report-table tr.lift-building>.report-name{border-left:1mm solid #6185a7}
 .report-table tr.lift-group>.report-name{border-left:0.7mm solid #b79552}
+
+
+/* Optional A3 height fitting enlarges sparse tables without widening their columns. */
+.report-fill-height .report-table tbody tr{height:var(--report-row-height,auto)}
+.report-fill-height.report-mockup .report-table .report-dates,.report-fill-height.report-mockup .report-table .report-dates span{white-space:normal;overflow-wrap:normal}
+.report-fill-height.report-mockup .report-months,.report-fill-height.report-mockup .report-months span{height:5mm;font-size:8pt}
+.report-fill-height.report-mockup .report-days,.report-fill-height.report-mockup .report-day{height:6.5mm}
+.report-fill-height.report-mockup .report-day small{font-size:5pt}

@@ -34,24 +34,28 @@ function drawLinks(document){const root=document.getElementById('printRoot');if(
  const layer=document.createElement('div');layer.className='report-arrows';Object.assign(layer.style,{left:(gr.left-wr.left)+'px',width:gr.width+'px',height:wr.height+'px'});layer.innerHTML=`<svg viewBox="0 0 ${gr.width} ${wr.height}" width="100%" height="100%"><defs><marker id="report-arrow-${page.dataset.page}" viewBox="0 0 6 6" refX="6" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path class="arrow-fill" d="M0,0L6,3L0,6z"/></marker></defs>${paths}</svg>`;wrap.appendChild(layer);}}
 function fitPages(document){const root=document.getElementById('printRoot');
  for(const page of root.querySelectorAll('.report-mockup')){
-  const cell=page.querySelector('.report-day'),days=+page.dataset.days||1;
-  if(cell){const width=cell.getBoundingClientRect().width;page.style.setProperty('--mock-day-font',Math.min(6,Math.max(2.5,width/(days>62?3.5:2)*.75))+'pt');}
+  const cell=page.querySelector('.report-day'),days=+page.dataset.days||1,fill=root.dataset.fillHeight==='1';page.classList.toggle('report-fill-height',fill);
+  if(cell){const width=cell.getBoundingClientRect().width;page.style.setProperty('--mock-day-font',Math.min(fill?9:6,Math.max(2.5,width/(days>62?3.5:2.2)*.75))+'pt');}
  }
  if(root.dataset.fit!=='1')return;for(const page of root.querySelectorAll('.report-page')){const body=page.querySelector('.report-calendar-wrap,.report-cut-table');if(!body)continue;body.style.zoom='1';body.style.width='100%';
 if(page.classList.contains('report-mockup')){
- page.style.setProperty('--report-fit','1');
+ page.style.setProperty('--report-fit','1');page.style.removeProperty('--report-row-height');
  const unit=page.getBoundingClientRect().width/(page.dataset.paper==='A4'?277:400);
  const header=page.querySelector('header'),meta=page.querySelector('.report-meta'),footer=page.querySelector('footer');
  const used=[header,meta,footer].reduce((n,e)=>n+(e?e.getBoundingClientRect().height:0),0);
  const budget=(page.dataset.paper==='A4'?182:265)*unit-used-13*unit;
- let low=0,high=1;
+ let low=0,high=root.dataset.fillHeight==='1'?1.6:1;
  for(let i=0;i<9;i++){const mid=(low+high)/2;page.style.setProperty('--report-fit',String(mid));if(body.getBoundingClientRect().height<=budget)low=mid;else high=mid;}
  const scale=low;page.style.setProperty('--report-fit',String(scale));
+ if(root.dataset.fillHeight==='1'){
+  const rows=body.querySelectorAll('tbody tr').length,head=body.querySelector('thead')?.getBoundingClientRect().height||0;
+  if(rows){const rowHeight=Math.max(0,Math.min(18,(budget-head-2*unit)/(rows*unit)));page.style.setProperty('--report-row-height',rowHeight+'mm');}
+ }
  page.dataset.textScale=Math.round(scale*100)+'%';continue;
 }
 const unit=page.getBoundingClientRect().width/(page.dataset.paper==='A4'?277:400);const budget=(page.dataset.paper==='A4'?137:210)+(page.classList.contains('no-report-header')?22:0);const h=body.getBoundingClientRect().height;let scale=Math.min(1,budget*unit/Math.max(h,1));body.style.zoom=String(scale);body.style.width='100%';page.dataset.textScale=Math.round(scale*100)+'%';}}
 function rootWindow(){return typeof window!=='undefined'?window:globalThis;}
-function prepare(document,rows,options){const pages=plan(rows,options.start,options.end,options.paper,options.span,options.mode,options.targetPages);document.getElementById('printRoot').innerHTML=html(pages,options);let style=document.getElementById('printPageStyle');if(!style){style=document.createElement('style');style.id='printPageStyle';document.head.appendChild(style);}style.textContent=`@page{size:${options.paper||'A3'} landscape;margin:10mm}`;document.getElementById('printRoot').dataset.links=options.showLinks?'1':'0';document.getElementById('printRoot').dataset.fit=options.targetPages?'1':'0';fitPages(document);drawLinks(document);return pages.length;}
+function prepare(document,rows,options){const pages=plan(rows,options.start,options.end,options.paper,options.span,options.mode,options.targetPages);document.getElementById('printRoot').innerHTML=html(pages,options);let style=document.getElementById('printPageStyle');if(!style){style=document.createElement('style');style.id='printPageStyle';document.head.appendChild(style);}style.textContent=`@page{size:${options.paper||'A3'} landscape;margin:10mm}`;document.getElementById('printRoot').dataset.links=options.showLinks?'1':'0';document.getElementById('printRoot').dataset.fit=options.targetPages||options.fillHeight?'1':'0';document.getElementById('printRoot').dataset.fillHeight=options.fillHeight?'1':'0';fitPages(document);drawLinks(document);return pages.length;}
 function close(document){document.body.classList.remove('report-preview');document.getElementById('printRoot').replaceChildren();}
 function preview(document,rows,options){const pages=prepare(document,rows,options),root=document.getElementById('printRoot');root.insertAdjacentHTML('afterbegin',`<div class="report-actions"><b>Предпросмотр · ${options.paper||'A3'} · Листов: ${pages}</b><span>В диалоге браузера выберите «Сохранить как PDF»</span><button id="reportPrint" class="btn dark">Печать / Сохранить PDF</button><button id="reportClose" class="btn">Закрыть</button></div>`);document.body.classList.add('report-preview');root.scrollTop=0;fitPages(document);const sizes=[...root.querySelectorAll('[data-text-scale]')].map(p=>parseInt(p.dataset.textScale));if(sizes.length)root.querySelector('.report-actions span').textContent='Размер текста: '+Math.min(...sizes)+'% · Сохранить как PDF в диалоге браузера';drawLinks(document);document.getElementById('reportPrint').onclick=()=>window.print();document.getElementById('reportClose').onclick=()=>close(document);return pages;}
 if(typeof window!=='undefined'){
@@ -62,3 +66,4 @@ if(typeof window!=='undefined'){
 }
 root.GPR_REPORT={overlaps,filterRows,plan,html,prepare,preview,close,drawLinks,fitPages};if(typeof module!=='undefined')module.exports=root.GPR_REPORT;
 })(typeof window!=='undefined'?window:globalThis);
+
