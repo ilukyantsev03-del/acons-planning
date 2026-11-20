@@ -183,29 +183,30 @@ function range(){
   T1=Math.round(Date.UTC(b.getUTCFullYear(),b.getUTCMonth()+1,1)/DAY)-1;
 }
 const X=n=>(n-T0)*px;
-function sortTasks(arr){
-  if(ui.sort==='gpr') return arr.sort((a,b)=>stOrder(a)-stOrder(b)||(a.order||0)-(b.order||0)||(a.num||0)-(b.num||0));
+function sortTasks(arr,dates=S,stageMap=stages){
+  const stageOrder=t=>stageMap[t.stage]?.order??999;
+  if(ui.sort==='gpr') return arr.sort((a,b)=>stageOrder(a)-stageOrder(b)||(a.order||0)-(b.order||0)||(a.num||0)-(b.num||0));
   return arr.sort((a,b)=>{
-    const ra=S[a.id],rb=S[b.id];
+    const ra=dates[a.id],rb=dates[b.id];
     if(!!ra!==!!rb) return ra?-1:1;
     if(ra&&rb&&ra.s!==rb.s) return ra.s-rb.s;
-    if(stOrder(a)!==stOrder(b)) return stOrder(a)-stOrder(b);
+    if(stageOrder(a)!==stageOrder(b)) return stageOrder(a)-stageOrder(b);
     return (a.order||0)-(b.order||0);
   });
 }
-function groups(list){
-  if(ui.group==='none') return [{key:'',label:null,items:sortTasks(list)}];
+function groups(list,dates=S,stageMap=stages){
+  if(ui.group==='none') return [{key:'',label:null,items:sortTasks(list,dates,stageMap)}];
   const map=new Map();
   for(const t of list){
     let k,l,o;
-    if(ui.group==='stage'){const s=stageOf(t);k=t.stage;l=s?s.name:'Без этапа';o=s?s.order:999;var gn=s&&s.note}
+    if(ui.group==='stage'){const s=stageMap[t.stage];k=t.stage;l=s?s.name:'Без этапа';o=s?s.order:999;var gn=s&&s.note}
     else if(ui.group==='type'){k=t.type||'Прочее';l=k;o=0}
     else {k=t.contractor||'';l=t.contractor||'Без подрядчика';o=t.contractor?0:-1}
     if(!map.has(k)) map.set(k,{key:k,label:l,o,items:[],note:ui.group==='stage'?gn:''});
     map.get(k).items.push(t);
   }
-  const gs=[...map.values()];for(const g of gs)g.percent=g.items.reduce((sum,t)=>sum+t._m.pct*100,0)/(g.items.length||1);
-  gs.forEach(g=>{sortTasks(g.items);const ss=g.items.map(t=>S[t.id]).filter(Boolean);g.s=ss.length?Math.min(...ss.map(r=>r.s)):null;g.f=ss.length?Math.max(...ss.map(r=>r.f)):null});
+  const gs=[...map.values()];for(const g of gs)g.percent=g.items.reduce((sum,t)=>sum+(t._m?.pct||0)*100,0)/(g.items.length||1);
+  gs.forEach(g=>{sortTasks(g.items,dates,stageMap);const ss=g.items.map(t=>dates[t.id]).filter(Boolean);g.s=ss.length?Math.min(...ss.map(r=>r.s)):null;g.f=ss.length?Math.max(...ss.map(r=>r.f)):null});
   gs.sort((a,b)=>ui.group==='stage'?a.o-b.o:ui.group==='contractor'?(a.o-b.o||a.label.localeCompare(b.label,'ru')):((a.s??1e9)-(b.s??1e9)));
   return gs;
 }
@@ -337,7 +338,7 @@ function hideTip(){tip.style.display='none'}
 // ---------- events on gantt ----------
 const gw=$('gwrap');
 gw.addEventListener('click',e=>{
-  const g=e.target.closest('.row.grp');
+  const g=e.target.closest('.row.grp,.cut-group');
   if(g){const k=g.dataset.g;ui.collapsed.has(k)?ui.collapsed.delete(k):ui.collapsed.add(k);render();return}
   if(e.target.closest('input')) return;
   const msd=e.target.closest('.ms'); if(msd){openDrawer(msd.dataset.id);return}
@@ -755,7 +756,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){if($('modalBg').sty
 // ---------- shared working view and baseline cut ----------
 function cutSchedule(data){const by=Object.fromEntries(data.tasks.map(t=>[t.id,t])),out={},active=new Set,ps=dn(data.settings.projectStart||'2026-09-20');function visit(id){if(id in out)return out[id];const t=by[id];if(!t||active.has(id))return null;if(t.finishOnly){const f=dn(t.finishOnly);return out[id]={s:f,f};}if((!t.ms&&!(t.dur>0)&&!t.stretch)||(t.ms&&!t.cons&&!t.preds?.length))return out[id]=null;active.add(id);let start=Math.max(ps,t.cons?dn(t.cons):ps),finish=null,dur=Math.max(1,+t.dur||1);for(const p of t.preds||[]){const r=visit(p.id);if(!r)continue;const lag=+p.lag||0;if(p.type==='НН')start=Math.max(start,r.s+lag);else if(p.type==='ОО'||p.type==='НО'){const n=(p.type==='ОО'?r.f:r.s)+lag;finish=finish===null?n:Math.max(finish,n);}else start=Math.max(start,r.f+(by[p.id]?.ms?0:1)+lag);}active.delete(id);if(t.stretch)return out[id]={s:start,f:Math.max(finish??start+dur-1,start)};start=finish!==null?Math.max(start,finish-dur+1):start;return out[id]={s:start,f:t.ms?start:start+dur-1};}data.tasks.forEach(t=>visit(t.id));return out;}
 async function refreshCut(){if(cutBusy)return;if(dirty){toast('Сначала сохраните или закройте карточку.');return;}cutBusy=true;const day=$('cutDate').value,now=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Moscow',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());try{if(!day)throw Error('Укажите дату среза.');cutState=day<now?await store.asOf(day):null;$('cutNotice').textContent=day<now?'Сохранённое состояние на '+day+' относительно действующего базового плана.':'Текущий график относительно базового плана'+(baseline.date?' от '+baseline.date:'')+'.';render();}catch(e){cutState=false;$('cutNotice').textContent=e.message;if(facadeView==='cut')$('gwrap').innerHTML='<div class="empty">'+esc(e.message)+'</div>';}finally{cutBusy=false;}}
-function renderFacadeCut(){if(cutState===false){$('gwrap').innerHTML='<div class="empty">На выбранную дату сохранённого состояния нет. Выберите текущую дату или более позднюю сохранённую редакцию.</div>';return;}const data=cutState||snapshot(),dates=cutState?cutSchedule(data):S,selected=new Set(filtered(false,dates).map(t=>t.id));let rows=data.tasks.filter(t=>(selected.has(t.id)||cutState&&!tasks[t.id])&&inFacadePeriod(dates[t.id]));const horizon=+$('lookAhead').value;if(horizon){const a=dn($('cutDate').value);rows=rows.filter(t=>dates[t.id]&&dates[t.id].s<=a+horizon-1&&dates[t.id].f>=a);}const delta=n=>n==null?'—':(n>0?'+':'')+n+' дн.';const cell=n=>`<td class="${n>0?'bad':n<0?'good':''}">${delta(n)}</td>`;const body=rows.map(t=>{const r=dates[t.id],b=baseline.items[t.id];return `<tr><td class="cut-name"><b>${esc(t.name)}</b><small>${esc(stages[t.stage]?.short||stages[t.stage]?.name||'')}${t.contractor?' · '+esc(t.contractor):''}</small></td><td>${!cutState&&canWrite&&!t.ms&&!t.stretch&&!t.finishOnly?`<input class="durin" type="number" min="1" data-id="${esc(t.id)}" value="${t.dur}" aria-label="Длительность, дней">`:r&&!t.finishOnly?r.f-r.s+1:'—'}</td><td>${b?fmt(dateNumber(b[0])):'—'}</td><td>${b?fmt(dateNumber(b[1])):'—'}</td><td>${fmt(startOf(t,r))}</td><td>${fmt(finishOf(t,r))}</td>${cell(r&&b&&b[0]&&!t.finishOnly?r.s-dn(b[0]):null)}${cell(r&&b&&b[1]?r.f-dn(b[1]):null)}</tr>`;}).join('');$('gwrap').innerHTML=`<table class="facade-cut"><thead><tr><th>Работа / местоположение</th><th>Дней</th><th>Базовое начало</th><th>Базовое окончание</th><th>Текущее начало</th><th>Текущее окончание</th><th>Сдвиг начала</th><th>Сдвиг окончания</th></tr></thead><tbody>${body}</tbody></table>`;}
+function renderFacadeCut(){if(cutState===false){$('gwrap').innerHTML='<div class="empty">На выбранную дату сохранённого состояния нет. Выберите текущую дату или более позднюю сохранённую редакцию.</div>';return;}const data=cutState||snapshot(),dates=cutState?cutSchedule(data):S,selected=new Set(filtered(false,dates).map(t=>t.id));let rows=data.tasks.filter(t=>(selected.has(t.id)||cutState&&!tasks[t.id])&&inFacadePeriod(dates[t.id]));const horizon=+$('lookAhead').value;if(horizon){const a=dn($('cutDate').value);rows=rows.filter(t=>dates[t.id]&&dates[t.id].s<=a+horizon-1&&dates[t.id].f>=a);}const delta=n=>n==null?'—':(n>0?'+':'')+n+' дн.';const cell=n=>`<td class="${n>0?'bad':n<0?'good':''}">${delta(n)}</td>`;const renderRow=t=>{const r=dates[t.id],b=baseline.items[t.id];return `<tr><td class="cut-name"><b>${esc(t.name)}</b><small>${esc(stages[t.stage]?.short||stages[t.stage]?.name||'')}${t.contractor?' · '+esc(t.contractor):''}</small></td><td>${!cutState&&canWrite&&!t.ms&&!t.stretch&&!t.finishOnly?`<input class="durin" type="number" min="1" data-id="${esc(t.id)}" value="${t.dur}" aria-label="Длительность, дней">`:r&&!t.finishOnly?r.f-r.s+1:'—'}</td><td>${b?fmt(dateNumber(b[0])):'—'}</td><td>${b?fmt(dateNumber(b[1])):'—'}</td><td>${fmt(startOf(t,r))}</td><td>${fmt(finishOf(t,r))}</td>${cell(r&&b&&b[0]&&!t.finishOnly?r.s-dn(b[0]):null)}${cell(r&&b&&b[1]?r.f-dn(b[1]):null)}</tr>`;};const stageMap=Object.fromEntries(data.stages.map(s=>[s.id,s]));const body=groups(rows,dates,stageMap).map(g=>{if(g.label===null)return g.items.map(renderRow).join('');const closed=ui.collapsed.has(g.key);return `<tr class="cut-group" data-g="${esc(g.key)}"><th colspan="8"><button type="button" aria-expanded="${!closed}">${closed?'▸':'▾'} ${esc(g.label)} <span>${g.items.length} работ</span></button></th></tr>`+(closed?'':g.items.map(renderRow).join(''));}).join('');$('gwrap').innerHTML=`<table class="facade-cut"><thead><tr><th>Работа / местоположение</th><th>Дней</th><th>Базовое начало</th><th>Базовое окончание</th><th>Текущее начало</th><th>Текущее окончание</th><th>Сдвиг начала</th><th>Сдвиг окончания</th></tr></thead><tbody>${body}</tbody></table>`;}
 $('cutDate').value=isoOf(TODAY);$('compact').onchange=()=>{document.body.classList.toggle('compact-rows',$('compact').checked);render();};document.body.classList.add('compact-rows');$('nameWidth').oninput=()=>{document.documentElement.style.setProperty('--name-width',$('nameWidth').value+'px');updateRateColumns();render();};function updateRateColumns(){const on=$('showActualRate').checked;document.body.classList.toggle('hide-actual-rate',!on);document.documentElement.style.setProperty('--lw',((+$('nameWidth').value||460)+468+(on?80:0)+(window.GPR_WORKSPACE.quantity()?130:0))+'px');}
 $('showActualRate').onchange=()=>{updateRateColumns();render();};updateRateColumns();
 function showFacadeGroups(){

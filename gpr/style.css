@@ -262,3 +262,5 @@ svg.links .arrowhead{fill:context-stroke;stroke:none}
 .lab .fact-rate,.chead .fact-rate{flex:0 0 72px;width:72px}
 
 .lab .planned-rate,.chead .planned-rate{flex:0 0 100px;width:100px}.chead .planned-rate{white-space:normal;line-height:1.2}.planned-rate .ratein{width:86px}
+
+.facade-cut .cut-group th{background:var(--surface2);border-top:2px solid var(--line2);text-align:left;padding:8px 10px}.facade-cut .cut-group button{display:block;width:100%;border:0;padding:0;background:transparent;color:var(--ink);font:inherit;font-weight:650;text-align:left;cursor:pointer}.facade-cut .cut-group span{font-size:12px;font-weight:400;color:var(--muted);margin-left:10px}
