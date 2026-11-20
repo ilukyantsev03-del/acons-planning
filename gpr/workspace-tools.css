@@ -63,3 +63,8 @@ html[data-theme="dark"]{--sunday-ink:#ff8585;--sunday-bg:rgba(248,113,113,.11)}
  .unified-controls .accessbar #accessStatus,.unified-controls .accessbar #saveStatus{font-size:11px}
 }
 .unified-controls .workspace-tools:empty{display:none}
+
+
+/* Day number plus weekday, consistently across all timelines. */
+.ghead .drow,.ghead .dcell{height:37px}.ghead .dcell{padding-top:4px;font-size:12px;line-height:16px}.ghead .dcell small{display:block;font-size:9px;line-height:12px;color:var(--muted)}
+.mock-day,.dcell{font-variant-numeric:tabular-nums}.mock-month,.mcell{font-variant-numeric:tabular-nums}

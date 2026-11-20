@@ -147,3 +147,19 @@
 /* Plan intervals stay on one line; split dates get their own independent cells. */
 .report-mockup .report-table .report-date-range,.report-mockup .report-table .report-date-range span{white-space:nowrap!important;font-size:min(8.5pt,calc(7pt * var(--report-fit)))!important;overflow-wrap:normal}
 .report-mockup .report-table .report-date-single,.report-mockup .report-table .report-date-single span{white-space:nowrap!important;font-size:min(11pt,calc(7pt * var(--report-fit)))!important;overflow-wrap:normal}
+
+
+/* Readable shared calendar: month, date, weekday; daily grid independent of labels. */
+.report-mockup .report-months,.report-mockup .report-months span{height:5mm;font-size:7pt}
+.report-mockup .report-days,.report-mockup .report-day{height:8mm}
+.report-mockup .report-day{line-height:1.15;font-weight:500}
+.report-mockup .report-day small{font-size:clamp(3.5pt,var(--mock-day-font,5pt),5.5pt);font-weight:400;line-height:1.15}
+.report-mockup .report-fill-height .report-day{height:8mm}
+.report-mockup .report-sunday-date,.report-mockup .report-sunday-date small{color:#c53030!important;font-weight:600}
+.report-mockup .report-sunday-band,.report-mockup .report-sunday-cell{background:rgba(220,38,38,.075)!important}
+.report-mockup .report-gridline{border-left:.12mm solid #ccd7e3}
+.report-mockup .report-table .report-calendar{overflow:hidden}
+.report-mockup .report-fact-day small{display:block;font-size:4.5pt;color:inherit;margin-top:.5mm}
+.report-mockup .report-name .report-zone{white-space:normal;overflow:visible;text-overflow:clip}
+
+.report-today{position:absolute;top:0;bottom:0;border-left:.3mm solid #cf3030;z-index:4;pointer-events:none}
