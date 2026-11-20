@@ -128,3 +128,8 @@
  .report-mockup:last-child{break-after:auto!important;page-break-after:auto!important}
  .report-mockup:empty{display:none!important}
 }
+
+.report-table tr.lift-building>td{background-color:#dce7f2!important;border-top:0.55mm solid #8ba3bc;border-bottom:0.3mm solid #8ba3bc;font-weight:600}
+.report-table tr.lift-group>td{background-color:#f2ead8!important;border-top:0.35mm solid #bba87d;border-bottom:0.2mm solid #c7b995}
+.report-table tr.lift-building>.report-name{border-left:1mm solid #6185a7}
+.report-table tr.lift-group>.report-name{border-left:0.7mm solid #b79552}

@@ -54,3 +54,12 @@
 .percent-edit{display:flex;align-items:center;gap:3px}.percent-edit input{width:52px;min-width:0;padding:4px;border:1px solid var(--line);border-radius:4px;background:var(--surface);font-variant-numeric:tabular-nums}.progress-coverage{display:block;font-size:10px;color:var(--muted)}
 
 .parking-profile .mock-table .percent{width:104px}.parking-profile .percent-edit input{width:66px}.parking-profile .mock-table .duration{width:90px}.parking-profile .duration input{width:72px}.parking-profile .finishing-cut th:nth-child(2){width:90px}.parking-profile .finishing-cut th:last-child{width:104px}.parking-profile .mock-table tr.parking-zone-start>td{border-top:5px solid var(--line);padding-top:7px}.parking-profile .mock-table tr.parking-zone-start .mock-name small{font-weight:650;color:var(--ink)}
+
+
+/* Lifts: building headers and lift-number headers are separate levels. */
+.lifts-profile .mock-table .summary[data-depth="0"] td{background-color:var(--grp);border-top:4px solid var(--glaB);border-bottom:2px solid var(--preB);padding-top:7px;padding-bottom:7px}
+.lifts-profile .mock-table .summary[data-depth="0"] .mock-name{box-shadow:inset 6px 0 var(--glaB)}
+.lifts-profile .mock-table .summary[data-depth="0"] .mock-name strong{font-size:16px;font-weight:700}
+.lifts-profile .mock-table .summary[data-depth="1"] td{background-color:color-mix(in srgb,var(--fac) 24%,var(--surface));border-top:3px solid var(--surface);border-bottom:1px solid var(--facB);padding-top:5px;padding-bottom:5px}
+.lifts-profile .mock-table .summary[data-depth="1"] .mock-name{box-shadow:inset 4px 0 var(--facB)}
+.lifts-profile .mock-table .summary[data-depth="1"] .mock-name strong{font-size:14px;font-weight:650}
