@@ -141,4 +141,4 @@
 .report-fill-height.report-mockup .report-months,.report-fill-height.report-mockup .report-months span{height:5mm;font-size:8pt}
 .report-fill-height.report-mockup .report-days,.report-fill-height.report-mockup .report-day{height:6.5mm}
 .report-fill-height.report-mockup .report-day small{font-size:5pt}
-.report-fill-height.report-mockup .report-table thead th:not(.report-calendar){font-size:min(9pt,calc(8pt * var(--report-fit)));line-height:1.15}
+.report-fill-height.report-mockup .report-table thead th:not(.report-calendar){font-size:min(8.5pt,calc(8pt * var(--report-fit)))!important;line-height:1.15}
