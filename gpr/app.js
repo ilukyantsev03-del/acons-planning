@@ -825,7 +825,7 @@ function makeServerDb(){
 }
 db=makeServerDb();
 async function loadSchedule(id){
-  if(['mockup-block2','finishing-main','parking-main'].includes(id)){location.href='mockup.html?v=20261116-progress9&schedule='+encodeURIComponent(id);return;}
+  if(['mockup-block2','finishing-main','parking-main','lifts-main'].includes(id)){location.href='mockup.html?v=20261116-progress9&schedule='+encodeURIComponent(id);return;}
   if(loadingSchedule)return;
   if(store.writing)throw Error('Дождитесь завершения сохранения.');
   if(dirty&&!confirm('В карточке есть несохранённые изменения. Обновить график без них?')){$('scheduleSelect').value=store.scheduleId;return;}
@@ -866,3 +866,4 @@ window.GPR_EDITOR={rateUnit,resourceFactor,rateCalc,rateFact,durFromRate,compute
 refreshAuth();
 
 })();
+
