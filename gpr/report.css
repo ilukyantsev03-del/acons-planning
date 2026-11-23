@@ -163,3 +163,21 @@
 .report-mockup .report-name .report-zone{white-space:normal;overflow:visible;text-overflow:clip}
 
 .report-today{position:absolute;top:0;bottom:0;border-left:.3mm solid #cf3030;z-index:4;pointer-events:none}
+/* Shared presentation profile for facade, finishing/engineering, mockup, parking and lifts. */
+.report-page{font-family:Arial,sans-serif;color:#152b43}
+.report-mockup .report-table thead th,.report-mockup .report-table thead .report-current-heading,.report-mockup .report-table thead .report-base-heading{background:#183956!important;color:#fff;font-weight:600}
+.report-mockup .report-months span{color:#fff}.report-mockup .report-day{color:#f5f8fc;border-color:#577089}.report-mockup .report-day.report-sunday-date,.report-mockup .report-day.report-sunday-date small{color:#ffd1d1!important;background:#53414f!important}
+.report-mockup .report-table .report-name .report-task-name{font-size:calc(8.5pt * var(--report-fit));font-weight:400;line-height:1.22}
+.report-mockup .report-table .report-name .report-zone{font-size:calc(7pt * var(--report-fit));font-weight:500;line-height:1.2}
+.report-mockup .report-group td{background:#dce9f5!important;color:#193650;border-top:.3mm solid #8aa4be;font-weight:600}
+.report-mockup .report-table .report-group .report-name b{font-weight:600;line-height:1.2}
+.report-mockup .report-month-line{border-left:.25mm solid #8aa0b8}
+.report-mockup .report-table .report-calendar{padding:0!important}
+.report-metrics,.selection-metric-values{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));align-items:center;gap:0}
+.report-metrics{border-top:.18mm solid #8197ae;border-bottom:.18mm solid #8197ae;margin:1mm 0 2mm;padding:1.8mm 0}
+.report-metrics>div{padding:0 3mm;border-right:.15mm solid #b5c2d0;display:flex;gap:1mm;align-items:center;flex-wrap:wrap}
+.report-metrics>div:last-child{border:0}.report-metrics small{font-size:7pt;color:#50647a}.report-metrics strong{font-size:10pt;font-weight:600;white-space:nowrap}.report-metrics div:last-child small:last-child{font-size:6.5pt}
+.report-metrics .report-late{color:#ba3030}.report-metrics .report-early{color:#267047}
+@media print{.report-page{width:auto!important;max-width:100%!important}.report-actions{display:none!important}}
+
+.report-key.engineering{background:#9fbde2!important}

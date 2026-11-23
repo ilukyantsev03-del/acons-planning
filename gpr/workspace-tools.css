@@ -68,3 +68,10 @@ html[data-theme="dark"]{--sunday-ink:#ff8585;--sunday-bg:rgba(248,113,113,.11)}
 /* Day number plus weekday, consistently across all timelines. */
 .ghead .drow,.ghead .dcell{height:37px}.ghead .dcell{padding-top:4px;font-size:12px;line-height:16px}.ghead .dcell small{display:block;font-size:9px;line-height:12px;color:var(--muted)}
 .mock-day,.dcell{font-variant-numeric:tabular-nums}.mock-month,.mcell{font-variant-numeric:tabular-nums}
+/* Compact selection totals, shared by every schedule. */
+.selection-metrics{margin:7px 0 0;border:1px solid var(--line);border-radius:6px;background:var(--surface2);font-variant-numeric:tabular-nums}
+.selection-metrics>summary{cursor:pointer;list-style:none;padding:6px 8px}.selection-metrics>summary::-webkit-details-marker{display:none}.selection-metrics>summary:after{content:'Период и расчёт';display:block;font-size:10px;color:var(--muted);text-align:right}
+.selection-metric-values{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.selection-metric-values>div{border-right:1px solid var(--line);padding:0 8px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}.selection-metric-values>div:last-child{border:0}.selection-metric-values small{font-size:11px;color:var(--muted)}.selection-metric-values strong{font-size:19px;font-weight:650;white-space:nowrap}.selection-metric-values .report-late{color:#d13c34}.selection-metric-values .report-early{color:#20834d}.metric-period{padding:6px 12px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);display:flex;align-items:center;gap:12px}.metric-period input{font-size:12px;padding:3px}.selection-metrics~#metrics,#metrics,#kpis{display:none!important}
+@media(max-width:760px){.selection-metric-values{grid-template-columns:repeat(2,minmax(0,1fr))}.selection-metric-values strong{font-size:16px}.metric-period{flex-wrap:wrap}.selection-metrics>summary:after{font-size:9px}}
+
+.extra-settings:has(#kpis){display:none}
