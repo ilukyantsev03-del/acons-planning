@@ -84,7 +84,14 @@ if(page.classList.contains('report-mockup')){
  }
  page.dataset.textScale=Math.round(scale*100)+'%';continue;
 }
-const unit=page.getBoundingClientRect().width/(page.dataset.paper==='A4'?277:400);const budget=(page.dataset.paper==='A4'?137:210)+(page.classList.contains('no-report-header')?22:0);const h=body.getBoundingClientRect().height;let scale=Math.min(1,budget*unit/Math.max(h,1));body.style.zoom=String(scale);body.style.width='100%';page.dataset.textScale=Math.round(scale*100)+'%';}}
+const unit=page.getBoundingClientRect().width/(page.dataset.paper==='A4'?277:400);const budget=(page.dataset.paper==='A4'?137:210)+(page.classList.contains('no-report-header')?22:0);const h=body.getBoundingClientRect().height;let scale=Math.min(1,budget*unit/Math.max(h,1));body.style.zoom=String(scale);body.style.width='100%';page.dataset.textScale=Math.round(scale*100)+'%';}
+ // Use one typography scale across the whole document; sparse pages may only stretch row spacing.
+ const sharedPages=[...root.querySelectorAll('.report-page.report-mockup')],scales=sharedPages.map(p=>+p.style.getPropertyValue('--report-fit')).filter(n=>Number.isFinite(n)&&n>0),common=scales.length?Math.min(...scales):1;
+ for(const page of sharedPages){page.style.setProperty('--report-fit',String(common));page.dataset.textScale=Math.round(common*100)+'%';if(root.dataset.fillHeight!=='1')continue;
+  const body=page.querySelector('.report-calendar-wrap'),rows=body?.querySelectorAll('tbody tr').length;if(!rows)continue;const unit=page.getBoundingClientRect().width/(page.dataset.paper==='A4'?277:400),used=['header','.report-meta','footer','.report-metrics'].reduce((n,k)=>n+(page.querySelector(k)?.getBoundingClientRect().height||0),0),budget=(page.dataset.paper==='A4'?182:265)*unit-used-13*unit,head=body.querySelector('thead')?.getBoundingClientRect().height||0;
+  page.style.setProperty('--report-row-height',Math.max(0,Math.min(18,(budget-head-2*unit)/(rows*unit)))+'mm');
+ }
+}
 function rootWindow(){return typeof window!=='undefined'?window:globalThis;}
 function prepare(document,rows,options){const pages=plan(rows,options.start,options.end,options.paper,options.span,options.mode,options.targetPages,options);if(options.showMetrics)options.metrics=metrics(rows,{...options.metricHistory,asOf:options.today});document.getElementById('printRoot').innerHTML=html(pages,options);let style=document.getElementById('printPageStyle');if(!style){style=document.createElement('style');style.id='printPageStyle';document.head.appendChild(style);}style.textContent=`@page{size:${options.paper||'A3'} landscape;margin:10mm}`;document.getElementById('printRoot').dataset.links=options.showLinks?'1':'0';document.getElementById('printRoot').dataset.fit=options.targetPages||options.fillHeight?'1':'0';document.getElementById('printRoot').dataset.fillHeight=options.fillHeight?'1':'0';fitPages(document);drawLinks(document);return pages.length;}
 function close(document){document.body.classList.remove('report-preview');document.getElementById('printRoot').replaceChildren();}
