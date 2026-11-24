@@ -471,7 +471,7 @@ function renderDrawer(){
   <div class="db">${Entry.panel(stages[t.stage]?.name,esc)}
     ${t.sys?`<div class="sysn">Пометка при переносе из Excel: ${esc(t.sys)}</div>`:''}
     ${cycles.has(t.id)?'<div class="warnbox">Работа попала в замкнутую цепочку связей — уберите одну из связей.</div>':''}
-    <div class="stats" id="dStats"></div>
+    <div class="stats" id="dStats"></div>${!isNew&&!ro?Entry.baselineButton(finishOf(t,S[t.id])!=null):''}
     <div class="sect">Работа</div>
     <div class="f"><label>Название</label><input id="dName" value="${esc(t.name)}"${dis}></div>
     <div class="g2">
@@ -595,6 +595,7 @@ function bindDrawer(){
   };
   document.querySelectorAll('.fDel').forEach(b=>b.onclick=()=>{readDraft();delete draft.facts[b.dataset.d];dirty=true;if(tasks[draft.id])doSave('Запись факта удалена');else renderDrawer()});
   $('dSave').onclick=()=>{readDraft();doSave(tasks[draft.id]?'Сохранено':'Работа добавлена')};
+  if($('taskBaseline'))$('taskBaseline').onclick=()=>fixFacadeTaskBaseline().catch(handleWriteErr);
   $('dCancel').onclick=()=>{dirty=false;closeDrawer()};
   const mv=async dir=>{
     if(dirty&&!confirm('Изменения не сохранены. Переместить без сохранения?'))return;
@@ -631,6 +632,7 @@ function rateCalc(t){if(t.finishOnly)return null;const v=+t.vol||0,r=S[t.id],d=r
 function rateFact(t){if(t.rateBasis&&t.rateBasis!=='day')return null;const rows=Object.entries(t.facts||{}).filter(([d,q])=>d<=isoOf(TODAY)&&Number.isFinite(+q)).sort();if(!rows.length)return null;const n=TODAY-dn(rows[0][0])+1;return n>0?rows.reduce((a,[,q])=>a+(+q),0)/n:null}
 function durFromRate(t,rate){rate=rate??t.rateExp;const v=+t.vol||0,k=resourceFactor(t);if(!(rate>0)||!v||!k||t.stretch||t.ms)return null;const m=t._m,r=S[t.id];if(m&&m.complete)return null;const pace=rate*k;if(r&&TODAY>r.s&&m&&m.done>0){const elapsed=TODAY-r.s;return Math.max(elapsed+1,elapsed+Math.ceil(Math.max(0,v-m.done)/pace))}return Math.max(1,Math.ceil(Math.max(0,v-(m?m.done:0))/pace))}
 function nextNum(){return Math.max(0,...Object.values(tasks).map(t=>t.num||0))+1}
+async function fixFacadeTaskBaseline(){if(!canWrite||store.writing)return;if(dirty)throw Error('Сначала сохраните изменения карточки.');const t=tasks[draft.id],r=S[t.id],start=startOf(t,r),finish=finishOf(t,r);if(finish==null)throw Error('У работы нет текущих сроков.');const button=$('taskBaseline');button.disabled=true;try{const taskRow=store.rows.get(store.key('task',t.id)),baseRow=store.rows.get(store.key('meta','baseline'));await Entry.fixBaseline(client,{schedule:store.scheduleId,task:t.id,baseline:'baseline',taskVersion:taskRow?.version,baselineVersion:baseRow?.version,start:start==null?null:isoOf(start),finish:isoOf(finish)});const id=t.id;dirty=false;$('drawer').classList.remove('open');draft=null;await loadSchedule(store.scheduleId);openDrawer(id);toast('Базовый план зафиксирован только для этой работы');}finally{if(button.isConnected)button.disabled=false;}}
 async function doSave(msg){
   const t=draft;
   if(!t.name){toast('Введите название работы');return}
