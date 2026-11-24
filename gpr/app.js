@@ -261,7 +261,7 @@ function render(){
     if(g.label!==null){
       const closed=ui.collapsed.has(g.key);
       const done=g.items.filter(t=>t._m.complete).length;
-      body+=`<div class="row grp${ui.group==='stage'?' stage-group':''}${closed?' closed':''}" data-g="${esc(g.key)}"><div class="lab"><span class="caret">▾</span><div class="t"><div class="n" title="${esc(g.label)}${g.note?'\nПримечание: '+esc(g.note):''}">${esc(g.label)} <span class="cnt">${g.items.length} работ, выполнено ${done}${g.note?', есть примечание':''}</span></div></div><span class="cr planned-rate"></span><span class="cr fact-rate"></span><span class="cd">${g.s!=null?fmt(g.s):''}</span><span class="cd">${g.f!=null?fmt(g.f):''}</span><span class="cn">${g.s!=null?g.f-g.s+1:''}</span><span class="p" title="Средняя готовность работ группы">${nf(g.percent,1)}%</span>${window.GPR_WORKSPACE.quantity()?'<span class="quantity-facade"></span>':''}</div><div class="trk" style="width:${W}px">${g.s!=null?`<div class="gbar" style="left:${X(g.s)}px;width:${(g.f-g.s+1)*px}px"></div>`:''}</div></div>`;
+      body+=`<div class="row grp${ui.group==='stage'?' stage-group':''}${closed?' closed':''}" data-g="${esc(g.key)}"><div class="lab"><span class="caret">▾</span><div class="t"><div class="n" title="${esc(g.label)}${g.note?'\nПримечание: '+esc(g.note):''}"><span class="entry-group-label">${esc(g.label)}</span> ${canWrite?`<button type="button" class="entry-add entry-add-group" data-entry-facade="${esc(g.key)}" data-entry-kind="${esc(ui.group)}" aria-label="Добавить работу в раздел">+ Работа</button>`:''}<span class="cnt">${g.items.length} работ, выполнено ${done}${g.note?', есть примечание':''}</span></div></div><span class="cr planned-rate"></span><span class="cr fact-rate"></span><span class="cd">${g.s!=null?fmt(g.s):''}</span><span class="cd">${g.f!=null?fmt(g.f):''}</span><span class="cn">${g.s!=null?g.f-g.s+1:''}</span><span class="p" title="Средняя готовность работ группы">${nf(g.percent,1)}%</span>${window.GPR_WORKSPACE.quantity()?'<span class="quantity-facade"></span>':''}</div><div class="trk" style="width:${W}px">${g.s!=null?`<div class="gbar" style="left:${X(g.s)}px;width:${(g.f-g.s+1)*px}px"></div>`:''}</div></div>`;
       y+=GH; if(closed) continue;
     }
     for(const t of g.items){
@@ -277,7 +277,7 @@ function render(){
         tr+=`<div class="${cls}" data-id="${t.id}" style="left:${X(r.s)}px;width:${Math.max(t.dur*px,3)}px"><div class="dn" style="width:${m.pct*100}%"></div><div class="rz"></div></div>`;
       } else if(!t.finishOnly) tr+=`<div class="nodate" style="left:${X(TODAY)+8}px">сроки не заданы</div>`;
       if(m.bs!=null) tr+=`<div class="bl" style="left:${X(m.bs)}px;width:${(m.bf-m.bs+1)*px}px"></div>`;
-      body+=`<div class="row${ui.sel===t.id?' sel':''}" data-id="${t.id}"><div class="lab"><div class="t"><div class="n" title="${esc(t.name)}">${esc(t.name)}</div><div class="s">${esc(subtitle(t))}</div></div>${crit&&FL[t.id]<0?`<span class="fl" title="Отрицательный резерв: не успевает к сроку">${FL[t.id]}</span>`:''}<span class="cr planned-rate">${t.vol?(canWrite?`<input class="ratein${t.rateExp>0?' set':''}" type="number" step="any" min="0" data-id="${t.id}" value="${t.rateExp??''}" placeholder="" aria-label="Расчётная выработка" title="${rateFact(t)!=null?'По факту сейчас: '+nf(rateFact(t),1)+' '+esc(rateUnit(t))+'. ':''}Введите свою выработку, ${esc(rateUnit(t))}">`:(t.rateExp>0?nf(t.rateExp,1):'—')):''}</span><span class="cr fact-rate" title="Средний темп по дневным записям, от первой записи до выбранной даты. Ранее выполненный объём не включён.">${rateFact(t)!=null?nf(rateFact(t),1):'—'}<small class="rate-unit">${!t.ms&&t.vol?esc(rateUnit(t)):''}</small></span><span class="cd">${fmt(startOf(t,r))}</span><span class="cd">${fmt(finishOf(t,r))}</span><span class="cn">${canWrite&&!t.stretch&&!t.ms&&!t.finishOnly?`<input class="durin" type="number" min="1" data-id="${t.id}" value="${t.dur??''}" aria-label="Длительность, дней" title="Длительность, календарных дней — измените и нажмите Enter">`:(r&&!t.finishOnly?(r.f-r.s+1):'—')}</span><span class="p ${pctClass(t)}">${canWrite?`<input class="percentin" type="number" min="0" max="100" step="0.1" data-id="${t.id}" value="${Number((m.pct*100).toFixed(1))}" aria-label="Готовность, %">`:pc}</span>${window.GPR_WORKSPACE.quantity()?`<span class="quantity-facade">${nf(m.done,1)} / ${t.vol??'—'} ${esc(t.unit)}</span>`:''}</div><div class="trk" style="width:${W}px">${tr}</div></div>`;
+      body+=`<div class="row${ui.sel===t.id?' sel':''}" data-id="${t.id}"><div class="lab"><div class="t"><div class="n" title="${esc(t.name)}">${esc(t.name)}${canWrite?`<button type="button" class="entry-add entry-add-row" data-entry-after="${esc(t.id)}" aria-label="Добавить работу после текущей" title="Добавить работу после этой">+</button>`:''}</div><div class="s">${esc(subtitle(t))}</div></div>${crit&&FL[t.id]<0?`<span class="fl" title="Отрицательный резерв: не успевает к сроку">${FL[t.id]}</span>`:''}<span class="cr planned-rate">${t.vol?(canWrite?`<input class="ratein${t.rateExp>0?' set':''}" type="number" step="any" min="0" data-id="${t.id}" value="${t.rateExp??''}" placeholder="" aria-label="Расчётная выработка" title="${rateFact(t)!=null?'По факту сейчас: '+nf(rateFact(t),1)+' '+esc(rateUnit(t))+'. ':''}Введите свою выработку, ${esc(rateUnit(t))}">`:(t.rateExp>0?nf(t.rateExp,1):'—')):''}</span><span class="cr fact-rate" title="Средний темп по дневным записям, от первой записи до выбранной даты. Ранее выполненный объём не включён.">${rateFact(t)!=null?nf(rateFact(t),1):'—'}<small class="rate-unit">${!t.ms&&t.vol?esc(rateUnit(t)):''}</small></span><span class="cd">${fmt(startOf(t,r))}</span><span class="cd">${fmt(finishOf(t,r))}</span><span class="cn">${canWrite&&!t.stretch&&!t.ms&&!t.finishOnly?`<input class="durin" type="number" min="1" data-id="${t.id}" value="${t.dur??''}" aria-label="Длительность, дней" title="Длительность, календарных дней — измените и нажмите Enter">`:(r&&!t.finishOnly?(r.f-r.s+1):'—')}</span><span class="p ${pctClass(t)}">${canWrite?`<input class="percentin" type="number" min="0" max="100" step="0.1" data-id="${t.id}" value="${Number((m.pct*100).toFixed(1))}" aria-label="Готовность, %">`:pc}</span>${window.GPR_WORKSPACE.quantity()?`<span class="quantity-facade">${nf(m.done,1)} / ${t.vol??'—'} ${esc(t.unit)}</span>`:''}</div><div class="trk" style="width:${W}px">${tr}</div></div>`;
       y+=RH;
     }
   }
@@ -338,7 +338,7 @@ function hideTip(){tip.style.display='none'}
 // ---------- events on gantt ----------
 const gw=$('gwrap');
 gw.addEventListener('click',e=>{
-  const g=e.target.closest('.row.grp,.cut-group');
+  if(e.target.closest('[data-entry-facade],[data-entry-after]'))return;const g=e.target.closest('.row.grp,.cut-group');
   if(g){const k=g.dataset.g;ui.collapsed.has(k)?ui.collapsed.delete(k):ui.collapsed.add(k);render();return}
   if(e.target.closest('input')) return;
   const msd=e.target.closest('.ms'); if(msd){openDrawer(msd.dataset.id);return}
@@ -444,6 +444,7 @@ function handleWriteErr(e){
 }
 
 // ---------- drawer ----------
+const Entry=window.GPR_TASK_ENTRY;
 let draft=null, dirty=false;
 function openDrawer(id,isNew){
   ui.sel=id; draft=isNew?isNew:clone(tasks[id]); dirty=!!isNew;
@@ -467,7 +468,7 @@ function renderDrawer(){
   const isNew=!tasks[t.id];
   $('drawer').innerHTML=`
   <div class="dh"><h2>${isNew?'Новая работа':'#'+t.num+' '+esc(t.name)}</h2><button class="x" id="dClose" aria-label="Закрыть">✕</button></div>
-  <div class="db">
+  <div class="db">${Entry.panel(stages[t.stage]?.name,esc)}
     ${t.sys?`<div class="sysn">Пометка при переносе из Excel: ${esc(t.sys)}</div>`:''}
     ${cycles.has(t.id)?'<div class="warnbox">Работа попала в замкнутую цепочку связей — уберите одну из связей.</div>':''}
     <div class="stats" id="dStats"></div>
@@ -481,6 +482,7 @@ function renderDrawer(){
       <div class="f"><label>Подрядчик</label><input id="dCon" list="dlCons" value="${esc(t.contractor)}" placeholder="не назначен"${dis}></div>
       <div class="f"><label>Категория</label><select id="dCat"${dis}><option value="facade"${t.cat==='facade'?' selected':''}>Фасад</option><option value="glass"${t.cat==='glass'?' selected':''}>Светопрозрачные</option><option value="prep"${t.cat==='prep'?' selected':''}>Леса и подготовка</option><option value="other"${t.cat==='other'?' selected':''}>Смежные работы и вехи</option></select></div>
     </div>
+    ${facadePosition(t,ro)}
     <div class="f"><label>Раздел внутри этапа</label><input id="dSec" list="dlSecs" value="${esc(t.section||'')}" placeholder="например, Завершение СМР"${dis}></div>
     <datalist id="dlSecs"><option value="Завершение СМР"></datalist>
     <datalist id="dlTypes">${types.map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
@@ -562,6 +564,7 @@ function readDraft(){
   t.note=v('dNote');
   if($('dRateBasis')){t.rateBasis=$('dRateBasis').value;t.rateResources=Number($('dRateResources').value)||null;}
   if($('dRate')){const rv=parseFloat(($('dRate').value||'').replace(',','.')); t.rateExp=isNaN(rv)||rv<=0?null:rv}
+  if($('dBefore')&&$('dBefore').dataset.stage===t.stage)Entry.place(Object.values(tasks),t,v('dBefore'),'stage');
   t.section=(v('dSec')||'').trim(); t.stretch=$('dStretch').checked; t.ms=$('dMs').checked;
   if(t.ms) t.dur=0;
   t.preds=[...document.querySelectorAll('#dPreds .predrow')].map(r=>({id:r.querySelector('.pId').value,type:r.querySelector('.pType').value,lag:parseInt(r.querySelector('.pLag').value)||0}));
@@ -572,6 +575,7 @@ function bindDrawer(){
   document.querySelectorAll('.succ a').forEach(a=>a.onclick=()=>{if(dirty&&!confirm('Изменения не сохранены. Перейти без сохранения?'))return;dirty=false;openDrawer(a.dataset.id)});
   if(!canWrite) return;
   $('drawer').querySelectorAll('.db input,.db select,.db textarea').forEach(el=>{if(el.id==='fDate'||el.id==='fVal')return;el.addEventListener('input',markDirty);el.addEventListener('change',markDirty)});
+  $('dStage').addEventListener('change',()=>{readDraft();draft.order=Entry.position(Object.values(tasks),draft,'','stage');dirty=true;renderDrawer();});
   if($('dPercent'))$('dPercent').addEventListener('input',()=>{$('dProgressByFacts').checked=false;markDirty();});
   if($('dRateBasis')) $('dRateBasis').addEventListener('change',()=>{readDraft();draft.rateExp=null;dirty=true;renderDrawer();});
   if($('dRateApply')) $('dRateApply').onclick=()=>{
@@ -636,11 +640,10 @@ async function doSave(msg){
   if(!await saveTask(clone(t),msg)){dirty=true;renderDrawer();return;}
   dirty=false;draft=clone(tasks[t.id]||t);renderDrawer();
 }
-$('bAdd').onclick=()=>{
-  const st=ui.stage||Object.values(stages).sort((a,b)=>a.order-b.order)[0]?.id;
-  const id=db.collection('tasks').doc().id;
-  openDrawer(id,{id,num:nextNum(),stage:st,order:999,name:'',unit:'м²',vol:null,open:0,facts:{},preds:[],cons:isoOf(TODAY),dur:5,type:ui.type||'',cat:ui.cat||'facade',contractor:'',closed:false,note:'',sys:'',section:'',stretch:false,ms:false});
-};
+function facadePosition(t,ro){const rows=Object.values(tasks),next=Entry.next(rows,t,'stage');return `<div class="f"><label for="dBefore">Разместить перед</label><select id="dBefore" data-stage="${esc(t.stage)}" ${ro?'disabled':''}>${Entry.siblings(rows,t,'stage').map(x=>`<option value="${esc(x.id)}" ${x.id===next?'selected':''}>#${x.num} ${esc(x.name)}</option>`).join('')}<option value="" ${!next?'selected':''}>В конце выбранного этапа</option></select><small class="entry-placement-note">Позиция отображается в режиме «Порядок как в ГПР».</small></div>`;}
+function addFacadeTask(context={}){if(!canWrite)return;if(dirty&&!confirm('Закрыть несохранённые изменения?'))return;const source=context.after?tasks[context.after]:null,st=context.stage||source?.stage||ui.stage||Object.values(stages).sort((a,b)=>a.order-b.order)[0]?.id;if(!st){toast('Сначала создайте этап через «Порядок этапов».');return;}const id=db.collection('tasks').doc().id,rows=Object.values(tasks),period=facadePeriod(),start=period&&(TODAY<period.start||TODAY>period.finish)?isoOf(period.start):isoOf(TODAY),t={id,num:nextNum(),stage:st,order:999,name:'',unit:source?.unit||'м²',vol:null,open:0,facts:{},preds:[],cons:start,dur:5,type:context.type??source?.type??ui.type??'',cat:source?.cat||ui.cat||'facade',contractor:context.contractor??source?.contractor??'',closed:false,note:'',sys:'',section:source?.section||'',stretch:false,ms:false,progressMode:'percent',manualPercent:0};t.order=Entry.position(rows,t,source?Entry.next(rows,source,'stage'):'','stage');openDrawer(id,t);$('dName').focus();}
+$('bAdd').onclick=()=>addFacadeTask();
+gw.addEventListener('click',e=>{const group=e.target.closest('[data-entry-facade]'),after=e.target.closest('[data-entry-after]');if(!group&&!after)return;e.stopPropagation();if(after){addFacadeTask({after:after.dataset.entryAfter});return;}const key=group.dataset.entryFacade,kind=group.dataset.entryKind;addFacadeTask(kind==='stage'?{stage:key}:kind==='type'?{type:key}:{contractor:key});});
 
 // ---------- stages modal ----------
 function openStages(){
@@ -885,5 +888,6 @@ window.GPR_EDITOR={rateUnit,resourceFactor,rateCalc,rateFact,durFromRate,compute
 refreshAuth();
 
 })();
+
 
 
