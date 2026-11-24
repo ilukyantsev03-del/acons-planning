@@ -63,3 +63,6 @@
 .lifts-profile .mock-table .summary[data-depth="1"] td{background-color:color-mix(in srgb,var(--fac) 24%,var(--surface));border-top:3px solid var(--surface);border-bottom:1px solid var(--facB);padding-top:5px;padding-bottom:5px}
 .lifts-profile .mock-table .summary[data-depth="1"] .mock-name{box-shadow:inset 4px 0 var(--facB)}
 .lifts-profile .mock-table .summary[data-depth="1"] .mock-name strong{font-size:14px;font-weight:650}
+
+/* Mockup print header: omit the baseline source caption. */
+.mockup-profile .report-page:not(.report-facts) .report-meta{display:none}
