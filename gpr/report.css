@@ -285,3 +285,8 @@
 .report-readable-mockup .report-subtitle{margin:.5mm 0 1mm;font-size:8pt;color:#536271}
 .report-readable-mockup .report-compact-status{font-size:9pt;margin:1mm 0}
 @media screen{.report-actions .report-font-control{display:flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap}.report-font-control select{font:inherit;padding:5px}}
+
+
+/* Variance is visible in both monochrome text and semantic colour. */
+.report-readable-mockup .report-table td.report-shift.report-late{color:#b42318!important;background:#fff0ee!important;font-weight:700}
+.report-readable-mockup .report-table td.report-shift.report-early{color:#176b3a!important;background:#ecf8ef!important;font-weight:700}
