@@ -8,6 +8,7 @@ function refreshGroups(rows){const by=new Map(rows.map(t=>[t.id,t])),desc=new Ma
 function isReadableMockup(o){return o.profile==='mockup-block2'&&o.mockupReadable===true&&(!o.mode||o.mode==='gantt');}
 function mockupFontSize(o){const n=Number(o.mockupFontSize);return [9,10,11,12].includes(n)?n:9;}
 function mockupPart(t,by){const seen=new Set;for(let row=t;row&&!seen.has(row.id);row=by.get(row.parent)){seen.add(row.id);if(row.summary&&/^(Номер\s|Коридор(?:\s|$))/i.test(row.name||''))return 'rooms';}return 'supply';}
+function markContinuations(pages){const by=new Map(pages.flatMap(p=>p.rows).filter(t=>t.id).map(t=>[t.id,t])),seenByPeriod=new Map;return pages.map(p=>{const key=String(p.start)+'|'+String(p.end);if(!seenByPeriod.has(key))seenByPeriod.set(key,new Set);const seen=seenByPeriod.get(key),rows=p.rows.map(t=>t.summary?{...t,continued:seen.has(t.id)}:t);for(const t of rows)if(!t.summary){const visited=new Set;for(let parent=by.get(t.parent);parent&&!visited.has(parent.id);parent=by.get(parent.parent)){visited.add(parent.id);seen.add(parent.id);}}return {...p,rows};});}
 function readableMockupPlan(rows,start,end,paper,span,o){
  const a=day(start),b=day(end);if(!Number.isFinite(a+b)||b<a||b-a>730*DAY)throw Error('Выберите период от 1 до 730 дней.');if(!rows.length)throw Error('В выборке нет строк для печати.');
  const by=new Map(rows.map(t=>[t.id,t])),font=mockupFontSize(o),nameWidth=timelineColumns(o).find(c=>c[0]==='name')[1],chars=Math.max(12,(paper==='A4'?271:394)*nameWidth/100/(font*.3528*.49)),budget=o.mockupBodyBudgetMM||(paper==='A4'?153:238),height=t=>o.mockupRowHeights?.get(t.id)||Math.max(4.2,Math.ceil(String(t.name||'').length/chars)*font*.3528*1.12+.7),ancestors=t=>{const result=[],seen=new Set;for(let v=by.get(t.parent);v&&!seen.has(v.id);v=by.get(v.parent)){seen.add(v.id);result.unshift({...v,continued:true});}return result;};
@@ -17,7 +18,7 @@ function readableMockupPlan(rows,start,end,paper,span,o){
  if(chunk.some(t=>!t.summary))chunks.push(chunk);
  const split=rows.findIndex(t=>t.summary&&mockupPart(t,by)==='rooms'),total=xs=>xs.reduce((n,t)=>n+height(t),0);
  if(!o.sectionBreaks&&split>0&&rows.slice(split).some(t=>!t.summary)&&total(rows.slice(0,split))<=budget&&total(rows.slice(split))<=budget)chunks=[rows.slice(0,split),rows.slice(split)];
- const days=span||Math.round((b-a)/DAY)+1,pages=[];for(let d=a;d<=b;d+=days*DAY)for(const rs of chunks){const parts=new Set(rs.filter(t=>!t.summary).map(t=>mockupPart(t,by))),subtitle=parts.size>1?'Поставки, общие работы и номера':parts.has('rooms')?'Номера и коридор':'Поставки, мебель и фасадные работы';pages.push({start:d,end:Math.min(b,d+(days-1)*DAY),rows:rs,subtitle});}return pages;
+ const days=span||Math.round((b-a)/DAY)+1,pages=[];for(let d=a;d<=b;d+=days*DAY)for(const rs of chunks){const parts=new Set(rs.filter(t=>!t.summary).map(t=>mockupPart(t,by))),subtitle=parts.size>1?'Поставки, общие работы и номера':parts.has('rooms')?'Номера и коридор':'Поставки, мебель и фасадные работы';pages.push({start:d,end:Math.min(b,d+(days-1)*DAY),rows:rs,subtitle});}return markContinuations(pages);
 }
 function repaginateMockup(document,rows,o){
  const root=document.getElementById('printRoot');if(!isReadableMockup(o)||o.layout==='fit')return root.querySelectorAll('.report-page').length;
@@ -44,7 +45,7 @@ function plan(rows,start,end,paper='A3',span,mode='gantt',targetPages=0,o={}){if
  }
  if(chunk.length){if(chunk.some(t=>!t.summary))chunks.push(chunk);else if(chunks.length)chunks.at(-1).push(...chunk);else chunks.push(chunk);}
  if(targetPages&&!readable){const leaves=rows.some(t=>!t.summary)?rows.filter(t=>!t.summary):rows,n=Math.min(leaves.length||1,Math.max(1,Math.floor(targetPages)));chunks.length=0;for(let i=0;i<n;i++){const part=leaves.slice(Math.floor(i*leaves.length/n),Math.floor((i+1)*leaves.length/n)),keep=new Set(part.map(t=>t.id));for(const t of part)for(const a of ancestors(t))keep.add(a.id);chunks.push(rows.filter(t=>keep.has(t.id)).map(t=>t.summary?{...t,continued:i>0}:t));}}
- const pages=[];for(let d=a;d<=b;d+=days*DAY)for(const chunk of chunks)pages.push({start:d,end:Math.min(b,d+(days-1)*DAY),rows:chunk});return pages;
+ const pages=[];for(let d=a;d<=b;d+=days*DAY)for(const chunk of chunks)pages.push({start:d,end:Math.min(b,d+(days-1)*DAY),rows:chunk});return markContinuations(pages);
 }
 function progressValue(t,asOf){
  if(t.progress!=null&&typeof t.progress!=='object'){const n=parseFloat(String(t.progress).replace(',','.'));if(Number.isFinite(n))return Math.max(0,Math.min(100,n));}
@@ -162,7 +163,7 @@ if(typeof window!=='undefined'){
  // Print uses the already fitted physical page dimensions. Reflowing fragmented print pages changes measurements and can create blank sheets.
  window.addEventListener('beforeprint',()=>flushPrintLayout());
 }
-root.GPR_REPORT={isReadableMockup,mockupFontSize,mockupPart,readableMockupPlan,repaginateMockup,barThickness,fittedBarThickness,fitBarThickness,calendarArtwork,ganttWidth,timelineColumns,dependencyColumns,dependencyRows,dependencyCell,dependencyLegend,overallProgressHtml,reportMetricsHtml,refreshGroups,metrics,metricsHtml,progressValue,sectionRows,calendarScale,overlaps,filterRows,plan,html,prepare,preview,close,drawLinks,fitPages};if(typeof module!=='undefined')module.exports=root.GPR_REPORT;
+root.GPR_REPORT={markContinuations,isReadableMockup,mockupFontSize,mockupPart,readableMockupPlan,repaginateMockup,barThickness,fittedBarThickness,fitBarThickness,calendarArtwork,ganttWidth,timelineColumns,dependencyColumns,dependencyRows,dependencyCell,dependencyLegend,overallProgressHtml,reportMetricsHtml,refreshGroups,metrics,metricsHtml,progressValue,sectionRows,calendarScale,overlaps,filterRows,plan,html,prepare,preview,close,drawLinks,fitPages};if(typeof module!=='undefined')module.exports=root.GPR_REPORT;
 })(typeof window!=='undefined'?window:globalThis);
 
 
