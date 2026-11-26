@@ -215,3 +215,15 @@
  .report-page[data-paper=A4]{width:277mm!important}
  body:has(.report-page[data-paper=A4])>#printRoot{width:277mm!important}
 }
+
+
+/* Bar height is a document-wide physical size, independent of wrapped row content. */
+.report-page.report-fixed-bars .report-table .report-bar{
+ top:50%;height:var(--report-bar-render-height,var(--report-bar-height,2mm));
+ transform:translateY(-50%);box-sizing:border-box;
+}
+.report-page.report-fixed-bars .report-table .report-base{
+ top:calc(50% + var(--report-bar-render-height,var(--report-bar-height,2mm))/2 + .2mm);
+ height:.25mm;transform:none;box-sizing:border-box;
+}
+.report-page.report-fixed-bars .report-ms{top:50%;transform:translateY(-50%);line-height:1}
