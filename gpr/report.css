@@ -248,3 +248,40 @@
 .report-readable-mockup .report-day small{font-size:5pt}
 .report-readable-mockup footer{font-size:7pt;margin-top:1mm;padding-top:.8mm}
 .report-readable-mockup.no-report-header>.report-compact-status{display:none}
+
+
+/* Final mockup print: light engineering sheet, full-size text and compact header. */
+.report-readable-mockup{color:#182633;font-family:Arial,sans-serif;font-variant-numeric:tabular-nums}
+.report-readable-mockup.report-mockup .report-table thead th,
+.report-readable-mockup.report-mockup .report-table thead .report-current-heading,
+.report-readable-mockup.report-mockup .report-table thead .report-base-heading{
+ background:#edf1f5!important;color:#233a50!important;border-color:#b5c1cd;
+ font-size:9pt!important;font-weight:600;height:auto;padding:.65mm .45mm;line-height:1.08;
+}
+.report-readable-mockup .report-column-title{padding:0;line-height:1.08}
+.report-readable-mockup .report-months span,.report-readable-mockup .report-day{color:#233a50}
+.report-readable-mockup.report-mockup .report-day.report-sunday-date,
+.report-readable-mockup.report-mockup .report-day.report-sunday-date small{color:#ae3030!important;background:#fbeeee!important}
+.report-readable-mockup .report-table td{color:#182633;padding:.3mm .8mm;line-height:1.14}
+.report-readable-mockup .report-table td.report-grid{padding:0}
+.report-readable-mockup .report-table .report-name .report-task-name,
+.report-readable-mockup .report-table .report-name b{color:#182633;line-height:1.14;overflow-wrap:normal;word-break:normal}
+.report-readable-mockup .report-table td.report-dates,
+.report-readable-mockup .report-table td.report-dates span{font-variant-numeric:tabular-nums;font-weight:400;padding:0;line-height:1.14}
+.report-readable-mockup .report-table .report-group td{background:#e7edf3!important;color:#182633;border-top:.25mm solid #8fa0b0;font-weight:700}
+.report-readable-mockup .report-table .report-group .report-name b{font-weight:700}
+.report-readable-mockup .report-table .report-group td.report-dates span{font-weight:700}
+.report-readable-mockup .report-table td.report-number{font-size:8pt!important;color:#536271;padding:.3mm .2mm;text-align:center}
+.report-readable-mockup .report-base{background:#74818e!important}
+.report-readable-mockup .report-bar{border-radius:.25mm;border-width:.12mm}
+.report-readable-mockup .report-bar-progress{position:absolute;top:50%;transform:translateY(-50%);z-index:3;font:8pt Arial,sans-serif;line-height:1;white-space:nowrap;padding:.3mm .45mm;color:#182633;background:#ffffffd9}
+.report-readable-mockup .report-group .report-bar-progress{font-weight:700}
+.report-readable-mockup .report-months,.report-readable-mockup .report-months span{height:3.5mm;font-size:8pt}
+.report-readable-mockup .report-days,.report-readable-mockup .report-day{height:4.5mm}
+.report-readable-mockup .report-day{font-size:var(--mock-day-font,7pt);font-weight:400}
+.report-readable-mockup .report-day small{font-size:5pt}
+.report-readable-mockup .report-period{display:block;font-size:9pt;color:#344858}
+.report-readable-mockup>header{padding-bottom:1mm;border-bottom:.25mm solid #738699}
+.report-readable-mockup .report-subtitle{margin:.5mm 0 1mm;font-size:8pt;color:#536271}
+.report-readable-mockup .report-compact-status{font-size:9pt;margin:1mm 0}
+@media screen{.report-actions .report-font-control{display:flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap}.report-font-control select{font:inherit;padding:5px}}
