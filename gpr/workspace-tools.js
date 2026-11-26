@@ -13,12 +13,12 @@ function dimensionFilters(specs){
   const allowed=new Set(spec.items.map(x=>String(x.value)));for(const v of state[spec.key])if(!allowed.has(v))state[spec.key].delete(v);
   let d=document.querySelector(`[data-key="${spec.key}"]`);
   if(!d){d=document.createElement('details');d.className='multi-filter';d.dataset.key=spec.key;d.innerHTML=`<summary></summary><input placeholder="Поиск в списке" aria-label="Найти: ${esc(spec.label)}"><button type="button" data-clear>Сбросить</button><div class="multi-options"></div>`;
-   const host=document.getElementById('mainFilterRow'),anchor=document.getElementById('search');host.insertBefore(d,anchor?.parentElement===host?anchor:null);
+   const host=spec.host||document.getElementById('mainFilterRow'),anchor=document.getElementById('search');host.insertBefore(d,anchor?.parentElement===host?anchor:null);
    d.querySelector('input').oninput=e=>{for(const l of d.querySelectorAll('.multi-options label'))l.hidden=!l.textContent.toLowerCase().includes(e.target.value.toLowerCase());};
-   d.querySelector('[data-clear]').onclick=()=>{state[spec.key].clear();d.querySelectorAll('input[type=checkbox]').forEach(i=>i.checked=false);caption(d);redraw();};
-   d.querySelector('.multi-options').onchange=e=>{if(e.target.type!=='checkbox')return;e.target.checked?state[spec.key].add(e.target.value):state[spec.key].delete(e.target.value);caption(d);redraw();};
+   d.querySelector('[data-clear]').onclick=()=>{state[spec.key].clear();d.querySelectorAll('input[type=checkbox]').forEach(i=>i.checked=false);caption(d);(dimensions.get(spec.key).onChange||redraw)();};
+   d.querySelector('.multi-options').onchange=e=>{if(e.target.type!=='checkbox')return;e.target.checked?state[spec.key].add(e.target.value):state[spec.key].delete(e.target.value);caption(d);(dimensions.get(spec.key).onChange||redraw)();};
   }
-  d.querySelector('.multi-options').innerHTML=spec.items.map(item=>`<label><input type="checkbox" value="${esc(item.value)}" ${state[spec.key].has(String(item.value))?'checked':''}>${esc(item.label)}</label>`).join('');
+  const signature=JSON.stringify([spec.items,selection(spec.key)]);if(d.dataset.signature!==signature){d.querySelector('.multi-options').innerHTML=spec.items.map(item=>`<label><input type="checkbox" value="${esc(item.value)}" ${state[spec.key].has(String(item.value))?'checked':''}>${esc(item.label)}</label>`).join('');d.dataset.signature=signature;}
   const q=d.querySelector('input').value.toLowerCase();for(const l of d.querySelectorAll('.multi-options label'))l.hidden=!l.textContent.toLowerCase().includes(q);caption(d);
  }
 }
@@ -53,10 +53,10 @@ function printControls(){
  d.querySelector('#printEstimate').before(p);
  const width=document.getElementById('printGanttWidth');width.oninput=()=>{document.getElementById('printGanttWidthValue').textContent=width.value+'% · таблица '+(100-width.value)+'%';};document.getElementById('printPages').disabled=true;d.addEventListener('change',e=>{if(e.target.id==='printLayout')document.getElementById('printPages').disabled=e.target.value==='readable';if(e.target.id==='printTaskNames'){const zone=document.getElementById('printZone');if(!e.target.checked)zone.checked=true;zone.disabled=!e.target.checked;}});
 }
-function configurePrint({mode='gantt',context=true,quantityAvailable=false,profile='' }={}){
+function configurePrint({mode='gantt',context=true,quantityAvailable=false,profile='',sectionBreaks=true }={}){
  const d=document.getElementById('printDialog');
  d.querySelector('h2').textContent=mode==='cut'?'Печать среза к базовому плану':mode==='facts'?'Печать факта по дням':'Печать календарной сетки';
- if(d.dataset.profile!==profile){document.getElementById('printLayout').value='readable';document.getElementById('printPages').disabled=true;document.getElementById('printLinks').checked=false;document.getElementById('printZone').checked=context;document.getElementById('printFillHeight').checked=true;d.dataset.profile=profile;}
+ if(d.dataset.profile!==profile){document.getElementById('printSectionBreaks').checked=sectionBreaks;document.getElementById('printLayout').value='readable';document.getElementById('printPages').disabled=true;document.getElementById('printLinks').checked=false;document.getElementById('printZone').checked=context;document.getElementById('printFillHeight').checked=true;d.dataset.profile=profile;}
  for(const id of ['printCurrent','printBaseline','printShift','printDuration'])document.getElementById(id).disabled=mode==='facts';
  document.getElementById('printQuantity').disabled=!quantityAvailable;
  document.getElementById('printLinks').disabled=mode!=='gantt';document.getElementById('printDateLayout').disabled=mode==='facts';
@@ -102,6 +102,7 @@ function compactControls(host){
 function calendar(host,tasks,start,end,editable,save){let a=Date.parse(start.slice(0,10)+'T00:00:00Z'),b=Date.parse(end.slice(0,10)+'T00:00:00Z');if(!Number.isFinite(a+b)||b<a||b-a>730*DAY){host.innerHTML='<p>Укажите период от 1 до 730 дней.</p>';return;}const fullEnd=b;const pageOffset=+(host.dataset.factOffset||0);a=Math.min(b,Math.max(a,a+pageOffset*14*DAY));b=Math.min(b,a+13*DAY);const days=[];for(let d=a;d<=b;d+=DAY)days.push(new Date(d).toISOString().slice(0,10));const number=n=>Number(n||0).toLocaleString('ru-RU');host.innerHTML=`<p class="fact-note"><button type="button" id="factPrev" ${pageOffset<=0?'disabled':''}>← 14 дней</button> ${days[0]} — ${days.at(-1)} <button type="button" id="factNext" ${b>=fullEnd?'disabled':''}>14 дней →</button><br>Дневной прирост объёма. Новое число заменяет запись дня; пустая ячейка удаляет её. Процент считается по объёму; исходное выполненное учитывается отдельно. Ввод открыт на любые даты. В готовности учитываются объёмы до выбранной даты включительно.</p><table class="fact-calendar"><thead><tr><th>Работа / расположение</th><th>Готово</th>${quantity()?'<th>Выполнено / объём</th>':''}${days.map(d=>`<th class="${new Date(d+'T00:00:00Z').getUTCDay()===0?'sunday-date':''}">${d.slice(8)}.${d.slice(5,7)}</th>`).join('')}</tr></thead><tbody>${tasks.filter(t=>!t.summary).map(t=>`<tr><td><b>${esc(t.name)}</b><small>${esc(t.context||'')}</small></td><td>${t.percentLabel||'0%'}</td>${quantity()?`<td>${number(done(t))} / ${t.vol??'—'} ${esc(t.unit)}</td>`:''}${days.map(d=>`<td class="${new Date(d+'T00:00:00Z').getUTCDay()===0?'sunday-band':''}">${editable?`<input type="number" min="0" step="any" data-fact-task="${esc(t.id)}" data-fact-day="${d}" value="${t.facts?.[d]??''}" aria-label="${esc(t.name)} ${d}" title="${esc(t.unit||'Укажите единицу и объём в карточке работы')}">`:esc(t.facts?.[d]??'')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;host.querySelector('#factPrev').onclick=()=>{host.dataset.factOffset=Math.max(0,pageOffset-1);redraw();};host.querySelector('#factNext').onclick=()=>{host.dataset.factOffset=pageOffset+1;redraw();};host.querySelectorAll('[data-fact-task]').forEach(el=>{el.onkeydown=e=>{if(e.key==='Enter')el.blur();};el.onchange=async()=>{el.disabled=true;try{await save(el.dataset.factTask,el.dataset.factDay,el.value);}catch(e){alert(e.message||String(e));el.disabled=false;el.focus();}};});}
 root.GPR_WORKSPACE={renderMetrics,printMetricHistory,mount,options,dimensionFilters,selection,accepts,active,quantity,facts,asOf,done,putFact,quantityCell,title,printControls,configurePrint,printOptions,pageEstimate,calendar,esc};
 })(window);
+
 
 
 
