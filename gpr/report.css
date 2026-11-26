@@ -191,3 +191,16 @@
 .report-metrics-without-progress{grid-template-columns:repeat(3,minmax(0,1fr))}
 .report-mockup .report-table td.report-dependency{font-size:calc(7pt * var(--report-fit))!important;white-space:normal;overflow-wrap:anywhere;line-height:1.25;text-align:center}
 .report-dependency span{display:block}.report-number{font-variant-numeric:tabular-nums}
+
+
+/* Print width controls stay outside the printed document. */
+@media screen{
+ .report-actions{flex-wrap:wrap;gap:10px 16px}
+ .report-actions .report-width-control{display:flex;align-items:center;gap:8px;white-space:nowrap;font-size:12px;font-weight:500}
+ .report-width-control input[type=range]{width:150px;min-width:110px;accent-color:#28567c;cursor:ew-resize}
+ .report-width-control output{min-width:32px;font-variant-numeric:tabular-nums}
+ #printDialog .print-width-control{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+ #printDialog .print-width-control input[type=range]{width:160px;accent-color:#28567c;cursor:ew-resize}
+ #printDialog .print-width-control output{font-size:12px;color:#526175;white-space:nowrap}
+ .report-actions .report-preview-info{flex:1;min-width:180px}
+}

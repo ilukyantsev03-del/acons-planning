@@ -48,7 +48,8 @@ function dependencyCell(t,key){return `<td class="report-dependency report-${key
 function dependencyLegend(o){return o.showPredecessors||o.showSuccessors?' · Связи: № работы · FS — окончание → начало; SS — начало → начало; FF — окончание → окончание; SF — начало → окончание; +/− дн. — лаг.':'';}
 function overallProgressHtml(o){if(!o.showOverallProgress||!o.metrics)return '';const value=o.metrics.progress,n=value==null?'—':Number(value).toLocaleString('ru-RU',{maximumFractionDigits:1})+'%';return `<div class="report-overall-progress"><div><small>Общая готовность</small><strong>${n}</strong><span class="report-progress-track"><i style="width:${value==null?0:Math.max(0,Math.min(100,value))}%"></i></span></div><span>По всем работам выбранного графика</span></div>`;}
 function reportMetricsHtml(o){if(!o.showMetrics)return '';const h=metricsHtml(o.metrics);return o.showOverallProgress?h.replace(/<div title="Готовность полного состава[\s\S]*?<\/div>/,'').replace('class="report-metrics"','class="report-metrics report-metrics-without-progress"'):h;}
-function timelineColumns(o){const deps=dependencyColumns(o),cols=[...(deps.some(c=>c.key==='number')?[['number',3]]:[]),['name',26],...(o.showProgress!==false?[['progress',4]]:[]),...(o.showQuantity?[['quantity',8]]:[]),...(o.showDuration!==false?[['duration',3]]:[]),...dateColumns(o).map(c=>[c.key,c.width]),...(o.showShift!==false?[['shift',4]]:[]),...deps.filter(c=>c.key!=='number').map(c=>[c.key,c.width])],sum=cols.reduce((n,c)=>n+c[1],0),scale=Math.min(1,80/sum);return [...cols.map(([k,w])=>[k,w*scale]),['calendar',100-Math.min(80,sum)]];}
+function ganttWidth(o){const n=Number(o.ganttWidth);return o.ganttWidth==null||o.ganttWidth===''||!Number.isFinite(n)?null:Math.max(20,Math.min(65,n));}
+function timelineColumns(o){const deps=dependencyColumns(o),cols=[...(deps.some(c=>c.key==='number')?[['number',3]]:[]),['name',26],...(o.showProgress!==false?[['progress',4]]:[]),...(o.showQuantity?[['quantity',8]]:[]),...(o.showDuration!==false?[['duration',3]]:[]),...dateColumns(o).map(c=>[c.key,c.width]),...(o.showShift!==false?[['shift',4]]:[]),...deps.filter(c=>c.key!=='number').map(c=>[c.key,c.width])],sum=cols.reduce((n,c)=>n+c[1],0),calendar=ganttWidth(o)??100-Math.min(80,sum),scale=(100-calendar)/sum;return [...cols.map(([k,w])=>[k,w*scale]),['calendar',calendar]];}
 
 function dateColumns(o){const split=o.dateLayout==='separate';return [...(o.showCurrent!==false?(split?[{key:'start',label:'Текущее начало',width:7,plan:'current'},{key:'finish',label:'Текущее окончание',width:7,plan:'current'}]:[{key:'currentDates',label:'Текущие сроки',width:10,plan:'current'}]):[]),...(o.showBaseline!==false?(split?[{key:'baseStart',label:'Базовое начало',width:7,plan:'base'},{key:'baseFinish',label:'Базовое окончание',width:7,plan:'base'}]:[{key:'baseDates',label:'Базовые сроки',width:10,plan:'base'}]):[])];}
 function mockupColumns(o){return timelineColumns(o).map(([key,width])=>`<col data-column="${key}" style="width:${width}%">`).join('');}
@@ -111,15 +112,36 @@ const unit=page.getBoundingClientRect().width/(page.dataset.paper==='A4'?277:400
 function rootWindow(){return typeof window!=='undefined'?window:globalThis;}
 function prepare(document,rows,options){options.dependencyRows=rows.dependencyRows||rows;const printable=options.showPredecessors||options.showSuccessors?dependencyRows(rows,options.dependencyRows):rows;const pages=plan(printable,options.start,options.end,options.paper,options.span,options.mode,options.targetPages,options);if(options.showMetrics||options.showOverallProgress)options.metrics=metrics(rows.metricRows||rows,{...options.metricHistory,asOf:options.today});document.getElementById('printRoot').innerHTML=html(pages,options);let style=document.getElementById('printPageStyle');if(!style){style=document.createElement('style');style.id='printPageStyle';document.head.appendChild(style);}style.textContent=`@page{size:${options.paper||'A3'} landscape;margin:10mm}`;document.getElementById('printRoot').dataset.links=options.showLinks?'1':'0';document.getElementById('printRoot').dataset.fit=options.targetPages||options.fillHeight?'1':'0';document.getElementById('printRoot').dataset.fillHeight=options.fillHeight?'1':'0';fitPages(document);drawLinks(document);return pages.length;}
 function close(document){document.body.classList.remove('report-preview');document.getElementById('printRoot').replaceChildren();}
-function preview(document,rows,options){const pages=prepare(document,rows,options),root=document.getElementById('printRoot');root.insertAdjacentHTML('afterbegin',`<div class="report-actions"><b>Предпросмотр · ${options.paper||'A3'} · Листов: ${pages}</b><span>В диалоге браузера выберите «Сохранить как PDF»</span><button id="reportPrint" class="btn dark">Печать / Сохранить PDF</button><button id="reportClose" class="btn">Закрыть</button></div>`);document.body.classList.add('report-preview');root.scrollTop=0;fitPages(document);const sizes=[...root.querySelectorAll('[data-text-scale]')].map(p=>parseInt(p.dataset.textScale));if(sizes.length)root.querySelector('.report-actions span').textContent='Размер текста: '+Math.min(...sizes)+'% · Сохранить как PDF в диалоге браузера';drawLinks(document);document.getElementById('reportPrint').onclick=()=>window.print();document.getElementById('reportClose').onclick=()=>close(document);return pages;}
+function preview(document,rows,options){
+ const pages=prepare(document,rows,options),root=document.getElementById('printRoot'),hasGantt=(!options.mode||options.mode==='gantt')&&options.compactWorkNames,width=ganttWidth(options)??timelineColumns(options).at(-1)[1];
+ root.insertAdjacentHTML('afterbegin',`<div class="report-actions"><b>Предпросмотр · ${options.paper||'A3'} · Листов: ${pages}</b>${hasGantt?`<label class="report-width-control">Ширина Ганта <input id="reportGanttWidth" type="range" min="20" max="65" step="1" value="${width}" aria-label="Ширина Ганта в предпросмотре"><output id="reportGanttWidthValue" for="reportGanttWidth">${width}%</output></label>`:''}<span class="report-preview-info">В диалоге браузера выберите «Сохранить как PDF»</span><button id="reportPrint" class="btn dark">Печать / Сохранить PDF</button><button id="reportClose" class="btn">Закрыть</button></div>`);
+ document.body.classList.add('report-preview');root.scrollTop=0;
+ const sizeInfo=()=>{const sizes=[...root.querySelectorAll('[data-text-scale]')].map(p=>parseInt(p.dataset.textScale));if(sizes.length)root.querySelector('.report-preview-info').textContent='Размер текста: '+Math.min(...sizes)+'% · Сохранить как PDF в диалоге браузера';};
+ const slider=document.getElementById('reportGanttWidth');let frame=null;
+ const applyWidth=()=>{
+  if(slider){options.ganttWidth=+slider.value;const cols=new Map(timelineColumns(options));for(const page of root.querySelectorAll('.report-page[data-start]')){
+   for(const col of page.querySelectorAll('col[data-column]'))if(cols.has(col.dataset.column))col.style.width=cols.get(col.dataset.column)+'%';
+   const scale=calendarScale(+page.dataset.start,+page.dataset.end,options),todayLine=page.querySelector('.report-days .report-today')?.outerHTML||'';page.querySelector('.report-months').innerHTML=scale.months;page.querySelector('.report-days').innerHTML=scale.days+todayLine;page.dataset.calendarDetail=scale.detail;
+  }}fitPages(document);drawLinks(document);sizeInfo();
+ };
+ if(slider)slider.oninput=()=>{
+  document.getElementById('reportGanttWidthValue').textContent=slider.value+'%';
+  const setting=document.getElementById('printGanttWidth');if(setting){setting.value=slider.value;document.getElementById('printGanttWidthValue').textContent=slider.value+'% · таблица '+(100-slider.value)+'%';}
+  if(frame!==null)window.cancelAnimationFrame(frame);frame=window.requestAnimationFrame(()=>{frame=null;applyWidth();});
+ };
+ fitPages(document);drawLinks(document);sizeInfo();
+ document.getElementById('reportPrint').onclick=()=>{if(frame!==null){window.cancelAnimationFrame(frame);frame=null;}applyWidth();window.print();};
+ document.getElementById('reportClose').onclick=()=>{if(frame!==null)window.cancelAnimationFrame(frame);close(document);};return pages;
+}
 if(typeof window!=='undefined'){
  const refresh=()=>{fitPages(window.document);drawLinks(window.document);};
  window.addEventListener('beforeprint',refresh);
  window.addEventListener('afterprint',refresh);
  window.matchMedia?.('print').addEventListener('change',refresh);
 }
-root.GPR_REPORT={dependencyColumns,dependencyRows,dependencyCell,dependencyLegend,overallProgressHtml,reportMetricsHtml,refreshGroups,metrics,metricsHtml,progressValue,sectionRows,calendarScale,overlaps,filterRows,plan,html,prepare,preview,close,drawLinks,fitPages};if(typeof module!=='undefined')module.exports=root.GPR_REPORT;
+root.GPR_REPORT={ganttWidth,timelineColumns,dependencyColumns,dependencyRows,dependencyCell,dependencyLegend,overallProgressHtml,reportMetricsHtml,refreshGroups,metrics,metricsHtml,progressValue,sectionRows,calendarScale,overlaps,filterRows,plan,html,prepare,preview,close,drawLinks,fitPages};if(typeof module!=='undefined')module.exports=root.GPR_REPORT;
 })(typeof window!=='undefined'?window:globalThis);
+
 
 
 
